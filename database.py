@@ -23,7 +23,11 @@ db     = None
 
 async def connect():
     global client, db
-    client = AsyncIOMotorClient(MONGO_URI)
+    client = AsyncIOMotorClient(
+    MONGO_URI,
+    tls=True,
+    tlsAllowInvalidCertificates=True
+)
     db     = client[DB_NAME]
     # Indexes for fast queries
     await db.screenings.create_index("created_at")
