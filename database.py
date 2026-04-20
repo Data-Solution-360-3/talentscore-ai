@@ -23,8 +23,11 @@ db     = None
 
 async def connect():
     global client, db
-    client = AsyncIOMotorClient(
+   client = AsyncIOMotorClient(
     MONGO_URI,
+    serverSelectionTimeoutMS=30000,
+    connectTimeoutMS=30000,
+    socketTimeoutMS=30000,
     tls=True,
     tlsAllowInvalidCertificates=True
 )
