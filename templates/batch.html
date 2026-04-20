@@ -145,17 +145,7 @@ textarea.fi{resize:vertical;line-height:1.6}
   <!-- INPUT FORM -->
   <div id="form-section">
     <div class="frow">
-      <div class="fw">
-        <label class="fl" for="api-key">OpenAI API Key</label>
-        <input class="fi" type="password" id="api-key" placeholder="sk-...">
-        <span class="fh">Never stored. Used only for this batch.</span>
-      </div>
-      <div class="fw">
-        <label class="fl">Concurrency</label>
-        <input class="fi" type="number" id="concurrency" value="5" min="1" max="10" style="width:100px">
-        <span class="fh">Parallel AI calls (1–10). Higher = faster but may hit rate limits.</span>
-      </div>
-    </div>
+      
 
     <div class="card">
       <div class="card-ttl">Job description</div>
@@ -307,10 +297,10 @@ document.getElementById('jd').addEventListener('input', function() {
   document.getElementById('jd-cnt').textContent = this.value.length + ' chars' + (this.value.length < 50 ? ' · Minimum 50' : ' ✓');
   checkReady();
 });
-document.getElementById('api-key').addEventListener('input', checkReady);
+
 
 function checkReady() {
-  const ok = document.getElementById('api-key').value.trim().startsWith('sk-') &&
+  const ok = 
     document.getElementById('jd').value.trim().length >= 50 &&
     selectedFiles.length > 0;
   document.getElementById('run-btn').disabled = !ok;
@@ -332,16 +322,14 @@ function tbcls(r) {
 }
 
 async function runBatch() {
-  const apiKey = document.getElementById('api-key').value.trim();
-  const jd     = document.getElementById('jd').value.trim();
+const jd     = document.getElementById('jd').value.trim();
   const conc   = parseInt(document.getElementById('concurrency').value) || 5;
 
   if (!selectedFiles.length) return;
 
   // Build FormData
   const fd = new FormData();
-  fd.append('api_key', apiKey);
-  fd.append('job_description', jd);
+fd.append('job_description', jd);
   selectedFiles.forEach(f => fd.append('cv_files', f));
 
   // Hide form, show progress

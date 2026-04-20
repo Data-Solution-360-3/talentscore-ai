@@ -22,4 +22,3 @@ Set these in Render dashboard:
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
-"# talentscore-ai" 

@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 from bson import ObjectId
 import os
+import ssl
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,10 +21,11 @@ async def connect():
         serverSelectionTimeoutMS=30000,
         connectTimeoutMS=30000,
         socketTimeoutMS=30000,
-        tls=True,
-        tlsAllowInvalidCertificates=True
+        tlsAllowInvalidCertificates=True,
+        tlsAllowInvalidHostnames=True,
     )
     db = client[DB_NAME]
+    await client.admin.command("ping")
     await db.screenings.create_index("created_at")
     await db.screenings.create_index("recommendation")
     await db.screenings.create_index("overall_score")
@@ -78,7 +80,8 @@ async def get_screening_stats() -> dict:
     ]
     results = await db.screenings.aggregate(pipeline).to_list(1)
     if not results:
-        return {"total": 0, "avg_score": 0, "avg_coverage": 0, "strong_hires": 0, "hires": 0, "maybes": 0, "rejects": 0}
+        return {"total": 0, "avg_score": 0, "avg_coverage": 0,
+                "strong_hires": 0, "hires": 0, "maybes": 0, "rejects": 0}
     stats = results[0]
     stats.pop("_id", None)
     stats["avg_score"] = round(stats["avg_score"] or 0, 1)
@@ -100,11 +103,16 @@ async def get_skills_gap_frequency() -> list:
 async def get_dimension_averages() -> list:
     pipeline = [
         {"$unwind": "$dimensions"},
-        {"$group": {"_id": "$dimensions.name", "avg_score": {"$avg": "$dimensions.score"}, "count": {"$sum": 1}}},
+        {"$group": {
+            "_id": "$dimensions.name",
+            "avg_score": {"$avg": "$dimensions.score"},
+            "count": {"$sum": 1}
+        }},
         {"$sort": {"avg_score": -1}}
     ]
     results = await db.screenings.aggregate(pipeline).to_list(20)
-    return [{"name": r["_id"], "avg_score": round(r["avg_score"], 1), "count": r["count"]} for r in results]
+    return [{"name": r["_id"], "avg_score": round(r["avg_score"], 1),
+             "count": r["count"]} for r in results]
 
 
 async def delete_screening(screening_id: str) -> bool:
@@ -129,12 +137,18 @@ async def get_all_jobs() -> list:
 
 
 async def delete_job(job_id: str) -> bool:
-    result = await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": {"active": False}})
+    result = await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": {"active": False}}
+    )
     return result.modified_count > 0
 
 
 async def increment_job_candidates(job_id: str):
-    await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$inc": {"candidates_count": 1}})
+    await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$inc": {"candidates_count": 1}}
+    )
 
 
 async def create_batch_job(total: int, jd_preview: str) -> str:
@@ -147,13 +161,15 @@ async def create_batch_job(total: int, jd_preview: str) -> str:
     return str(inserted.inserted_id)
 
 
-async def update_batch_progress(batch_id: str, index: int, status: str, filename: str, score=None, recommendation=None, error=None):
+async def update_batch_progress(batch_id: str, index: int, status: str,
+                                 filename: str, score=None,
+                                 recommendation=None, error=None):
     entry = {"index": index, "status": status, "filename": filename}
     if score is not None: entry["score"] = score
-    if recommendation: entry["recommendation"] = recommendation
-    if error: entry["error"] = error
+    if recommendation:    entry["recommendation"] = recommendation
+    if error:             entry["error"] = error
     inc = {"completed": 1}
-    if status == "done": inc["succeeded"] = 1
+    if status == "done":   inc["succeeded"] = 1
     if status == "failed": inc["failed"] = 1
     await db.batch_jobs.update_one(
         {"_id": ObjectId(batch_id)},
@@ -164,7 +180,12 @@ async def update_batch_progress(batch_id: str, index: int, status: str, filename
 async def finish_batch_job(batch_id: str, summary: dict):
     await db.batch_jobs.update_one(
         {"_id": ObjectId(batch_id)},
-        {"$set": {"status": "done", "finished_at": datetime.utcnow(), "succeeded": summary.get("succeeded", 0), "failed": summary.get("failed", 0)}}
+        {"$set": {
+            "status": "done",
+            "finished_at": datetime.utcnow(),
+            "succeeded": summary.get("succeeded", 0),
+            "failed": summary.get("failed", 0),
+        }}
     )
 
 
@@ -185,3 +206,139 @@ async def get_all_batch_jobs(limit: int = 50) -> list:
         doc.pop("progress", None)
         jobs.append(doc)
     return jobs
+
+
+# ─────────────────────────────────────────────────────────────
+# USERS / COMPANIES
+# ─────────────────────────────────────────────────────────────
+
+async def create_user(email: str, hashed_password: str, company_name: str, role: str = "client") -> str:
+    """Create a new user account."""
+    existing = await db.users.find_one({"email": email.lower()})
+    if existing:
+        raise ValueError("Email already registered")
+    doc = {
+        "email": email.lower().strip(),
+        "password": hashed_password,
+        "company_name": company_name.strip(),
+        "role": role,  # "admin" or "client"
+        "active": True,
+        "created_at": datetime.utcnow(),
+        "screening_count": 0,
+        "plan": "trial",  # trial / basic / pro
+    }
+    inserted = await db.users.insert_one(doc)
+    return str(inserted.inserted_id)
+
+
+async def get_user_by_email(email: str) -> dict | None:
+    doc = await db.users.find_one({"email": email.lower()})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+async def get_user_by_id(user_id: str) -> dict | None:
+    doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+async def get_all_users() -> list:
+    cursor = db.users.find({}).sort("created_at", -1)
+    users = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("password", None)  # Never return password
+        users.append(doc)
+    return users
+
+
+async def update_user(user_id: str, updates: dict):
+    updates.pop("password", None)  # Use change_password for that
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+
+
+async def increment_screening_count(user_id: str):
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"screening_count": 1}}
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# TENANT-SCOPED QUERIES (filter by company/user)
+# ─────────────────────────────────────────────────────────────
+
+async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
+    cursor = db.screenings.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
+    results = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        results.append(doc)
+    return results
+
+
+async def get_stats_for_user(user_id: str) -> dict:
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {
+            "$group": {
+                "_id": None,
+                "total": {"$sum": 1},
+                "avg_score": {"$avg": "$overall_score"},
+                "avg_coverage": {"$avg": "$skills_coverage_pct"},
+                "strong_hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "STRONG HIRE"]}, 1, 0]}},
+                "hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "HIRE"]}, 1, 0]}},
+                "maybes": {"$sum": {"$cond": [{"$eq": ["$recommendation", "MAYBE"]}, 1, 0]}},
+                "rejects": {"$sum": {"$cond": [{"$eq": ["$recommendation", "REJECT"]}, 1, 0]}},
+            }
+        }
+    ]
+    results = await db.screenings.aggregate(pipeline).to_list(1)
+    if not results:
+        return {"total": 0, "avg_score": 0, "avg_coverage": 0,
+                "strong_hires": 0, "hires": 0, "maybes": 0, "rejects": 0}
+    stats = results[0]
+    stats.pop("_id", None)
+    stats["avg_score"] = round(stats["avg_score"] or 0, 1)
+    stats["avg_coverage"] = round(stats["avg_coverage"] or 0, 1)
+    return stats
+
+
+async def get_jobs_for_user(user_id: str) -> list:
+    cursor = db.jobs.find({"user_id": user_id, "active": True}).sort("created_at", -1)
+    jobs = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        jobs.append(doc)
+    return jobs
+
+
+async def get_skills_gaps_for_user(user_id: str) -> list:
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$unwind": "$critical_gaps"},
+        {"$group": {"_id": "$critical_gaps", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    results = await db.screenings.aggregate(pipeline).to_list(10)
+    return [{"skill": r["_id"], "count": r["count"]} for r in results]
+
+
+async def get_dimension_averages_for_user(user_id: str) -> list:
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$unwind": "$dimensions"},
+        {"$group": {
+            "_id": "$dimensions.name",
+            "avg_score": {"$avg": "$dimensions.score"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"avg_score": -1}}
+    ]
+    results = await db.screenings.aggregate(pipeline).to_list(20)
+    return [{"name": r["_id"], "avg_score": round(r["avg_score"], 1),
+             "count": r["count"]} for r in results]

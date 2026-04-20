@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentScore AI — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05070f;--surface:#0d1117;--s2:#161b27;--border:#1e2535;--border2:#2a3347;
+  --text:#f0f2f8;--t2:#8892aa;--t3:#4a5568;
+  --accent:#5b5ef4;--ag:rgba(91,94,244,.15);--ab:rgba(91,94,244,.3);
+  --green:#10b981;--gg:rgba(16,185,129,.12);--gb:rgba(16,185,129,.3);
+  --red:#f43f5e;--rg:rgba(244,63,94,.12);--rb:rgba(244,63,94,.3);
+  --r:14px;--rs:10px
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem}
+.box{width:100%;max-width:420px}
+.logo-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:2.5rem}
+.logo-icon{width:38px;height:38px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.logo-text{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:2rem}
+.card-title{font-size:20px;font-weight:700;margin-bottom:4px}
+.card-sub{font-size:14px;color:var(--t2);margin-bottom:1.75rem}
+.tabs{display:flex;background:var(--s2);border-radius:var(--rs);padding:4px;margin-bottom:1.75rem}
+.tab{flex:1;text-align:center;padding:8px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;color:var(--t2)}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.fw{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.fl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
+input.fi{width:100%;padding:11px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s}
+input.fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ag)}
+input.fi::placeholder{color:var(--t3)}
+.btn{width:100%;padding:13px;border-radius:var(--rs);background:var(--accent);color:#fff;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:all .15s;box-shadow:0 0 20px rgba(91,94,244,.25);margin-top:4px}
+.btn:hover{background:#4a4de0}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.err{background:var(--rg);border:1px solid var(--rb);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:#fda4af;margin-bottom:14px;display:none}
+.ok{background:var(--gg);border:1px solid var(--gb);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:14px;display:none}
+.divider{display:flex;align-items:center;gap:10px;margin:1.25rem 0;color:var(--t3);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.footer{text-align:center;font-size:12px;color:var(--t3);margin-top:1.5rem}
+.footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo-row">
+    <div class="logo-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <span class="logo-text">TalentScore<span style="color:#a5b4fc">AI</span></span>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" id="tab-login" onclick="switchTab('login')">Sign in</div>
+      <div class="tab" id="tab-register" onclick="switchTab('register')">Create account</div>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="form-login">
+      <div class="err" id="login-err"></div>
+      <div class="fw"><label class="fl">Email</label><input class="fi" type="email" id="l-email" placeholder="you@company.com" autocomplete="email"></div>
+      <div class="fw"><label class="fl">Password</label><input class="fi" type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn" onclick="login()" id="login-btn">Sign in</button>
+    </div>
+
+    <!-- REGISTER FORM -->
+    <div id="form-register" style="display:none">
+      <div class="err" id="reg-err"></div>
+      <div class="ok" id="reg-ok"></div>
+      <div class="fw"><label class="fl">Company name</label><input class="fi" type="text" id="r-company" placeholder="Acme Corp"></div>
+      <div class="fw"><label class="fl">Work email</label><input class="fi" type="email" id="r-email" placeholder="you@company.com" autocomplete="email"></div>
+      <div class="fw"><label class="fl">Password</label><input class="fi" type="password" id="r-pass" placeholder="Min 8 characters" autocomplete="new-password"></div>
+      <div class="fw"><label class="fl">Confirm password</label><input class="fi" type="password" id="r-pass2" placeholder="Repeat password"></div>
+      <button class="btn" onclick="register()" id="reg-btn">Create account</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by <a href="https://linkx360.com" target="_blank">LinkX360</a> · AI-powered hiring
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+}
+
+// Allow Enter key to submit
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('form-login').style.display !== 'none') login();
+    else register();
+  }
+});
+
+async function login() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-err');
+  err.style.display = 'none';
+  if (!email || !pass) { err.textContent = 'Please fill in all fields.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const fd = new FormData();
+    fd.append('email', email); fd.append('password', pass);
+    const res = await fetch('/api/auth/login', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Login failed');
+    window.location.href = '/';
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+
+async function register() {
+  const company = document.getElementById('r-company').value.trim();
+  const email   = document.getElementById('r-email').value.trim();
+  const pass    = document.getElementById('r-pass').value;
+  const pass2   = document.getElementById('r-pass2').value;
+  const btn     = document.getElementById('reg-btn');
+  const err     = document.getElementById('reg-err');
+  const ok      = document.getElementById('reg-ok');
+  err.style.display = 'none'; ok.style.display = 'none';
+  if (!company || !email || !pass) { err.textContent = 'Please fill in all fields.'; err.style.display = 'block'; return; }
+  if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; err.style.display = 'block'; return; }
+  if (pass !== pass2) { err.textContent = 'Passwords do not match.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Creating account...';
+  try {
+    const fd = new FormData();
+    fd.append('company_name', company); fd.append('email', email); fd.append('password', pass);
+    const res = await fetch('/api/auth/register', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Registration failed');
+    ok.textContent = 'Account created! Signing you in...'; ok.style.display = 'block';
+    setTimeout(() => window.location.href = '/', 1000);
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Create account';
+  }
+}
+</script>
+</body>
+</html>
