@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Screening — TalentScore AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05070f;--surface:#0d1117;--s2:#161b27;--s3:#1e2535;
+  --border:#1e2535;--border2:#2a3347;
+  --text:#f0f2f8;--t2:#8892aa;--t3:#4a5568;
+  --accent:#5b5ef4;--ah:#4a4de0;--ag:rgba(91,94,244,.15);--ab:rgba(91,94,244,.3);
+  --green:#10b981;--gg:rgba(16,185,129,.12);--gb:rgba(16,185,129,.3);
+  --amber:#f59e0b;--amg:rgba(245,158,11,.12);--amb:rgba(245,158,11,.3);
+  --red:#f43f5e;--rg:rgba(244,63,94,.12);--rb:rgba(244,63,94,.3);
+  --blue:#38bdf8;--blg:rgba(56,189,248,.1);--blb:rgba(56,189,248,.25);
+  --r:14px;--rs:10px
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(5,7,15,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
+.tl{display:flex;align-items:center;gap:9px}
+.tli{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.tln{font-size:15px;font-weight:700}
+.back-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--rs);background:var(--s2);border:1px solid var(--border2);color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;transition:all .15s;margin-left:auto}
+.back-btn:hover{background:var(--s3);color:var(--text)}
+.wrap{padding:2rem 2.5rem;padding-top:calc(56px + 2rem);max-width:1100px;margin:0 auto}
+.ph{margin-bottom:1.75rem}
+.ph h1{font-size:22px;font-weight:700;margin-bottom:5px}
+.ph p{font-size:14px;color:var(--t2);line-height:1.6}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.4rem;margin-bottom:14px}
+.card-ttl{font-size:14px;font-weight:600;margin-bottom:1rem}
+.fl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2);display:block;margin-bottom:6px}
+.fh{font-size:12px;color:var(--t3);margin-top:4px}
+input.fi,textarea.fi{width:100%;padding:10px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s}
+input.fi:focus,textarea.fi:focus{border-color:var(--accent)}
+input.fi::placeholder,textarea.fi::placeholder{color:var(--t3)}
+textarea.fi{resize:vertical;line-height:1.6}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.fw{display:flex;flex-direction:column;gap:5px}
+
+/* Drop zone */
+.dz{border:2px dashed var(--border2);border-radius:var(--rs);padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.dz:hover,.dz.over{border-color:var(--accent);background:var(--ag)}
+.dz-icon{width:52px;height:52px;border-radius:12px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.dz-title{font-size:16px;font-weight:600;margin-bottom:6px}
+.dz-sub{font-size:13px;color:var(--t3);line-height:1.6}
+#files-input{display:none}
+
+/* File list */
+.file-list{margin-top:14px;max-height:220px;overflow-y:auto}
+.file-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:6px;font-size:13px}
+.file-item svg{flex-shrink:0;opacity:.5}
+.file-name{flex:1;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-size{font-size:11px;color:var(--t3);flex-shrink:0}
+.file-remove{cursor:pointer;color:var(--t3);flex-shrink:0;padding:2px;transition:color .15s}
+.file-remove:hover{color:var(--red)}
+.file-count{font-size:13px;font-weight:600;color:var(--accent);margin-top:10px}
+
+/* Buttons */
+.bp{width:100%;padding:13px;border-radius:var(--rs);background:var(--accent);color:#fff;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;box-shadow:0 0 20px rgba(91,94,244,.3)}
+.bp:hover{background:var(--ah)}
+.bp:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.bg{padding:9px 18px;border-radius:var(--rs);background:var(--s2);color:var(--t2);font-size:13px;font-weight:500;border:1px solid var(--border2);cursor:pointer;font-family:inherit;transition:all .15s}
+.bg:hover{background:var(--s3);color:var(--text)}
+.err{background:var(--rg);border:1px solid var(--rb);border-radius:var(--rs);padding:12px 16px;font-size:13px;color:#fda4af;line-height:1.5;display:none;margin-bottom:12px}
+
+/* Progress section */
+#progress-section{display:none}
+.prog-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.prog-title{font-size:16px;font-weight:700}
+.prog-meta{font-size:13px;color:var(--t2)}
+.overall-bar-wrap{margin-bottom:1.5rem}
+.overall-bar-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px}
+.overall-bar-bg{height:8px;background:var(--border2);border-radius:4px;overflow:hidden}
+.overall-bar-fill{height:100%;background:var(--accent);border-radius:4px;width:0;transition:width .4s}
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
+.ss{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.85rem 1rem;text-align:center}
+.ss-val{font-size:20px;font-weight:800;margin-bottom:2px}
+.ss-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
+.ss-val.g{color:var(--green)}.ss-val.a{color:var(--amber)}.ss-val.r{color:var(--red)}.ss-val.b{color:var(--blue)}
+
+/* CV progress grid */
+.cv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:320px;overflow-y:auto;margin-bottom:1.25rem}
+.cv-item{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem;font-size:12px;transition:border-color .3s}
+.cv-item.processing{border-color:var(--accent)}
+.cv-item.done{border-color:var(--green)}
+.cv-item.failed{border-color:var(--red)}
+.cv-fn{font-weight:600;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
+.cv-status{font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px}
+.cv-status.processing{color:var(--accent)}
+.cv-status.done{color:var(--green)}
+.cv-status.failed{color:var(--red)}
+.cv-status.waiting{color:var(--t3)}
+.cv-score{font-size:16px;font-weight:800;margin-top:4px}
+.dot-spin{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* Results table */
+#results-section{display:none}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:11px;font-weight:800}
+.rank-1{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff}
+.rank-2{background:var(--s3);color:var(--t2)}
+.rank-3{background:var(--s3);color:var(--t2)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:11px 14px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--s2)}
+.tbadge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid}
+.t-sh{background:var(--gg);color:var(--green);border-color:var(--gb)}
+.t-h{background:rgba(16,185,129,.08);color:#10b981;border-color:rgba(16,185,129,.2)}
+.t-m{background:var(--amg);color:var(--amber);border-color:var(--amb)}
+.t-r{background:var(--rg);color:#fda4af;border-color:var(--rb)}
+.score-bar-wrap{display:flex;align-items:center;gap:8px}
+.score-bar-bg{flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:2px}
+.failed-list{background:var(--rg);border:1px solid var(--rb);border-radius:var(--rs);padding:1rem;margin-top:10px}
+.failed-title{font-size:12px;font-weight:700;color:#fda4af;margin-bottom:6px}
+.failed-item{font-size:12px;color:var(--t2);padding:2px 0}
+
+@media(max-width:700px){.frow,.stats-strip{grid-template-columns:1fr}.cv-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="tl">
+    <div class="tli"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="tln">TalentScore<span style="color:#a5b4fc">AI</span></span>
+  </div>
+  <a href="/" class="back-btn">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back to dashboard
+  </a>
+</header>
+
+<div class="wrap">
+  <div class="ph">
+    <h1>Batch CV Screening</h1>
+    <p>Upload up to 100 CVs at once. All candidates are scored against the same job description and ranked by fit — 5 run in parallel for speed.</p>
+  </div>
+
+  <!-- INPUT FORM -->
+  <div id="form-section">
+    <div class="frow">
+      <div class="fw">
+        <label class="fl" for="api-key">OpenAI API Key</label>
+        <input class="fi" type="password" id="api-key" placeholder="sk-...">
+        <span class="fh">Never stored. Used only for this batch.</span>
+      </div>
+      <div class="fw">
+        <label class="fl">Concurrency</label>
+        <input class="fi" type="number" id="concurrency" value="5" min="1" max="10" style="width:100px">
+        <span class="fh">Parallel AI calls (1–10). Higher = faster but may hit rate limits.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Job description</div>
+      <textarea class="fi" id="jd" rows="6" placeholder="Paste the full job description — role title, responsibilities, required skills, experience level, qualifications..."></textarea>
+      <div style="font-size:12px;color:var(--t3);margin-top:5px" id="jd-cnt">0 chars · Minimum 50</div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Upload CVs</div>
+      <div class="dz" id="dz" onclick="document.getElementById('files-input').click()">
+        <div class="dz-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="dz-title">Drop up to 100 PDF CVs here</div>
+        <div class="dz-sub">or click to browse · PDF only · Max 10MB per file<br>All CVs will be ranked against the same job description</div>
+      </div>
+      <input type="file" id="files-input" accept=".pdf" multiple>
+      <div id="file-list" class="file-list"></div>
+      <div id="file-count" class="file-count" style="display:none"></div>
+    </div>
+
+    <div id="err" class="err"></div>
+    <button class="bp" id="run-btn" onclick="runBatch()" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Screen all CVs
+    </button>
+  </div>
+
+  <!-- PROGRESS SECTION -->
+  <div id="progress-section">
+    <div class="card">
+      <div class="prog-header">
+        <div class="prog-title">Screening in progress...</div>
+        <div class="prog-meta" id="prog-meta">0 / 0 complete</div>
+      </div>
+      <div class="overall-bar-wrap">
+        <div class="overall-bar-label">
+          <span id="prog-lbl" style="color:var(--t2);font-size:13px">Starting...</span>
+          <span id="prog-pct" style="font-weight:700">0%</span>
+        </div>
+        <div class="overall-bar-bg"><div class="overall-bar-fill" id="prog-bar"></div></div>
+      </div>
+      <div class="stats-strip">
+        <div class="ss"><div class="ss-val" id="ps-total">0</div><div class="ss-lbl">Total</div></div>
+        <div class="ss"><div class="ss-val g" id="ps-done">0</div><div class="ss-lbl">Screened</div></div>
+        <div class="ss"><div class="ss-val a" id="ps-processing">0</div><div class="ss-lbl">Processing</div></div>
+        <div class="ss"><div class="ss-val r" id="ps-failed">0</div><div class="ss-lbl">Failed</div></div>
+      </div>
+      <div class="cv-grid" id="cv-grid"></div>
+      <button class="bg" id="cancel-btn" onclick="cancelBatch()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- RESULTS SECTION -->
+  <div id="results-section">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:3px">Batch complete — ranked results</div>
+          <div style="font-size:13px;color:var(--t2)" id="res-meta">—</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="bg" onclick="exportCSV()">Export CSV</button>
+          <button class="bg" onclick="location.reload()">New batch</button>
+        </div>
+      </div>
+      <div class="stats-strip">
+        <div class="ss"><div class="ss-val" id="rs-total">—</div><div class="ss-lbl">Total</div></div>
+        <div class="ss"><div class="ss-val g" id="rs-screened">—</div><div class="ss-lbl">Screened</div></div>
+        <div class="ss"><div class="ss-val b" id="rs-avg">—</div><div class="ss-lbl">Avg score</div></div>
+        <div class="ss"><div class="ss-val r" id="rs-failed">—</div><div class="ss-lbl">Failed</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Candidate rankings</div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Candidate</th>
+            <th>Current role</th>
+            <th>Score</th>
+            <th>Skills match</th>
+            <th>Experience</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="failed-section" style="display:none">
+      <div class="failed-list">
+        <div class="failed-title">Failed files</div>
+        <div id="failed-items"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedFiles = [];
+let eventSource = null;
+let batchState = { total: 0, done: 0, processing: 0, failed: 0 };
+let cvItems = {};
+let allRanked = [];
+
+// File input
+const dz = document.getElementById('dz');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  handleFiles(Array.from(e.dataTransfer.files));
+});
+document.getElementById('files-input').addEventListener('change', e => {
+  handleFiles(Array.from(e.target.files));
+});
+
+function handleFiles(files) {
+  const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  const toAdd = pdfs.filter(f => !selectedFiles.find(sf => sf.name === f.name));
+  selectedFiles = [...selectedFiles, ...toAdd].slice(0, 100);
+  renderFileList(); checkReady();
+}
+
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  const cnt  = document.getElementById('file-count');
+  if (!selectedFiles.length) { list.innerHTML = ''; cnt.style.display = 'none'; return; }
+  list.innerHTML = selectedFiles.map((f, i) =>
+    `<div class="file-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span class="file-name">${f.name}</span>
+      <span class="file-size">${(f.size/1024).toFixed(0)}KB</span>
+      <span class="file-remove" onclick="removeFile(${i})">✕</span>
+    </div>`).join('');
+  cnt.textContent = selectedFiles.length + ' PDF' + (selectedFiles.length > 1 ? 's' : '') + ' selected (max 100)';
+  cnt.style.display = 'block';
+}
+
+function removeFile(i) {
+  selectedFiles.splice(i, 1);
+  renderFileList(); checkReady();
+}
+
+document.getElementById('jd').addEventListener('input', function() {
+  document.getElementById('jd-cnt').textContent = this.value.length + ' chars' + (this.value.length < 50 ? ' · Minimum 50' : ' ✓');
+  checkReady();
+});
+document.getElementById('api-key').addEventListener('input', checkReady);
+
+function checkReady() {
+  const ok = document.getElementById('api-key').value.trim().startsWith('sk-') &&
+    document.getElementById('jd').value.trim().length >= 50 &&
+    selectedFiles.length > 0;
+  document.getElementById('run-btn').disabled = !ok;
+  if (selectedFiles.length) {
+    document.getElementById('run-btn').textContent = '';
+    document.getElementById('run-btn').innerHTML =
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
+      'Screen ' + selectedFiles.length + ' CV' + (selectedFiles.length > 1 ? 's' : '');
+  }
+}
+
+function gc(s) {
+  if (s >= 80) return '#10b981';
+  if (s >= 60) return '#f59e0b';
+  return '#f43f5e';
+}
+function tbcls(r) {
+  return { 'STRONG HIRE': 't-sh', 'HIRE': 't-h', 'MAYBE': 't-m', 'REJECT': 't-r' }[r] || 't-m';
+}
+
+async function runBatch() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  const jd     = document.getElementById('jd').value.trim();
+  const conc   = parseInt(document.getElementById('concurrency').value) || 5;
+
+  if (!selectedFiles.length) return;
+
+  // Build FormData
+  const fd = new FormData();
+  fd.append('api_key', apiKey);
+  fd.append('job_description', jd);
+  selectedFiles.forEach(f => fd.append('cv_files', f));
+
+  // Hide form, show progress
+  document.getElementById('form-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'block';
+
+  // Init progress UI
+  batchState = { total: selectedFiles.length, done: 0, processing: 0, failed: 0 };
+  document.getElementById('ps-total').textContent = selectedFiles.length;
+  document.getElementById('ps-done').textContent = 0;
+  document.getElementById('ps-processing').textContent = 0;
+  document.getElementById('ps-failed').textContent = 0;
+
+  // Build CV grid
+  const grid = document.getElementById('cv-grid');
+  grid.innerHTML = '';
+  cvItems = {};
+  selectedFiles.forEach((f, i) => {
+    const el = document.createElement('div');
+    el.className = 'cv-item';
+    el.id = 'cv-' + i;
+    el.innerHTML = '<div class="cv-fn">' + f.name.replace('.pdf','') + '</div><div class="cv-status waiting">Waiting...</div>';
+    grid.appendChild(el);
+    cvItems[i] = el;
+  });
+
+  // Start SSE stream
+  try {
+    const res = await fetch('/api/batch/screen', { method: 'POST', body: fd });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6));
+            handleEvent(event);
+          } catch(e) {}
+        }
+      }
+    }
+  } catch(e) {
+    document.getElementById('err').textContent = 'Batch failed: ' + e.message;
+    document.getElementById('err').style.display = 'block';
+    document.getElementById('form-section').style.display = 'block';
+    document.getElementById('progress-section').style.display = 'none';
+  }
+}
+
+function handleEvent(event) {
+  if (event.type === 'start') {
+    document.getElementById('prog-lbl').textContent = 'Processing ' + event.total + ' CVs (' + event.concurrency + ' at a time)...';
+  }
+
+  if (event.type === 'progress' || event.type === 'result') {
+    const el = cvItems[event.index];
+    if (!el) return;
+
+    if (event.status === 'processing') {
+      batchState.processing++;
+      el.className = 'cv-item processing';
+      el.querySelector('.cv-status').className = 'cv-status processing';
+      el.querySelector('.cv-status').innerHTML = '<span class="dot-spin"></span> Scoring...';
+    }
+
+    if (event.status === 'done') {
+      batchState.processing = Math.max(0, batchState.processing - 1);
+      batchState.done++;
+      const color = gc(event.score || 0);
+      el.className = 'cv-item done';
+      el.querySelector('.cv-status').className = 'cv-status done';
+      el.querySelector('.cv-status').innerHTML = '✓ Done';
+      el.innerHTML += '<div class="cv-score" style="color:' + color + '">' + (event.score || '?') + '/100</div>';
+    }
+
+    if (event.status === 'failed') {
+      batchState.processing = Math.max(0, batchState.processing - 1);
+      batchState.failed++;
+      el.className = 'cv-item failed';
+      el.querySelector('.cv-status').className = 'cv-status failed';
+      el.querySelector('.cv-status').innerHTML = '✗ Failed';
+    }
+
+    // Update stats
+    document.getElementById('ps-done').textContent = batchState.done;
+    document.getElementById('ps-processing').textContent = batchState.processing;
+    document.getElementById('ps-failed').textContent = batchState.failed;
+    document.getElementById('prog-meta').textContent = batchState.done + ' / ' + batchState.total + ' complete';
+    const pct = Math.round((batchState.done + batchState.failed) / batchState.total * 100);
+    document.getElementById('prog-bar').style.width = pct + '%';
+    document.getElementById('prog-pct').textContent = pct + '%';
+    document.getElementById('prog-lbl').textContent = batchState.done + ' screened, ' + batchState.processing + ' in progress...';
+  }
+
+  if (event.type === 'done') {
+    allRanked = event.ranked || [];
+    renderResults(event);
+  }
+}
+
+function renderResults(event) {
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('results-section').style.display = 'block';
+
+  document.getElementById('res-meta').textContent =
+    'Batch ID: ' + event.batch_id + ' · ' + event.succeeded + ' screened, ' + event.failed + ' failed';
+  document.getElementById('rs-total').textContent = event.total;
+  document.getElementById('rs-screened').textContent = event.succeeded;
+
+  const avgScore = event.ranked.length
+    ? Math.round(event.ranked.reduce((a, r) => a + r.overall_score, 0) / event.ranked.length)
+    : '—';
+  document.getElementById('rs-avg').textContent = avgScore;
+  document.getElementById('rs-failed').textContent = event.failed;
+
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = event.ranked.map(r => {
+    const color = gc(r.overall_score);
+    const rankEl = r.rank <= 3
+      ? `<span class="rank-badge rank-${r.rank}">${r.rank}</span>`
+      : `<span style="font-size:13px;font-weight:600;color:var(--t3)">#${r.rank}</span>`;
+    return `<tr>
+      <td>${rankEl}</td>
+      <td><a href="/candidate?id=${r._id}" style="color:#a5b4fc;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${r.candidate_name || '—'}</a></td>
+      <td>${r.current_title || '—'}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <span style="font-weight:700;color:${color};min-width:28px">${r.overall_score}</span>
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${r.overall_score}%;background:${color}"></div></div>
+        </div>
+      </td>
+      <td>${r.skills_coverage_pct || 0}%</td>
+      <td>${r.years_experience || '?'} yrs</td>
+      <td><span class="tbadge ${tbcls((r.recommendation||'').toUpperCase())}">${r.recommendation || '—'}</span></td>
+    </tr>`;
+  }).join('');
+
+  if (!event.ranked.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:2rem">No results</td></tr>';
+  }
+
+  if (event.failed_files && event.failed_files.length) {
+    const fs = document.getElementById('failed-section');
+    fs.style.display = 'block';
+    document.getElementById('failed-items').innerHTML = event.failed_files.map(f =>
+      '<div class="failed-item">✗ ' + f + '</div>'
+    ).join('');
+  }
+}
+
+function exportCSV() {
+  if (!allRanked.length) return;
+  const headers = ['Rank','Candidate','Role','Score','Skills%','Experience','Recommendation','File'];
+  const rows = allRanked.map(r => [
+    r.rank, r.candidate_name, r.current_title, r.overall_score,
+    r.skills_coverage_pct, r.years_experience, r.recommendation, r.filename
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => '"'+(v||'')+ '"').join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'talentscore-batch-results.csv'; a.click();
+}
+
+function cancelBatch() {
+  if (confirm('Cancel this batch? CVs already screened will be saved.')) {
+    location.reload();
+  }
+}
+</script>
+</body>
+</html>
