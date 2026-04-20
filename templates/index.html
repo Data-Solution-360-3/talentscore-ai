@@ -625,7 +625,7 @@ async function run(){
     fd.append('job_description', jdText);
 
     try{
-      const res = await fetch('/api/screen', {method:'POST', body:fd});
+      const res = await fetch('/api/screen', {method:'POST', body:fd, credentials:'include'});
       const data = await res.json();
       if(!res.ok) throw new Error(data.detail||'Failed');
       const score = Math.round(data.overall_score||0);
@@ -940,7 +940,7 @@ renderJobs();
 // Load user info
 async function loadUserInfo(){
   try{
-    const res=await fetch('/api/auth/me');
+    const res=await fetch('/api/auth/me', {credentials:'include'});
     if(res.status===401){window.location.href='/login';return;}
     const u=await res.json();
     document.getElementById('tuser-avatar').textContent=u.company.slice(0,2).toUpperCase();
@@ -948,7 +948,7 @@ async function loadUserInfo(){
   }catch(e){}
 }
 async function logout(){
-  await fetch('/api/auth/logout',{method:'POST'});
+  await fetch('/api/auth/logout',{method:'POST',credentials:'include'});
   window.location.href='/login';
 }
 loadUserInfo();
@@ -960,9 +960,9 @@ loadUserInfo();
 async function loadFromDB() {
   try {
     const [statsRes, screenRes, jobsRes, gapsRes, dimsRes] = await Promise.all([
-      fetch('/api/stats'), fetch('/api/screenings?limit=200'),
-      fetch('/api/jobs'), fetch('/api/analytics/skills-gaps'),
-      fetch('/api/analytics/dimension-averages')
+      fetch('/api/stats',{credentials:'include'}), fetch('/api/screenings?limit=200',{credentials:'include'}),
+      fetch('/api/jobs',{credentials:'include'}), fetch('/api/analytics/skills-gaps',{credentials:'include'}),
+      fetch('/api/analytics/dimension-averages',{credentials:'include'})
     ]);
     const statsData  = await statsRes.json();
     const screenData = await screenRes.json();
@@ -1022,7 +1022,7 @@ async function addJob() {
   fd.append('location', loc); fd.append('employment_type', type);
   fd.append('skills', skills);
   try {
-    const res  = await fetch('/api/jobs', { method: 'POST', body: fd });
+    const res  = await fetch('/api/jobs', { method: 'POST', body: fd, credentials: 'include' });
     const data = await res.json();
     jobs.unshift({ title, dept, loc, type, skills: data.skills || [], candidates: 0, _id: data._id });
     renderJobs();

@@ -358,7 +358,7 @@ fd.append('job_description', jd);
 
   // Start SSE stream
   try {
-    const res = await fetch('/api/batch/screen', { method: 'POST', body: fd });
+    const res = await fetch('/api/batch/screen', { method: 'POST', body: fd, credentials: 'include' });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';

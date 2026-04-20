@@ -151,7 +151,7 @@ if (!id) location.href = '/';
 
 async function load() {
   try {
-    const res = await fetch('/api/screenings/' + id);
+    const res = await fetch('/api/screenings/' + id, {credentials:'include'});
     if (!res.ok) throw new Error('Not found');
     data = await res.json();
     render(data);
@@ -305,7 +305,7 @@ function buildCVText(d){
 
 async function tryLoadPDF(d){
   try{
-    const res=await fetch('/api/screenings/'+d._id+'/cv');
+    const res=await fetch('/api/screenings/'+d._id+'/cv', {credentials:'include'});
     if(!res.ok)throw new Error('no pdf');
     const blob=await res.blob();
     pdfURL=URL.createObjectURL(blob);
