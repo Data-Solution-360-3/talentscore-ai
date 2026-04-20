@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Portal — TalentScore AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;--ig:rgba(91,94,244,.12);--ib:rgba(91,94,244,.3);
+  --orange:#fb923c;--og:rgba(251,146,60,.12);--ob:rgba(251,146,60,.3);
+  --bg:#05070f;--surface:#0d1117;--s2:#161b27;--s3:#1e2535;
+  --border:#1e2535;--border2:#2a3347;
+  --text:#f0f2f8;--t2:#8892aa;--t3:#4a5568;
+  --green:#10b981;--gg:rgba(16,185,129,.12);--gb:rgba(16,185,129,.3);
+  --red:#f43f5e;--rg:rgba(244,63,94,.12);--rb:rgba(244,63,94,.3);
+  --amber:#f59e0b;--amg:rgba(245,158,11,.12);--amb:rgba(245,158,11,.3);
+  --r:14px;--rs:10px
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(13,17,23,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
+.tl{display:flex;align-items:center;gap:9px}
+.tli{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
+.tln{font-size:15px;font-weight:700}
+.admin-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--og);color:var(--orange);border:1px solid var(--ob)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tb-btn{padding:6px 12px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .15s}
+.tb-btn:hover{background:var(--s3);color:var(--text)}
+.layout{display:flex;min-height:100vh;padding-top:56px}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:fixed;top:56px;bottom:0;overflow-y:auto}
+.sid-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);padding:.75rem 1.25rem .4rem}
+.sid-item{display:flex;align-items:center;gap:9px;padding:.65rem 1.25rem;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .15s;border-left:3px solid transparent}
+.sid-item:hover{background:var(--s2);color:var(--text)}
+.sid-item.active{background:var(--ig);color:var(--indigo);border-left-color:var(--indigo);font-weight:600}
+.sid-item svg{flex-shrink:0;opacity:.7}
+.sid-item.active svg{opacity:1}
+.main{margin-left:220px;padding:2rem;flex:1}
+.page{display:none}
+.page.active{display:block}
+.ph{margin-bottom:1.75rem}
+.ph h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.ph p{font-size:13px;color:var(--t2)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem 1.25rem;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc-indigo::before{background:var(--indigo)}.sc-orange::before{background:var(--orange)}
+.sc-green::before{background:var(--green)}.sc-red::before{background:var(--red)}
+.stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px}
+.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px}
+.stat-sub{font-size:11px;color:var(--t3);margin-top:3px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:14px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:600}
+.card-sub{font-size:12px;color:var(--t3)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 12px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--s2)}
+.badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid;display:inline-block}
+.b-green{background:var(--gg);color:var(--green);border-color:var(--gb)}
+.b-red{background:var(--rg);color:#fda4af;border-color:var(--rb)}
+.b-amber{background:var(--amg);color:var(--amber);border-color:var(--amb)}
+.b-indigo{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
+.b-orange{background:var(--og);color:var(--orange);border-color:var(--ob)}
+.btn-sm{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid;transition:all .15s}
+.btn-danger{background:var(--rg);color:#fda4af;border-color:var(--rb)}
+.btn-danger:hover{background:rgba(244,63,94,.25)}
+.btn-success{background:var(--gg);color:var(--green);border-color:var(--gb)}
+.btn-success:hover{background:rgba(16,185,129,.25)}
+.btn-primary{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
+.btn-primary:hover{background:rgba(91,94,244,.25)}
+.search-bar{width:100%;padding:9px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;margin-bottom:1rem}
+.search-bar:focus{border-color:var(--indigo)}
+.empty{text-align:center;padding:3rem;color:var(--t3);font-size:13px}
+.spinner{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--indigo);border-radius:50%;animation:spin .6s linear infinite;margin:2rem auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prog-lbl{font-size:11px;color:var(--t2);width:100px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prog-bg{flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px}
+.prog-val{font-size:11px;font-weight:700;color:var(--t2);width:30px;text-align:right;flex-shrink:0}
+.alert{padding:12px 16px;border-radius:var(--rs);font-size:13px;margin-bottom:14px;border:1px solid}
+.alert-warning{background:var(--amg);border-color:var(--amb);color:var(--amber)}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="tl">
+    <div class="tli"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="tln">TalentScore<span style="color:#a5b4fc">AI</span></span>
+    <span class="admin-badge">Admin Portal</span>
+  </div>
+  <div class="topbar-right">
+    <a href="/app" class="tb-btn">← Go to app</a>
+    <button class="tb-btn" onclick="logout()">Sign out</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sid-section">Overview</div>
+    <div class="sid-item active" onclick="showPage('overview')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="sid-section">Management</div>
+    <div class="sid-item" onclick="showPage('users')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Users & Companies
+    </div>
+    <div class="sid-item" onclick="showPage('screenings')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      All Screenings
+    </div>
+    <div class="sid-section">System</div>
+    <div class="sid-item" onclick="showPage('settings')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      System Settings
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="ph"><h1>Admin Dashboard</h1><p>Platform-wide overview and key metrics</p></div>
+      <div class="stats-grid">
+        <div class="stat-card sc-indigo"><div class="stat-lbl">Total users</div><div class="stat-val" id="ov-users">—</div><div class="stat-sub">registered companies</div></div>
+        <div class="stat-card sc-orange"><div class="stat-lbl">Total screenings</div><div class="stat-val" id="ov-screenings">—</div><div class="stat-sub">all time</div></div>
+        <div class="stat-card sc-green"><div class="stat-lbl">Active users</div><div class="stat-val" id="ov-active">—</div><div class="stat-sub">accounts active</div></div>
+        <div class="stat-card sc-red"><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">across all screenings</div></div>
+      </div>
+      <div class="overview-grid">
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Top companies by usage</div></div>
+          <div id="top-companies"><div class="spinner"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Recommendation breakdown</div></div>
+          <div id="rec-breakdown"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Recent signups</div></div>
+        <table class="tbl">
+          <thead><tr><th>Company</th><th>Email</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th></tr></thead>
+          <tbody id="recent-signups"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <div class="ph"><h1>Users & Companies</h1><p>Manage all registered accounts</p></div>
+      <div class="card">
+        <input class="search-bar" type="text" id="user-search" placeholder="Search by company or email..." oninput="filterUsers()">
+        <table class="tbl">
+          <thead><tr><th>Company</th><th>Email</th><th>Role</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="users-tbl"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SCREENINGS -->
+    <div class="page" id="page-screenings">
+      <div class="ph"><h1>All Screenings</h1><p>Every CV screening across all companies</p></div>
+      <div class="card">
+        <input class="search-bar" type="text" id="screen-search" placeholder="Search by candidate name or company..." oninput="filterScreenings()">
+        <table class="tbl">
+          <thead><tr><th>Candidate</th><th>Company</th><th>Score</th><th>Recommendation</th><th>Skills match</th><th>Experience</th><th>Date</th></tr></thead>
+          <tbody id="screenings-tbl"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="ph"><h1>System Settings</h1><p>Platform configuration and admin tools</p></div>
+      <div class="alert alert-warning">⚠️ Changes here affect the entire platform. Be careful.</div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Admin account</div></div>
+        <div style="font-size:13px;color:var(--t2);margin-bottom:1rem" id="admin-email-display">Loading...</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-sm btn-primary" onclick="window.location.href='/app'">Go to main app</button>
+          <button class="btn-sm btn-danger" onclick="logout()">Sign out</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Platform stats</div></div>
+        <div id="platform-stats" style="font-size:13px;color:var(--t2);line-height:2">Loading...</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+let allUsers = [], allScreenings = [];
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sid-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function gc(s){if(s>=80)return'#10b981';if(s>=60)return'#f59e0b';return'#f43f5e';}
+function rbcls(r){return{'STRONG HIRE':'b-green','HIRE':'b-green','MAYBE':'b-amber','REJECT':'b-red'}[r]||'b-amber';}
+function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch{return'—';}}
+
+async function loadAll() {
+  try {
+    const [usersRes, screenRes, statsRes] = await Promise.all([
+      fetch('/api/admin/users', {credentials:'include'}),
+      fetch('/api/screenings?limit=500', {credentials:'include'}),
+      fetch('/api/stats', {credentials:'include'})
+    ]);
+    if (usersRes.status === 403) { window.location.href = '/app'; return; }
+    const usersData   = await usersRes.json();
+    const screenData  = await screenRes.json();
+    const statsData   = await statsRes.json();
+    allUsers      = usersData.users || [];
+    allScreenings = screenData.screenings || [];
+
+    // Overview stats
+    document.getElementById('ov-users').textContent = allUsers.length;
+    document.getElementById('ov-screenings').textContent = allScreenings.length;
+    document.getElementById('ov-active').textContent = allUsers.filter(u => u.active !== false).length;
+    document.getElementById('ov-avg').textContent = statsData.avg_score || '—';
+
+    renderOverview(statsData);
+    renderUsers();
+    renderScreenings();
+    renderSettings();
+  } catch(e) { console.error(e); }
+}
+
+function renderOverview(stats) {
+  // Top companies
+  const compMap = {};
+  allScreenings.forEach(s => { if(s.company) compMap[s.company] = (compMap[s.company]||0)+1; });
+  const sorted = Object.entries(compMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const max = sorted[0]?.[1] || 1;
+  document.getElementById('top-companies').innerHTML = sorted.length
+    ? sorted.map(([co,cnt]) =>
+        `<div class="prog-row"><span class="prog-lbl">${co}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(cnt/max*100)}%;background:var(--indigo)"></div></div><span class="prog-val">${cnt}</span></div>`
+      ).join('')
+    : '<p class="empty">No data yet</p>';
+
+  // Rec breakdown
+  const recs = {STRONG_HIRE:stats.strong_hires||0,HIRE:stats.hires||0,MAYBE:stats.maybes||0,REJECT:stats.rejects||0};
+  const total = Object.values(recs).reduce((a,b)=>a+b,0)||1;
+  const colors = {STRONG_HIRE:'#10b981',HIRE:'#22d3ee',MAYBE:'#f59e0b',REJECT:'#f43f5e'};
+  const labels = {STRONG_HIRE:'Strong Hire',HIRE:'Hire',MAYBE:'Maybe',REJECT:'Reject'};
+  document.getElementById('rec-breakdown').innerHTML = Object.entries(recs).map(([k,v]) =>
+    `<div class="prog-row"><span class="prog-lbl">${labels[k]}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(v/total*100)}%;background:${colors[k]}"></div></div><span class="prog-val">${v}</span></div>`
+  ).join('');
+
+  // Recent signups
+  const recent = [...allUsers].slice(0,8);
+  document.getElementById('recent-signups').innerHTML = recent.length
+    ? recent.map(u => `<tr>
+        <td style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px">
+          <div class="user-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div>${u.company_name||'—'}
+        </td>
+        <td>${u.email}</td>
+        <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
+        <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
+        <td>${fmt(u.created_at)}</td>
+        <td><span class="badge ${u.active===false?'b-red':'b-green'}">${u.active===false?'Suspended':'Active'}</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No users yet</td></tr>';
+}
+
+function renderUsers() {
+  const q = (document.getElementById('user-search')?.value||'').toLowerCase();
+  const filtered = allUsers.filter(u =>
+    (u.company_name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)
+  );
+  document.getElementById('users-tbl').innerHTML = filtered.length
+    ? filtered.map(u => `<tr>
+        <td style="font-weight:600;color:var(--text)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="user-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div>${u.company_name||'—'}
+          </div>
+        </td>
+        <td>${u.email}</td>
+        <td><span class="badge ${u.role==='admin'?'b-orange':'b-indigo'}">${u.role||'client'}</span></td>
+        <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
+        <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
+        <td>${fmt(u.created_at)}</td>
+        <td><span class="badge ${u.active===false?'b-red':'b-green'}">${u.active===false?'Suspended':'Active'}</span></td>
+        <td>
+          <div style="display:flex;gap:5px">
+            <button class="btn-sm ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u._id}','${u.active===false?'activate':'suspend'}')">
+              ${u.active===false?'Activate':'Suspend'}
+            </button>
+            <select onchange="changePlan('${u._id}',this.value)" style="padding:4px 6px;background:var(--s2);border:1px solid var(--border2);border-radius:5px;font-size:11px;color:var(--t2);cursor:pointer">
+              ${['trial','starter','pro','enterprise'].map(p=>`<option value="${p}" ${(u.plan||'trial')===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No users found</td></tr>';
+}
+
+function renderScreenings() {
+  const q = (document.getElementById('screen-search')?.value||'').toLowerCase();
+  const filtered = allScreenings.filter(s =>
+    (s.candidate_name||'').toLowerCase().includes(q) || (s.company||'').toLowerCase().includes(q)
+  );
+  document.getElementById('screenings-tbl').innerHTML = filtered.length
+    ? filtered.slice(0,100).map(s => {
+        const score = Math.round(s.overall_score||0);
+        const rec = (s.recommendation||'MAYBE').toUpperCase();
+        return `<tr>
+          <td><a href="/candidate?id=${s._id}" style="color:var(--indigo);font-weight:600;text-decoration:none">${s.candidate_name||'Unknown'}</a></td>
+          <td style="color:var(--t2)">${s.company||'—'}</td>
+          <td style="font-weight:700;color:${gc(score)}">${score}</td>
+          <td><span class="badge ${rbcls(rec)}">${rec}</span></td>
+          <td>${s.skills_coverage_pct||0}%</td>
+          <td>${s.years_experience||'?'} yrs</td>
+          <td>${fmt(s.created_at)}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="7" class="empty">No screenings found</td></tr>';
+}
+
+function renderSettings() {
+  fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(u=>{
+    document.getElementById('admin-email-display').innerHTML = `Signed in as <strong style="color:var(--text)">${u.email}</strong> · Role: <span class="badge b-orange">${u.role}</span>`;
+  });
+  const stats = `
+    Total users: <strong style="color:var(--text)">${allUsers.length}</strong><br>
+    Active users: <strong style="color:var(--green)">${allUsers.filter(u=>u.active!==false).length}</strong><br>
+    Suspended users: <strong style="color:var(--red)">${allUsers.filter(u=>u.active===false).length}</strong><br>
+    Total screenings: <strong style="color:var(--text)">${allScreenings.length}</strong><br>
+    Batch screenings: <strong style="color:var(--text)">${allScreenings.filter(s=>s.batch).length}</strong>
+  `;
+  document.getElementById('platform-stats').innerHTML = stats;
+}
+
+function filterUsers() { renderUsers(); }
+function filterScreenings() { renderScreenings(); }
+
+async function toggleUser(userId, action) {
+  if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+  try {
+    const res = await fetch(`/api/admin/users/${userId}/toggle`,{method:'POST',credentials:'include'});
+    if (res.ok) { await loadAll(); }
+  } catch(e) { alert('Failed: '+e.message); }
+}
+
+async function changePlan(userId, plan) {
+  try {
+    const fd = new FormData(); fd.append('plan', plan);
+    await fetch(`/api/admin/users/${userId}/plan`,{method:'POST',body:fd,credentials:'include'});
+  } catch(e) { console.error(e); }
+}
+
+async function logout() {
+  await fetch('/api/auth/logout',{method:'POST',credentials:'include'});
+  window.location.href='/login';
+}
+
+loadAll();
+</script>
+</body>
+</html>

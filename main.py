@@ -11,6 +11,7 @@ import os
 import base64
 
 from scorer import extract_pdf_text, run_screening_pipeline
+from email_service import generate_otp, send_verification_email, send_welcome_email
 from batch import run_batch_screening, CONCURRENCY_LIMIT
 from auth import (
     hash_password, verify_password, create_token,
@@ -26,6 +27,7 @@ from database import (
     get_batch_job, get_all_batch_jobs,
     create_user, get_user_by_email, get_user_by_id, get_all_users,
     update_user, increment_screening_count,
+    store_otp, verify_otp, delete_pending,
     get_screenings_for_user, get_stats_for_user, get_jobs_for_user,
     get_skills_gaps_for_user, get_dimension_averages_for_user, db
 )
@@ -86,7 +88,7 @@ def read_template(name: str) -> str:
         return f.read()
 
 
-@app.get("/home", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 @app.get("/landing", response_class=HTMLResponse)
 async def landing_page():
     return read_template("landing.html")
@@ -96,16 +98,27 @@ async def landing_page():
 async def login_page(request: Request):
     token = get_token_from_request(request)
     if token and decode_token(token):
-        return RedirectResponse("/")
+        return RedirectResponse("/app")
     return read_template("login.html")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/app", response_class=HTMLResponse)
 async def home(request: Request):
     token = get_token_from_request(request)
     if not token or not decode_token(token):
         return RedirectResponse("/login")
     return read_template("index.html")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    token = get_token_from_request(request)
+    if not token or not decode_token(token):
+        return RedirectResponse("/login")
+    payload = decode_token(token)
+    if payload.get("role") != "admin":
+        return RedirectResponse("/app")
+    return read_template("admin.html")
 
 
 @app.get("/batch", response_class=HTMLResponse)
@@ -133,23 +146,76 @@ async def register(
     email: str = Form(...),
     password: str = Form(...),
     company_name: str = Form(...),
-    response: Response = None,
 ):
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    # Check if email already registered
+    existing = await get_user_by_email(email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered. Please sign in.")
+    # Generate OTP and store pending registration
+    otp = generate_otp()
+    await store_otp(
+        email=email,
+        otp=otp,
+        company_name=company_name,
+        password_hash=hash_password(password)
+    )
+    # Send verification email
+    sent = send_verification_email(to_email=email, company_name=company_name, otp=otp)
+    if not sent:
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
+    return JSONResponse({"success": True, "message": "Verification code sent to your email."})
+
+
+@app.post("/api/auth/verify")
+async def verify_email(
+    email: str = Form(...),
+    otp: str = Form(...),
+):
+    pending = await verify_otp(email=email, otp=otp)
+    if not pending:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code. Please try again.")
+    # Create the user account
     try:
         user_id = await create_user(
             email=email,
-            hashed_password=hash_password(password),
-            company_name=company_name,
+            hashed_password=pending["password_hash"],
+            company_name=pending["company_name"],
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    token = create_token({"user_id": user_id, "email": email.lower(), "company": company_name, "role": "client"})
-    resp = JSONResponse({"success": True, "company": company_name})
+    # Send welcome email
+    send_welcome_email(to_email=email, company_name=pending["company_name"])
+
+    token = create_token({
+        "user_id": user_id,
+        "email": email.lower(),
+        "company": pending["company_name"],
+        "role": "client"
+    })
+    resp = JSONResponse({"success": True, "company": pending["company_name"]})
     resp.set_cookie("access_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
     return resp
+
+
+@app.post("/api/auth/resend-otp")
+async def resend_otp(email: str = Form(...)):
+    # Check pending registration exists
+    from database import db
+    pending = await db.pending_registrations.find_one({"email": email.lower()})
+    if not pending:
+        raise HTTPException(status_code=400, detail="No pending registration found. Please register again.")
+    otp = generate_otp()
+    await store_otp(
+        email=email,
+        otp=otp,
+        company_name=pending["company_name"],
+        password_hash=pending["password_hash"]
+    )
+    send_verification_email(to_email=email, company_name=pending["company_name"], otp=otp)
+    return JSONResponse({"success": True})
 
 
 @app.post("/api/auth/login")
@@ -503,6 +569,17 @@ async def admin_toggle_user(request: Request, user_id: str):
     new_status = not target.get("active", True)
     await update_user(user_id, {"active": new_status})
     return {"active": new_status}
+
+
+@app.post("/api/admin/users/{user_id}/plan")
+async def admin_change_plan(request: Request, user_id: str, plan: str = Form(...)):
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    if plan not in ["trial","starter","pro","enterprise"]:
+        raise HTTPException(status_code=400, detail="Invalid plan.")
+    await update_user(user_id, {"plan": plan})
+    return {"plan": plan}
 
 
 # ─────────────────────────────────────────────────────────────

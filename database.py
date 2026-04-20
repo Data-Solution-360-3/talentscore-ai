@@ -342,3 +342,41 @@ async def get_dimension_averages_for_user(user_id: str) -> list:
     results = await db.screenings.aggregate(pipeline).to_list(20)
     return [{"name": r["_id"], "avg_score": round(r["avg_score"], 1),
              "count": r["count"]} for r in results]
+
+
+# ─────────────────────────────────────────────────────────────
+# EMAIL VERIFICATION OTP
+# ─────────────────────────────────────────────────────────────
+
+async def store_otp(email: str, otp: str, company_name: str, password_hash: str):
+    """Store pending registration with OTP. Expires in 15 minutes."""
+    await db.pending_registrations.delete_many({"email": email.lower()})
+    await db.pending_registrations.insert_one({
+        "email": email.lower(),
+        "otp": otp,
+        "company_name": company_name,
+        "password_hash": password_hash,
+        "created_at": datetime.utcnow(),
+        "expires_at": datetime.utcnow().replace(
+            minute=(datetime.utcnow().minute + 15) % 60
+        ),
+        "attempts": 0
+    })
+
+
+async def verify_otp(email: str, otp: str) -> dict | None:
+    """Verify OTP. Returns pending registration data if valid."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(minutes=15)
+    doc = await db.pending_registrations.find_one({
+        "email": email.lower(),
+        "otp": otp,
+        "created_at": {"$gt": cutoff}
+    })
+    if doc:
+        await db.pending_registrations.delete_one({"_id": doc["_id"]})
+    return doc
+
+
+async def delete_pending(email: str):
+    await db.pending_registrations.delete_many({"email": email.lower()})
