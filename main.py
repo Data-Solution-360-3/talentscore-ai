@@ -41,11 +41,11 @@ async def lifespan(app: FastAPI):
     if not admin:
         await create_user(
             email="admin@talentscore.ai",
-            hashed_password=hash_password("admin123"),
+            hashed_password=hash_password("Admin@123"),
             company_name="TalentScore AI",
             role="admin"
         )
-        print("[AUTH] Default admin created: admin@talentscore.ai / admin123")
+        print("[AUTH] Default admin created: admin@talentscore.ai / Admin@123")
     yield
     await disconnect()
 
