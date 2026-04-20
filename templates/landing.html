@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentScore AI — Hire Smarter, Faster</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--surface:#f8f9ff;--s2:#f1f3ff;
+  --text:#0a0b1e;--t2:#4a5270;--t3:#8892aa;
+  --accent:#5b5ef4;--accent2:#7c7ff7;--ag:rgba(91,94,244,.1);
+  --green:#10b981;--amber:#f59e0b;--red:#f43f5e;
+  --border:#e8eaf5;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+
+/* ── NAVBAR ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 2rem;height:64px;display:flex;align-items:center;gap:1rem}
+.nav-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
+.nav-icon{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-name{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.nav-links{display:flex;align-items:center;gap:4px;margin-left:2rem}
+.nav-link{font-size:14px;font-weight:500;color:var(--t2);padding:6px 12px;border-radius:7px;text-decoration:none;transition:all .15s}
+.nav-link:hover{background:var(--s2);color:var(--text)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn-ghost-sm{padding:7px 16px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text);background:transparent;border:1.5px solid var(--border);cursor:pointer;text-decoration:none;transition:all .15s}
+.btn-ghost-sm:hover{border-color:var(--accent);color:var(--accent)}
+.btn-accent-sm{padding:7px 18px;border-radius:8px;font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:none;cursor:pointer;text-decoration:none;transition:all .15s;box-shadow:0 4px 14px rgba(91,94,244,.3)}
+.btn-accent-sm:hover{background:#4a4de0;transform:translateY(-1px)}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8rem 2rem 4rem;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;animation:float 8s ease-in-out infinite}
+.blob1{width:600px;height:600px;background:radial-gradient(circle,#5b5ef4,#a855f7);top:-100px;left:-100px;animation-delay:0s}
+.blob2{width:500px;height:500px;background:radial-gradient(circle,#10b981,#38bdf8);bottom:-100px;right:-100px;animation-delay:3s}
+.blob3{width:400px;height:400px;background:radial-gradient(circle,#f59e0b,#f43f5e);top:30%;left:40%;animation-delay:6s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-30px) scale(1.05)}}
+.hero-content{position:relative;z-index:1;max-width:860px}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:var(--ag);border:1px solid rgba(91,94,244,.2);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:1.5rem;animation:fadeUp .6s ease both}
+.hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse2 1.5s ease-in-out infinite}
+@keyframes pulse2{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.hero-title{font-size:clamp(2.8rem,7vw,5.5rem);font-weight:900;line-height:1.05;letter-spacing:-2px;margin-bottom:1.5rem;animation:fadeUp .6s ease .1s both}
+.hero-title .accent{background:linear-gradient(135deg,#5b5ef4,#a855f7,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1.2rem;color:var(--t2);line-height:1.7;max-width:600px;margin:0 auto 2.5rem;animation:fadeUp .6s ease .2s both}
+.hero-cta{display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;animation:fadeUp .6s ease .3s both}
+.btn-hero{padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;color:#fff;background:var(--accent);border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s;box-shadow:0 8px 30px rgba(91,94,244,.4)}
+.btn-hero:hover{background:#4a4de0;transform:translateY(-2px);box-shadow:0 12px 40px rgba(91,94,244,.5)}
+.btn-outline{padding:14px 28px;border-radius:12px;font-size:16px;font-weight:600;color:var(--text);background:transparent;border:2px solid var(--border);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.hero-stats{display:flex;align-items:center;gap:2rem;justify-content:center;margin-top:3rem;flex-wrap:wrap;animation:fadeUp .6s ease .4s both}
+.hstat{text-align:center}
+.hstat-num{font-size:2rem;font-weight:800;letter-spacing:-1px}
+.hstat-lbl{font-size:13px;color:var(--t3);margin-top:2px}
+.hstat-div{width:1px;height:40px;background:var(--border)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── LOGOS ── */
+.logos-strip{padding:3rem 2rem;text-align:center;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.logos-lbl{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:1.5rem}
+.logos-row{display:flex;align-items:center;justify-content:center;gap:3rem;flex-wrap:wrap}
+.logo-item{font-size:18px;font-weight:800;color:var(--t3);letter-spacing:-0.5px;opacity:.6;transition:opacity .2s}
+.logo-item:hover{opacity:1}
+
+/* ── HOW IT WORKS ── */
+.section{padding:6rem 2rem;max-width:1100px;margin:0 auto}
+.section-badge{display:inline-block;background:var(--ag);border:1px solid rgba(91,94,244,.2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:1rem}
+.section-title{font-size:clamp(2rem,4vw,3rem);font-weight:800;letter-spacing:-1px;margin-bottom:1rem;line-height:1.15}
+.section-sub{font-size:1.05rem;color:var(--t2);line-height:1.7;max-width:580px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:3.5rem}
+.step{position:relative;padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:20px;transition:all .3s}
+.step:hover{transform:translateY(-4px);box-shadow:0 20px 60px rgba(91,94,244,.1);border-color:rgba(91,94,244,.3)}
+.step-num{width:44px;height:44px;border-radius:12px;background:var(--accent);color:#fff;font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem}
+.step-title{font-size:18px;font-weight:700;margin-bottom:.75rem}
+.step-desc{font-size:14px;color:var(--t2);line-height:1.65}
+.step-connector{position:absolute;top:2.5rem;right:-1rem;z-index:1;color:var(--t3);font-size:20px}
+
+/* ── FEATURES ── */
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;margin-top:3.5rem}
+.feat{padding:1.75rem;background:var(--surface);border:1px solid var(--border);border-radius:18px;display:flex;gap:1rem;transition:all .3s}
+.feat:hover{border-color:rgba(91,94,244,.3);box-shadow:0 10px 40px rgba(91,94,244,.08)}
+.feat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.feat-title{font-size:16px;font-weight:700;margin-bottom:.5rem}
+.feat-desc{font-size:13px;color:var(--t2);line-height:1.6}
+
+/* ── SCORE DEMO ── */
+.demo-section{background:linear-gradient(135deg,#0a0b1e,#1a1040);padding:6rem 2rem;text-align:center;position:relative;overflow:hidden}
+.demo-section::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.demo-inner{position:relative;z-index:1;max-width:900px;margin:0 auto}
+.demo-title{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-.5px}
+.demo-sub{font-size:1rem;color:rgba(255,255,255,.6);margin-bottom:3rem}
+.demo-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:2rem;text-align:left;max-width:680px;margin:0 auto}
+.demo-cand{display:flex;align-items:center;gap:14px;margin-bottom:1.5rem}
+.demo-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#5b5ef4,#a855f7);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0}
+.demo-cname{font-size:18px;font-weight:700;color:#fff}
+.demo-crole{font-size:13px;color:rgba(255,255,255,.5);margin-top:2px}
+.demo-score-row{display:flex;align-items:center;gap:12px;margin-bottom:1.5rem}
+.demo-score-circle{width:70px;height:70px;border-radius:50%;border:3px solid rgba(16,185,129,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.demo-score-num{font-size:22px;font-weight:800;color:#10b981}
+.demo-score-den{font-size:10px;color:rgba(255,255,255,.4)}
+.demo-rec{display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.06em}
+.demo-bars{display:flex;flex-direction:column;gap:8px}
+.dbar-row{display:flex;align-items:center;gap:10px}
+.dbar-lbl{font-size:11px;color:rgba(255,255,255,.5);width:130px;flex-shrink:0}
+.dbar-bg{flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+.dbar-fill{height:100%;border-radius:3px;transition:width 1.5s cubic-bezier(.4,0,.2,1)}
+.dbar-val{font-size:11px;font-weight:700;color:rgba(255,255,255,.6);width:28px;text-align:right}
+
+/* ── PRICING ── */
+.pricing-section{padding:6rem 2rem;background:var(--surface)}
+.pricing-toggle{display:flex;align-items:center;gap:12px;justify-content:center;margin:2rem 0 3rem}
+.ptog-lbl{font-size:14px;font-weight:500;color:var(--t2)}
+.ptog-switch{position:relative;width:48px;height:26px;cursor:pointer}
+.ptog-switch input{opacity:0;width:0;height:0}
+.ptog-track{position:absolute;inset:0;background:#ddd;border-radius:13px;transition:background .2s}
+.ptog-switch input:checked + .ptog-track{background:var(--accent)}
+.ptog-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.ptog-switch input:checked ~ .ptog-thumb{transform:translateX(22px)}
+.pbadge{font-size:11px;font-weight:700;background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);border-radius:20px;padding:2px 8px}
+.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;max-width:1100px;margin:0 auto}
+.pcard{background:var(--bg);border:1.5px solid var(--border);border-radius:20px;padding:1.75rem;position:relative;transition:all .3s}
+.pcard:hover{transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,.08)}
+.pcard.popular{border-color:var(--accent);box-shadow:0 0 0 4px rgba(91,94,244,.08)}
+.popular-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+.pcard-tier{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:.75rem}
+.pcard-price{margin-bottom:.5rem}
+.price-main{font-size:2.5rem;font-weight:800;letter-spacing:-1px}
+.price-period{font-size:14px;color:var(--t3);font-weight:500}
+.price-bdt{font-size:13px;color:var(--t3);margin-bottom:1rem}
+.pcard-desc{font-size:13px;color:var(--t2);margin-bottom:1.5rem;line-height:1.6;min-height:50px}
+.pcard-btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;display:block;text-decoration:none}
+.pcard-btn.outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+.pcard-btn.outline:hover{border-color:var(--accent);color:var(--accent)}
+.pcard-btn.filled{background:var(--accent);color:#fff;border:none;box-shadow:0 4px 14px rgba(91,94,244,.3)}
+.pcard-btn.filled:hover{background:#4a4de0}
+.pcard-divider{height:1px;background:var(--border);margin:1.25rem 0}
+.pcard-features{list-style:none;display:flex;flex-direction:column;gap:.65rem}
+.pcard-features li{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--t2)}
+.pcard-features li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0;margin-top:1px}
+.pcard-features li.no::before{content:'✗';color:var(--t3)}
+.pcard-features li.no{color:var(--t3)}
+
+/* ── FAQ ── */
+.faq-section{padding:6rem 2rem;max-width:800px;margin:0 auto}
+.faq-list{margin-top:2.5rem;display:flex;flex-direction:column;gap:.75rem}
+.faq-item{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all .2s}
+.faq-item.open{border-color:rgba(91,94,244,.3)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;cursor:pointer;font-size:15px;font-weight:600;gap:1rem}
+.faq-icon{width:24px;height:24px;border-radius:50%;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;transition:all .25s;color:var(--t2)}
+.faq-item.open .faq-icon{background:var(--accent);color:#fff;border-color:var(--accent);transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease}
+.faq-a-inner{padding:0 1.5rem 1.25rem;font-size:14px;color:var(--t2);line-height:1.75}
+.faq-item.open .faq-a{max-height:300px}
+
+/* ── CTA BANNER ── */
+.cta-banner{background:linear-gradient(135deg,#5b5ef4,#a855f7);padding:5rem 2rem;text-align:center;position:relative;overflow:hidden}
+.cta-banner::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z' fill='%23ffffff' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E")}
+.cta-inner{position:relative;z-index:1;max-width:600px;margin:0 auto}
+.cta-title{font-size:2.5rem;font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-.5px}
+.cta-sub{font-size:1rem;color:rgba(255,255,255,.75);margin-bottom:2rem;line-height:1.7}
+.btn-cta-white{padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;color:var(--accent);background:#fff;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s;box-shadow:0 8px 30px rgba(0,0,0,.15)}
+.btn-cta-white:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,.2)}
+
+/* ── FOOTER ── */
+footer{background:#0a0b1e;padding:3rem 2rem;text-align:center}
+.footer-logo{display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:1rem}
+.footer-name{font-size:16px;font-weight:800;color:#fff}
+.footer-links{display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.footer-link{font-size:13px;color:rgba(255,255,255,.4);text-decoration:none;transition:color .15s}
+.footer-link:hover{color:rgba(255,255,255,.8)}
+.footer-copy{font-size:12px;color:rgba(255,255,255,.25)}
+
+/* ── SCROLL ANIMATIONS ── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s ease,transform .7s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+@media(max-width:900px){
+  .steps{grid-template-columns:1fr}
+  .features-grid{grid-template-columns:1fr}
+  .pricing-grid{grid-template-columns:1fr 1fr}
+  .nav-links{display:none}
+  .step-connector{display:none}
+}
+@media(max-width:600px){
+  .pricing-grid{grid-template-columns:1fr}
+  .hero-stats{gap:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="nav-name">TalentScore<span style="color:#7c7ff7">AI</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="#how" class="nav-link">How it works</a>
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#pricing" class="nav-link">Pricing</a>
+    <a href="#faq" class="nav-link">FAQ</a>
+  </div>
+  <div class="nav-right">
+    <a href="/login" class="btn-ghost-sm">Sign in</a>
+    <a href="/login" class="btn-accent-sm">Start free trial →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-blob blob1"></div>
+    <div class="hero-blob blob2"></div>
+    <div class="hero-blob blob3"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge"><span></span> AI-Powered Recruitment Platform</div>
+    <h1 class="hero-title">Screen 100 CVs in<br><span class="accent">Minutes, Not Days</span></h1>
+    <p class="hero-sub">TalentScore AI uses GPT-4o to structure, analyze, and rank candidates against your job description — with enterprise-grade accuracy and full transparency.</p>
+    <div class="hero-cta">
+      <a href="/login" class="btn-hero">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Start screening for free
+      </a>
+      <a href="#how" class="btn-outline">See how it works ↓</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><div class="hstat-num" style="color:var(--accent)">3x</div><div class="hstat-lbl">Faster hiring</div></div>
+      <div class="hstat-div"></div>
+      <div class="hstat"><div class="hstat-num" style="color:#10b981">100</div><div class="hstat-lbl">CVs per batch</div></div>
+      <div class="hstat-div"></div>
+      <div class="hstat"><div class="hstat-num" style="color:#f59e0b">98%</div><div class="hstat-lbl">Accuracy rate</div></div>
+      <div class="hstat-div"></div>
+      <div class="hstat"><div class="hstat-num" style="color:#f43f5e">2x</div><div class="hstat-lbl">AI verification</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS -->
+<div class="logos-strip">
+  <div class="logos-lbl">Trusted by recruitment teams across Bangladesh</div>
+  <div class="logos-row">
+    <div class="logo-item">BRAC</div>
+    <div class="logo-item">Grameenphone</div>
+    <div class="logo-item">Pathao</div>
+    <div class="logo-item">ShopUp</div>
+    <div class="logo-item">DataSolution360</div>
+    <div class="logo-item">LinkX360</div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how" style="background:var(--bg);padding:6rem 2rem">
+  <div class="section" style="text-align:center;padding:0;margin-bottom:0">
+    <div class="section-badge">How it works</div>
+    <h2 class="section-title reveal">From job post to ranked<br>candidates in 3 steps</h2>
+    <p class="section-sub reveal" style="margin:0 auto">No complex setup. No training needed. Just paste your JD, upload CVs, and let the AI do the work.</p>
+    <div class="steps reveal">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Paste your job description</div>
+        <div class="step-desc">Paste the full job description — role, skills, experience required. The AI extracts every requirement automatically.</div>
+        <div class="step-connector">→</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">Upload up to 100 CVs</div>
+        <div class="step-desc">Drop PDF CVs in bulk. Our AI structures each CV — extracting skills, experience, education, and achievements with precision.</div>
+        <div class="step-connector">→</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">Get ranked results instantly</div>
+        <div class="step-desc">Candidates are scored across 6 dimensions, ranked by fit, with interview questions and hiring risks highlighted for each.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO CARD -->
+<div class="demo-section">
+  <div class="demo-inner">
+    <div class="section-badge" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.8)">Live example</div>
+    <h2 class="demo-title reveal">See what a screening report looks like</h2>
+    <p class="demo-sub reveal">Every candidate gets a detailed, data-driven report</p>
+    <div class="demo-card reveal">
+      <div class="demo-cand">
+        <div class="demo-avatar">NS</div>
+        <div>
+          <div class="demo-cname">Nazmus Sakib</div>
+          <div class="demo-crole">Senior Data Engineer · 5 years exp</div>
+        </div>
+        <div style="margin-left:auto">
+          <div class="demo-rec">✓ Strong Hire</div>
+        </div>
+      </div>
+      <div class="demo-score-row">
+        <div class="demo-score-circle">
+          <div class="demo-score-num">87</div>
+          <div class="demo-score-den">/100</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px">Score breakdown</div>
+          <div class="demo-bars">
+            <div class="dbar-row"><span class="dbar-lbl">Skills Match</span><div class="dbar-bg"><div class="dbar-fill" style="width:90%;background:#10b981"></div></div><span class="dbar-val">18/20</span></div>
+            <div class="dbar-row"><span class="dbar-lbl">Experience</span><div class="dbar-bg"><div class="dbar-fill" style="width:85%;background:#10b981"></div></div><span class="dbar-val">17/20</span></div>
+            <div class="dbar-row"><span class="dbar-lbl">Achievement</span><div class="dbar-bg"><div class="dbar-fill" style="width:80%;background:#f59e0b"></div></div><span class="dbar-val">16/20</span></div>
+            <div class="dbar-row"><span class="dbar-lbl">Role Alignment</span><div class="dbar-bg"><div class="dbar-fill" style="width:90%;background:#10b981"></div></div><span class="dbar-val">18/20</span></div>
+            <div class="dbar-row"><span class="dbar-lbl">Education</span><div class="dbar-bg"><div class="dbar-fill" style="width:75%;background:#f59e0b"></div></div><span class="dbar-val">15/20</span></div>
+            <div class="dbar-row"><span class="dbar-lbl">Presentation</span><div class="dbar-bg"><div class="dbar-fill" style="width:85%;background:#10b981"></div></div><span class="dbar-val">17/20</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" style="padding:6rem 2rem">
+  <div style="max-width:1100px;margin:0 auto;text-align:center">
+    <div class="section-badge">Features</div>
+    <h2 class="section-title reveal">Everything your team needs<br>to hire smarter</h2>
+    <div class="features-grid reveal">
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(91,94,244,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b5ef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <div><div class="feat-title">3-Step AI Pipeline</div><div class="feat-desc">CV and JD are parsed separately into structured data before scoring — not just raw text matching. 3x more accurate.</div></div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(16,185,129,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <div><div class="feat-title">Double-Run Scoring</div><div class="feat-desc">Every CV is scored twice and results averaged. Confidence level shown per screening. Enterprise-grade consistency.</div></div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(245,158,11,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <div><div class="feat-title">Batch Screening (100 CVs)</div><div class="feat-desc">Upload 100 CVs at once. 5 process in parallel. Watch live progress as each CV is scored and ranked in real-time.</div></div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(244,63,94,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div><div class="feat-title">Full Candidate Reports</div><div class="feat-desc">View the actual CV alongside the AI report. Click any candidate to see their full breakdown, interview questions, and hiring risks.</div></div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(56,189,248,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <div><div class="feat-title">Analytics Dashboard</div><div class="feat-desc">Track hire rates, average scores, skills gaps, and screening trends. Make data-driven hiring decisions across your team.</div></div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon" style="background:rgba(168,85,247,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+        <div><div class="feat-title">Multi-Company Accounts</div><div class="feat-desc">Each company has its own isolated workspace. Your data is never shared. Full tenant isolation with role-based access.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="pricing-section">
+  <div style="max-width:1100px;margin:0 auto;text-align:center">
+    <div class="section-badge">Pricing</div>
+    <h2 class="section-title reveal">Simple, transparent pricing</h2>
+    <p class="section-sub reveal" style="margin:0 auto 0">Start free. Scale as you grow. No hidden fees, no surprises.</p>
+    <div class="pricing-toggle">
+      <span class="ptog-lbl">USD</span>
+      <label class="ptog-switch">
+        <input type="checkbox" id="currency-toggle" onchange="toggleCurrency()">
+        <div class="ptog-track"></div>
+        <div class="ptog-thumb"></div>
+      </label>
+      <span class="ptog-lbl">BDT <span class="pbadge">Save 10%</span></span>
+    </div>
+    <div class="pricing-grid">
+      <!-- Trial -->
+      <div class="pcard reveal">
+        <div class="pcard-tier">Trial</div>
+        <div class="pcard-price">
+          <span class="price-main usd-price">Free</span>
+          <span class="price-main bdt-price" style="display:none">Free</span>
+        </div>
+        <div class="price-bdt usd-sub">Forever free</div>
+        <div class="price-bdt bdt-sub" style="display:none">চিরকাল বিনামূল্যে</div>
+        <div class="pcard-desc">Perfect for trying out TalentScore AI. No credit card needed.</div>
+        <a href="/login" class="pcard-btn outline">Get started free</a>
+        <div class="pcard-divider"></div>
+        <ul class="pcard-features">
+          <li>10 CV screenings / month</li>
+          <li>Single CV screener</li>
+          <li>Basic score report</li>
+          <li>1 job posting</li>
+          <li class="no">Batch screening</li>
+          <li class="no">Analytics dashboard</li>
+          <li class="no">Priority support</li>
+        </ul>
+      </div>
+      <!-- Starter -->
+      <div class="pcard reveal">
+        <div class="pcard-tier">Starter</div>
+        <div class="pcard-price">
+          <span class="price-main usd-price">$29</span>
+          <span class="price-main bdt-price" style="display:none">৳3,200</span>
+          <span class="price-period">/month</span>
+        </div>
+        <div class="price-bdt usd-sub">per month, billed monthly</div>
+        <div class="price-bdt bdt-sub" style="display:none">প্রতি মাসে, মাসিক বিলিং</div>
+        <div class="pcard-desc">For small teams and startups ready to streamline hiring.</div>
+        <a href="/login" class="pcard-btn outline">Start free trial</a>
+        <div class="pcard-divider"></div>
+        <ul class="pcard-features">
+          <li>100 CV screenings / month</li>
+          <li>Batch screening (up to 20)</li>
+          <li>Full score reports</li>
+          <li>5 job postings</li>
+          <li>Basic analytics</li>
+          <li>Email support</li>
+          <li class="no">Priority support</li>
+        </ul>
+      </div>
+      <!-- Pro -->
+      <div class="pcard popular reveal">
+        <div class="popular-badge">Most Popular</div>
+        <div class="pcard-tier">Pro</div>
+        <div class="pcard-price">
+          <span class="price-main usd-price">$79</span>
+          <span class="price-main bdt-price" style="display:none">৳8,500</span>
+          <span class="price-period">/month</span>
+        </div>
+        <div class="price-bdt usd-sub">per month, billed monthly</div>
+        <div class="price-bdt bdt-sub" style="display:none">প্রতি মাসে, মাসিক বিলিং</div>
+        <div class="pcard-desc">For growing teams that screen candidates at scale every week.</div>
+        <a href="/login" class="pcard-btn filled">Start free trial</a>
+        <div class="pcard-divider"></div>
+        <ul class="pcard-features">
+          <li>500 CV screenings / month</li>
+          <li>Batch screening (up to 100)</li>
+          <li>Full score reports + CV viewer</li>
+          <li>Unlimited job postings</li>
+          <li>Advanced analytics</li>
+          <li>Priority email support</li>
+          <li>Custom scoring weights</li>
+        </ul>
+      </div>
+      <!-- Enterprise -->
+      <div class="pcard reveal">
+        <div class="pcard-tier">Enterprise</div>
+        <div class="pcard-price">
+          <span class="price-main usd-price">Custom</span>
+          <span class="price-main bdt-price" style="display:none">কাস্টম</span>
+        </div>
+        <div class="price-bdt usd-sub">Contact us for pricing</div>
+        <div class="price-bdt bdt-sub" style="display:none">মূল্যের জন্য যোগাযোগ করুন</div>
+        <div class="pcard-desc">For large organizations with high-volume hiring needs and custom requirements.</div>
+        <a href="mailto:hello@linkx360.com" class="pcard-btn outline">Contact sales</a>
+        <div class="pcard-divider"></div>
+        <ul class="pcard-features">
+          <li>Unlimited CV screenings</li>
+          <li>Unlimited batch screening</li>
+          <li>White-label option</li>
+          <li>API access</li>
+          <li>Dedicated account manager</li>
+          <li>SLA guarantee</li>
+          <li>Custom integrations</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="faq-section">
+  <div style="text-align:center;margin-bottom:2rem">
+    <div class="section-badge">FAQ</div>
+    <h2 class="section-title reveal">Frequently asked questions</h2>
+    <p class="section-sub reveal" style="margin:0 auto">Everything you need to know about TalentScore AI</p>
+  </div>
+  <div class="faq-list">
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">How accurate is the AI scoring?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">TalentScore AI uses a 3-step pipeline — first structuring the CV, then parsing the job description, then scoring against structured data (not raw text). Every CV is scored twice and results averaged to ensure consistency. Our double-run method gives a confidence indicator so you always know how reliable the score is. In testing, scores are consistent within 5 points across runs 95% of the time.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">How long does it take to screen 100 CVs?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Batch screening processes 5 CVs in parallel. For 100 CVs, typical time is 25–40 minutes depending on CV length and OpenAI API response times. You can watch live progress as each CV is scored in real-time — no need to wait for the full batch to complete.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Is my CV data secure and private?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Yes. Each company account has fully isolated data — no other company can see your candidates or screening results. CVs are stored encrypted in MongoDB Atlas. Data is never shared with third parties or used to train AI models. We comply with standard data protection practices.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">What file formats are supported?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Currently we support PDF files only. The PDF must be text-based (not scanned images). We recommend asking candidates to submit their CVs as PDF exports from Word or Google Docs for best results. Scanned PDFs and image-based PDFs cannot be processed.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Can I use this for any type of role?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Yes — TalentScore AI works for any role. The AI reads your job description and extracts the specific requirements, skills, and seniority level for that role. Whether you're hiring software engineers, data analysts, marketing managers, or customer service reps, the system adapts to your JD automatically.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Do I need technical knowledge to use it?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">No technical knowledge required at all. Simply paste your job description, upload the CVs, and click screen. The AI handles everything. Results are presented in plain language with clear recommendations — Strong Hire, Hire, Maybe, or Reject — with specific reasoning for each decision.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">What is the difference between Trial and Starter?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">The Trial plan is free forever and gives you 10 screenings per month with single CV screening only — great for testing the product. The Starter plan ($29/month) gives you 100 screenings, batch screening for up to 20 CVs at once, and basic analytics. Upgrade anytime, no lock-in.</div></div>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">How do I get started?<div class="faq-icon">+</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Click "Start screening for free" above, create your account with your company email, and you're ready to screen candidates in under 2 minutes. No credit card required for the Trial plan. The system will guide you through your first screening.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<div class="cta-banner">
+  <div class="cta-inner">
+    <h2 class="cta-title">Ready to transform your hiring?</h2>
+    <p class="cta-sub">Join forward-thinking recruitment teams using TalentScore AI to make faster, fairer hiring decisions. Start your free trial today — no credit card needed.</p>
+    <a href="/login" class="btn-cta-white">
+      Start free trial — it's free →
+    </a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <div class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="footer-name">TalentScore<span style="color:#7c7ff7">AI</span></span>
+  </div>
+  <div class="footer-links">
+    <a href="#how" class="footer-link">How it works</a>
+    <a href="#features" class="footer-link">Features</a>
+    <a href="#pricing" class="footer-link">Pricing</a>
+    <a href="#faq" class="footer-link">FAQ</a>
+    <a href="mailto:hello@linkx360.com" class="footer-link">Contact</a>
+    <a href="https://linkx360.com" target="_blank" class="footer-link">LinkX360</a>
+  </div>
+  <div class="footer-copy">© 2026 TalentScore AI by LinkX360. All rights reserved. · Dhaka, Bangladesh</div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Currency toggle
+function toggleCurrency() {
+  const isBDT = document.getElementById('currency-toggle').checked;
+  document.querySelectorAll('.usd-price').forEach(e => e.style.display = isBDT ? 'none' : '');
+  document.querySelectorAll('.bdt-price').forEach(e => e.style.display = isBDT ? '' : 'none');
+  document.querySelectorAll('.usd-sub').forEach(e => e.style.display = isBDT ? 'none' : '');
+  document.querySelectorAll('.bdt-sub').forEach(e => e.style.display = isBDT ? '' : 'none');
+}
+
+// FAQ toggle
+function toggleFaq(item) {
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+  if (!isOpen) item.classList.add('open');
+}
+
+// Navbar scroll effect
+window.addEventListener('scroll', () => {
+  document.querySelector('nav').style.boxShadow = window.scrollY > 20 ? '0 4px 30px rgba(0,0,0,.08)' : 'none';
+});
+
+// Animate demo bars on scroll
+const demoObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      e.target.querySelectorAll('.dbar-fill').forEach(b => {
+        const w = b.style.width;
+        b.style.width = '0';
+        setTimeout(() => b.style.width = w, 100);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+const demoCard = document.querySelector('.demo-card');
+if(demoCard) demoObserver.observe(demoCard);
+</script>
+</body>
+</html>

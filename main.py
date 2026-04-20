@@ -86,6 +86,12 @@ def read_template(name: str) -> str:
         return f.read()
 
 
+@app.get("/home", response_class=HTMLResponse)
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_page():
+    return read_template("landing.html")
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     token = get_token_from_request(request)
