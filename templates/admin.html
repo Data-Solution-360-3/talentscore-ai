@@ -10,360 +10,907 @@
 :root{
   --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;--ig:rgba(91,94,244,.12);--ib:rgba(91,94,244,.3);
   --orange:#fb923c;--og:rgba(251,146,60,.12);--ob:rgba(251,146,60,.3);
-  --bg:#05070f;--surface:#0d1117;--s2:#161b27;--s3:#1e2535;
-  --border:#1e2535;--border2:#2a3347;
-  --text:#f0f2f8;--t2:#8892aa;--t3:#4a5568;
-  --green:#10b981;--gg:rgba(16,185,129,.12);--gb:rgba(16,185,129,.3);
-  --red:#f43f5e;--rg:rgba(244,63,94,.12);--rb:rgba(244,63,94,.3);
-  --amber:#f59e0b;--amg:rgba(245,158,11,.12);--amb:rgba(245,158,11,.3);
-  --r:14px;--rs:10px
+  --bg:#07080f;--surface:#0f1117;--s2:#171b26;--s3:#1e2333;--s4:#252b3b;
+  --border:#1e2333;--border2:#252b3b;--border3:#2e3548;
+  --text:#eef0f8;--t2:#8b95b0;--t3:#4a5270;
+  --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.3);
+  --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.3);
+  --amber:#f59e0b;--amg:rgba(245,158,11,.1);--amb:rgba(245,158,11,.3);
+  --r:12px;--rs:8px;--rxs:6px;
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(13,17,23,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
-.tl{display:flex;align-items:center;gap:9px}
-.tli{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
-.tln{font-size:15px;font-weight:700}
-.admin-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--og);color:var(--orange);border:1px solid var(--ob)}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.tb-btn{padding:6px 12px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .15s}
-.tb-btn:hover{background:var(--s3);color:var(--text)}
-.layout{display:flex;min-height:100vh;padding-top:56px}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:fixed;top:56px;bottom:0;overflow-y:auto}
-.sid-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);padding:.75rem 1.25rem .4rem}
-.sid-item{display:flex;align-items:center;gap:9px;padding:.65rem 1.25rem;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .15s;border-left:3px solid transparent}
-.sid-item:hover{background:var(--s2);color:var(--text)}
-.sid-item.active{background:var(--ig);color:var(--indigo);border-left-color:var(--indigo);font-weight:600}
-.sid-item svg{flex-shrink:0;opacity:.7}
-.sid-item.active svg{opacity:1}
-.main{margin-left:220px;padding:2rem;flex:1}
+
+/* TOPBAR */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(15,17,23,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
+.t-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
+.t-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
+.t-name{font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
+.admin-badge{font-size:11px;font-weight:700;background:var(--og);color:var(--orange);border:1px solid var(--ob);border-radius:20px;padding:3px 10px}
+.t-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.t-btn{padding:6px 13px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.t-btn:hover{background:var(--s3);color:var(--text)}
+
+/* LAYOUT */
+.shell{display:flex;padding-top:58px;min-height:100vh}
+.sidebar{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem;position:fixed;top:58px;bottom:0;overflow-y:auto;display:flex;flex-direction:column}
+.sb-section{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);padding:0 8px;margin:1.1rem 0 4px}
+.sb-section:first-child{margin-top:0}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;background:none;border:none;font-family:inherit;width:100%;text-align:left}
+.sb-item:hover{background:var(--s2);color:var(--text)}
+.sb-item.act{background:var(--ig);color:#a5b4fc;font-weight:600;position:relative}
+.sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--indigo);border-radius:0 3px 3px 0}
+.sb-item svg{flex-shrink:0;opacity:.6}
+.sb-item.act svg{opacity:1}
+.sb-badge{margin-left:auto;font-size:10px;font-weight:700;background:var(--s3);color:var(--t3);border-radius:10px;padding:1px 7px}
+.sb-item.act .sb-badge{background:var(--ig);color:#a5b4fc}
+.sb-footer{margin-top:auto;padding:.75rem 8px 0;border-top:1px solid var(--border);font-size:11px;color:var(--t3)}
+
+/* MAIN */
+.main{margin-left:230px;flex:1;padding:2rem;min-height:calc(100vh - 58px)}
 .page{display:none}
-.page.active{display:block}
-.ph{margin-bottom:1.75rem}
-.ph h1{font-size:20px;font-weight:700;margin-bottom:4px}
-.ph p{font-size:13px;color:var(--t2)}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem 1.25rem;position:relative;overflow:hidden}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
-.sc-indigo::before{background:var(--indigo)}.sc-orange::before{background:var(--orange)}
-.sc-green::before{background:var(--green)}.sc-red::before{background:var(--red)}
-.stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px}
-.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px}
-.stat-sub{font-size:11px;color:var(--t3);margin-top:3px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:14px}
+.page.act{display:block}
+.page-hd{margin-bottom:1.5rem}
+.page-hd h1{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-bottom:4px}
+.page-hd p{font-size:13px;color:var(--t2)}
+.page-hd-row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:12px}
 .card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
-.card-title{font-size:14px;font-weight:600}
+.card-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
 .card-sub{font-size:12px;color:var(--t3)}
-.tbl{width:100%;border-collapse:collapse}
-.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
-.tbl td{padding:10px 12px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border)}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:var(--s2)}
-.badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid;display:inline-block}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px}
+.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px;margin-bottom:3px}
+.stat-sub{font-size:11px;color:var(--t3)}
+.stat-trend{font-size:11px;font-weight:600;margin-top:4px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s;text-decoration:none}
+.btn-primary{background:var(--indigo);color:#fff}
+.btn-primary:hover{background:var(--indigo2)}
+.btn-orange{background:var(--orange);color:#fff}
+.btn-orange:hover{background:#f97316}
+.btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border2)}
+.btn-ghost:hover{background:var(--s3);color:var(--text)}
+.btn-danger{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
+.btn-danger:hover{background:rgba(244,63,94,.2)}
+.btn-success{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px;border-radius:var(--rxs)}
+
+/* BADGES */
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;border:1px solid;display:inline-block}
 .b-green{background:var(--gg);color:var(--green);border-color:var(--gb)}
 .b-red{background:var(--rg);color:#fda4af;border-color:var(--rb)}
 .b-amber{background:var(--amg);color:var(--amber);border-color:var(--amb)}
 .b-indigo{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
 .b-orange{background:var(--og);color:var(--orange);border-color:var(--ob)}
-.btn-sm{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid;transition:all .15s}
-.btn-danger{background:var(--rg);color:#fda4af;border-color:var(--rb)}
-.btn-danger:hover{background:rgba(244,63,94,.25)}
-.btn-success{background:var(--gg);color:var(--green);border-color:var(--gb)}
-.btn-success:hover{background:rgba(16,185,129,.25)}
-.btn-primary{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
-.btn-primary:hover{background:rgba(91,94,244,.25)}
-.search-bar{width:100%;padding:9px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;margin-bottom:1rem}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:10px 12px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--s2)}
+.tbl-empty{text-align:center;padding:2.5rem;color:var(--t3);font-size:13px}
+
+/* FORM */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
+.form-input,.form-select,.form-textarea{width:100%;padding:10px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--ig)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--t3)}
+.form-textarea{resize:vertical;line-height:1.6}
+.form-hint{font-size:11px;color:var(--t3);margin-top:3px}
+
+/* SEARCH */
+.search-bar{width:100%;padding:9px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;margin-bottom:1rem;transition:border-color .15s}
 .search-bar:focus{border-color:var(--indigo)}
-.empty{text-align:center;padding:3rem;color:var(--t3);font-size:13px}
-.spinner{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--indigo);border-radius:50%;animation:spin .6s linear infinite;margin:2rem auto}
-@keyframes spin{to{transform:rotate(360deg)}}
-.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.prog-lbl{font-size:11px;color:var(--t2);width:100px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-bar::placeholder{color:var(--t3)}
+
+/* PROGRESS BARS */
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.prog-lbl{font-size:12px;color:var(--t2);width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prog-bg{flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
 .prog-fill{height:100%;border-radius:3px}
-.prog-val{font-size:11px;font-weight:700;color:var(--t2);width:30px;text-align:right;flex-shrink:0}
-.alert{padding:12px 16px;border-radius:var(--rs);font-size:13px;margin-bottom:14px;border:1px solid}
-.alert-warning{background:var(--amg);border-color:var(--amb);color:var(--amber)}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.prog-val{font-size:11px;font-weight:700;color:var(--t3);width:28px;text-align:right}
+
+/* USER AVATAR */
+.u-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:var(--rs);font-size:13px;border:1px solid;margin-bottom:12px}
+.alert-warn{background:var(--amg);border-color:var(--amb);color:var(--amber)}
+.alert-ok{background:var(--gg);border-color:var(--gb);color:var(--green);display:none}
+.alert-err{background:var(--rg);border-color:var(--rb);color:#fda4af;display:none}
+
+/* CONTENT EDITOR */
+.edit-section{background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:1rem;margin-bottom:10px}
+.edit-section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.edit-section-title{font-size:12px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em}
+.edit-preview{font-size:13px;color:var(--t3);background:var(--bg);border:1px solid var(--border);border-radius:var(--rxs);padding:8px 10px;margin-top:6px;line-height:1.6;font-style:italic}
+
+/* TABS */
+.tab-row{display:flex;gap:4px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:4px;margin-bottom:1.25rem}
+.tab{padding:7px 14px;border-radius:var(--rxs);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--t2);border:none;background:none;font-family:inherit}
+.tab.act{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem;width:90%;max-width:520px;max-height:80vh;overflow-y:auto}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:0 2px;transition:color .15s}
+.modal-close:hover{color:var(--text)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)}
+
+/* SPINNER */
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOGGLE */
+.toggle-wrap{display:flex;align-items:center;gap:10px}
+.toggle{position:relative;width:40px;height:22px;cursor:pointer;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--border3);border-radius:11px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--indigo)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle input:checked~.toggle-thumb{transform:translateX(18px)}
+
+@media(max-width:860px){.stats-grid{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}}
 </style>
 </head>
 <body>
 
+<!-- TOPBAR -->
 <header class="topbar">
-  <div class="tl">
-    <div class="tli"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-    <span class="tln">TalentScore<span style="color:#a5b4fc">AI</span></span>
-    <span class="admin-badge">Admin Portal</span>
-  </div>
-  <div class="topbar-right">
-    <a href="/app" class="tb-btn">← Go to app</a>
-    <button class="tb-btn" onclick="logout()">Sign out</button>
+  <a href="/app" class="t-logo">
+    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="t-name">TalentScore<span style="color:#fb923c">AI</span></span>
+  </a>
+  <span class="admin-badge">Admin Portal</span>
+  <div class="t-right">
+    <span id="t-admin-email" style="font-size:12px;color:var(--t3)"></span>
+    <a href="/app" class="t-btn">← Go to app</a>
+    <button class="t-btn" onclick="logout()">Sign out</button>
   </div>
 </header>
 
-<div class="layout">
+<div class="shell">
+  <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="sid-section">Overview</div>
-    <div class="sid-item active" onclick="showPage('overview')">
+    <div class="sb-section">Overview</div>
+    <button class="sb-item act" onclick="nav('dashboard')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Dashboard
-    </div>
-    <div class="sid-section">Management</div>
-    <div class="sid-item" onclick="showPage('users')">
+    </button>
+
+    <div class="sb-section">Management</div>
+    <button class="sb-item" onclick="nav('users')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Users & Companies
-    </div>
-    <div class="sid-item" onclick="showPage('screenings')">
+      <span class="sb-badge" id="sb-users-cnt">0</span>
+    </button>
+    <button class="sb-item" onclick="nav('screenings')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       All Screenings
-    </div>
-    <div class="sid-section">System</div>
-    <div class="sid-item" onclick="showPage('settings')">
+      <span class="sb-badge" id="sb-screen-cnt">0</span>
+    </button>
+
+    <div class="sb-section">Content Editor</div>
+    <button class="sb-item" onclick="nav('edit-landing')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Landing Page
+    </button>
+    <button class="sb-item" onclick="nav('edit-pricing')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Pricing Plans
+    </button>
+    <button class="sb-item" onclick="nav('edit-faq')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      FAQ
+    </button>
+    <button class="sb-item" onclick="nav('edit-brand')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Brand & Colors
+    </button>
+
+    <div class="sb-section">System</div>
+    <button class="sb-item" onclick="nav('settings')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      System Settings
-    </div>
+      Platform Settings
+    </button>
+
+    <div class="sb-footer" id="sb-info">Admin</div>
   </aside>
 
   <main class="main">
 
-    <!-- OVERVIEW -->
-    <div class="page active" id="page-overview">
-      <div class="ph"><h1>Admin Dashboard</h1><p>Platform-wide overview and key metrics</p></div>
+    <!-- ── DASHBOARD ── -->
+    <div class="page act" id="page-dashboard">
+      <div class="page-hd"><h1>Admin Dashboard</h1><p>Platform-wide overview and key metrics</p></div>
       <div class="stats-grid">
-        <div class="stat-card sc-indigo"><div class="stat-lbl">Total users</div><div class="stat-val" id="ov-users">—</div><div class="stat-sub">registered companies</div></div>
-        <div class="stat-card sc-orange"><div class="stat-lbl">Total screenings</div><div class="stat-val" id="ov-screenings">—</div><div class="stat-sub">all time</div></div>
-        <div class="stat-card sc-green"><div class="stat-lbl">Active users</div><div class="stat-val" id="ov-active">—</div><div class="stat-sub">accounts active</div></div>
-        <div class="stat-card sc-red"><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">across all screenings</div></div>
+        <div class="stat"><div style="height:2px;background:var(--indigo);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total users</div><div class="stat-val" id="ov-users">—</div><div class="stat-sub">registered companies</div></div>
+        <div class="stat"><div style="height:2px;background:var(--orange);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total screenings</div><div class="stat-val" id="ov-screens">—</div><div class="stat-sub">all time</div></div>
+        <div class="stat"><div style="height:2px;background:var(--green);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Active accounts</div><div class="stat-val" id="ov-active">—</div><div class="stat-sub">not suspended</div></div>
+        <div class="stat"><div style="height:2px;background:var(--amber);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">across all screenings</div></div>
       </div>
-      <div class="overview-grid">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="card">
           <div class="card-hd"><div class="card-title">Top companies by usage</div></div>
-          <div id="top-companies"><div class="spinner"></div></div>
+          <div id="top-companies"></div>
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-title">Recommendation breakdown</div></div>
-          <div id="rec-breakdown"><div class="spinner"></div></div>
+          <div id="rec-breakdown"></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-title">Recent signups</div></div>
-        <table class="tbl">
-          <thead><tr><th>Company</th><th>Email</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th></tr></thead>
-          <tbody id="recent-signups"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
-        </table>
+        <div class="card-hd"><div class="card-title">Recent signups</div><span class="card-sub" id="recent-count"></span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Company</th><th>Email</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th></tr></thead>
+            <tbody id="recent-tbl"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- USERS -->
+    <!-- ── USERS ── -->
     <div class="page" id="page-users">
-      <div class="ph"><h1>Users & Companies</h1><p>Manage all registered accounts</p></div>
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Users & Companies</h1><p>Manage all registered accounts, plans, and access</p></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('add-user-modal')">+ Add user</button>
+      </div>
       <div class="card">
-        <input class="search-bar" type="text" id="user-search" placeholder="Search by company or email..." oninput="filterUsers()">
-        <table class="tbl">
-          <thead><tr><th>Company</th><th>Email</th><th>Role</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="users-tbl"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
-        </table>
+        <input class="search-bar" id="user-search" placeholder="Search by company name or email..." oninput="filterUsers()">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Company</th><th>Email</th><th>Role</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbl"><tr><td colspan="8" class="tbl-empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- SCREENINGS -->
+    <!-- ── SCREENINGS ── -->
     <div class="page" id="page-screenings">
-      <div class="ph"><h1>All Screenings</h1><p>Every CV screening across all companies</p></div>
+      <div class="page-hd"><h1>All Screenings</h1><p>Every CV screening across all companies — click a candidate to view their full report</p></div>
       <div class="card">
-        <input class="search-bar" type="text" id="screen-search" placeholder="Search by candidate name or company..." oninput="filterScreenings()">
-        <table class="tbl">
-          <thead><tr><th>Candidate</th><th>Company</th><th>Score</th><th>Recommendation</th><th>Skills match</th><th>Experience</th><th>Date</th></tr></thead>
-          <tbody id="screenings-tbl"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
-        </table>
+        <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+          <input class="search-bar" id="screen-search" placeholder="Search by candidate or company..." oninput="filterScreenings()" style="flex:1;margin:0">
+          <select class="form-select" id="screen-filter-rec" onchange="filterScreenings()" style="width:150px">
+            <option value="">All results</option>
+            <option>STRONG HIRE</option><option>HIRE</option><option>MAYBE</option><option>REJECT</option>
+          </select>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Candidate</th><th>Company</th><th>Score</th><th>Recommendation</th><th>Skills match</th><th>Experience</th><th>Date</th></tr></thead>
+            <tbody id="screens-tbl"><tr><td colspan="7" class="tbl-empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:12px;color:var(--t3);margin-top:8px" id="screen-count"></div>
       </div>
     </div>
 
-    <!-- SETTINGS -->
-    <div class="page" id="page-settings">
-      <div class="ph"><h1>System Settings</h1><p>Platform configuration and admin tools</p></div>
-      <div class="alert alert-warning">⚠️ Changes here affect the entire platform. Be careful.</div>
+    <!-- ── EDIT LANDING ── -->
+    <div class="page" id="page-edit-landing">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Edit Landing Page</h1><p>Edit the text shown on your public homepage at <strong style="color:var(--indigo)">/</strong></p></div>
+        <button class="btn btn-primary btn-sm" onclick="saveLanding()">Save changes</button>
+      </div>
+      <div class="alert alert-ok" id="landing-ok">✓ Landing page content saved!</div>
       <div class="card">
-        <div class="card-hd"><div class="card-title">Admin account</div></div>
-        <div style="font-size:13px;color:var(--t2);margin-bottom:1rem" id="admin-email-display">Loading...</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn-sm btn-primary" onclick="window.location.href='/app'">Go to main app</button>
-          <button class="btn-sm btn-danger" onclick="logout()">Sign out</button>
+        <div class="card-title" style="margin-bottom:1rem">Hero section</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Hero headline (line 1)</label><input class="form-input" id="lp-h1" placeholder="Screen 100 CVs in"></div>
+          <div class="form-group"><label class="form-label">Hero headline (line 2 — accent)</label><input class="form-input" id="lp-h2" placeholder="Minutes, Not Days"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Hero subtitle</label><textarea class="form-textarea" id="lp-sub" rows="2" placeholder="Describe your platform in 1-2 sentences"></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">CTA button text</label><input class="form-input" id="lp-cta" placeholder="Start screening for free"></div>
+          <div class="form-group"><label class="form-label">Secondary button text</label><input class="form-input" id="lp-cta2" placeholder="See how it works ↓"></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-title">Platform stats</div></div>
-        <div id="platform-stats" style="font-size:13px;color:var(--t2);line-height:2">Loading...</div>
+        <div class="card-title" style="margin-bottom:1rem">Stats strip (hero)</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 1 number</label><input class="form-input" id="lp-s1n" placeholder="3x"></div>
+          <div class="form-group"><label class="form-label">Stat 1 label</label><input class="form-input" id="lp-s1l" placeholder="Faster hiring"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 2 number</label><input class="form-input" id="lp-s2n" placeholder="100"></div>
+          <div class="form-group"><label class="form-label">Stat 2 label</label><input class="form-input" id="lp-s2l" placeholder="CVs per batch"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 3 number</label><input class="form-input" id="lp-s3n" placeholder="98%"></div>
+          <div class="form-group"><label class="form-label">Stat 3 label</label><input class="form-input" id="lp-s3l" placeholder="Accuracy rate"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">CTA banner (bottom of page)</div>
+        <div class="form-group"><label class="form-label">Banner headline</label><input class="form-input" id="lp-banner-h" placeholder="Ready to transform your hiring?"></div>
+        <div class="form-group"><label class="form-label">Banner subtext</label><textarea class="form-textarea" id="lp-banner-sub" rows="2"></textarea></div>
+        <div class="form-group"><label class="form-label">Banner button text</label><input class="form-input" id="lp-banner-btn" placeholder="Start free trial →"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Trusted companies strip</div>
+        <div class="form-group"><label class="form-label">Company names (comma separated)</label><input class="form-input" id="lp-companies" placeholder="BRAC, Grameenphone, Pathao, ShopUp"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="loadLandingDefaults()">Reset to defaults</button>
+        <button class="btn btn-primary" onclick="saveLanding()">Save all changes</button>
+      </div>
+    </div>
+
+    <!-- ── EDIT PRICING ── -->
+    <div class="page" id="page-edit-pricing">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Edit Pricing Plans</h1><p>Update prices, features, and plan names shown on the landing page</p></div>
+        <button class="btn btn-primary btn-sm" onclick="savePricing()">Save pricing</button>
+      </div>
+      <div class="alert alert-ok" id="pricing-ok">✓ Pricing saved!</div>
+      <div id="pricing-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-primary" onclick="savePricing()">Save all pricing</button>
+      </div>
+    </div>
+
+    <!-- ── EDIT FAQ ── -->
+    <div class="page" id="page-edit-faq">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Edit FAQ</h1><p>Manage frequently asked questions shown on the landing page</p></div>
+        <button class="btn btn-primary btn-sm" onclick="addFaq()">+ Add question</button>
+      </div>
+      <div class="alert alert-ok" id="faq-ok">✓ FAQ saved!</div>
+      <div id="faq-list"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-primary" onclick="saveFaq()">Save FAQ</button>
+      </div>
+    </div>
+
+    <!-- ── EDIT BRAND ── -->
+    <div class="page" id="page-edit-brand">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Brand & Colors</h1><p>Customize your platform's name, colors, and contact details</p></div>
+        <button class="btn btn-primary btn-sm" onclick="saveBrand()">Save brand</button>
+      </div>
+      <div class="alert alert-ok" id="brand-ok">✓ Brand settings saved!</div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Identity</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Platform name</label><input class="form-input" id="br-name" placeholder="TalentScore AI"><div class="form-hint">Shown in navbar and emails</div></div>
+          <div class="form-group"><label class="form-label">Tagline</label><input class="form-input" id="br-tagline" placeholder="by LinkX360"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Support email</label><input class="form-input" id="br-email" placeholder="hello@linkx360.com"></div>
+          <div class="form-group"><label class="form-label">Company website</label><input class="form-input" id="br-website" placeholder="https://linkx360.com"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Company address</label><input class="form-input" id="br-address" placeholder="Dhaka, Bangladesh"></div>
+          <div class="form-group"><label class="form-label">Copyright text</label><input class="form-input" id="br-copyright" placeholder="© 2026 TalentScore AI by LinkX360"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Colors</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Primary color (Indigo)</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="color" id="br-color1" value="#5b5ef4" style="width:44px;height:36px;border:1px solid var(--border2);border-radius:var(--rs);background:none;cursor:pointer">
+              <input class="form-input" id="br-color1-hex" placeholder="#5b5ef4" style="font-family:monospace">
+            </div>
+          </div>
+          <div class="form-group"><label class="form-label">Accent color (Orange)</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="color" id="br-color2" value="#fb923c" style="width:44px;height:36px;border:1px solid var(--border2);border-radius:var(--rs);background:none;cursor:pointer">
+              <input class="form-input" id="br-color2-hex" placeholder="#fb923c" style="font-family:monospace">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <div style="flex:1;height:40px;border-radius:var(--rs);background:var(--indigo);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">Primary</div>
+          <div style="flex:1;height:40px;border-radius:var(--rs);background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">Gradient</div>
+          <div style="flex:1;height:40px;border-radius:var(--rs);background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">Accent</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="page-settings">
+      <div class="page-hd"><h1>Platform Settings</h1><p>Global configuration for TalentScore AI</p></div>
+      <div class="alert alert-ok" id="settings-ok">✓ Settings saved!</div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Platform status</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="tog-maintenance" onchange="saveSetting('maintenance',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            <div><div style="font-size:13px;font-weight:600">Maintenance mode</div><div style="font-size:12px;color:var(--t3)">Show a maintenance message to all users</div></div>
+          </div>
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="tog-register" checked onchange="saveSetting('allow_register',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            <div><div style="font-size:13px;font-weight:600">Allow new registrations</div><div style="font-size:12px;color:var(--t3)">Let new companies create accounts</div></div>
+          </div>
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="tog-email" checked onchange="saveSetting('email_verify',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            <div><div style="font-size:13px;font-weight:600">Email verification required</div><div style="font-size:12px;color:var(--t3)">New users must verify email before accessing the app</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Screening limits per plan</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Trial — screenings/month</label><input class="form-input" id="lim-trial" type="number" placeholder="10"></div>
+          <div class="form-group"><label class="form-label">Starter — screenings/month</label><input class="form-input" id="lim-starter" type="number" placeholder="100"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Pro — screenings/month</label><input class="form-input" id="lim-pro" type="number" placeholder="500"></div>
+          <div class="form-group"><label class="form-label">Enterprise — screenings/month</label><input class="form-input" id="lim-enterprise" type="number" placeholder="99999"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveLimits()">Save limits</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Admin account info</div>
+        <div style="font-size:13px;color:var(--t2);line-height:2" id="admin-info">Loading...</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Platform statistics</div>
+        <div style="font-size:13px;color:var(--t2);line-height:2" id="platform-stats">Loading...</div>
       </div>
     </div>
 
   </main>
 </div>
 
-<script>
-let allUsers = [], allScreenings = [];
+<!-- ADD USER MODAL -->
+<div class="modal-overlay" id="add-user-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3 class="modal-title">Add user account</h3><button class="modal-close" onclick="closeModal('add-user-modal')">✕</button></div>
+    <div class="alert alert-err" id="add-user-err"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Company name *</label><input class="form-input" id="new-company" placeholder="Acme Corp"></div>
+      <div class="form-group"><label class="form-label">Email *</label><input class="form-input" id="new-email" type="email" placeholder="user@company.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Password *</label><input class="form-input" id="new-pass" type="password" placeholder="Min 8 chars"></div>
+      <div class="form-group"><label class="form-label">Plan</label>
+        <select class="form-select" id="new-plan"><option value="trial">Trial</option><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Role</label>
+      <select class="form-select" id="new-role"><option value="client">Client</option><option value="admin">Admin</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('add-user-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="addUser()">Create account</button>
+    </div>
+  </div>
+</div>
 
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.sid-item').forEach(s => s.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
-  event.currentTarget.classList.add('active');
+<script>
+let allUsers=[], allScreenings=[], faqItems=[], pricingData=[];
+
+// ── NAVIGATION ──
+function nav(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
+  document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('act'));
+  document.getElementById('page-'+id).classList.add('act');
+  event.currentTarget.classList.add('act');
+  if(id==='edit-pricing')renderPricingEditor();
+  if(id==='edit-faq')renderFaqEditor();
+  if(id==='edit-landing')loadLandingContent();
+  if(id==='settings')loadSettings();
 }
 
+// ── MODALS ──
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ── HELPERS ──
 function gc(s){if(s>=80)return'#10b981';if(s>=60)return'#f59e0b';return'#f43f5e';}
-function rbcls(r){return{'STRONG HIRE':'b-green','HIRE':'b-green','MAYBE':'b-amber','REJECT':'b-red'}[r]||'b-amber';}
+function tbcls(r){return{'STRONG HIRE':'b-green','HIRE':'b-green','MAYBE':'b-amber','REJECT':'b-red'}[r]||'b-amber';}
 function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch{return'—';}}
+function showOk(id){const el=document.getElementById(id);el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 
-async function loadAll() {
-  try {
-    const [usersRes, screenRes, statsRes] = await Promise.all([
-      fetch('/api/admin/users', {credentials:'include'}),
-      fetch('/api/screenings?limit=500', {credentials:'include'}),
-      fetch('/api/stats', {credentials:'include'})
+// ── LOAD DATA ──
+async function loadAll(){
+  try{
+    const [meRes,usersRes,screenRes,statsRes]=await Promise.all([
+      fetch('/api/auth/me',{credentials:'include'}),
+      fetch('/api/admin/users',{credentials:'include'}),
+      fetch('/api/screenings?limit=500',{credentials:'include'}),
+      fetch('/api/stats',{credentials:'include'})
     ]);
-    if (usersRes.status === 403) { window.location.href = '/app'; return; }
-    const usersData   = await usersRes.json();
-    const screenData  = await screenRes.json();
-    const statsData   = await statsRes.json();
-    allUsers      = usersData.users || [];
-    allScreenings = screenData.screenings || [];
+    if(meRes.status===401||usersRes.status===403){window.location.href='/login';return;}
+    const me=await meRes.json();
+    const usersData=await usersRes.json();
+    const screenData=await screenRes.json();
+    const statsData=await statsRes.json();
 
-    // Overview stats
-    document.getElementById('ov-users').textContent = allUsers.length;
-    document.getElementById('ov-screenings').textContent = allScreenings.length;
-    document.getElementById('ov-active').textContent = allUsers.filter(u => u.active !== false).length;
-    document.getElementById('ov-avg').textContent = statsData.avg_score || '—';
+    allUsers=usersData.users||[];
+    allScreenings=screenData.screenings||[];
 
-    renderOverview(statsData);
+    document.getElementById('t-admin-email').textContent=me.email;
+    document.getElementById('sb-info').textContent='Signed in as '+me.email;
+    document.getElementById('sb-users-cnt').textContent=allUsers.length;
+    document.getElementById('sb-screen-cnt').textContent=allScreenings.length;
+
+    renderDashboard(statsData);
     renderUsers();
     renderScreenings();
-    renderSettings();
-  } catch(e) { console.error(e); }
+    renderSettings(me,statsData);
+  }catch(e){console.error(e);}
 }
 
-function renderOverview(stats) {
+// ── DASHBOARD ──
+function renderDashboard(stats){
+  document.getElementById('ov-users').textContent=allUsers.length;
+  document.getElementById('ov-screens').textContent=allScreenings.length;
+  document.getElementById('ov-active').textContent=allUsers.filter(u=>u.active!==false).length;
+  document.getElementById('ov-avg').textContent=stats.avg_score||'—';
+  document.getElementById('recent-count').textContent=allUsers.length+' total users';
+
   // Top companies
-  const compMap = {};
-  allScreenings.forEach(s => { if(s.company) compMap[s.company] = (compMap[s.company]||0)+1; });
-  const sorted = Object.entries(compMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const max = sorted[0]?.[1] || 1;
-  document.getElementById('top-companies').innerHTML = sorted.length
-    ? sorted.map(([co,cnt]) =>
-        `<div class="prog-row"><span class="prog-lbl">${co}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(cnt/max*100)}%;background:var(--indigo)"></div></div><span class="prog-val">${cnt}</span></div>`
-      ).join('')
-    : '<p class="empty">No data yet</p>';
+  const compMap={};
+  allScreenings.forEach(s=>{if(s.company)compMap[s.company]=(compMap[s.company]||0)+1;});
+  const sorted=Object.entries(compMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const max=sorted[0]?.[1]||1;
+  document.getElementById('top-companies').innerHTML=sorted.length
+    ?sorted.map(([co,cnt])=>`<div class="prog-row"><span class="prog-lbl">${co}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(cnt/max*100)}%;background:var(--indigo)"></div></div><span class="prog-val">${cnt}</span></div>`).join('')
+    :'<p style="color:var(--t3);font-size:13px">No data yet</p>';
 
   // Rec breakdown
-  const recs = {STRONG_HIRE:stats.strong_hires||0,HIRE:stats.hires||0,MAYBE:stats.maybes||0,REJECT:stats.rejects||0};
-  const total = Object.values(recs).reduce((a,b)=>a+b,0)||1;
-  const colors = {STRONG_HIRE:'#10b981',HIRE:'#22d3ee',MAYBE:'#f59e0b',REJECT:'#f43f5e'};
-  const labels = {STRONG_HIRE:'Strong Hire',HIRE:'Hire',MAYBE:'Maybe',REJECT:'Reject'};
-  document.getElementById('rec-breakdown').innerHTML = Object.entries(recs).map(([k,v]) =>
+  const recs={STRONG_HIRE:stats.strong_hires||0,HIRE:stats.hires||0,MAYBE:stats.maybes||0,REJECT:stats.rejects||0};
+  const total=Object.values(recs).reduce((a,b)=>a+b,0)||1;
+  const colors={STRONG_HIRE:'#10b981',HIRE:'#22d3ee',MAYBE:'#f59e0b',REJECT:'#f43f5e'};
+  const labels={STRONG_HIRE:'Strong Hire',HIRE:'Hire',MAYBE:'Maybe',REJECT:'Reject'};
+  document.getElementById('rec-breakdown').innerHTML=Object.entries(recs).map(([k,v])=>
     `<div class="prog-row"><span class="prog-lbl">${labels[k]}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(v/total*100)}%;background:${colors[k]}"></div></div><span class="prog-val">${v}</span></div>`
   ).join('');
 
-  // Recent signups
-  const recent = [...allUsers].slice(0,8);
-  document.getElementById('recent-signups').innerHTML = recent.length
-    ? recent.map(u => `<tr>
-        <td style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px">
-          <div class="user-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div>${u.company_name||'—'}
-        </td>
-        <td>${u.email}</td>
-        <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
-        <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
-        <td>${fmt(u.created_at)}</td>
-        <td><span class="badge ${u.active===false?'b-red':'b-green'}">${u.active===false?'Suspended':'Active'}</span></td>
-      </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No users yet</td></tr>';
+  // Recent users
+  document.getElementById('recent-tbl').innerHTML=allUsers.slice(0,10).map(u=>`<tr>
+    <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div><span style="font-weight:600;color:var(--text)">${u.company_name||'—'}</span></div></td>
+    <td>${u.email}</td>
+    <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
+    <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
+    <td>${fmt(u.created_at)}</td>
+    <td><span class="badge ${u.active===false?'b-red':'b-green'}">${u.active===false?'Suspended':'Active'}</span></td>
+  </tr>`).join('');
 }
 
-function renderUsers() {
-  const q = (document.getElementById('user-search')?.value||'').toLowerCase();
-  const filtered = allUsers.filter(u =>
-    (u.company_name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)
-  );
-  document.getElementById('users-tbl').innerHTML = filtered.length
-    ? filtered.map(u => `<tr>
-        <td style="font-weight:600;color:var(--text)">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="user-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div>${u.company_name||'—'}
-          </div>
-        </td>
+// ── USERS ──
+function renderUsers(){
+  const q=(document.getElementById('user-search')?.value||'').toLowerCase();
+  const filtered=allUsers.filter(u=>(u.company_name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+  document.getElementById('users-tbl').innerHTML=filtered.length
+    ?filtered.map(u=>`<tr>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div><span style="font-weight:600;color:var(--text)">${u.company_name||'—'}</span></div></td>
         <td>${u.email}</td>
         <td><span class="badge ${u.role==='admin'?'b-orange':'b-indigo'}">${u.role||'client'}</span></td>
-        <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
+        <td>
+          <select onchange="changePlan('${u._id}',this.value)" style="padding:3px 7px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rxs);font-size:11px;color:var(--t2);cursor:pointer">
+            ${['trial','starter','pro','enterprise'].map(p=>`<option value="${p}" ${(u.plan||'trial')===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+          </select>
+        </td>
         <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
         <td>${fmt(u.created_at)}</td>
         <td><span class="badge ${u.active===false?'b-red':'b-green'}">${u.active===false?'Suspended':'Active'}</span></td>
         <td>
-          <div style="display:flex;gap:5px">
-            <button class="btn-sm ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u._id}','${u.active===false?'activate':'suspend'}')">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-xs ${u.active===false?'btn-success':'btn-danger'}" onclick="toggleUser('${u._id}')">
               ${u.active===false?'Activate':'Suspend'}
             </button>
-            <select onchange="changePlan('${u._id}',this.value)" style="padding:4px 6px;background:var(--s2);border:1px solid var(--border2);border-radius:5px;font-size:11px;color:var(--t2);cursor:pointer">
-              ${['trial','starter','pro','enterprise'].map(p=>`<option value="${p}" ${(u.plan||'trial')===p?'selected':''}>${p}</option>`).join('')}
-            </select>
           </div>
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="8" class="empty">No users found</td></tr>';
+    :'<tr><td colspan="8" class="tbl-empty">No users found</td></tr>';
+}
+function filterUsers(){renderUsers();}
+
+async function toggleUser(id){
+  if(!confirm('Are you sure?'))return;
+  await fetch('/api/admin/users/'+id+'/toggle',{method:'POST',credentials:'include'});
+  await loadAll();
 }
 
-function renderScreenings() {
-  const q = (document.getElementById('screen-search')?.value||'').toLowerCase();
-  const filtered = allScreenings.filter(s =>
-    (s.candidate_name||'').toLowerCase().includes(q) || (s.company||'').toLowerCase().includes(q)
-  );
-  document.getElementById('screenings-tbl').innerHTML = filtered.length
-    ? filtered.slice(0,100).map(s => {
-        const score = Math.round(s.overall_score||0);
-        const rec = (s.recommendation||'MAYBE').toUpperCase();
-        return `<tr>
-          <td><a href="/candidate?id=${s._id}" style="color:var(--indigo);font-weight:600;text-decoration:none">${s.candidate_name||'Unknown'}</a></td>
-          <td style="color:var(--t2)">${s.company||'—'}</td>
-          <td style="font-weight:700;color:${gc(score)}">${score}</td>
-          <td><span class="badge ${rbcls(rec)}">${rec}</span></td>
-          <td>${s.skills_coverage_pct||0}%</td>
-          <td>${s.years_experience||'?'} yrs</td>
-          <td>${fmt(s.created_at)}</td>
-        </tr>`;
-      }).join('')
-    : '<tr><td colspan="7" class="empty">No screenings found</td></tr>';
+async function changePlan(id,plan){
+  const fd=new FormData();fd.append('plan',plan);
+  await fetch('/api/admin/users/'+id+'/plan',{method:'POST',body:fd,credentials:'include'});
 }
 
-function renderSettings() {
-  fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(u=>{
-    document.getElementById('admin-email-display').innerHTML = `Signed in as <strong style="color:var(--text)">${u.email}</strong> · Role: <span class="badge b-orange">${u.role}</span>`;
+async function addUser(){
+  const company=document.getElementById('new-company').value.trim();
+  const email=document.getElementById('new-email').value.trim();
+  const pass=document.getElementById('new-pass').value;
+  const plan=document.getElementById('new-plan').value;
+  const role=document.getElementById('new-role').value;
+  const errEl=document.getElementById('add-user-err');
+  errEl.style.display='none';
+  if(!company||!email||!pass){errEl.textContent='Please fill all required fields.';errEl.style.display='block';return;}
+  try{
+    const res=await fetch('/api/admin/users/create',{method:'POST',body:JSON.stringify({company_name:company,email,password:pass,plan,role}),headers:{'Content-Type':'application/json'},credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    closeModal('add-user-modal');
+    await loadAll();
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+}
+
+// ── SCREENINGS ──
+function renderScreenings(){
+  const q=(document.getElementById('screen-search')?.value||'').toLowerCase();
+  const recF=(document.getElementById('screen-filter-rec')?.value||'').toUpperCase();
+  const filtered=allScreenings.filter(s=>{
+    const matchQ=(s.candidate_name||'').toLowerCase().includes(q)||(s.company||'').toLowerCase().includes(q);
+    const matchR=!recF||((s.recommendation||'').toUpperCase()===recF);
+    return matchQ&&matchR;
   });
-  const stats = `
-    Total users: <strong style="color:var(--text)">${allUsers.length}</strong><br>
-    Active users: <strong style="color:var(--green)">${allUsers.filter(u=>u.active!==false).length}</strong><br>
-    Suspended users: <strong style="color:var(--red)">${allUsers.filter(u=>u.active===false).length}</strong><br>
-    Total screenings: <strong style="color:var(--text)">${allScreenings.length}</strong><br>
-    Batch screenings: <strong style="color:var(--text)">${allScreenings.filter(s=>s.batch).length}</strong>
-  `;
-  document.getElementById('platform-stats').innerHTML = stats;
+  document.getElementById('screen-count').textContent='Showing '+filtered.length+' of '+allScreenings.length+' screenings';
+  document.getElementById('screens-tbl').innerHTML=filtered.slice(0,100).map(s=>{
+    const score=Math.round(s.overall_score||0);
+    const rec=(s.recommendation||'MAYBE').toUpperCase();
+    return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer">
+      <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}</td>
+      <td>${s.company||'—'}</td>
+      <td style="font-weight:700;color:${gc(score)}">${score}</td>
+      <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
+      <td>${s.skills_coverage_pct||0}%</td>
+      <td>${s.years_experience||'?'} yrs</td>
+      <td>${fmt(s.created_at)}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="7" class="tbl-empty">No screenings found</td></tr>';
+}
+function filterScreenings(){renderScreenings();}
+
+// ── LANDING EDITOR ──
+const LANDING_DEFAULTS={
+  h1:'Screen 100 CVs in',h2:'Minutes, Not Days',
+  sub:'TalentScore AI uses GPT-4o to structure, analyze, and rank candidates against your job description — with enterprise-grade accuracy and full transparency.',
+  cta:'Start screening for free',cta2:'See how it works ↓',
+  s1n:'3x',s1l:'Faster hiring',s2n:'100',s2l:'CVs per batch',s3n:'98%',s3l:'Accuracy rate',
+  bannerH:'Ready to transform your hiring?',
+  bannerSub:'Join forward-thinking recruitment teams using TalentScore AI to make faster, fairer hiring decisions. Start your free trial today — no credit card needed.',
+  bannerBtn:'Start free trial — it\'s free →',
+  companies:'BRAC, Grameenphone, Pathao, ShopUp, DataSolution360, LinkX360'
+};
+
+function loadLandingContent(){
+  const saved=JSON.parse(localStorage.getItem('landing_content')||'{}');
+  const d={...LANDING_DEFAULTS,...saved};
+  Object.keys(LANDING_DEFAULTS).forEach(k=>{
+    const el=document.getElementById('lp-'+k.replace(/([A-Z])/g,'-$1').toLowerCase());
+    if(el)el.value=d[k]||'';
+  });
+  // Handle special cases
+  ['h1','h2','sub','cta','cta2','s1n','s1l','s2n','s2l','s3n','s3l','banner-h','banner-sub','banner-btn','companies'].forEach(k=>{
+    const el=document.getElementById('lp-'+k);
+    const key=k.replace(/-([a-z])/g,(m,l)=>l.toUpperCase());
+    if(el&&d[key!==undefined?key:k]!==undefined)el.value=d[key]||d[k]||'';
+  });
 }
 
-function filterUsers() { renderUsers(); }
-function filterScreenings() { renderScreenings(); }
-
-async function toggleUser(userId, action) {
-  if (!confirm(`Are you sure you want to ${action} this user?`)) return;
-  try {
-    const res = await fetch(`/api/admin/users/${userId}/toggle`,{method:'POST',credentials:'include'});
-    if (res.ok) { await loadAll(); }
-  } catch(e) { alert('Failed: '+e.message); }
+function saveLanding(){
+  const d={
+    h1:document.getElementById('lp-h1')?.value||'',
+    h2:document.getElementById('lp-h2')?.value||'',
+    sub:document.getElementById('lp-sub')?.value||'',
+    cta:document.getElementById('lp-cta')?.value||'',
+    cta2:document.getElementById('lp-cta2')?.value||'',
+    s1n:document.getElementById('lp-s1n')?.value||'',
+    s1l:document.getElementById('lp-s1l')?.value||'',
+    s2n:document.getElementById('lp-s2n')?.value||'',
+    s2l:document.getElementById('lp-s2l')?.value||'',
+    s3n:document.getElementById('lp-s3n')?.value||'',
+    s3l:document.getElementById('lp-s3l')?.value||'',
+    bannerH:document.getElementById('lp-banner-h')?.value||'',
+    bannerSub:document.getElementById('lp-banner-sub')?.value||'',
+    bannerBtn:document.getElementById('lp-banner-btn')?.value||'',
+    companies:document.getElementById('lp-companies')?.value||''
+  };
+  localStorage.setItem('landing_content',JSON.stringify(d));
+  showOk('landing-ok');
 }
 
-async function changePlan(userId, plan) {
-  try {
-    const fd = new FormData(); fd.append('plan', plan);
-    await fetch(`/api/admin/users/${userId}/plan`,{method:'POST',body:fd,credentials:'include'});
-  } catch(e) { console.error(e); }
+function loadLandingDefaults(){
+  localStorage.removeItem('landing_content');
+  loadLandingContent();
 }
 
-async function logout() {
+// ── PRICING EDITOR ──
+const DEFAULT_PRICING=[
+  {id:'trial',name:'Trial',usd:'Free',bdt:'Free',period:'',desc:'Perfect for trying out TalentScore AI. No credit card needed.',popular:false,features:['10 CV screenings / month','Single CV screener','Basic score report','1 job posting'],noFeatures:['Batch screening','Analytics dashboard','Priority support']},
+  {id:'starter',name:'Starter',usd:'$29',bdt:'৳3,200',period:'/month',desc:'For small teams and startups ready to streamline hiring.',popular:false,features:['100 CV screenings / month','Batch screening (up to 20)','Full score reports','5 job postings','Basic analytics','Email support'],noFeatures:['Priority support']},
+  {id:'pro',name:'Pro',usd:'$79',bdt:'৳8,500',period:'/month',desc:'For growing teams that screen candidates at scale every week.',popular:true,features:['500 CV screenings / month','Batch screening (up to 100)','Full score reports + CV viewer','Unlimited job postings','Advanced analytics','Priority email support','Custom scoring weights'],noFeatures:[]},
+  {id:'enterprise',name:'Enterprise',usd:'Custom',bdt:'কাস্টম',period:'',desc:'For large organizations with high-volume hiring needs.',popular:false,features:['Unlimited CV screenings','Unlimited batch screening','White-label option','API access','Dedicated account manager','SLA guarantee','Custom integrations'],noFeatures:[]}
+];
+
+function renderPricingEditor(){
+  pricingData=JSON.parse(localStorage.getItem('pricing_data')||JSON.stringify(DEFAULT_PRICING));
+  document.getElementById('pricing-cards').innerHTML=pricingData.map((p,i)=>`
+    <div class="card" style="${p.popular?'border-color:var(--indigo)':''}">
+      <div class="card-hd"><div class="card-title">${p.popular?'⭐ ':''}${p.name} Plan</div><span class="badge ${p.popular?'b-indigo':'b-indigo'}">${p.id}</span></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Plan name</label><input class="form-input" id="p-${i}-name" value="${p.name}" oninput="updatePlan(${i},'name',this.value)"></div>
+        <div class="form-group"><label class="form-label">USD price</label><input class="form-input" id="p-${i}-usd" value="${p.usd}" placeholder="$29" oninput="updatePlan(${i},'usd',this.value)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">BDT price</label><input class="form-input" id="p-${i}-bdt" value="${p.bdt}" placeholder="৳3,200" oninput="updatePlan(${i},'bdt',this.value)"></div>
+        <div class="form-group"><label class="form-label">Period</label><input class="form-input" id="p-${i}-period" value="${p.period}" placeholder="/month" oninput="updatePlan(${i},'period',this.value)"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" rows="2" id="p-${i}-desc" oninput="updatePlan(${i},'desc',this.value)">${p.desc}</textarea></div>
+      <div class="form-group"><label class="form-label">Features (one per line)</label><textarea class="form-textarea" rows="5" id="p-${i}-features" oninput="updatePlan(${i},'features',this.value.split('\\n').filter(Boolean))">${p.features.join('\n')}</textarea></div>
+      <div class="form-group"><label class="form-label">Not included (one per line)</label><textarea class="form-textarea" rows="3" id="p-${i}-noFeatures" oninput="updatePlan(${i},'noFeatures',this.value.split('\\n').filter(Boolean))">${p.noFeatures.join('\n')}</textarea></div>
+      <div class="toggle-wrap" style="margin-top:4px">
+        <label class="toggle"><input type="checkbox" ${p.popular?'checked':''} onchange="updatePlan(${i},'popular',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span style="font-size:13px;color:var(--t2)">Mark as "Most Popular"</span>
+      </div>
+    </div>`).join('');
+}
+
+function updatePlan(i,key,val){pricingData[i][key]=val;}
+
+function savePricing(){
+  localStorage.setItem('pricing_data',JSON.stringify(pricingData));
+  showOk('pricing-ok');
+}
+
+// ── FAQ EDITOR ──
+const DEFAULT_FAQ=[
+  {q:'How accurate is the AI scoring?',a:'TalentScore AI uses a 3-step pipeline — first structuring the CV, then parsing the job description, then scoring against structured data. Every CV is scored twice and results averaged.'},
+  {q:'How long does it take to screen 100 CVs?',a:'Batch screening processes 5 CVs in parallel. For 100 CVs, typical time is 25–40 minutes depending on CV length and API response times.'},
+  {q:'Is my CV data secure and private?',a:'Yes. Each company account has fully isolated data. CVs are stored encrypted. Data is never shared with third parties.'},
+  {q:'What file formats are supported?',a:'Currently we support PDF files only. The PDF must be text-based (not scanned images).'},
+  {q:'Can I use this for any type of role?',a:'Yes — TalentScore AI works for any role. The AI reads your job description and adapts automatically.'},
+  {q:'Do I need technical knowledge to use it?',a:'No technical knowledge required at all. Just paste your job description, upload CVs, and click screen.'},
+  {q:'What is the difference between Trial and Starter?',a:'Trial is free with 10 screenings/month. Starter ($29/month) gives 100 screenings and batch screening for up to 20 CVs.'},
+  {q:'How do I get started?',a:'Click "Start screening for free", create your account, and you\'re ready in under 2 minutes. No credit card required.'},
+];
+
+function renderFaqEditor(){
+  faqItems=JSON.parse(localStorage.getItem('faq_data')||JSON.stringify(DEFAULT_FAQ));
+  renderFaqList();
+}
+
+function renderFaqList(){
+  document.getElementById('faq-list').innerHTML=faqItems.map((item,i)=>`
+    <div class="card" style="margin-bottom:8px">
+      <div class="card-hd">
+        <div class="card-title" style="font-size:12px">Question ${i+1}</div>
+        <button class="btn btn-danger btn-xs" onclick="removeFaq(${i})">Remove</button>
+      </div>
+      <div class="form-group"><label class="form-label">Question</label><input class="form-input" value="${item.q.replace(/"/g,'&quot;')}" oninput="faqItems[${i}].q=this.value"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Answer</label><textarea class="form-textarea" rows="3" oninput="faqItems[${i}].a=this.value">${item.a}</textarea></div>
+    </div>`).join('');
+}
+
+function addFaq(){
+  faqItems.push({q:'New question',a:'Answer goes here'});
+  renderFaqList();
+}
+
+function removeFaq(i){
+  if(!confirm('Remove this FAQ?'))return;
+  faqItems.splice(i,1);renderFaqList();
+}
+
+function saveFaq(){
+  localStorage.setItem('faq_data',JSON.stringify(faqItems));
+  showOk('faq-ok');
+}
+
+// ── BRAND ──
+function saveBrand(){
+  const brand={
+    name:document.getElementById('br-name').value,
+    tagline:document.getElementById('br-tagline').value,
+    email:document.getElementById('br-email').value,
+    website:document.getElementById('br-website').value,
+    address:document.getElementById('br-address').value,
+    copyright:document.getElementById('br-copyright').value,
+    color1:document.getElementById('br-color1').value,
+    color2:document.getElementById('br-color2').value,
+  };
+  localStorage.setItem('brand_data',JSON.stringify(brand));
+  showOk('brand-ok');
+}
+
+document.getElementById('br-color1')?.addEventListener('input',function(){
+  document.getElementById('br-color1-hex').value=this.value;
+});
+document.getElementById('br-color2')?.addEventListener('input',function(){
+  document.getElementById('br-color2-hex').value=this.value;
+});
+
+// Load brand saved values
+const savedBrand=JSON.parse(localStorage.getItem('brand_data')||'{}');
+if(savedBrand.name)document.getElementById('br-name').value=savedBrand.name;
+if(savedBrand.tagline)document.getElementById('br-tagline').value=savedBrand.tagline;
+if(savedBrand.email)document.getElementById('br-email').value=savedBrand.email;
+if(savedBrand.website)document.getElementById('br-website').value=savedBrand.website;
+if(savedBrand.address)document.getElementById('br-address').value=savedBrand.address;
+if(savedBrand.copyright)document.getElementById('br-copyright').value=savedBrand.copyright;
+if(savedBrand.color1){document.getElementById('br-color1').value=savedBrand.color1;document.getElementById('br-color1-hex').value=savedBrand.color1;}
+if(savedBrand.color2){document.getElementById('br-color2').value=savedBrand.color2;document.getElementById('br-color2-hex').value=savedBrand.color2;}
+
+// ── SETTINGS ──
+function loadSettings(){
+  fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(me=>{
+    document.getElementById('admin-info').innerHTML=`Email: <strong style="color:var(--text)">${me.email}</strong><br>Role: <span class="badge b-orange">${me.role}</span><br>Company: <strong style="color:var(--text)">${me.company}</strong>`;
+  });
+  document.getElementById('platform-stats').innerHTML=
+    `Total users: <strong style="color:var(--text)">${allUsers.length}</strong><br>`+
+    `Active users: <strong style="color:var(--green)">${allUsers.filter(u=>u.active!==false).length}</strong><br>`+
+    `Suspended users: <strong style="color:var(--red)">${allUsers.filter(u=>u.active===false).length}</strong><br>`+
+    `Total screenings: <strong style="color:var(--text)">${allScreenings.length}</strong><br>`+
+    `Batch screenings: <strong style="color:var(--text)">${allScreenings.filter(s=>s.batch).length}</strong><br>`+
+    `Single screenings: <strong style="color:var(--text)">${allScreenings.filter(s=>!s.batch).length}</strong>`;
+
+  // Load saved settings
+  const settings=JSON.parse(localStorage.getItem('platform_settings')||'{}');
+  if(settings.maintenance!==undefined)document.getElementById('tog-maintenance').checked=settings.maintenance;
+  if(settings.allow_register!==undefined)document.getElementById('tog-register').checked=settings.allow_register;
+  if(settings.email_verify!==undefined)document.getElementById('tog-email').checked=settings.email_verify;
+  if(settings.lim_trial)document.getElementById('lim-trial').value=settings.lim_trial;
+  if(settings.lim_starter)document.getElementById('lim-starter').value=settings.lim_starter;
+  if(settings.lim_pro)document.getElementById('lim-pro').value=settings.lim_pro;
+  if(settings.lim_enterprise)document.getElementById('lim-enterprise').value=settings.lim_enterprise;
+}
+
+function saveSetting(key,val){
+  const settings=JSON.parse(localStorage.getItem('platform_settings')||'{}');
+  settings[key]=val;
+  localStorage.setItem('platform_settings',JSON.stringify(settings));
+  showOk('settings-ok');
+}
+
+function saveLimits(){
+  const settings=JSON.parse(localStorage.getItem('platform_settings')||'{}');
+  settings.lim_trial=document.getElementById('lim-trial').value;
+  settings.lim_starter=document.getElementById('lim-starter').value;
+  settings.lim_pro=document.getElementById('lim-pro').value;
+  settings.lim_enterprise=document.getElementById('lim-enterprise').value;
+  localStorage.setItem('platform_settings',JSON.stringify(settings));
+  showOk('settings-ok');
+}
+
+// ── ADD USER via API ──
+// We need a new endpoint for this
+async function addUser(){
+  const company=document.getElementById('new-company').value.trim();
+  const email=document.getElementById('new-email').value.trim();
+  const pass=document.getElementById('new-pass').value;
+  const plan=document.getElementById('new-plan').value;
+  const role=document.getElementById('new-role').value;
+  const errEl=document.getElementById('add-user-err');
+  errEl.style.display='none';
+  if(!company||!email||!pass){errEl.textContent='Please fill all fields.';errEl.style.display='block';return;}
+  try{
+    const fd=new FormData();
+    fd.append('company_name',company);fd.append('email',email);
+    fd.append('password',pass);fd.append('plan',plan);fd.append('role',role);
+    const res=await fetch('/api/admin/users/create',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed to create user');
+    closeModal('add-user-modal');
+    ['new-company','new-email','new-pass'].forEach(id=>document.getElementById(id).value='');
+    await loadAll();
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+}
+
+async function logout(){
   await fetch('/api/auth/logout',{method:'POST',credentials:'include'});
   window.location.href='/login';
 }

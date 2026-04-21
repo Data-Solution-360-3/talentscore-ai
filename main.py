@@ -571,6 +571,33 @@ async def admin_toggle_user(request: Request, user_id: str):
     return {"active": new_status}
 
 
+@app.post("/api/admin/users/create")
+async def admin_create_user(
+    request: Request,
+    company_name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    plan: str = Form("trial"),
+    role: str = Form("client"),
+):
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    try:
+        user_id = await create_user(
+            email=email,
+            hashed_password=hash_password(password),
+            company_name=company_name,
+            role=role
+        )
+        await update_user(user_id, {"plan": plan})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"success": True, "user_id": user_id}
+
+
 @app.post("/api/admin/users/{user_id}/plan")
 async def admin_change_plan(request: Request, user_id: str, plan: str = Form(...)):
     user = await get_current_user(request)
