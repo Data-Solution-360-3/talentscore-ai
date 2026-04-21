@@ -366,12 +366,22 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <!-- ── PIPELINE ── -->
     <div class="page" id="page-pipeline">
-      <div class="page-hd"><h1>Live Pipeline</h1><p>Track candidates through your hiring stages</p></div>
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Live Pipeline</h1><p>Candidates auto-sorted by AI recommendation — unique candidates only, duplicates hidden</p></div>
+      </div>
+      <!-- Legend -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <span style="font-size:12px;color:var(--t3);margin-right:4px">Auto-sorted:</span>
+        <span class="badge b-green" style="font-size:11px">STRONG HIRE → Interview</span>
+        <span class="badge b-indigo" style="font-size:11px">HIRE + MAYBE → Screening</span>
+        <span class="badge b-red" style="font-size:11px">REJECT → Rejected</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto" id="pipeline-notice"></span>
+      </div>
       <div class="kb-cols" id="kb-cols">
-        <div class="kb-col"><div class="kb-col-hd"><span>Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div class="kb-col-body" id="kb-0"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span>Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div class="kb-col-body" id="kb-1"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span>Offer</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div class="kb-col-body" id="kb-2"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span>Hired</span><span class="badge b-green" id="kb-cnt-3">0</span></div><div class="kb-col-body" id="kb-3"></div></div>
+        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div class="kb-col-body" id="kb-0"></div></div>
+        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div class="kb-col-body" id="kb-1"></div></div>
+        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Offer</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div class="kb-col-body" id="kb-2"></div></div>
+        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Rejected</span><span class="badge b-red" id="kb-cnt-3">0</span></div><div class="kb-col-body" id="kb-3"></div></div>
       </div>
     </div>
 
@@ -661,23 +671,74 @@ function renderCandidates(){
 
 // ── PIPELINE ──
 function renderPipeline(){
-  const cols=[[],[],[],[]];
-  allResults.forEach(r=>{
-    const rec=r.rec;
-    if(rec==='STRONG HIRE'||rec==='HIRE')cols[0].push(r);
-    else if(rec==='MAYBE')cols[1].push(r);
-    else cols[3].push(r);
+  // Deduplicate by candidate name + score (keep latest)
+  const seen = new Set();
+  const unique = [];
+  [...allResults].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).forEach(r=>{
+    const key = (r.candidate_name||'unknown').toLowerCase().trim();
+    if(!seen.has(key)){ seen.add(key); unique.push(r); }
   });
-  const colors=['var(--indigo)','var(--amber)','var(--orange)','var(--red)'];
+
+  // Auto-sort by AI recommendation into correct stages
+  // STRONG HIRE → Interview (ready to interview)
+  // HIRE → Screening (good, review first)
+  // MAYBE → Screening (needs review)
+  // REJECT → Rejected (not suitable)
+  const cols=[[],[],[],[]]; // [Screening, Interview, Offer, Hired/Rejected]
+  unique.forEach(r=>{
+    const rec=r.rec||'MAYBE';
+    if(rec==='STRONG HIRE') cols[1].push(r);      // → Interview
+    else if(rec==='HIRE')   cols[0].push(r);      // → Screening
+    else if(rec==='MAYBE')  cols[0].push(r);      // → Screening
+    else                    cols[3].push(r);      // → Rejected
+  });
+
+  // Sort each column by score descending
+  cols.forEach(col=>col.sort((a,b)=>b.score-a.score));
+
+  const labels=['Screening','Interview','Offer','Rejected'];
+  const badgeCls=['b-indigo','b-amber','b-orange','b-red'];
+
   for(let i=0;i<4;i++){
     document.getElementById('kb-cnt-'+i).textContent=cols[i].length;
+    // Update column header badge color
+    const badge=document.querySelector(`#kb-cnt-${i}`);
+    if(badge){badge.className='badge '+badgeCls[i];}
     document.getElementById('kb-'+i).innerHTML=cols[i].length
-      ?cols[i].map(r=>`<div class="kb-card" onclick="window.location.href='/candidate?id=${r._id}'">
-          <div class="kb-name">${r.candidate_name||'Unknown'}</div>
-          <div class="kb-role">${r.current_title||'—'}</div>
-          <div class="kb-score" style="color:${gc(r.score)}">Score: ${r.score}/100</div>
-        </div>`).join('')
-      :'<div style="color:var(--t3);font-size:12px;text-align:center;padding:1rem">Empty</div>';
+      ?cols[i].map(r=>{
+          const c=gc(r.score);
+          const recBadge = r.rec==='STRONG HIRE'?'<span class="badge b-green" style="font-size:9px;padding:1px 6px">STRONG HIRE</span>':
+                           r.rec==='HIRE'?'<span class="badge b-green" style="font-size:9px;padding:1px 6px">HIRE</span>':
+                           r.rec==='MAYBE'?'<span class="badge b-amber" style="font-size:9px;padding:1px 6px">MAYBE</span>':
+                           '<span class="badge b-red" style="font-size:9px;padding:1px 6px">REJECT</span>';
+          return `<div class="kb-card" onclick="window.location.href='/candidate?id=${r._id}'">
+            <div class="kb-name">${r.candidate_name||'Unknown'}</div>
+            <div class="kb-role" style="margin-bottom:5px">${r.current_title||'—'}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="kb-score" style="color:${c};font-size:13px;font-weight:700">${r.score}/100</div>
+              ${recBadge}
+            </div>
+          </div>`;
+        }).join('')
+      :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:1.5rem;line-height:1.6">
+          Empty<br><span style="font-size:11px">No candidates here</span>
+        </div>`;
+  }
+
+  // Update column headers with correct labels
+  const hdrs=['Screening','Interview','Offer','Rejected'];
+  const descs=['HIRE + MAYBE candidates','STRONG HIRE candidates','Manually move here','REJECT candidates'];
+  for(let i=0;i<4;i++){
+    const col=document.querySelector(`#kb-${i}`).parentElement;
+    const hd=col.querySelector('.kb-col-hd');
+    if(hd) hd.innerHTML=`<span style="font-weight:700;font-size:13px">${hdrs[i]}</span><span class="badge ${badgeCls[i]}" id="kb-cnt-${i}">${cols[i].length}</span>`;
+  }
+
+  // Show dedup notice if duplicates were removed
+  const removed = allResults.length - unique.length;
+  if(removed > 0){
+    const notice = document.getElementById('pipeline-notice');
+    if(notice) notice.textContent = `${removed} duplicate screening${removed>1?'s':''} hidden — showing unique candidates only`;
   }
 }
 
