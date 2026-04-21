@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5ef4'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Portal — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -550,7 +551,7 @@ async function loadAll(){
     renderDashboard(statsData);
     renderUsers();
     renderScreenings();
-    renderSettings(me,statsData);
+    loadSettings();
   }catch(e){console.error(e);}
 }
 
@@ -617,6 +618,18 @@ function renderUsers(){
         </td>
       </tr>`).join('')
     :'<tr><td colspan="8" class="tbl-empty">No users found</td></tr>';
+
+  // Also populate migration dropdown
+  const migSel=document.getElementById('migrate-from-user');
+  if(migSel){
+    migSel.innerHTML='<option value="">Select source user...</option>';
+    filtered.forEach(u=>{
+      const o=document.createElement('option');
+      o.value=u._id;
+      o.textContent=u.company_name+' ('+u.email+') — '+u.screening_count+' screenings';
+      migSel.appendChild(o);
+    });
+  }
 }
 function filterUsers(){renderUsers();}
 
@@ -913,6 +926,25 @@ async function addUser(){
 async function logout(){
   await fetch('/api/auth/logout',{method:'POST',credentials:'include'});
   window.location.href='/login';
+}
+
+async function migrateAll(){
+  if(!confirm('This will assign ALL screenings to your admin account. Continue?'))return;
+  const res=await fetch('/api/admin/migrate-screenings',{method:'POST',credentials:'include'});
+  const data=await res.json();
+  const el=document.getElementById('migrate-result');
+  el.textContent='✓ '+data.message;el.style.display='block';
+  setTimeout(()=>loadAll(),1000);
+}
+
+async function migrateFromUser(){
+  const userId=document.getElementById('migrate-from-user').value;
+  if(!userId){alert('Please select a user');return;}
+  const res=await fetch('/api/admin/migrate-from/'+userId,{method:'POST',credentials:'include'});
+  const data=await res.json();
+  const el=document.getElementById('migrate-result');
+  el.textContent='✓ Moved '+data.migrated+' screenings';el.style.display='block';
+  setTimeout(()=>loadAll(),1000);
 }
 
 loadAll();
