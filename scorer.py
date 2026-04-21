@@ -284,6 +284,22 @@ def average_scores(result_a: dict, result_b: dict) -> dict:
 
     result["dimensions"] = averaged_dims
 
+    # Average skills_coverage_pct
+    cov_a = result_a.get("skills_coverage_pct", 0)
+    cov_b = result_b.get("skills_coverage_pct", 0)
+    result["skills_coverage_pct"] = round((cov_a + cov_b) / 2)
+
+    # If still 0, calculate from dimensions matched_skills
+    if result["skills_coverage_pct"] == 0:
+        all_matched = set()
+        all_missing = set()
+        for dim in averaged_dims:
+            all_matched.update(dim.get("matched_skills", []))
+            all_missing.update(dim.get("missing_skills", []))
+        total = len(all_matched) + len(all_missing)
+        if total > 0:
+            result["skills_coverage_pct"] = round(len(all_matched) / total * 100)
+
     # Recalculate recommendation based on averaged score
     score = result["overall_score"]
     if score >= 82:

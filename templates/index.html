@@ -312,8 +312,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="page act" id="page-overview">
   <div class="ph-row">
     <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
-    <div style="display:flex;gap:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
+      <button class="btn btn-ghost btn-sm" id="claim-btn" onclick="claimScreenings()" title="If you see missing screenings, click this to assign them to your account">⬇ Claim my screenings</button>
       <a href="/batch" class="btn btn-orange btn-sm">⚡ Batch screen CVs</a>
     </div>
   </div>

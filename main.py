@@ -860,6 +860,33 @@ async def get_team(request: Request):
     return {"members": members, "invites": invites}
 
 
+@app.post("/api/admin/migrate-screenings")
+async def migrate_screenings(request: Request):
+    """Admin tool: assign all unowned screenings to a specific user."""
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db
+    # Find all screenings with no user_id
+    result = await db.screenings.update_many(
+        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
+        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
+    )
+    return {"migrated": result.modified_count, "message": f"Assigned {result.modified_count} screenings to {user['email']}"}
+
+
+@app.post("/api/user/claim-screenings")
+async def claim_my_screenings(request: Request):
+    """Let current user claim all unowned screenings."""
+    user = await get_current_user(request)
+    from database import db
+    result = await db.screenings.update_many(
+        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
+        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
+    )
+    return {"claimed": result.modified_count}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "5.0.0", "auth": True, "db": "mongodb"}
