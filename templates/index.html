@@ -3,559 +3,687 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TalentScore AI</title>
+<title>TopCandidate.pro — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#1e1b4b;--navy2:#16133a;
-  --indigo:#5b5ef4;--indigo2:#4a4de0;--ig:rgba(91,94,244,.12);--ib:rgba(91,94,244,.3);--il:rgba(91,94,244,.06);
-  --orange:#fb923c;--orange2:#f97316;--og:rgba(251,146,60,.12);--ob:rgba(251,146,60,.3);
-  --bg:#07080f;--surface:#0f1117;--s2:#171b26;--s3:#1e2333;--s4:#252b3b;
-  --border:#1e2333;--border2:#252b3b;--border3:#2e3548;
-  --text:#eef0f8;--t2:#8b95b0;--t3:#4a5270;--t4:#2e3548;
-  --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.3);
-  --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.3);
-  --amber:#f59e0b;--amg:rgba(245,158,11,.1);--amb:rgba(245,158,11,.3);
-  --blue:#38bdf8;
+  --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;
+  --ig:rgba(91,94,244,.1);--ib:rgba(91,94,244,.25);
+  --orange:#fb923c;--orange2:#f97316;--og:rgba(251,146,60,.1);--ob:rgba(251,146,60,.25);
+  --bg:#07080f;--surface:#0f1117;--s2:#151a24;--s3:#1b2130;--s4:#212840;
+  --border:#1b2130;--border2:#212840;--border3:#2a3350;
+  --text:#eef0f8;--t2:#8b95b0;--t3:#4a5570;
+  --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.25);
+  --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.25);
+  --amber:#f59e0b;--amg:rgba(245,158,11,.1);--amb:rgba(245,158,11,.25);
+  --blue:#38bdf8;--blg:rgba(56,189,248,.1);--blb:rgba(56,189,248,.25);
   --r:12px;--rs:8px;--rxs:6px;
-  --sh: 0 1px 3px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── TOPBAR ── */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(15,17,23,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
-.t-logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0}
-.t-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;background:rgba(10,11,20,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:.75rem}
+.t-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0}
+.t-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .t-name{font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
-.t-by{font-size:10px;font-weight:600;color:var(--t3);background:var(--s2);border:1px solid var(--border2);border-radius:20px;padding:2px 8px;margin-left:2px}
-.t-nav{display:flex;align-items:center;gap:2px;margin-left:1.5rem}
-.tn{font-size:13px;font-weight:500;color:var(--t2);padding:6px 12px;border-radius:var(--rxs);cursor:pointer;transition:all .15s;text-decoration:none;border:none;background:none;font-family:inherit}
-.tn:hover{background:var(--s2);color:var(--text)}
-.tn.act{color:var(--text);background:var(--s2);font-weight:600}
-.t-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.t-plan{font-size:11px;font-weight:700;background:var(--og);color:var(--orange);border:1px solid var(--ob);border-radius:20px;padding:3px 10px}
-.t-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer;border:2px solid var(--border2)}
-.t-btn{padding:6px 13px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .15s}
+.t-by{font-size:10px;color:var(--t3);background:var(--s2);border:1px solid var(--border2);border-radius:20px;padding:2px 7px;margin-left:2px}
+.t-sep{width:1px;height:20px;background:var(--border2);flex-shrink:0}
+.t-nav{display:flex;align-items:center;gap:1px}
+.tn{font-size:12px;font-weight:500;color:var(--t2);padding:5px 10px;border-radius:6px;cursor:pointer;transition:all .12s;background:none;border:none;font-family:inherit}
+.tn:hover,.tn.act{background:var(--s2);color:var(--text)}
+.tn.act{font-weight:600}
+.t-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.t-plan{font-size:10px;font-weight:700;background:var(--og);color:var(--orange);border:1px solid var(--ob);border-radius:20px;padding:3px 9px}
+.t-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer;border:2px solid var(--border2);flex-shrink:0}
+.t-btn{padding:5px 11px;border-radius:var(--rs);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .12s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .t-btn:hover{background:var(--s3);color:var(--text)}
+.t-btn.accent{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+.t-btn.accent:hover{background:var(--indigo2)}
 
 /* ── LAYOUT ── */
-.shell{display:flex;padding-top:58px;min-height:100vh}
+.shell{display:flex;padding-top:56px;min-height:100vh}
 
 /* ── SIDEBAR ── */
-.sidebar{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem;display:flex;flex-direction:column;position:fixed;top:58px;left:0;height:calc(100vh - 58px);overflow-y:auto;z-index:100}
-.sb-section{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);padding:0 8px;margin:1.1rem 0 4px}
-.sb-section:first-child{margin-top:0}
-.sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;position:relative;text-decoration:none;border:none;background:none;font-family:inherit;width:100%}
+.sidebar{width:210px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:.75rem .6rem;position:fixed;top:56px;left:0;height:calc(100vh - 56px);overflow-y:auto;display:flex;flex-direction:column;z-index:100}
+.sb-sec{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);padding:0 8px;margin:1rem 0 3px}
+.sb-sec:first-child{margin-top:0}
+.sb-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:var(--rs);font-size:12px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;background:none;border:none;font-family:inherit;width:100%;text-align:left;position:relative}
 .sb-item:hover{background:var(--s2);color:var(--text)}
 .sb-item.act{background:var(--ig);color:#a5b4fc;font-weight:600}
-.sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--indigo);border-radius:0 3px 3px 0}
-.sb-item svg{flex-shrink:0;opacity:.65}
-.sb-item.act svg{opacity:1}
-.sb-badge{margin-left:auto;font-size:10px;font-weight:700;background:var(--s3);color:var(--t3);border-radius:10px;padding:1px 7px;min-width:20px;text-align:center}
+.sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:14px;background:var(--indigo);border-radius:0 2px 2px 0}
+.sb-badge{margin-left:auto;font-size:9px;font-weight:700;background:var(--s3);color:var(--t3);border-radius:8px;padding:1px 6px}
 .sb-item.act .sb-badge{background:var(--ig);color:#a5b4fc}
-.sb-footer{margin-top:auto;padding:.75rem 8px 0;border-top:1px solid var(--border)}
-.sb-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3)}
-.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 6px rgba(16,185,129,.5)}
-.sb-company{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px;padding:0 2px}
+.sb-footer{margin-top:auto;padding:.6rem 6px 0;border-top:1px solid var(--border);font-size:11px}
+.sb-company{font-weight:600;color:var(--t2);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-status{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)}
+.sb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0}
 
-/* ── MAIN CONTENT ── */
-.main{margin-left:230px;flex:1;padding:2rem 2rem 4rem;min-height:calc(100vh - 58px)}
+/* ── MAIN ── */
+.main{margin-left:210px;flex:1;padding:1.5rem 1.75rem 4rem;min-height:calc(100vh - 56px)}
 .page{display:none}
 .page.act{display:block}
 
 /* ── PAGE HEADER ── */
-.page-hd{margin-bottom:1.75rem}
-.page-hd h1{font-size:21px;font-weight:800;letter-spacing:-.4px;margin-bottom:4px}
-.page-hd p{font-size:13px;color:var(--t2);line-height:1.6}
-.page-hd-row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.ph{margin-bottom:1.25rem}
+.ph h1{font-size:19px;font-weight:800;letter-spacing:-.4px;margin-bottom:3px}
+.ph p{font-size:12px;color:var(--t2)}
+.ph-row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
 
 /* ── CARDS ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem}
-.card+.card{margin-top:12px}
-.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
-.card-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
-.card-sub{font-size:12px;color:var(--t3)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem}
+.card+.card{margin-top:10px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem}
+.card-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.card-sub{font-size:11px;color:var(--t3)}
 
 /* ── STAT CARDS ── */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;position:relative;overflow:hidden;transition:border-color .2s}
-.stat:hover{border-color:var(--border3)}
-.stat-accent{position:absolute;top:0;left:0;right:0;height:2px}
-.stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px}
-.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px;margin-bottom:3px}
-.stat-sub{font-size:11px;color:var(--t3)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+.stat:hover{border-color:var(--border3);transform:translateY(-1px)}
+.stat-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px}
+.stat-val{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:2px}
+.stat-sub{font-size:10px;color:var(--t3)}
+.stat-trend{font-size:10px;font-weight:600;margin-top:3px}
+.stat-trend.up{color:var(--green)}.stat-trend.dn{color:var(--red)}
 
 /* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;border:none;text-decoration:none}
-.btn-primary{background:var(--indigo);color:#fff;box-shadow:0 2px 8px rgba(91,94,244,.3)}
-.btn-primary:hover{background:var(--indigo2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,94,244,.4)}
-.btn-orange{background:var(--orange);color:#fff;box-shadow:0 2px 8px rgba(251,146,60,.3)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s;border:none;text-decoration:none;white-space:nowrap}
+.btn-primary{background:var(--indigo);color:#fff;box-shadow:0 2px 8px rgba(91,94,244,.25)}
+.btn-primary:hover{background:var(--indigo2)}
+.btn-orange{background:var(--orange);color:#fff}
 .btn-orange:hover{background:var(--orange2)}
 .btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border2)}
 .btn-ghost:hover{background:var(--s3);color:var(--text)}
-.btn-sm{padding:5px 11px;font-size:12px}
-.btn-xs{padding:3px 8px;font-size:11px;border-radius:var(--rxs)}
-.btn-danger{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
-.btn-danger:hover{background:rgba(244,63,94,.2)}
+.btn-sm{padding:4px 9px;font-size:11px}
+.btn-xs{padding:3px 7px;font-size:10px;border-radius:5px}
+.btn-green{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
+.btn-red{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
+.btn-amber{background:var(--amg);color:var(--amber);border:1px solid var(--amb)}
 
 /* ── BADGES ── */
-.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;border:1px solid;display:inline-block}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid;display:inline-block;white-space:nowrap}
 .b-green{background:var(--gg);color:var(--green);border-color:var(--gb)}
 .b-red{background:var(--rg);color:#fda4af;border-color:var(--rb)}
 .b-amber{background:var(--amg);color:var(--amber);border-color:var(--amb)}
 .b-indigo{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
 .b-orange{background:var(--og);color:var(--orange);border-color:var(--ob)}
+.b-blue{background:var(--blg);color:var(--blue);border-color:var(--blb)}
 
 /* ── TABLES ── */
 .tbl-wrap{overflow-x:auto}
-.tbl{width:100%;border-collapse:collapse}
-.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
-.tbl td{padding:10px 12px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border)}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--s2)}
+.tbl td{padding:9px 10px;color:var(--t2);border-bottom:1px solid var(--border);vertical-align:middle}
 .tbl tr:last-child td{border-bottom:none}
 .tbl tr:hover td{background:var(--s2);cursor:pointer}
+.tbl-empty{text-align:center;padding:2.5rem;color:var(--t3);font-size:12px}
 .tbl-link{color:var(--indigo);font-weight:600;text-decoration:none}
 .tbl-link:hover{text-decoration:underline}
-.tbl-empty{text-align:center;padding:3rem;color:var(--t3);font-size:13px}
 
-/* ── FORM ELEMENTS ── */
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-.form-group{display:flex;flex-direction:column;gap:5px}
-.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
-.form-input,.form-select,.form-textarea{width:100%;padding:10px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s}
+/* ── SCORE BAR ── */
+.score-bar{display:flex;align-items:center;gap:6px}
+.score-bar-bg{flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;min-width:50px}
+.score-bar-fill{height:100%;border-radius:2px}
+.score-num{font-weight:700;min-width:24px;font-size:12px}
+
+/* ── PIPELINE FUNNEL ── */
+.funnel{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px}
+.funnel-stage{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem .6rem;text-align:center;transition:all .2s;cursor:pointer}
+.funnel-stage:hover{border-color:var(--indigo);transform:translateY(-2px)}
+.funnel-stage.act{border-color:var(--indigo);background:var(--ig)}
+.funnel-num{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:3px}
+.funnel-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
+.funnel-bar{height:3px;border-radius:2px;margin-top:8px}
+
+/* ── FILTERS ── */
+.filters-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.filter-select{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--t2);outline:none;transition:border-color .12s;cursor:pointer}
+.filter-select:focus{border-color:var(--indigo)}
+.filter-input{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s}
+.filter-input::placeholder{color:var(--t3)}
+.filter-input:focus{border-color:var(--indigo)}
+.filter-clear{font-size:11px;color:var(--t3);cursor:pointer;padding:6px 8px;border:none;background:none;font-family:inherit}
+.filter-clear:hover{color:var(--text)}
+
+/* ── FORM ── */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.form-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s}
 .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--ig)}
 .form-input::placeholder,.form-textarea::placeholder{color:var(--t3)}
 .form-textarea{resize:vertical;line-height:1.6}
-.form-hint{font-size:11px;color:var(--t3);margin-top:2px}
+.form-hint{font-size:10px;color:var(--t3);margin-top:2px}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.35rem;width:90%;max-width:560px;max-height:85vh;overflow-y:auto}
+.modal-lg{max-width:800px}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:0;transition:color .12s}
+.modal-close:hover{color:var(--text)}
+.modal-footer{display:flex;gap:7px;justify-content:flex-end;margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--border)}
+
+/* ── CANDIDATE DETAIL ── */
+.cand-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.dim-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.dim-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.8rem;position:relative;overflow:hidden}
+.dim-top{height:2px;position:absolute;top:0;left:0;right:0}
+.dim-name{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:4px;margin-top:2px}
+.dim-score{font-size:17px;font-weight:800;letter-spacing:-.5px;margin-bottom:5px}
+.dim-bar-bg{height:3px;background:var(--border2);border-radius:2px;overflow:hidden;margin-bottom:6px}
+.dim-bar-fill{height:100%;border-radius:2px}
+.dim-fb{font-size:10px;color:var(--t2);line-height:1.5}
 
 /* ── DROP ZONE ── */
-.drop-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
 .drop-zone:hover,.drop-zone.over{border-color:var(--indigo);background:var(--ig)}
-.drop-zone-icon{width:48px;height:48px;border-radius:12px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
-.drop-zone-title{font-size:15px;font-weight:700;margin-bottom:4px}
-.drop-zone-sub{font-size:12px;color:var(--t3);line-height:1.6}
+.dz-icon{width:44px;height:44px;border-radius:10px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
 
-/* ── PROGRESS ── */
-.prog-bar-wrap{margin-bottom:12px}
-.prog-bar-hd{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;color:var(--t2)}
-.prog-bar-bg{height:6px;background:var(--border2);border-radius:3px;overflow:hidden}
-.prog-bar-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
-
-/* ── SCORE CIRCLE ── */
-.score-circle{width:72px;height:72px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid var(--border2);flex-shrink:0}
-.score-num{font-size:22px;font-weight:800;letter-spacing:-1px;line-height:1}
-.score-den{font-size:10px;color:var(--t3);margin-top:1px}
-
-/* ── FILE LIST ── */
-.file-item{display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;font-size:12px}
-.file-name{flex:1;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-size{font-size:11px;color:var(--t3);flex-shrink:0}
-.file-remove{cursor:pointer;color:var(--t3);flex-shrink:0;background:none;border:none;font-size:14px;padding:0 2px;transition:color .15s}
-.file-remove:hover{color:var(--red)}
+/* ── TOGGLE ── */
+.toggle{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--border3);border-radius:10px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--indigo)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s}
+.toggle input:checked~.toggle-thumb{transform:translateX(16px)}
 
 /* ── ALERTS ── */
-.alert{padding:10px 14px;border-radius:var(--rs);font-size:13px;border:1px solid;margin-bottom:12px;display:none}
-.alert-err{background:var(--rg);border-color:var(--rb);color:#fda4af}
+.alert{padding:9px 12px;border-radius:var(--rs);font-size:12px;border:1px solid;margin-bottom:10px;display:none}
 .alert-ok{background:var(--gg);border-color:var(--gb);color:var(--green)}
+.alert-err{background:var(--rg);border-color:var(--rb);color:#fda4af}
 
-/* ── SPINNER ── */
-.spin{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--indigo);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+/* ── ACTIVITY LOG ── */
+.activity-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.activity-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.activity-txt{font-size:12px;color:var(--t2);flex:1;line-height:1.5}
+.activity-time{font-size:10px;color:var(--t3);flex-shrink:0}
+
+/* ── TAGS ── */
+.tag{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:4px;margin:1px;background:var(--s3);color:var(--t2);border:1px solid var(--border2)}
+.tag.matched{background:var(--gg);color:var(--green);border-color:var(--gb)}
+.tag.missing{background:var(--rg);color:#fda4af;border-color:var(--rb)}
+
+/* ── JOB STATUS ── */
+.job-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid}
+
+/* ── SPIN ── */
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── STEP INDICATOR ── */
-.steps-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:1.5rem}
-.step-item{padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--t3);border-right:1px solid var(--border);transition:all .3s;position:relative}
+.steps-bar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--s2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:1.25rem}
+.step-item{padding:9px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);border-right:1px solid var(--border);transition:all .3s}
 .step-item:last-child{border-right:none}
 .step-item.act{background:var(--ig);color:#a5b4fc}
 .step-item.done{background:var(--gg);color:var(--green)}
-.step-num{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;opacity:.6}
+.step-num{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;opacity:.6}
 
-/* ── CANDIDATE PROGRESS GRID ── */
-.cv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;max-height:280px;overflow-y:auto;margin-bottom:1rem}
-.cv-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.8rem;font-size:12px;transition:border-color .3s}
-.cv-card.processing{border-color:var(--indigo)}
-.cv-card.done{border-color:var(--green)}
-.cv-card.failed{border-color:var(--red)}
-.cv-card-name{font-weight:600;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
-.cv-card-status{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
-.cv-card-status.wait{color:var(--t3)}
-.cv-card-status.processing{color:var(--indigo)}
-.cv-card-status.done{color:var(--green)}
-.cv-card-status.failed{color:var(--red)}
-.cv-card-score{font-size:18px;font-weight:800;margin-top:4px}
-.dot-pulse{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse .8s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
-
-/* ── RESULTS TABLE ── */
-.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:800}
-.rank-1{background:linear-gradient(135deg,var(--orange),var(--red));color:#fff}
-.rank-2{background:var(--s3);color:var(--t2)}
-.rank-3{background:var(--s3);color:var(--t2)}
-
-/* ── KANBAN ── */
-.kb-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.kb-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.kb-col-hd{padding:.85rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700}
-.kb-col-body{padding:.75rem;max-height:500px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
-.kb-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem;cursor:pointer;transition:all .15s}
-.kb-card:hover{border-color:var(--indigo);transform:translateY(-1px)}
-.kb-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
-.kb-role{font-size:11px;color:var(--t3);margin-bottom:6px}
-.kb-score{font-size:12px;font-weight:700}
-
-/* ── DASHBOARD ── */
-.dash-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
-
-/* ── LOADING ── */
-#global-loading{position:fixed;inset:0;background:rgba(7,8,15,.8);backdrop-filter:blur(4px);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
-.loading-spin{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--indigo);border-radius:50%;animation:spin .7s linear infinite}
-.loading-txt{font-size:14px;color:var(--t2)}
-
-@media(max-width:900px){.stats-row{grid-template-columns:1fr 1fr}.kb-cols{grid-template-columns:1fr 1fr}.dash-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.main{padding:1.25rem}}
-@media(max-width:640px){.stats-row{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}}
+@media(max-width:1100px){.stats-grid-7{grid-template-columns:repeat(4,1fr)}.funnel{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:860px){.stats-grid{grid-template-columns:1fr 1fr}.dim-grid{grid-template-columns:1fr 1fr}.cand-detail-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}}
+@media(max-width:640px){.sidebar{display:none}.main{margin-left:0}.funnel{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
 <body>
 
-<!-- GLOBAL LOADING -->
-<div id="global-loading" style="display:none">
-  <div class="loading-spin"></div>
-  <div class="loading-txt" id="loading-txt">Processing...</div>
-</div>
-
 <!-- TOPBAR -->
 <header class="topbar">
   <a href="/app" class="t-logo">
-    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-    <span class="t-name">TalentScore<span style="color:#fb923c">AI</span></span>
+    <div class="t-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+    <span class="t-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
     <span class="t-by">by LinkX360</span>
   </a>
+  <div class="t-sep"></div>
   <nav class="t-nav">
-    <button class="tn act" onclick="showPage('screen')">Screener</button>
-    <button class="tn" onclick="showPage('pipeline')">Pipeline</button>
+    <button class="tn act" onclick="showPage('overview')">Overview</button>
+    <button class="tn" onclick="showPage('screener')">Screener</button>
     <button class="tn" onclick="showPage('candidates')">Candidates</button>
+    <button class="tn" onclick="showPage('jobs')">Jobs</button>
     <button class="tn" onclick="showPage('analytics')">Analytics</button>
   </nav>
   <div class="t-right">
     <span class="t-plan" id="t-plan">Trial</span>
-    <div class="t-avatar" id="t-avatar" title="Account">TA</div>
-    <button class="t-btn" onclick="window.location.href='/batch'">Batch screen</button>
+    <a href="/batch" class="t-btn accent">Batch screen</a>
+    <a href="/settings" class="t-btn">Settings</a>
+    <div class="t-avatar" id="t-avatar">TC</div>
     <button class="t-btn" onclick="logout()">Sign out</button>
   </div>
 </header>
 
 <div class="shell">
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sb-section">Screening</div>
-    <button class="sb-item act" id="sb-screen" onclick="showPage('screen')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      CV Screener
-    </button>
-    <button class="sb-item" id="sb-pipeline" onclick="showPage('pipeline')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Live Pipeline
-      <span class="sb-badge" id="sb-pipeline-cnt">0</span>
-    </button>
-    <button class="sb-item" id="sb-reports" onclick="showPage('reports')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      All Reports
-      <span class="sb-badge" id="sb-reports-cnt">0</span>
-    </button>
-    <div class="sb-section">Jobs</div>
-    <button class="sb-item" id="sb-jobs" onclick="showPage('jobs')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-      Job Postings
-    </button>
-    <button class="sb-item" id="sb-candidates" onclick="showPage('candidates')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-      Candidates
-    </button>
-    <div class="sb-section">Analytics</div>
-    <button class="sb-item" id="sb-dashboard" onclick="showPage('dashboard')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Dashboard
-    </button>
-    <button class="sb-item" id="sb-analytics" onclick="showPage('analytics')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Analytics
-    </button>
-    <div class="sb-footer">
-      <div class="sb-company" id="sb-company">Company</div>
-      <a href="/settings" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t3);text-decoration:none;padding:5px 0;margin-top:6px;transition:color .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--t3)'">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Account settings
-      </a>
-      <div class="sb-status"><span class="sb-dot"></span>All systems operational</div>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-sec">Overview</div>
+  <button class="sb-item act" id="sb-overview" onclick="showPage('overview')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </button>
+  <div class="sb-sec">Screening</div>
+  <button class="sb-item" id="sb-screener" onclick="showPage('screener')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    CV Screener
+  </button>
+  <button class="sb-item" id="sb-candidates" onclick="showPage('candidates')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    All Candidates
+    <span class="sb-badge" id="sb-cand-cnt">0</span>
+  </button>
+  <button class="sb-item" id="sb-pipeline" onclick="showPage('pipeline')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Pipeline
+  </button>
+  <div class="sb-sec">Jobs</div>
+  <button class="sb-item" id="sb-jobs" onclick="showPage('jobs')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+    Job Postings
+    <span class="sb-badge" id="sb-job-cnt">0</span>
+  </button>
+  <div class="sb-sec">Analytics</div>
+  <button class="sb-item" id="sb-analytics" onclick="showPage('analytics')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Analytics
+  </button>
+  <button class="sb-item" id="sb-audit" onclick="showPage('audit')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Audit Trail
+  </button>
+  <div class="sb-footer">
+    <div class="sb-company" id="sb-company">Company</div>
+    <a href="/settings" style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);text-decoration:none;padding:4px 0;transition:color .12s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Account settings
+    </a>
+    <div class="sb-status"><span class="sb-dot"></span>All systems operational</div>
+  </div>
+</aside>
+
+<main class="main">
+
+<!-- ══════════════════════════════════════════
+     1. OVERVIEW / DASHBOARD
+══════════════════════════════════════════ -->
+<div class="page act" id="page-overview">
+  <div class="ph-row">
+    <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
+      <a href="/batch" class="btn btn-orange btn-sm">⚡ Batch screen CVs</a>
     </div>
-  </aside>
+  </div>
 
-  <main class="main">
+  <!-- 7 key stats -->
+  <div class="stats-grid-7">
+    <div class="stat"><div class="stat-bar" style="background:var(--indigo)"></div><div class="stat-lbl">Total CVs</div><div class="stat-val" id="ov-total">0</div><div class="stat-sub">screened</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Shortlisted</div><div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div><div class="stat-sub">strong hire + hire</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--amber)"></div><div class="stat-lbl">Review needed</div><div class="stat-val" id="ov-maybe" style="color:var(--amber)">0</div><div class="stat-sub">maybe candidates</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--red)"></div><div class="stat-lbl">Rejected</div><div class="stat-val" id="ov-rejected" style="color:var(--red)">0</div><div class="stat-sub">not suitable</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--blue)"></div><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg" style="color:var(--blue)">—</div><div class="stat-sub">out of 100</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Jobs posted</div><div class="stat-val" id="ov-jobs" style="color:var(--orange)">0</div><div class="stat-sub">active roles</div></div>
+    <div class="stat"><div class="stat-bar" style="background:#a855f7"></div><div class="stat-lbl">This week</div><div class="stat-val" id="ov-week" style="color:#a855f7">0</div><div class="stat-sub">new applications</div></div>
+  </div>
 
-    <!-- ── CV SCREENER ── -->
-    <div class="page act" id="page-screen">
-      <div class="page-hd-row">
-        <div class="page-hd">
-          <h1>CV Screener</h1>
-          <p>AI-powered 3-step pipeline — extracts, structures, and double-scores for accuracy</p>
-        </div>
-        <div style="display:flex;gap:8px;align-items:flex-start">
-          <a href="/batch" class="btn btn-orange">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Batch screen (100 CVs)
-          </a>
-        </div>
-      </div>
+  <!-- Pipeline funnel -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-hd"><div class="card-title">Candidate pipeline funnel</div><span class="card-sub">Click a stage to filter candidates</span></div>
+    <div class="funnel" id="funnel-row">
+      <div class="funnel-stage" onclick="filterByStage('all')"><div class="funnel-num" id="fn-all">0</div><div class="funnel-lbl">Applied</div><div class="funnel-bar" style="background:var(--indigo)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('screened')"><div class="funnel-num" id="fn-screened">0</div><div class="funnel-lbl">Screened</div><div class="funnel-bar" style="background:#7c7ff7"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('strong')"><div class="funnel-num" id="fn-strong">0</div><div class="funnel-lbl">High Match</div><div class="funnel-bar" style="background:var(--green)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('maybe')"><div class="funnel-num" id="fn-maybe">0</div><div class="funnel-lbl">Manual Review</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('interview')"><div class="funnel-num" id="fn-interview">0</div><div class="funnel-lbl">Interview</div><div class="funnel-bar" style="background:var(--orange)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:#a855f7"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('rejected')"><div class="funnel-num" id="fn-rejected">0</div><div class="funnel-lbl">Rejected</div><div class="funnel-bar" style="background:var(--red)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('hired')"><div class="funnel-num" id="fn-hired">0</div><div class="funnel-lbl">Hired</div><div class="funnel-bar" style="background:var(--green)"></div></div>
+    </div>
+  </div>
 
-      <div class="steps-bar" id="steps-bar">
-        <div class="step-item act" id="step1"><span class="step-num">Step 1</span>Upload CV</div>
-        <div class="step-item" id="step2"><span class="step-num">Step 2</span>Structure + Parse</div>
-        <div class="step-item" id="step3"><span class="step-num">Step 3</span>AI Scoring</div>
-        <div class="step-item" id="step4"><span class="step-num">Complete</span>Results ready</div>
-      </div>
-
-      <!-- Input section -->
-      <div id="screen-input">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div class="card">
-            <div class="card-hd">
-              <div class="card-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Job Description
-              </div>
-              <span class="card-sub" id="jd-cnt">0 chars</span>
-            </div>
-            <textarea class="form-textarea" id="jd" rows="10" placeholder="Paste the full job description here — role title, responsibilities, required skills, experience level, qualifications..."></textarea>
-          </div>
-          <div class="card">
-            <div class="card-hd">
-              <div class="card-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                Candidate CV
-              </div>
-              <span class="card-sub">PDF only</span>
-            </div>
-            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('cv-input').click()">
-              <div class="drop-zone-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              </div>
-              <div class="drop-zone-title">Drop CV here</div>
-              <div class="drop-zone-sub">Single PDF · Max 10MB<br>Click to browse</div>
-            </div>
-            <input type="file" id="cv-input" accept=".pdf" style="display:none">
-            <div id="file-preview" style="margin-top:8px"></div>
-          </div>
-        </div>
-        <div class="alert alert-err" id="screen-err"></div>
-        <button class="btn btn-primary" id="screen-btn" onclick="runScreen()" disabled style="width:100%;padding:13px;font-size:15px;justify-content:center;box-shadow:0 4px 20px rgba(91,94,244,.3)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Screen this CV with AI
-        </button>
-      </div>
-
-      <!-- Result section -->
-      <div id="screen-result" style="display:none">
-        <div style="display:flex;gap:10px;margin-bottom:1rem">
-          <button class="btn btn-ghost btn-sm" onclick="resetScreen()">← Screen another CV</button>
-          <button class="btn btn-ghost btn-sm" id="view-detail-btn">View full report</button>
-        </div>
-        <div class="card" id="result-card"></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+    <!-- Recent applicants -->
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Recent applicants</div><button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button></div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Candidate</th><th>Score</th><th>Match</th><th>Result</th><th>Action</th></tr></thead>
+          <tbody id="ov-recent-tbl"><tr><td colspan="5" class="tbl-empty">Screen your first CV to see results here</td></tr></tbody>
+        </table>
       </div>
     </div>
-
-    <!-- ── PIPELINE ── -->
-    <div class="page" id="page-pipeline">
-      <div class="page-hd-row">
-        <div class="page-hd"><h1>Live Pipeline</h1><p>Candidates auto-sorted by AI recommendation — unique candidates only, duplicates hidden</p></div>
-      </div>
-      <!-- Legend -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
-        <span style="font-size:12px;color:var(--t3);margin-right:4px">Auto-sorted:</span>
-        <span class="badge b-green" style="font-size:11px">STRONG HIRE → Interview</span>
-        <span class="badge b-indigo" style="font-size:11px">HIRE + MAYBE → Screening</span>
-        <span class="badge b-red" style="font-size:11px">REJECT → Rejected</span>
-        <span style="font-size:11px;color:var(--t3);margin-left:auto" id="pipeline-notice"></span>
-      </div>
-      <div class="kb-cols" id="kb-cols">
-        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div class="kb-col-body" id="kb-0"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div class="kb-col-body" id="kb-1"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Offer</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div class="kb-col-body" id="kb-2"></div></div>
-        <div class="kb-col"><div class="kb-col-hd"><span style="font-weight:700;font-size:13px">Rejected</span><span class="badge b-red" id="kb-cnt-3">0</span></div><div class="kb-col-body" id="kb-3"></div></div>
-      </div>
+    <!-- Job performance -->
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Jobs performance</div></div>
+      <div id="jobs-perf-list"><p style="color:var(--t3);font-size:12px;text-align:center;padding:1.5rem">No jobs posted yet</p></div>
     </div>
+  </div>
 
-    <!-- ── REPORTS ── -->
-    <div class="page" id="page-reports">
-      <div class="page-hd"><h1>All Reports</h1><p>Every CV screening — click any candidate to see their full report</p></div>
-      <div class="card">
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>Candidate</th><th>Current role</th><th>Score</th><th>Skills match</th><th>Recommendation</th><th>Experience</th><th>Screened</th></tr></thead>
-            <tbody id="reports-tbl"><tr><td colspan="7" class="tbl-empty">No screenings yet</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── CANDIDATES ── -->
-    <div class="page" id="page-candidates">
-      <div class="page-hd"><h1>Candidates</h1><p>All candidates across all your job postings</p></div>
-      <div class="card">
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>Candidate</th><th>Current role</th><th>Score</th><th>Skills match</th><th>Recommendation</th><th>Experience</th></tr></thead>
-            <tbody id="cands-tbl"><tr><td colspan="6" class="tbl-empty">No candidates yet</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── JOBS ── -->
-    <div class="page" id="page-jobs">
-      <div class="page-hd-row">
-        <div class="page-hd"><h1>Job Postings</h1><p>Manage your open positions</p></div>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-job-modal').style.display='flex'">+ Add job</button>
-      </div>
-      <div class="card">
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Candidates</th><th>Actions</th></tr></thead>
-            <tbody id="jobs-tbl"><tr><td colspan="6" class="tbl-empty">No jobs posted yet</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── DASHBOARD ── -->
-    <div class="page" id="page-dashboard">
-      <div class="page-hd"><h1>Dashboard</h1><p>Your hiring performance at a glance</p></div>
-      <div class="stats-row">
-        <div class="stat"><div class="stat-accent" style="background:var(--indigo)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="ds-total">0</div><div class="stat-sub">all time</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--orange)"></div><div class="stat-lbl">Avg match score</div><div class="stat-val" id="ds-avg">—</div><div class="stat-sub">out of 100</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--green)"></div><div class="stat-lbl">Strong hires</div><div class="stat-val" id="ds-hires">0</div><div class="stat-sub">recommended</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--red)"></div><div class="stat-lbl">Rejection rate</div><div class="stat-val" id="ds-rejects">—</div><div class="stat-sub">of total</div></div>
-      </div>
-      <div class="dash-grid">
-        <div class="card"><div class="card-hd"><div class="card-title">Recent screenings</div></div>
-          <table class="tbl"><thead><tr><th>Candidate</th><th>Score</th><th>Result</th></tr></thead><tbody id="dash-recent"></tbody></table>
-        </div>
-        <div class="card"><div class="card-hd"><div class="card-title">Score distribution</div></div><canvas id="score-chart" height="200"></canvas></div>
-      </div>
-    </div>
-
-    <!-- ── ANALYTICS ── -->
-    <div class="page" id="page-analytics">
-      <div class="page-hd"><h1>Analytics</h1><p>Deep insights into your hiring data</p></div>
-      <div class="stats-row">
-        <div class="stat"><div class="stat-accent" style="background:var(--indigo)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="an-total">0</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--green)"></div><div class="stat-lbl">Avg score</div><div class="stat-val" id="an-avg">—</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--orange)"></div><div class="stat-lbl">Strong hires</div><div class="stat-val" id="an-hires">0</div></div>
-        <div class="stat"><div class="stat-accent" style="background:var(--amber)"></div><div class="stat-lbl">Maybe</div><div class="stat-val" id="an-maybe">0</div></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="card"><div class="card-hd"><div class="card-title">Top skills gaps</div></div><div id="gaps-list"><p style="color:var(--t3);font-size:13px">No data yet</p></div></div>
-        <div class="card"><div class="card-hd"><div class="card-title">Dimension performance</div></div><div id="dims-list"><p style="color:var(--t3);font-size:13px">No data yet</p></div></div>
-      </div>
-    </div>
-
-  </main>
+  <!-- Activity log -->
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Activity log</div><span class="card-sub">Recent actions</span></div>
+    <div id="activity-log"><p style="color:var(--t3);font-size:12px;padding:.5rem 0">No recent activity</p></div>
+  </div>
 </div>
 
-<!-- ADD JOB MODAL -->
-<div id="add-job-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem;width:90%;max-width:480px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
-      <h3 style="font-size:16px;font-weight:700">Add job posting</h3>
-      <button onclick="document.getElementById('add-job-modal').style.display='none'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">✕</button>
+<!-- ══════════════════════════════════════════
+     2. CV SCREENER
+══════════════════════════════════════════ -->
+<div class="page" id="page-screener">
+  <div class="ph-row">
+    <div class="ph"><h1>CV Screener</h1><p>Upload a CV and JD — get a full AI screening report in 60 seconds</p></div>
+    <a href="/batch" class="btn btn-orange btn-sm">⚡ Batch screen (100 CVs)</a>
+  </div>
+
+  <div class="steps-bar">
+    <div class="step-item act" id="step1"><span class="step-num">Step 1</span>Upload CV + JD</div>
+    <div class="step-item" id="step2"><span class="step-num">Step 2</span>Structure + Parse</div>
+    <div class="step-item" id="step3"><span class="step-num">Step 3</span>AI Double-Score</div>
+    <div class="step-item" id="step4"><span class="step-num">Done</span>Results ready</div>
+  </div>
+
+  <div id="screen-input">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="card">
+        <div class="card-hd"><div class="card-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Job Description</div><span class="card-sub" id="jd-cnt">0 chars</span></div>
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">Select a job (optional)</label>
+          <select class="form-select" id="jd-job-select" onchange="fillJdFromJob()">
+            <option value="">— Select job or paste below —</option>
+          </select>
+        </div>
+        <textarea class="form-textarea" id="jd" rows="9" placeholder="Paste the full job description — role title, responsibilities, required skills, experience level, qualifications..."></textarea>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Candidate CV</div><span class="card-sub">PDF only</span></div>
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('cv-input').click()">
+          <div class="dz-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:3px">Drop CV here</div>
+          <div style="font-size:11px;color:var(--t3)">Single PDF · Max 10MB · Click to browse</div>
+        </div>
+        <input type="file" id="cv-input" accept=".pdf" style="display:none">
+        <div id="file-preview" style="margin-top:7px"></div>
+      </div>
     </div>
+    <div class="alert alert-err" id="screen-err"></div>
+    <button class="btn btn-primary" id="screen-btn" onclick="runScreen()" disabled style="width:100%;padding:12px;font-size:14px;justify-content:center;box-shadow:0 4px 20px rgba(91,94,244,.3)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Screen this CV with AI
+    </button>
+  </div>
+
+  <div id="screen-result" style="display:none">
+    <div style="display:flex;gap:7px;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" onclick="resetScreen()">← Screen another CV</button>
+      <button class="btn btn-ghost btn-sm" id="view-detail-btn">View full report</button>
+      <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all candidates</button>
+    </div>
+    <div class="card" id="result-card"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     3. ALL CANDIDATES (with filters)
+══════════════════════════════════════════ -->
+<div class="page" id="page-candidates">
+  <div class="ph-row">
+    <div class="ph"><h1>All Candidates</h1><p>Every screened candidate — filter, sort, and take action</p></div>
+    <button class="btn btn-ghost btn-sm" onclick="exportCandidates()">↓ Export CSV</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="card" style="margin-bottom:10px;padding:.85rem">
+    <div class="filters-row">
+      <input class="filter-input" id="f-search" placeholder="🔍 Search by name, skill..." oninput="applyFilters()" style="flex:1;min-width:180px">
+      <select class="filter-select" id="f-job" onchange="applyFilters()"><option value="">All jobs</option></select>
+      <select class="filter-select" id="f-result" onchange="applyFilters()">
+        <option value="">All results</option>
+        <option value="STRONG HIRE">Strong Hire</option>
+        <option value="HIRE">Hire</option>
+        <option value="MAYBE">Maybe</option>
+        <option value="REJECT">Reject</option>
+      </select>
+      <select class="filter-select" id="f-score" onchange="applyFilters()">
+        <option value="">Any score</option>
+        <option value="80">80+ (Strong)</option>
+        <option value="60">60+ (Good)</option>
+        <option value="40">40+ (Average)</option>
+        <option value="0">Below 40 (Weak)</option>
+      </select>
+      <select class="filter-select" id="f-exp" onchange="applyFilters()">
+        <option value="">Any experience</option>
+        <option value="0">0–2 years (Junior)</option>
+        <option value="3">3–5 years (Mid)</option>
+        <option value="6">6+ years (Senior)</option>
+      </select>
+      <select class="filter-select" id="f-sort" onchange="applyFilters()">
+        <option value="score">Highest score</option>
+        <option value="newest">Newest first</option>
+        <option value="exp">Most experienced</option>
+        <option value="name">Name A–Z</option>
+      </select>
+      <button class="filter-clear" onclick="clearFilters()">✕ Clear</button>
+    </div>
+    <div style="font-size:11px;color:var(--t3)" id="filter-count">Showing all candidates</div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Applied job</th>
+            <th>Score</th>
+            <th>Skills matched</th>
+            <th>Missing skills</th>
+            <th>Experience</th>
+            <th>Education</th>
+            <th>Result</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="cands-tbl"><tr><td colspan="10" class="tbl-empty">No candidates yet — run your first CV screening</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     4. PIPELINE
+══════════════════════════════════════════ -->
+<div class="page" id="page-pipeline">
+  <div class="ph"><h1>Pipeline</h1><p>Auto-sorted by AI recommendation — unique candidates, duplicates hidden</p></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <span class="badge b-green">STRONG HIRE → Interview</span>
+    <span class="badge b-indigo">HIRE + MAYBE → Screening</span>
+    <span class="badge b-red">REJECT → Rejected</span>
+    <span style="font-size:11px;color:var(--t3);margin-left:auto" id="pipeline-notice"></span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="kb-grid">
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-0"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-1"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Offer</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Rejected</span><span class="badge b-red" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     5. JOBS
+══════════════════════════════════════════ -->
+<div class="page" id="page-jobs">
+  <div class="ph-row">
+    <div class="ph"><h1>Job Postings</h1><p>Manage open roles, scoring weights, and applicant flow</p></div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('job-modal')">+ Create new job</button>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg score</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="jobs-tbl"><tr><td colspan="9" class="tbl-empty">No jobs yet — create your first job posting</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     6. ANALYTICS
+══════════════════════════════════════════ -->
+<div class="page" id="page-analytics">
+  <div class="ph"><h1>Analytics & Insights</h1><p>Data-driven insights into your hiring performance</p></div>
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-bar" style="background:var(--indigo)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="an-total">0</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Avg match score</div><div class="stat-val" id="an-avg">—</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Shortlist rate</div><div class="stat-val" id="an-rate">—</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--amber)"></div><div class="stat-lbl">Time saved</div><div class="stat-val" id="an-time">—</div><div class="stat-sub">vs manual review</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div class="card"><div class="card-hd"><div class="card-title">Most common missing skills</div><span class="card-sub">Top gaps across all CVs</span></div><div id="gaps-chart"></div></div>
+    <div class="card"><div class="card-hd"><div class="card-title">Score distribution</div></div><canvas id="score-chart" height="180"></canvas></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="card"><div class="card-hd"><div class="card-title">Dimension performance</div><span class="card-sub">Avg score per dimension</span></div><div id="dims-chart"></div></div>
+    <div class="card"><div class="card-hd"><div class="card-title">AI insights</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="insights-list">
+        <div style="font-size:12px;color:var(--t3)">Screen more CVs to unlock insights</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     7. AUDIT TRAIL
+══════════════════════════════════════════ -->
+<div class="page" id="page-audit">
+  <div class="ph"><h1>Audit Trail</h1><p>Full transparency — when, what, and how every CV was screened</p></div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Candidate</th><th>Screened at</th><th>AI confidence</th><th>Run 1</th><th>Run 2</th><th>Δ Variance</th><th>Final score</th><th>Result</th><th>JD used</th></tr></thead>
+        <tbody id="audit-tbl"><tr><td colspan="9" class="tbl-empty">No screenings yet</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- CANDIDATE DETAIL MODAL -->
+<div class="modal-overlay" id="cand-modal">
+  <div class="modal modal-lg">
+    <div class="modal-hd"><h3 class="modal-title" id="cand-modal-name">Candidate Report</h3><button class="modal-close" onclick="closeModal('cand-modal')">✕</button></div>
+    <div id="cand-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-red btn-sm" onclick="actionReject()">✕ Reject</button>
+      <button class="btn btn-amber btn-sm" onclick="actionInterview()">→ Move to interview</button>
+      <button class="btn btn-green btn-sm" onclick="actionShortlist()">✓ Shortlist</button>
+      <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- JOB MODAL -->
+<div class="modal-overlay" id="job-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3 class="modal-title" id="job-modal-title">Create job posting</h3><button class="modal-close" onclick="closeModal('job-modal')">✕</button></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Job title *</label><input class="form-input" id="j-title" placeholder="e.g. Data Engineer"></div>
+      <div class="form-group"><label class="form-label">Job title *</label><input class="form-input" id="j-title" placeholder="e.g. Senior Data Engineer"></div>
       <div class="form-group"><label class="form-label">Department</label><input class="form-input" id="j-dept" placeholder="e.g. Engineering"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="j-loc" placeholder="e.g. Dhaka, Remote"></div>
-      <div class="form-group"><label class="form-label">Type</label>
-        <select class="form-select" id="j-type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Remote</option></select>
+      <div class="form-group"><label class="form-label">Employment type</label>
+        <select class="form-select" id="j-type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Remote</option><option>Internship</option></select>
       </div>
     </div>
-    <div class="form-group" style="margin-bottom:1rem"><label class="form-label">Required skills (comma separated)</label><input class="form-input" id="j-skills" placeholder="Python, SQL, Machine Learning"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('add-job-modal').style.display='none'">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="addJob()">Save job posting</button>
+    <div class="form-group"><label class="form-label">Required skills (comma separated)</label><input class="form-input" id="j-skills" placeholder="Python, SQL, Machine Learning, Data Analysis"></div>
+    <div class="form-group"><label class="form-label">Job description (paste here)</label><textarea class="form-textarea" id="j-desc" rows="4" placeholder="Paste full job description..."></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Min experience (years)</label><input class="form-input" id="j-exp" type="number" placeholder="2"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="j-status"><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('job-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveJob()">Save job posting</button>
     </div>
   </div>
 </div>
 
 <script>
 // ── STATE ──
-let allResults=[], allJobs=[], scoreChart=null, currentResultId=null;
+let allResults=[], allJobs=[], filteredResults=[], currentCandId=null, scoreChart=null;
+const PLAN_LIMITS={trial:10,starter:100,pro:500,enterprise:999999};
 
 // ── NAVIGATION ──
-function showPage(id) {
+function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
-  document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('act'));
-  document.querySelectorAll('.tn').forEach(t=>t.classList.remove('act'));
+  document.querySelectorAll('.sb-item,.tn').forEach(s=>s.classList.remove('act'));
   document.getElementById('page-'+id)?.classList.add('act');
   document.getElementById('sb-'+id)?.classList.add('act');
-
-  const navMap={screen:'Screener',pipeline:'Pipeline',candidates:'Candidates',analytics:'Analytics'};
-  document.querySelectorAll('.tn').forEach(t=>{
-    if(t.textContent===navMap[id])t.classList.add('act');
-  });
-  if(id==='dashboard')renderDashboard();
+  // Update top nav
+  const navMap={overview:'Overview',screener:'Screener',candidates:'Candidates',jobs:'Jobs',analytics:'Analytics'};
+  document.querySelectorAll('.tn').forEach(t=>{if(t.textContent===navMap[id])t.classList.add('act');});
   if(id==='analytics')renderAnalytics();
   if(id==='pipeline')renderPipeline();
+  if(id==='audit')renderAudit();
 }
 
-// ── COLORS ──
+// ── MODALS ──
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ── HELPERS ──
 function gc(s){if(s>=80)return'#10b981';if(s>=60)return'#f59e0b';return'#f43f5e';}
 function tbcls(r){return{'STRONG HIRE':'b-green','HIRE':'b-green','MAYBE':'b-amber','REJECT':'b-red'}[r]||'b-amber';}
 function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch{return'—';}}
+function fmtTime(d){if(!d)return'—';try{const dt=new Date(d);return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return'—';}}
+function isThisWeek(d){if(!d)return false;const now=new Date();const then=new Date(d);const diff=(now-then)/(1000*60*60*24);return diff<=7;}
 
 // ── CV SCREENER ──
-let selectedFile=null;
-const dropZone=document.getElementById('drop-zone');
-const cvInput=document.getElementById('cv-input');
-
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('over');});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('over'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.pdf')){setFile(f);}});
-cvInput.addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0]);});
+let sf=null;
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.pdf'))setFile(f);});
+document.getElementById('cv-input').addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0]);});
 document.getElementById('jd').addEventListener('input',function(){
-  document.getElementById('jd-cnt').textContent=this.value.length+' chars';
-  checkReady();
+  document.getElementById('jd-cnt').textContent=this.value.length+' chars';checkReady();
 });
 
 function setFile(f){
-  selectedFile=f;
+  sf=f;
   document.getElementById('file-preview').innerHTML=
-    `<div class="file-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-    <span class="file-name">${f.name}</span><span class="file-size">${(f.size/1024).toFixed(0)}KB</span>
-    <button class="file-remove" onclick="clearFile()">✕</button></div>`;
-  dropZone.style.display='none';
-  checkReady();
+    `<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);font-size:11px">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span style="flex:1;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <span style="color:var(--t3)">${(f.size/1024).toFixed(0)}KB</span>
+      <button onclick="clearFile()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0">✕</button>
+    </div>`;
+  dz.style.display='none';checkReady();
 }
 
-function clearFile(){
-  selectedFile=null;
-  document.getElementById('file-preview').innerHTML='';
-  document.getElementById('cv-input').value='';
-  dropZone.style.display='';
-  checkReady();
-}
+function clearFile(){sf=null;document.getElementById('file-preview').innerHTML='';document.getElementById('cv-input').value='';dz.style.display='';checkReady();}
+function checkReady(){document.getElementById('screen-btn').disabled=!(sf&&document.getElementById('jd').value.trim().length>=50);}
 
-function checkReady(){
-  const ok=selectedFile&&document.getElementById('jd').value.trim().length>=50;
-  document.getElementById('screen-btn').disabled=!ok;
-}
+function setStep(n){for(let i=1;i<=4;i++){const el=document.getElementById('step'+i);el.classList.remove('act','done');if(i<n)el.classList.add('done');else if(i===n)el.classList.add('act');}}
 
-function setStep(n){
-  for(let i=1;i<=4;i++){
-    const el=document.getElementById('step'+i);
-    el.classList.remove('act','done');
-    if(i<n)el.classList.add('done');
-    else if(i===n)el.classList.add('act');
+function fillJdFromJob(){
+  const sel=document.getElementById('jd-job-select');
+  const jobId=sel.value;
+  if(!jobId)return;
+  const job=allJobs.find(j=>j._id===jobId);
+  if(job&&job.description){
+    document.getElementById('jd').value=job.description;
+    document.getElementById('jd-cnt').textContent=job.description.length+' chars';
+    checkReady();
   }
 }
 
@@ -563,327 +691,511 @@ async function runScreen(){
   const jd=document.getElementById('jd').value.trim();
   const err=document.getElementById('screen-err');
   err.style.display='none';
-  if(!selectedFile||jd.length<50)return;
-
+  if(!sf||jd.length<50)return;
   const btn=document.getElementById('screen-btn');
-  btn.disabled=true;
-  btn.innerHTML='<div class="spin"></div> Analyzing CV...';
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div> Analyzing CV...';
   setStep(2);
-
   const fd=new FormData();
-  fd.append('cv_file',selectedFile);
-  fd.append('job_description',jd);
-
+  fd.append('cv_file',sf);fd.append('job_description',jd);
   try{
     setStep(3);
     const res=await fetch('/api/screen',{method:'POST',body:fd,credentials:'include'});
     const data=await res.json();
     if(!res.ok)throw new Error(data.detail||'Screening failed');
     setStep(4);
-    currentResultId=data._id;
-    allResults.unshift({...data,score:Math.round(data.overall_score||0),rec:(data.recommendation||'MAYBE').toUpperCase()});
-    updateBadges();
+    currentCandId=data._id;
+    const r={...data,score:Math.round(data.overall_score||0),rec:(data.recommendation||'MAYBE').toUpperCase()};
+    allResults.unshift(r);filteredResults=allResults;
+    updateAll();
     renderResultCard(data);
     document.getElementById('screen-input').style.display='none';
     document.getElementById('screen-result').style.display='block';
     document.getElementById('view-detail-btn').onclick=()=>window.location.href='/candidate?id='+data._id;
+    addActivity('CV screened: '+(data.candidate_name||'Unknown')+' — Score '+Math.round(data.overall_score||0),'var(--indigo)');
   }catch(e){
     err.textContent=e.message;err.style.display='block';
-    btn.disabled=false;
-    btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Screen this CV with AI';
+    btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Screen this CV with AI';
     setStep(1);
   }
 }
 
 function renderResultCard(d){
-  const score=Math.round(d.overall_score||0);
-  const col=gc(score);
-  const rec=(d.recommendation||'MAYBE').toUpperCase();
-  const cov=d.skills_coverage_pct||0;
+  const score=Math.round(d.overall_score||0);const col=gc(score);const rec=(d.recommendation||'MAYBE').toUpperCase();const cov=d.skills_coverage_pct||0;
   document.getElementById('result-card').innerHTML=`
-    <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)">
-      <div class="score-circle" style="border-color:${col}40">
-        <span class="score-num" style="color:${col}">${score}</span>
-        <span class="score-den">/100</span>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div style="width:64px;height:64px;border-radius:50%;border:3px solid ${col}40;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-size:20px;font-weight:800;color:${col};letter-spacing:-1px">${score}</span>
+        <span style="font-size:9px;color:var(--t3)">/100</span>
       </div>
       <div style="flex:1">
-        <div style="font-size:19px;font-weight:800;margin-bottom:3px">${d.candidate_name||'Unknown Candidate'}</div>
-        <div style="font-size:13px;color:var(--t2);margin-bottom:8px">${d.current_title||'—'} · ${d.years_experience||'?'} yrs experience</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="font-size:17px;font-weight:800;margin-bottom:2px">${d.candidate_name||'Unknown Candidate'}</div>
+        <div style="font-size:12px;color:var(--t2);margin-bottom:6px">${d.current_title||'—'} · ${d.years_experience||'?'} yrs exp</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
           <span class="badge ${tbcls(rec)}">${rec}</span>
           <span class="badge b-indigo">${cov}% skills matched</span>
-          <span class="badge" style="background:var(--s2);border-color:var(--border2);color:var(--t2)">${(d.score_consistency?.confidence||'High')} confidence</span>
+          <span class="badge b-blue">${(d.score_consistency?.confidence||'High')} confidence</span>
         </div>
       </div>
     </div>
-    <div style="font-size:13px;color:var(--t2);line-height:1.75;margin-bottom:1.25rem">${d.summary||''}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      ${(d.dimensions||[]).slice(0,6).map(dim=>{
-        const p=Math.round((dim.score/20)*100);const c=gc(p);
-        return`<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:4px">${dim.name}</div>
-          <div style="font-size:18px;font-weight:800;color:${c};margin-bottom:6px">${dim.score.toFixed(1)}<span style="font-size:10px;font-weight:400;opacity:.5">/20</span></div>
-          <div style="height:3px;background:var(--border2);border-radius:2px;overflow:hidden"><div style="height:100%;width:${p}%;background:${c};border-radius:2px"></div></div>
-        </div>`;
-      }).join('')}
+    <div style="font-size:12px;color:var(--t2);line-height:1.75;margin-bottom:1rem">${d.summary||''}</div>
+    <div class="dim-grid">
+      ${(d.dimensions||[]).slice(0,6).map(dim=>{const p=Math.round((dim.score/20)*100);const c=gc(p);
+        return`<div class="dim-card"><div class="dim-top" style="background:${c}"></div>
+          <div class="dim-name">${dim.name}</div>
+          <div class="dim-score" style="color:${c}">${dim.score.toFixed(1)}<span style="font-size:9px;opacity:.5;font-weight:400">/20</span></div>
+          <div class="dim-bar-bg"><div class="dim-bar-fill" style="width:${p}%;background:${c}"></div></div>
+          <div class="dim-fb">${(dim.feedback||'').slice(0,60)}${dim.feedback&&dim.feedback.length>60?'...':''}</div>
+        </div>`;}).join('')}
     </div>`;
 }
 
 function resetScreen(){
-  clearFile();
-  document.getElementById('jd').value='';
-  document.getElementById('jd-cnt').textContent='0 chars';
-  document.getElementById('screen-input').style.display='';
-  document.getElementById('screen-result').style.display='none';
-  document.getElementById('screen-btn').innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Screen this CV with AI';
+  clearFile();document.getElementById('jd').value='';document.getElementById('jd-cnt').textContent='0 chars';
+  document.getElementById('screen-input').style.display='';document.getElementById('screen-result').style.display='none';
+  document.getElementById('screen-btn').innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Screen this CV with AI';
   setStep(1);
 }
 
-// ── REPORTS TABLE ──
-function renderReports(){
-  const tbody=document.getElementById('reports-tbl');
-  tbody.innerHTML=allResults.length
-    ?allResults.map(r=>`<tr onclick="window.location.href='/candidate?id=${r._id}'" style="cursor:pointer">
-        <td class="tbl-link">${r.candidate_name||'Unknown'}</td>
-        <td>${r.current_title||'—'}</td>
-        <td style="font-weight:700;color:${gc(r.score)}">${r.score}</td>
-        <td>${r.skills_coverage_pct||0}%</td>
-        <td><span class="badge ${tbcls(r.rec)}">${r.rec}</span></td>
-        <td>${r.years_experience||'?'} yrs</td>
-        <td>${fmt(r.created_at)}</td>
-      </tr>`).join('')
-    :'<tr><td colspan="7" class="tbl-empty">No screenings yet — run your first CV screening</td></tr>';
+// ── CANDIDATES TABLE ──
+function renderCandidates(results){
+  const tbody=document.getElementById('cands-tbl');
+  if(!results||!results.length){tbody.innerHTML='<tr><td colspan="10" class="tbl-empty">No candidates match your filters</td></tr>';return;}
+  tbody.innerHTML=results.map(r=>{
+    const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+    const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
+    const missing=(r.critical_gaps||[]).slice(0,2);
+    const edu=r.parsed_cv?.education?.[0];
+    return`<tr>
+      <td><a class="tbl-link" href="/candidate?id=${r._id}">${r.candidate_name||'Unknown'}</a></td>
+      <td style="color:var(--t3);font-size:11px">${r.company||'—'}</td>
+      <td><div class="score-bar"><span class="score-num" style="color:${col}">${score}</span><div class="score-bar-bg"><div class="score-bar-fill" style="width:${score}%;background:${col}"></div></div></div></td>
+      <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
+      <td>${missing.map(s=>`<span class="tag missing">${s}</span>`).join('')||'<span class="badge b-green" style="font-size:9px">None</span>'}</td>
+      <td style="font-size:11px">${r.years_experience||'?'} yrs</td>
+      <td style="font-size:10px;color:var(--t3)">${edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—'}</td>
+      <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
+      <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-xs btn-ghost" onclick="openCandModal('${r._id}')">View</button>
+          <button class="btn btn-xs" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)" onclick="quickAction('${r._id}','shortlist')">✓</button>
+          <button class="btn btn-xs" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb)" onclick="quickAction('${r._id}','reject')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
-function renderCandidates(){
-  const tbody=document.getElementById('cands-tbl');
-  tbody.innerHTML=allResults.length
-    ?allResults.map(r=>`<tr onclick="window.location.href='/candidate?id=${r._id}'" style="cursor:pointer">
-        <td class="tbl-link">${r.candidate_name||'Unknown'}</td>
-        <td>${r.current_title||'—'}</td>
-        <td style="font-weight:700;color:${gc(r.score)}">${r.score}</td>
-        <td>${r.skills_coverage_pct||0}%</td>
-        <td><span class="badge ${tbcls(r.rec)}">${r.rec}</span></td>
-        <td>${r.years_experience||'?'} yrs</td>
-      </tr>`).join('')
-    :'<tr><td colspan="6" class="tbl-empty">No candidates yet</td></tr>';
+// ── FILTERS ──
+function applyFilters(){
+  const q=(document.getElementById('f-search')?.value||'').toLowerCase();
+  const job=document.getElementById('f-job')?.value||'';
+  const result=document.getElementById('f-result')?.value||'';
+  const scoreMin=parseInt(document.getElementById('f-score')?.value||'0')||0;
+  const expMin=parseInt(document.getElementById('f-exp')?.value||'-1');
+  const sort=document.getElementById('f-sort')?.value||'score';
+  const scoreMax=document.getElementById('f-score')?.value===''?999:(scoreMin===0?39:scoreMin===80?100:scoreMin===60?79:59);
+
+  let filtered=allResults.filter(r=>{
+    const score=r.score||Math.round(r.overall_score||0);
+    const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+    const exp=parseInt(r.years_experience)||0;
+    const matchQ=!q||(r.candidate_name||'').toLowerCase().includes(q)||(r.current_title||'').toLowerCase().includes(q)||((r.critical_gaps||[]).join(' ')).toLowerCase().includes(q)||((r.dimensions||[]).flatMap(d=>d.matched_skills||[]).join(' ')).toLowerCase().includes(q);
+    const matchJ=!job||(r.company||'')==job;
+    const matchR=!result||rec===result;
+    const matchS=document.getElementById('f-score')?.value===''||score<=scoreMax;
+    const matchE=expMin<0||(expMin===0?exp<=2:expMin===3?exp>=3&&exp<=5:exp>=6);
+    return matchQ&&matchJ&&matchR&&matchS&&matchE;
+  });
+
+  if(sort==='score')filtered.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0));
+  else if(sort==='newest')filtered.sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+  else if(sort==='exp')filtered.sort((a,b)=>(parseInt(b.years_experience)||0)-(parseInt(a.years_experience)||0));
+  else if(sort==='name')filtered.sort((a,b)=>(a.candidate_name||'').localeCompare(b.candidate_name||''));
+
+  filteredResults=filtered;
+  document.getElementById('filter-count').textContent=`Showing ${filtered.length} of ${allResults.length} candidates`;
+  renderCandidates(filtered);
+}
+
+function clearFilters(){
+  ['f-search','f-job','f-result','f-score','f-exp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('f-sort').value='score';
+  applyFilters();
+}
+
+function filterByStage(stage){
+  showPage('candidates');
+  const mapRec={strong:'STRONG HIRE',shortlisted:'HIRE',maybe:'MAYBE',rejected:'REJECT'};
+  if(mapRec[stage])document.getElementById('f-result').value=mapRec[stage];
+  else document.getElementById('f-result').value='';
+  applyFilters();
+}
+
+// ── CANDIDATE MODAL ──
+function openCandModal(id){
+  const r=allResults.find(x=>x._id===id);
+  if(!r)return;
+  currentCandId=id;
+  const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();const cov=r.skills_coverage_pct||0;const sc=r.score_consistency||{};
+  document.getElementById('cand-modal-name').textContent=(r.candidate_name||'Candidate')+' — AI Report';
+  document.getElementById('open-full-report').onclick=()=>{window.location.href='/candidate?id='+id;};
+  document.getElementById('cand-modal-body').innerHTML=`
+    <div class="cand-detail-grid">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:52px;height:52px;border-radius:50%;border:2px solid ${col}50;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="font-size:17px;font-weight:800;color:${col}">${score}</span>
+            <span style="font-size:8px;color:var(--t3)">/100</span>
+          </div>
+          <div>
+            <div style="font-size:15px;font-weight:700;margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
+            <div style="font-size:11px;color:var(--t2);margin-bottom:5px">${r.current_title||'—'} · ${r.years_experience||'?'} yrs</div>
+            <span class="badge ${tbcls(rec)}">${rec}</span>
+          </div>
+        </div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">AI Summary</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">${r.summary||'—'}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--t3);width:90px">Skills coverage</span>
+          <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${cov}%;background:${gc(cov)};border-radius:3px"></div></div>
+          <span style="font-size:11px;font-weight:700;color:${gc(cov)}">${cov}%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:10px;color:var(--t3);width:90px">AI Confidence</span>
+          <span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span>
+          <span style="font-size:10px;color:var(--t3)">Run 1: ${sc.run_1||'—'} · Run 2: ${sc.run_2||'—'} · Δ${sc.difference||0}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="background:var(--gg);border:1px solid var(--gb);border-radius:var(--rs);padding:.6rem">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--green);margin-bottom:4px">Key strengths</div>
+            ${(r.key_strengths||[]).slice(0,3).map(s=>`<div style="font-size:10px;color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:var(--green)">✓</span>${s}</div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+          </div>
+          <div style="background:var(--rg);border:1px solid var(--rb);border-radius:var(--rs);padding:.6rem">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin-bottom:4px">Critical gaps</div>
+            ${(r.critical_gaps||[]).slice(0,3).map(s=>`<div style="font-size:10px;color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:var(--red)">✗</span>${s}</div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px">Score breakdown</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          ${(r.dimensions||[]).map(d=>{const p=Math.round((d.score/20)*100);const c=gc(p);return`
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
+                <span style="color:var(--t2)">${d.name}</span>
+                <span style="font-weight:700;color:${c}">${d.score.toFixed(1)}/20</span>
+              </div>
+              <div style="height:4px;background:var(--border2);border-radius:2px;overflow:hidden"><div style="height:100%;width:${p}%;background:${c};border-radius:2px"></div></div>
+            </div>`;}).join('')}
+        </div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Interview questions</div>
+        ${(r.interview_questions||[]).slice(0,3).map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:var(--indigo);font-weight:700;flex-shrink:0">${i+1}.</span>${q}</div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
+        ${r.hiring_risks&&r.hiring_risks.length?`
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);margin-top:8px;margin-bottom:5px">⚠ Hiring risks</div>
+        ${r.hiring_risks.slice(0,2).map(risk=>`<div style="font-size:11px;color:var(--amber);padding:3px 0">${risk}</div>`).join('')}`:''}
+      </div>
+    </div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:8px">
+      <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · Confidence: ${(r.score_consistency?.confidence||'High')} · Variance: ${r.score_consistency?.difference||0} pts · 2 AI runs averaged
+    </div>`;
+  openModal('cand-modal');
+}
+
+function quickAction(id,action){
+  addActivity(`Candidate ${action==='shortlist'?'shortlisted':'rejected'}: `+(allResults.find(r=>r._id===id)?.candidate_name||'Unknown'),action==='shortlist'?'var(--green)':'var(--red)');
+}
+function actionShortlist(){quickAction(currentCandId,'shortlist');closeModal('cand-modal');}
+function actionReject(){quickAction(currentCandId,'reject');closeModal('cand-modal');}
+function actionInterview(){addActivity('Moved to interview: '+(allResults.find(r=>r._id===currentCandId)?.candidate_name||'Unknown'),'var(--orange)');closeModal('cand-modal');}
+
+// ── OVERVIEW ──
+function renderOverview(){
+  const total=allResults.length;
+  const shortlisted=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
+  const maybe=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='MAYBE').length;
+  const rejected=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='REJECT').length;
+  const avg=total?Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total):0;
+  const thisWeek=allResults.filter(r=>isThisWeek(r.created_at)).length;
+
+  document.getElementById('ov-total').textContent=total;
+  document.getElementById('ov-shortlisted').textContent=shortlisted;
+  document.getElementById('ov-maybe').textContent=maybe;
+  document.getElementById('ov-rejected').textContent=rejected;
+  document.getElementById('ov-avg').textContent=total?avg:'—';
+  document.getElementById('ov-jobs').textContent=allJobs.length;
+  document.getElementById('ov-week').textContent=thisWeek;
+
+  // Funnel
+  document.getElementById('fn-all').textContent=total;
+  document.getElementById('fn-screened').textContent=total;
+  document.getElementById('fn-strong').textContent=allResults.filter(r=>(r.score||r.overall_score||0)>=80).length;
+  document.getElementById('fn-maybe').textContent=maybe;
+  document.getElementById('fn-interview').textContent=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE').length;
+  document.getElementById('fn-shortlisted').textContent=shortlisted;
+  document.getElementById('fn-rejected').textContent=rejected;
+  document.getElementById('fn-hired').textContent=0;
+
+  // Recent applicants
+  const recent=allResults.slice(0,6);
+  document.getElementById('ov-recent-tbl').innerHTML=recent.length
+    ?recent.map(r=>{const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();return`<tr onclick="openCandModal('${r._id}')">
+        <td><span class="tbl-link">${r.candidate_name||'Unknown'}</span><div style="font-size:10px;color:var(--t3)">${r.current_title||'—'}</div></td>
+        <td style="font-weight:700;color:${gc(score)}">${score}</td>
+        <td style="font-size:10px">${r.skills_coverage_pct||0}%</td>
+        <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
+        <td><button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();openCandModal('${r._id}')">View</button></td>
+      </tr>`;}).join('')
+    :'<tr><td colspan="5" class="tbl-empty">No candidates yet</td></tr>';
+
+  // Jobs performance
+  document.getElementById('jobs-perf-list').innerHTML=allJobs.length
+    ?allJobs.map(j=>{
+        const related=allResults.filter(r=>r.job_id===j._id||r.company===j.title);
+        const avgS=related.length?Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length):0;
+        const shl=related.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
+        return`<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text)">${j.title}</div><div style="font-size:10px;color:var(--t3)">${related.length} applicants · ${shl} shortlisted</div></div>
+          <div style="text-align:right"><div style="font-size:14px;font-weight:700;color:${avgS>=70?'var(--green)':avgS>=50?'var(--amber)':'var(--red)'}">${avgS||'—'}</div><div style="font-size:9px;color:var(--t3)">avg score</div></div>
+        </div>`;}).join('')
+    :'<p style="color:var(--t3);font-size:12px;text-align:center;padding:1rem">No jobs posted yet</p>';
 }
 
 // ── PIPELINE ──
 function renderPipeline(){
-  // Deduplicate by candidate name + score (keep latest)
-  const seen = new Set();
-  const unique = [];
+  const seen=new Set();const unique=[];
   [...allResults].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).forEach(r=>{
-    const key = (r.candidate_name||'unknown').toLowerCase().trim();
-    if(!seen.has(key)){ seen.add(key); unique.push(r); }
+    const key=(r.candidate_name||'unknown').toLowerCase().trim();
+    if(!seen.has(key)){seen.add(key);unique.push(r);}
   });
-
-  // Auto-sort by AI recommendation into correct stages
-  // STRONG HIRE → Interview (ready to interview)
-  // HIRE → Screening (good, review first)
-  // MAYBE → Screening (needs review)
-  // REJECT → Rejected (not suitable)
-  const cols=[[],[],[],[]]; // [Screening, Interview, Offer, Hired/Rejected]
+  const cols=[[],[],[],[]];
   unique.forEach(r=>{
-    const rec=r.rec||'MAYBE';
-    if(rec==='STRONG HIRE') cols[1].push(r);      // → Interview
-    else if(rec==='HIRE')   cols[0].push(r);      // → Screening
-    else if(rec==='MAYBE')  cols[0].push(r);      // → Screening
-    else                    cols[3].push(r);      // → Rejected
+    const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+    if(rec==='STRONG HIRE')cols[1].push(r);
+    else if(rec==='HIRE')cols[0].push(r);
+    else if(rec==='MAYBE')cols[0].push(r);
+    else cols[3].push(r);
   });
-
-  // Sort each column by score descending
-  cols.forEach(col=>col.sort((a,b)=>b.score-a.score));
-
-  const labels=['Screening','Interview','Offer','Rejected'];
+  cols.forEach(col=>col.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)));
   const badgeCls=['b-indigo','b-amber','b-orange','b-red'];
-
   for(let i=0;i<4;i++){
     document.getElementById('kb-cnt-'+i).textContent=cols[i].length;
-    // Update column header badge color
-    const badge=document.querySelector(`#kb-cnt-${i}`);
-    if(badge){badge.className='badge '+badgeCls[i];}
     document.getElementById('kb-'+i).innerHTML=cols[i].length
-      ?cols[i].map(r=>{
-          const c=gc(r.score);
-          const recBadge = r.rec==='STRONG HIRE'?'<span class="badge b-green" style="font-size:9px;padding:1px 6px">STRONG HIRE</span>':
-                           r.rec==='HIRE'?'<span class="badge b-green" style="font-size:9px;padding:1px 6px">HIRE</span>':
-                           r.rec==='MAYBE'?'<span class="badge b-amber" style="font-size:9px;padding:1px 6px">MAYBE</span>':
-                           '<span class="badge b-red" style="font-size:9px;padding:1px 6px">REJECT</span>';
-          return `<div class="kb-card" onclick="window.location.href='/candidate?id=${r._id}'">
-            <div class="kb-name">${r.candidate_name||'Unknown'}</div>
-            <div class="kb-role" style="margin-bottom:5px">${r.current_title||'—'}</div>
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div class="kb-score" style="color:${c};font-size:13px;font-weight:700">${r.score}/100</div>
-              ${recBadge}
-            </div>
-          </div>`;
-        }).join('')
-      :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:1.5rem;line-height:1.6">
-          Empty<br><span style="font-size:11px">No candidates here</span>
-        </div>`;
+      ?cols[i].map(r=>{const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();const c=gc(score);
+        return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s" onmouseover="this.style.borderColor='var(--indigo)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px">${r.current_title||'—'}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:700;color:${c}">${score}/100</span>
+            <span class="badge ${tbcls(rec)}" style="font-size:9px">${rec}</span>
+          </div>
+        </div>`;}).join('')
+      :`<div style="color:var(--t3);font-size:11px;text-align:center;padding:1.5rem">Empty</div>`;
   }
-
-  // Update column headers with correct labels
-  const hdrs=['Screening','Interview','Offer','Rejected'];
-  const descs=['HIRE + MAYBE candidates','STRONG HIRE candidates','Manually move here','REJECT candidates'];
-  for(let i=0;i<4;i++){
-    const col=document.querySelector(`#kb-${i}`).parentElement;
-    const hd=col.querySelector('.kb-col-hd');
-    if(hd) hd.innerHTML=`<span style="font-weight:700;font-size:13px">${hdrs[i]}</span><span class="badge ${badgeCls[i]}" id="kb-cnt-${i}">${cols[i].length}</span>`;
-  }
-
-  // Show dedup notice if duplicates were removed
-  const removed = allResults.length - unique.length;
-  if(removed > 0){
-    const notice = document.getElementById('pipeline-notice');
-    if(notice) notice.textContent = `${removed} duplicate screening${removed>1?'s':''} hidden — showing unique candidates only`;
-  }
-}
-
-// ── DASHBOARD ──
-function renderDashboard(){
-  const total=allResults.length;
-  const avg=total?Math.round(allResults.reduce((a,r)=>a+r.score,0)/total):0;
-  const hires=allResults.filter(r=>r.rec==='STRONG HIRE'||r.rec==='HIRE').length;
-  const rejects=allResults.filter(r=>r.rec==='REJECT').length;
-  document.getElementById('ds-total').textContent=total;
-  document.getElementById('ds-avg').textContent=total?avg:'—';
-  document.getElementById('ds-hires').textContent=hires;
-  document.getElementById('ds-rejects').textContent=total?Math.round(rejects/total*100)+'%':'—';
-
-  const recent=allResults.slice(0,5);
-  document.getElementById('dash-recent').innerHTML=recent.length
-    ?recent.map(r=>`<tr onclick="window.location.href='/candidate?id=${r._id}'" style="cursor:pointer">
-        <td class="tbl-link">${r.candidate_name||'Unknown'}</td>
-        <td style="font-weight:700;color:${gc(r.score)}">${r.score}</td>
-        <td><span class="badge ${tbcls(r.rec)}">${r.rec}</span></td>
-      </tr>`).join('')
-    :'<tr><td colspan="3" class="tbl-empty">No screenings yet</td></tr>';
-
-  if(scoreChart)scoreChart.destroy();
-  const ctx=document.getElementById('score-chart').getContext('2d');
-  const bins=[0,0,0,0,0];
-  allResults.forEach(r=>{const b=Math.min(4,Math.floor(r.score/20));bins[b]++;});
-  scoreChart=new Chart(ctx,{type:'bar',data:{labels:['0–20','21–40','41–60','61–80','81–100'],datasets:[{data:bins,backgroundColor:['#f43f5e','#f43f5e','#f59e0b','#10b981','#10b981'],borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8b95b0',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8b95b0',font:{size:11},stepSize:1}}}}});
-}
-
-// ── ANALYTICS ──
-function renderAnalytics(){
-  const total=allResults.length;
-  const avg=total?Math.round(allResults.reduce((a,r)=>a+r.score,0)/total):0;
-  const hires=allResults.filter(r=>r.rec==='STRONG HIRE'||r.rec==='HIRE').length;
-  const maybe=allResults.filter(r=>r.rec==='MAYBE').length;
-  document.getElementById('an-total').textContent=total;
-  document.getElementById('an-avg').textContent=total?avg:'—';
-  document.getElementById('an-hires').textContent=hires;
-  document.getElementById('an-maybe').textContent=maybe;
-
-  // Skills gaps
-  const gaps={};
-  allResults.forEach(r=>(r.critical_gaps||[]).forEach(g=>{gaps[g]=(gaps[g]||0)+1;}));
-  const topGaps=Object.entries(gaps).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxG=topGaps[0]?.[1]||1;
-  document.getElementById('gaps-list').innerHTML=topGaps.length
-    ?topGaps.map(([k,v])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--t2);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
-        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/maxG*100)}%;background:var(--red);border-radius:3px"></div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--t3);width:20px;text-align:right">${v}</span>
-      </div>`).join('')
-    :'<p style="color:var(--t3);font-size:13px">No data yet</p>';
-
-  // Dimension averages
-  const dims={};const dimCnt={};
-  allResults.forEach(r=>(r.dimensions||[]).forEach(d=>{dims[d.name]=(dims[d.name]||0)+d.score;dimCnt[d.name]=(dimCnt[d.name]||0)+1;}));
-  const dimList=Object.entries(dims).map(([k,v])=>([k,v/dimCnt[k]])).sort((a,b)=>b[1]-a[1]);
-  const maxD=20;
-  document.getElementById('dims-list').innerHTML=dimList.length
-    ?dimList.map(([k,v])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--t2);width:120px;flex-shrink:0">${k}</span>
-        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/maxD*100)}%;background:${gc(v/maxD*100)};border-radius:3px"></div></div>
-        <span style="font-size:11px;font-weight:700;color:var(--t3);width:30px;text-align:right">${v.toFixed(1)}</span>
-      </div>`).join('')
-    :'<p style="color:var(--t3);font-size:13px">No data yet</p>';
+  const removed=allResults.length-unique.length;
+  if(removed>0)document.getElementById('pipeline-notice').textContent=removed+' duplicate'+(removed>1?'s':'')+' hidden';
 }
 
 // ── JOBS ──
 function renderJobs(){
   const tbody=document.getElementById('jobs-tbl');
+  const sel=document.getElementById('jd-job-select');
+  if(sel){sel.innerHTML='<option value="">— Select job or paste below —</option>';allJobs.forEach(j=>{const o=document.createElement('option');o.value=j._id;o.textContent=j.title;sel.appendChild(o);});}
+  document.getElementById('sb-job-cnt').textContent=allJobs.length;
   tbody.innerHTML=allJobs.length
-    ?allJobs.map(j=>`<tr>
-        <td style="font-weight:600;color:var(--text)">${j.title}</td>
-        <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
-        <td><span class="badge b-indigo">${j.candidates||0}</span></td>
-        <td><button class="btn btn-danger btn-xs" onclick="deleteJob('${j._id}')">Delete</button></td>
-      </tr>`).join('')
-    :'<tr><td colspan="6" class="tbl-empty">No jobs posted yet — add your first job posting</td></tr>';
+    ?allJobs.map(j=>{
+        const statusCls={'active':'b-green','paused':'b-amber','closed':'b-red'}[j.status||'active']||'b-green';
+        const related=allResults.filter(r=>r.job_id===j._id||r.company===j.title);
+        const avgS=related.length?Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length):0;
+        const shl=related.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
+        const hi=related.length?Math.max(...related.map(r=>r.score||r.overall_score||0)):0;
+        const lo=related.length?Math.min(...related.map(r=>r.score||r.overall_score||0)):0;
+        return`<tr>
+          <td style="font-weight:600;color:var(--text)">${j.title}</td>
+          <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
+          <td style="font-weight:600;color:var(--indigo)">${related.length}</td>
+          <td style="font-weight:600;color:${gc(avgS)}">${avgS||'—'}</td>
+          <td><span class="badge b-green">${shl}</span></td>
+          <td><span class="badge ${statusCls}">${j.status||'active'}</span></td>
+          <td>
+            <div style="display:flex;gap:3px">
+              <button class="btn btn-xs btn-ghost" onclick="editJob('${j._id}')">Edit</button>
+              <button class="btn btn-xs btn-red" onclick="deleteJob('${j._id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;}).join('')
+    :'<tr><td colspan="9" class="tbl-empty">No jobs yet — create your first job posting to organize screenings</td></tr>';
 }
 
-async function addJob(){
+function openModal(id){document.getElementById(id).classList.add('open');}
+async function saveJob(){
   const title=document.getElementById('j-title').value.trim();
   if(!title){alert('Please enter a job title');return;}
   const fd=new FormData();
-  fd.append('title',title);
-  fd.append('department',document.getElementById('j-dept').value);
+  fd.append('title',title);fd.append('department',document.getElementById('j-dept').value);
   fd.append('location',document.getElementById('j-loc').value);
   fd.append('employment_type',document.getElementById('j-type').value);
   fd.append('skills',document.getElementById('j-skills').value);
   try{
     const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
     const data=await res.json();
-    allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,candidates:0,_id:data._id});
-    renderJobs();
-    document.getElementById('add-job-modal').style.display='none';
-    ['j-title','j-dept','j-loc','j-skills'].forEach(id=>document.getElementById(id).value='');
+    const desc=document.getElementById('j-desc').value;
+    allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,status:'active',description:desc,_id:data._id});
+    closeModal('job-modal');renderJobs();renderOverview();
+    addActivity('Job posted: '+title,'var(--orange)');
+    ['j-title','j-dept','j-loc','j-skills','j-desc'].forEach(id=>document.getElementById(id).value='');
   }catch(e){alert('Failed: '+e.message);}
 }
-
+function editJob(id){openModal('job-modal');}
 async function deleteJob(id){
-  if(!confirm('Delete this job posting?'))return;
+  if(!confirm('Delete this job?'))return;
   await fetch('/api/jobs/'+id,{method:'DELETE',credentials:'include'});
-  allJobs=allJobs.filter(j=>j._id!==id);
+  allJobs=allJobs.filter(j=>j._id!==id);renderJobs();renderOverview();
+}
+
+// ── ANALYTICS ──
+function renderAnalytics(){
+  const total=allResults.length;
+  const avg=total?Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total):0;
+  const shl=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
+  document.getElementById('an-total').textContent=total;
+  document.getElementById('an-avg').textContent=total?avg:'—';
+  document.getElementById('an-rate').textContent=total?Math.round(shl/total*100)+'%':'—';
+  document.getElementById('an-time').textContent=total?(total*8)+'h':'—';
+
+  // Score distribution chart
+  if(scoreChart)scoreChart.destroy();
+  const ctx=document.getElementById('score-chart').getContext('2d');
+  const bins=[0,0,0,0,0];
+  allResults.forEach(r=>{const s=r.score||r.overall_score||0;const b=Math.min(4,Math.floor(s/20));bins[b]++;});
+  scoreChart=new Chart(ctx,{type:'bar',data:{labels:['0–20','21–40','41–60','61–80','81–100'],datasets:[{data:bins,backgroundColor:['#f43f5e','#f43f5e','#f59e0b','#10b981','#10b981'],borderRadius:5,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a5570',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a5570',font:{size:10},stepSize:1}}}}});
+
+  // Gaps chart
+  const gaps={};
+  allResults.forEach(r=>(r.critical_gaps||[]).forEach(g=>{gaps[g]=(gaps[g]||0)+1;}));
+  const topGaps=Object.entries(gaps).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxG=topGaps[0]?.[1]||1;
+  document.getElementById('gaps-chart').innerHTML=topGaps.length
+    ?topGaps.map(([k,v])=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+        <span style="font-size:11px;color:var(--t2);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
+        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/maxG*100)}%;background:var(--red);border-radius:3px"></div></div>
+        <span style="font-size:10px;font-weight:700;color:var(--t3);width:18px;text-align:right">${v}</span>
+      </div>`).join('')
+    :'<p style="color:var(--t3);font-size:12px">No data yet</p>';
+
+  // Dims chart
+  const dims={};const dimCnt={};
+  allResults.forEach(r=>(r.dimensions||[]).forEach(d=>{dims[d.name]=(dims[d.name]||0)+d.score;dimCnt[d.name]=(dimCnt[d.name]||0)+1;}));
+  const dimList=Object.entries(dims).map(([k,v])=>([k,v/dimCnt[k]])).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('dims-chart').innerHTML=dimList.length
+    ?dimList.map(([k,v])=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+        <span style="font-size:11px;color:var(--t2);width:110px;flex-shrink:0">${k}</span>
+        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/20*100)}%;background:${gc(v/20*100)};border-radius:3px"></div></div>
+        <span style="font-size:10px;font-weight:700;color:var(--t3);width:28px;text-align:right">${v.toFixed(1)}</span>
+      </div>`).join('')
+    :'<p style="color:var(--t3);font-size:12px">No data yet</p>';
+
+  // AI insights
+  const insights=[];
+  if(total>0){
+    insights.push({icon:'🎯',txt:`Average match score is <strong style="color:${gc(avg)}">${avg}/100</strong> across ${total} candidates`});
+    if(topGaps[0])insights.push({icon:'❌',txt:`Most common missing skill: <strong>${topGaps[0][0]}</strong> (missing in ${topGaps[0][1]} CVs)`});
+    const strongRate=Math.round(shl/total*100);
+    insights.push({icon:`${strongRate>30?'✅':'⚠️'}`,txt:`<strong>${strongRate}%</strong> of candidates are shortlisted — ${strongRate>30?'good quality pool':'consider widening your search'}`});
+    insights.push({icon:'⏱',txt:`Estimated time saved: <strong style="color:var(--green)">${total*8} hours</strong> vs manual screening`});
+    const highScore=allResults.filter(r=>(r.score||r.overall_score||0)>=80).length;
+    if(highScore>0)insights.push({icon:'⭐',txt:`<strong>${highScore} candidate${highScore>1?'s':''}</strong> scored 80+ and are strong hire recommendations`});
+  }
+  document.getElementById('insights-list').innerHTML=insights.length
+    ?insights.map(i=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:14px;flex-shrink:0">${i.icon}</span><div style="font-size:12px;color:var(--t2);line-height:1.5">${i.txt}</div></div>`).join('')
+    :'<div style="font-size:12px;color:var(--t3)">Screen more CVs to unlock AI insights</div>';
+}
+
+// ── AUDIT TRAIL ──
+function renderAudit(){
+  document.getElementById('audit-tbl').innerHTML=allResults.length
+    ?allResults.map(r=>{const sc=r.score_consistency||{};const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();return`<tr>
+        <td><a class="tbl-link" href="/candidate?id=${r._id}">${r.candidate_name||'Unknown'}</a></td>
+        <td style="font-size:10px">${fmtTime(r.created_at)}</td>
+        <td><span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span></td>
+        <td style="font-size:11px">${sc.run_1||'—'}</td>
+        <td style="font-size:11px">${sc.run_2||'—'}</td>
+        <td style="font-size:11px;color:${(sc.difference||0)>10?'var(--amber)':'var(--t3)'}">${sc.difference||0} pts</td>
+        <td style="font-weight:700;color:${gc(score)}">${score}</td>
+        <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
+        <td style="font-size:10px;color:var(--t3)">v1 · standard</td>
+      </tr>`;}).join('')
+    :'<tr><td colspan="9" class="tbl-empty">No screenings yet</td></tr>';
+}
+
+// ── ACTIVITY LOG ──
+const activityItems=[];
+function addActivity(txt,color){
+  activityItems.unshift({txt,color,time:new Date()});
+  renderActivity();
+}
+function renderActivity(){
+  document.getElementById('activity-log').innerHTML=activityItems.slice(0,8).map(a=>`
+    <div class="activity-item">
+      <div class="activity-dot" style="background:${a.color}"></div>
+      <div class="activity-txt">${a.txt}</div>
+      <div class="activity-time">${a.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`).join('')||'<p style="color:var(--t3);font-size:12px;padding:.5rem 0">No recent activity</p>';
+}
+
+// ── EXPORT ──
+function exportCandidates(){
+  const h=['Name','Title','Score','Skills%','Recommendation','Experience','Date'];
+  const rows=(filteredResults.length?filteredResults:allResults).map(r=>[r.candidate_name,r.current_title,r.score||r.overall_score,r.skills_coverage_pct,r.recommendation,r.years_experience,fmt(r.created_at)]);
+  const csv=[h,...rows].map(r=>r.map(v=>'"'+(v||'')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='topcandidate-candidates.csv';a.click();
+}
+function exportAll(){exportCandidates();}
+
+// ── AUTH & LOAD ──
+async function logout(){await fetch('/api/auth/logout',{method:'POST',credentials:'include'});window.location.href='/login';}
+
+function updateAll(){
+  document.getElementById('sb-cand-cnt').textContent=allResults.length;
+  filteredResults=allResults;
+  renderOverview();
+  renderCandidates(allResults);
   renderJobs();
+  applyFilters();
 }
 
-// ── BADGES ──
-function updateBadges(){
-  document.getElementById('sb-reports-cnt').textContent=allResults.length;
-  document.getElementById('sb-pipeline-cnt').textContent=allResults.length;
-  renderReports();renderCandidates();
-}
-
-// ── AUTH ──
-async function logout(){
-  await fetch('/api/auth/logout',{method:'POST',credentials:'include'});
-  window.location.href='/login';
-}
-
-// ── LOAD DATA ──
 async function loadFromDB(){
   try{
     const [meRes,screenRes,jobsRes,statsRes]=await Promise.all([
       fetch('/api/auth/me',{credentials:'include'}),
-      fetch('/api/screenings?limit=200',{credentials:'include'}),
+      fetch('/api/screenings?limit=500',{credentials:'include'}),
       fetch('/api/jobs',{credentials:'include'}),
-      fetch('/api/stats',{credentials:'include'})
+      fetch('/api/stats',{credentials:'include'}),
     ]);
     if(meRes.status===401){window.location.href='/login';return;}
     const me=await meRes.json();
     const screenData=await screenRes.json();
     const jobsData=await jobsRes.json();
-    const statsData=await statsRes.json();
 
-    // Set user info
-    document.getElementById('t-avatar').textContent=(me.company||'TA').slice(0,2).toUpperCase();
-    document.getElementById('t-plan').textContent=(me.plan||'Trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
+    document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
+    document.getElementById('t-plan').textContent=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
     document.getElementById('sb-company').textContent=me.company||'';
 
-    allResults=(screenData.screenings||[]).map(r=>({...r,score:Math.round(r.overall_score||0),rec:(r.recommendation||'MAYBE').toUpperCase()}));
-    allJobs=(jobsData.jobs||[]).map(j=>({...j,dept:j.department,loc:j.location,type:j.employment_type,candidates:j.candidates_count||0}));
+    // Job filter options
+    const fJob=document.getElementById('f-job');
+    allJobs=(jobsData.jobs||[]).map(j=>({...j,dept:j.department,loc:j.location,type:j.employment_type,status:j.status||'active'}));
 
-    updateBadges();
-    renderJobs();
+    allResults=(screenData.screenings||[]).map(r=>({...r,score:Math.round(r.overall_score||0),rec:(r.recommendation||'MAYBE').toUpperCase()}));
+
+    // Populate job filter
+    if(fJob){
+      fJob.innerHTML='<option value="">All jobs</option>';
+      const companies=[...new Set(allResults.map(r=>r.company).filter(Boolean))];
+      companies.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;fJob.appendChild(o);});
+    }
+
+    updateAll();
+    addActivity('Dashboard loaded — '+allResults.length+' candidates','var(--indigo)');
   }catch(e){console.error('[DB]',e);}
 }
 
