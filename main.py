@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
         await create_user(
             email="admin@talentscore.ai",
             hashed_password=hash_password("Admin@123"),
-            company_name="TalentScore AI",
+            company_name="TopCandidate",
             role="admin"
         )
         print("[AUTH] Default admin created: admin@talentscore.ai / Admin@123")
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
     await disconnect()
 
 
-app = FastAPI(title="TalentScore AI", version="5.0.0", lifespan=lifespan)
+app = FastAPI(title="TopCandidate", version="5.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -276,6 +276,8 @@ async def screen_endpoint(
     request: Request,
     cv_file: UploadFile = File(...),
     job_description: str = Form(...),
+    job_id: str = Form(""),
+    job_title: str = Form(""),
 ):
     user = await get_current_user(request)
 
@@ -302,9 +304,11 @@ async def screen_endpoint(
     if error:
         raise HTTPException(status_code=500, detail=error)
 
-    # Tag with user/company
+    # Tag with user/company/job
     result["user_id"] = user["user_id"]
     result["company"] = user["company"]
+    if job_id:    result["job_id"]    = job_id
+    if job_title: result["job_title"] = job_title
 
     # Store PDF
     result["cv_pdf_b64"] = base64.b64encode(file_bytes).decode("utf-8")
@@ -327,6 +331,8 @@ async def batch_screen_endpoint(
     request: Request,
     cv_files: list[UploadFile] = File(...),
     job_description: str = Form(...),
+    job_id: str = Form(""),
+    job_title: str = Form(""),
 ):
     user = await get_current_user(request)
 
@@ -384,6 +390,8 @@ async def batch_screen_endpoint(
             for r in results.get("results", []):
                 r["user_id"] = user_id
                 r["company"] = company
+                if job_id:    r["job_id"]    = job_id
+                if job_title: r["job_title"] = job_title
             return results
 
         batch_task = asyncio.create_task(run_with_user_tag())

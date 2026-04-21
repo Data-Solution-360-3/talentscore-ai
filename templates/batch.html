@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Batch Screening — TalentScore AI</title>
+<title>Batch Screening — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -117,8 +117,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <header class="topbar">
   <a href="/app" class="t-logo">
-    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-    <span class="t-name">TalentScore<span style="color:#fb923c">AI</span></span>
+    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+    <span class="t-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
   </a>
   <div class="t-right">
     <a href="/app" class="t-btn">
@@ -294,6 +294,12 @@ async function runBatch(){
 
   const fd=new FormData();
   fd.append('job_description',jd);
+  const batchJobSel=document.getElementById('batch-job-select');
+  if(batchJobSel&&batchJobSel.value){
+    const parts=batchJobSel.value.split('|');
+    fd.append('job_id',parts[0]||'');
+    fd.append('job_title',parts[1]||'');
+  }
   selectedFiles.forEach(f=>fd.append('cv_files',f));
 
   document.getElementById('input-section').style.display='none';
@@ -412,8 +418,34 @@ function exportCSV(){
   a.download='talentscore-batch-results.csv';a.click();
 }
 
-// Auth check
-fetch('/api/auth/me',{credentials:'include'}).then(r=>{if(r.status===401)window.location.href='/login';});
+// Auth check + load jobs
+fetch('/api/auth/me',{credentials:'include'}).then(r=>{
+  if(r.status===401){window.location.href='/login';return;}
+  // Load jobs for selector
+  return fetch('/api/jobs',{credentials:'include'});
+}).then(r=>r&&r.json()).then(data=>{
+  if(!data)return;
+  const sel=document.getElementById('batch-job-select');
+  (data.jobs||[]).forEach(j=>{
+    const o=document.createElement('option');
+    o.value=j._id+'|'+j.title;
+    o.textContent=j.title+(j.department?' ('+j.department+')':'');
+    sel.appendChild(o);
+  });
+});
+
+function fillBatchJd(){
+  const sel=document.getElementById('batch-job-select');
+  const val=sel.value;
+  if(!val)return;
+  // Could pre-fill JD from job if stored - for now just note selection
+  const title=val.split('|')[1]||'';
+  const jdEl=document.getElementById('jd');
+  if(!jdEl.value.trim()){
+    jdEl.focus();
+    jdEl.placeholder='Paste the job description for: '+title;
+  }
+}
 </script>
 </body>
 </html>
