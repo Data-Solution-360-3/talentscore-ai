@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Portal — TalentScore AI</title>
+<title>Admin Portal — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -173,8 +173,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- TOPBAR -->
 <header class="topbar">
   <a href="/app" class="t-logo">
-    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-    <span class="t-name">TalentScore<span style="color:#fb923c">AI</span></span>
+    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+    <span class="t-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
   </a>
   <span class="admin-badge">Admin Portal</span>
   <div class="t-right">
@@ -388,7 +388,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="card">
         <div class="card-title" style="margin-bottom:1rem">Identity</div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Platform name</label><input class="form-input" id="br-name" placeholder="TalentScore AI"><div class="form-hint">Shown in navbar and emails</div></div>
+          <div class="form-group"><label class="form-label">Platform name</label><input class="form-input" id="br-name" placeholder="TopCandidate"><div class="form-hint">Shown in navbar and emails</div></div>
           <div class="form-group"><label class="form-label">Tagline</label><input class="form-input" id="br-tagline" placeholder="by LinkX360"></div>
         </div>
         <div class="form-row">
@@ -397,7 +397,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Company address</label><input class="form-input" id="br-address" placeholder="Dhaka, Bangladesh"></div>
-          <div class="form-group"><label class="form-label">Copyright text</label><input class="form-input" id="br-copyright" placeholder="© 2026 TalentScore AI by LinkX360"></div>
+          <div class="form-group"><label class="form-label">Copyright text</label><input class="form-input" id="br-copyright" placeholder="© 2026 TopCandidate by LinkX360"></div>
         </div>
       </div>
       <div class="card">
@@ -426,7 +426,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <!-- ── SETTINGS ── -->
     <div class="page" id="page-settings">
-      <div class="page-hd"><h1>Platform Settings</h1><p>Global configuration for TalentScore AI</p></div>
+      <div class="page-hd"><h1>Platform Settings</h1><p>Global configuration for TopCandidate</p></div>
       <div class="alert alert-ok" id="settings-ok">✓ Settings saved!</div>
 
       <div class="card">
@@ -678,11 +678,11 @@ function filterScreenings(){renderScreenings();}
 // ── LANDING EDITOR ──
 const LANDING_DEFAULTS={
   h1:'Screen 100 CVs in',h2:'Minutes, Not Days',
-  sub:'TalentScore AI uses GPT-4o to structure, analyze, and rank candidates against your job description — with enterprise-grade accuracy and full transparency.',
+  sub:'TopCandidate uses GPT-4o to structure, analyze, and rank candidates against your job description — with enterprise-grade accuracy and full transparency.',
   cta:'Start screening for free',cta2:'See how it works ↓',
   s1n:'3x',s1l:'Faster hiring',s2n:'100',s2l:'CVs per batch',s3n:'98%',s3l:'Accuracy rate',
   bannerH:'Ready to transform your hiring?',
-  bannerSub:'Join forward-thinking recruitment teams using TalentScore AI to make faster, fairer hiring decisions. Start your free trial today — no credit card needed.',
+  bannerSub:'Join forward-thinking recruitment teams using TopCandidate to make faster, fairer hiring decisions. Start your free trial today — no credit card needed.',
   bannerBtn:'Start free trial — it\'s free →',
   companies:'BRAC, Grameenphone, Pathao, ShopUp, DataSolution360, LinkX360'
 };
@@ -731,7 +731,7 @@ function loadLandingDefaults(){
 
 // ── PRICING EDITOR ──
 const DEFAULT_PRICING=[
-  {id:'trial',name:'Trial',usd:'Free',bdt:'Free',period:'',desc:'Perfect for trying out TalentScore AI. No credit card needed.',popular:false,features:['10 CV screenings / month','Single CV screener','Basic score report','1 job posting'],noFeatures:['Batch screening','Analytics dashboard','Priority support']},
+  {id:'trial',name:'Trial',usd:'Free',bdt:'Free',period:'',desc:'Perfect for trying out TopCandidate. No credit card needed.',popular:false,features:['10 CV screenings / month','Single CV screener','Basic score report','1 job posting'],noFeatures:['Batch screening','Analytics dashboard','Priority support']},
   {id:'starter',name:'Starter',usd:'$29',bdt:'৳3,200',period:'/month',desc:'For small teams and startups ready to streamline hiring.',popular:false,features:['100 CV screenings / month','Batch screening (up to 20)','Full score reports','5 job postings','Basic analytics','Email support'],noFeatures:['Priority support']},
   {id:'pro',name:'Pro',usd:'$79',bdt:'৳8,500',period:'/month',desc:'For growing teams that screen candidates at scale every week.',popular:true,features:['500 CV screenings / month','Batch screening (up to 100)','Full score reports + CV viewer','Unlimited job postings','Advanced analytics','Priority email support','Custom scoring weights'],noFeatures:[]},
   {id:'enterprise',name:'Enterprise',usd:'Custom',bdt:'কাস্টম',period:'',desc:'For large organizations with high-volume hiring needs.',popular:false,features:['Unlimited CV screenings','Unlimited batch screening','White-label option','API access','Dedicated account manager','SLA guarantee','Custom integrations'],noFeatures:[]}
@@ -769,11 +769,11 @@ function savePricing(){
 
 // ── FAQ EDITOR ──
 const DEFAULT_FAQ=[
-  {q:'How accurate is the AI scoring?',a:'TalentScore AI uses a 3-step pipeline — first structuring the CV, then parsing the job description, then scoring against structured data. Every CV is scored twice and results averaged.'},
+  {q:'How accurate is the AI scoring?',a:'TopCandidate uses a 3-step pipeline — first structuring the CV, then parsing the job description, then scoring against structured data. Every CV is scored twice and results averaged.'},
   {q:'How long does it take to screen 100 CVs?',a:'Batch screening processes 5 CVs in parallel. For 100 CVs, typical time is 25–40 minutes depending on CV length and API response times.'},
   {q:'Is my CV data secure and private?',a:'Yes. Each company account has fully isolated data. CVs are stored encrypted. Data is never shared with third parties.'},
   {q:'What file formats are supported?',a:'Currently we support PDF files only. The PDF must be text-based (not scanned images).'},
-  {q:'Can I use this for any type of role?',a:'Yes — TalentScore AI works for any role. The AI reads your job description and adapts automatically.'},
+  {q:'Can I use this for any type of role?',a:'Yes — TopCandidate works for any role. The AI reads your job description and adapts automatically.'},
   {q:'Do I need technical knowledge to use it?',a:'No technical knowledge required at all. Just paste your job description, upload CVs, and click screen.'},
   {q:'What is the difference between Trial and Starter?',a:'Trial is free with 10 screenings/month. Starter ($29/month) gives 100 screenings and batch screening for up to 20 CVs.'},
   {q:'How do I get started?',a:'Click "Start screening for free", create your account, and you\'re ready in under 2 minutes. No credit card required.'},

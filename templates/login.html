@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TalentScore AI — Sign In</title>
+<title>TopCandidate — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -18,21 +18,21 @@ body{font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);
 .page{display:flex;flex:1;min-height:100vh}
 
 /* LEFT PANEL */
-.left{width:480px;flex-shrink:0;background:linear-gradient(160deg,var(--navy) 0%,#312e81 50%,#1e1b4b 100%);padding:3rem;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.left{width:480px;flex-shrink:0;background:linear-gradient(160deg,#0f0d2e 0%,#1e1b4b 40%,#2d1a4a 100%);padding:3rem;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .left::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")}
 .left-blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.3}
-.lb1{width:300px;height:300px;background:var(--indigo);top:-50px;right:-50px}
+.lb1{width:300px;height:300px;background:radial-gradient(circle,#5b5ef4,#fb923c);top:-50px;right:-50px}
 .lb2{width:200px;height:200px;background:var(--orange);bottom:50px;left:-50px}
 .left-logo{display:flex;align-items:center;gap:10px;margin-bottom:auto;position:relative;z-index:1}
 .left-icon{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
 .left-name{font-size:18px;font-weight:800;color:#fff}
 .left-content{position:relative;z-index:1;margin-top:auto;padding-bottom:2rem}
 .left-title{font-size:2.2rem;font-weight:800;color:#fff;line-height:1.2;margin-bottom:1rem;letter-spacing:-.5px}
-.left-title span{color:var(--orange)}
+.left-title span{background:linear-gradient(135deg,#fb923c,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .left-sub{font-size:14px;color:rgba(255,255,255,.6);line-height:1.7;margin-bottom:2rem}
 .left-stats{display:flex;flex-direction:column;gap:.75rem}
 .left-stat{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.7)}
-.left-stat-dot{width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0}
+.left-stat-dot{width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#fb923c,#5b5ef4);flex-shrink:0}
 
 /* RIGHT PANEL */
 .right{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;background:#fff}
@@ -88,17 +88,17 @@ input.fi.error{border-color:var(--red)}
     <div class="left-blob lb2"></div>
     <div class="left-logo">
       <div class="left-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <span class="left-name">TalentScore<span style="color:#fb923c">AI</span></span>
+      <span class="left-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
     </div>
     <div class="left-content">
-      <h2 class="left-title">Hire the best.<br><span>Faster than ever.</span></h2>
-      <p class="left-sub">Screen 100 CVs in minutes with GPT-4o. Rank candidates, spot gaps, and make better hiring decisions — powered by AI.</p>
+      <h2 class="left-title">Find your<br><span>Top Candidates.</span></h2>
+      <p class="left-sub">Upload CVs, get instant AI scores, and shortlist your best candidates in minutes — not days. Trusted by HR teams across Bangladesh.</p>
       <div class="left-stats">
         <div class="left-stat"><span class="left-stat-dot"></span>3-step AI pipeline for 3x better accuracy</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Double-run scoring with confidence indicator</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Batch screen up to 100 CVs at once</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Full candidate reports with CV viewer</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Your data is 100% private and isolated</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Every CV scored twice for consistent results</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Screen up to 100 CVs in one go</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Full report with CV viewer side-by-side</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>100% private — your data never shared</div>
       </div>
     </div>
   </div>
@@ -116,8 +116,8 @@ input.fi.error{border-color:var(--red)}
 
         <!-- LOGIN -->
         <div id="login-form">
-          <h2 class="form-title">Welcome back</h2>
-          <p class="form-sub">Sign in to your TalentScore AI dashboard</p>
+          <h2 class="form-title">Welcome back to TopCandidate</h2>
+          <p class="form-sub">Sign in to your TopCandidate dashboard</p>
           <div class="err-box" id="login-err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="login-err-txt"></span></div>
           <div class="fw"><label class="fl">Work email</label><input class="fi" type="email" id="l-email" placeholder="you@company.com" autocomplete="email"></div>
           <div class="fw"><label class="fl">Password</label><input class="fi" type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -128,7 +128,7 @@ input.fi.error{border-color:var(--red)}
         <!-- REGISTER -->
         <div id="reg-form" style="display:none">
           <h2 class="form-title">Create your account</h2>
-          <p class="form-sub">Start screening candidates smarter — free trial, no card needed</p>
+          <p class="form-sub">Find your top candidates faster — free trial, no card needed</p>
           <div class="err-box" id="reg-err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="reg-err-txt"></span></div>
           <div class="fw"><label class="fl">Company name</label><input class="fi" type="text" id="r-company" placeholder="Acme Corp" autocomplete="organization"></div>
           <div class="fw"><label class="fl">Work email</label><input class="fi" type="email" id="r-email" placeholder="you@company.com" autocomplete="email"></div>

@@ -25,8 +25,8 @@ load_dotenv()
 
 GMAIL_USER     = os.getenv("GMAIL_USER", "")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
-APP_NAME       = "TalentScore AI"
-APP_URL        = os.getenv("APP_URL", "https://talentscore-ai.onrender.com")
+APP_NAME       = "TopCandidate"
+APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 
 
 def generate_otp(length: int = 6) -> str:
@@ -52,7 +52,7 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
         <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#1e1b4b,#5b5ef4);padding:32px 40px;text-align:center">
           <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-.5px">
-            TalentScore<span style="color:#fb923c">AI</span>
+            TopCandidate<span style="color:#fb923c">.pro</span>
           </div>
           <div style="font-size:13px;color:rgba(255,255,255,.6);margin-top:4px">by LinkX360</div>
         </td></tr>
@@ -76,7 +76,7 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
         <!-- Footer -->
         <tr><td style="background:#f8f9ff;padding:20px 40px;border-top:1px solid #e8eaf5">
           <p style="font-size:12px;color:#8892aa;text-align:center;margin:0">
-            © 2026 TalentScore AI by <a href="https://linkx360.com" style="color:#5b5ef4;text-decoration:none">LinkX360</a> · Dhaka, Bangladesh
+            © 2026 TopCandidate by <a href="https://linkx360.com" style="color:#5b5ef4;text-decoration:none">LinkX360</a> · Dhaka, Bangladesh
           </p>
         </td></tr>
       </table>
@@ -116,7 +116,7 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden">
         <tr><td style="background:linear-gradient(135deg,#1e1b4b,#5b5ef4);padding:32px 40px;text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#ffffff">TalentScore<span style="color:#fb923c">AI</span></div>
+          <div style="font-size:24px;font-weight:800;color:#ffffff">TopCandidate<span style="color:#fb923c">.pro</span></div>
         </td></tr>
         <tr><td style="padding:40px">
           <h2 style="font-size:22px;font-weight:700;color:#0a0b1e;margin:0 0 12px">🎉 Welcome, {company_name}!</h2>
@@ -128,7 +128,7 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
           </a>
         </td></tr>
         <tr><td style="background:#f8f9ff;padding:20px 40px;border-top:1px solid #e8eaf5">
-          <p style="font-size:12px;color:#8892aa;text-align:center;margin:0">© 2026 TalentScore AI by LinkX360</p>
+          <p style="font-size:12px;color:#8892aa;text-align:center;margin:0">© 2026 TopCandidate by LinkX360</p>
         </td></tr>
       </table>
     </td></tr>

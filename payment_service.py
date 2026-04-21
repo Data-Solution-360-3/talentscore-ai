@@ -10,7 +10,7 @@ Environment variables needed:
   SSLCOMMERZ_STORE_ID      = your store ID
   SSLCOMMERZ_STORE_PASS    = your store password
   SSLCOMMERZ_SANDBOX       = true (for testing) / false (for live)
-  APP_URL                  = https://talentscore-ai.onrender.com
+  APP_URL                  = https://topcandidate.pro
 """
 
 import os
@@ -24,7 +24,7 @@ load_dotenv()
 STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
-APP_URL               = os.getenv("APP_URL", "https://talentscore-ai.onrender.com")
+APP_URL               = os.getenv("APP_URL", "https://topcandidate.pro")
 
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
@@ -191,7 +191,7 @@ async def create_sslcommerz_payment(
         "fail_url": f"{APP_URL}/payment/sslcommerz/fail",
         "cancel_url": f"{APP_URL}/app?payment=cancelled",
         "ipn_url": f"{APP_URL}/api/payments/sslcommerz/ipn",
-        "product_name": f"TalentScore AI - {plan['name']} Plan",
+        "product_name": f"TopCandidate - {plan['name']} Plan",
         "product_category": "Software",
         "product_profile": "general",
         "cus_name": customer_name or company,
