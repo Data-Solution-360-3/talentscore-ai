@@ -447,7 +447,8 @@ async def get_screening(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and doc.get("user_id") != user["user_id"]:
+    # Allow access if no user_id (legacy data) or if it belongs to this user
+    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
     return doc
 
@@ -458,7 +459,7 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
     await delete_screening(screening_id)
     return {"deleted": True}
@@ -472,7 +473,7 @@ async def get_cv_pdf(request: Request, screening_id: str):
     doc = await db.screenings.find_one({"_id": ObjectId(screening_id)}, {"cv_pdf_b64": 1, "cv_filename": 1, "user_id": 1})
     if not doc or not doc.get("cv_pdf_b64"):
         raise HTTPException(status_code=404, detail="CV file not found.")
-    if user["role"] != "admin" and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
     pdf_bytes = base64.b64decode(doc["cv_pdf_b64"])
     return FastResponse(content=pdf_bytes, media_type="application/pdf",

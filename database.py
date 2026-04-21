@@ -272,7 +272,8 @@ async def increment_screening_count(user_id: str):
 # ─────────────────────────────────────────────────────────────
 
 async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
-    cursor = db.screenings.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
+    # Include screenings owned by user AND legacy screenings with no user_id
+    cursor = db.screenings.find({"$or": [{"user_id": user_id}, {"user_id": {"$exists": False}}, {"user_id": None}]}).sort("created_at", -1).limit(limit)
     results = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
