@@ -380,3 +380,93 @@ async def verify_otp(email: str, otp: str) -> dict | None:
 
 async def delete_pending(email: str):
     await db.pending_registrations.delete_many({"email": email.lower()})
+
+
+# ─────────────────────────────────────────────────────────────
+# PAYMENTS & BILLING
+# ─────────────────────────────────────────────────────────────
+
+async def save_payment(payment: dict) -> str:
+    doc = {**payment, "created_at": datetime.utcnow()}
+    inserted = await db.payments.insert_one(doc)
+    return str(inserted.inserted_id)
+
+
+async def get_payments_for_user(user_id: str) -> list:
+    cursor = db.payments.find({"user_id": user_id}).sort("created_at", -1).limit(20)
+    payments = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        payments.append(doc)
+    return payments
+
+
+async def update_user_subscription(user_id: str, plan: str, subscription_data: dict = None):
+    updates = {"plan": plan}
+    if subscription_data:
+        updates["subscription"] = subscription_data
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+
+
+# ─────────────────────────────────────────────────────────────
+# TEAM MEMBERS
+# ─────────────────────────────────────────────────────────────
+
+async def invite_team_member(owner_user_id: str, email: str, role: str, company_name: str) -> str:
+    """Create a team member invitation."""
+    existing = await db.users.find_one({"email": email.lower()})
+    if existing:
+        raise ValueError("This email is already registered.")
+    doc = {
+        "email": email.lower(),
+        "owner_user_id": owner_user_id,
+        "company_name": company_name,
+        "role": role,  # "viewer" or "screener"
+        "status": "pending",
+        "invited_at": datetime.utcnow(),
+    }
+    inserted = await db.team_invites.insert_one(doc)
+    return str(inserted.inserted_id)
+
+
+async def get_team_members(owner_user_id: str) -> list:
+    """Get all team members (active users) under this account."""
+    cursor = db.users.find({"owner_user_id": owner_user_id})
+    members = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("password", None)
+        members.append(doc)
+    return members
+
+
+async def get_team_invites(owner_user_id: str) -> list:
+    cursor = db.team_invites.find({"owner_user_id": owner_user_id, "status": "pending"})
+    invites = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        invites.append(doc)
+    return invites
+
+
+async def update_user_profile(user_id: str, profile: dict):
+    """Update user profile fields."""
+    allowed = ["company_name", "full_name", "phone", "website", "address", "avatar_initials"]
+    updates = {k: v for k, v in profile.items() if k in allowed}
+    if updates:
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+
+
+async def update_user_notifications(user_id: str, prefs: dict):
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"notification_prefs": prefs}}
+    )
+
+
+async def get_full_user(user_id: str) -> dict | None:
+    doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("password", None)
+    return doc

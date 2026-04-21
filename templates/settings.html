@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — TalentScore AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;--ig:rgba(91,94,244,.12);--ib:rgba(91,94,244,.3);
+  --orange:#fb923c;--og:rgba(251,146,60,.12);--ob:rgba(251,146,60,.3);
+  --bg:#07080f;--surface:#0f1117;--s2:#171b26;--s3:#1e2333;
+  --border:#1e2333;--border2:#252b3b;--border3:#2e3548;
+  --text:#eef0f8;--t2:#8b95b0;--t3:#4a5270;
+  --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.3);
+  --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.3);
+  --amber:#f59e0b;--amg:rgba(245,158,11,.1);--amb:rgba(245,158,11,.3);
+  --r:12px;--rs:8px;--rxs:6px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(15,17,23,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
+.t-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
+.t-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
+.t-name{font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
+.t-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.t-btn{padding:6px 13px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border2);background:var(--s2);color:var(--t2);transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.t-btn:hover{background:var(--s3);color:var(--text)}
+.shell{display:flex;padding-top:58px;min-height:100vh}
+.sidebar{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem;position:fixed;top:58px;bottom:0;overflow-y:auto}
+.sb-section{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);padding:0 8px;margin:1.1rem 0 4px}
+.sb-section:first-child{margin-top:0}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;background:none;border:none;font-family:inherit;width:100%;text-align:left}
+.sb-item:hover{background:var(--s2);color:var(--text)}
+.sb-item.act{background:var(--ig);color:#a5b4fc;font-weight:600;position:relative}
+.sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--indigo);border-radius:0 3px 3px 0}
+.sb-item svg{flex-shrink:0;opacity:.6}
+.sb-item.act svg{opacity:1}
+.main{margin-left:230px;flex:1;padding:2rem;max-width:860px}
+.page{display:none}
+.page.act{display:block}
+.page-hd{margin-bottom:1.5rem}
+.page-hd h1{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-bottom:4px}
+.page-hd p{font-size:13px;color:var(--t2)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:12px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:700}
+.card-sub{font-size:12px;color:var(--t3)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-group:last-child{margin-bottom:0}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
+.form-input,.form-select,.form-textarea{width:100%;padding:10px 13px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--ig)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--t3)}
+.form-hint{font-size:11px;color:var(--t3);margin-top:3px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s}
+.btn-primary{background:var(--indigo);color:#fff;box-shadow:0 2px 8px rgba(91,94,244,.3)}
+.btn-primary:hover{background:var(--indigo2)}
+.btn-orange{background:var(--orange);color:#fff}
+.btn-orange:hover{background:#f97316}
+.btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border2)}
+.btn-ghost:hover{background:var(--s3);color:var(--text)}
+.btn-danger{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
+.btn-danger:hover{background:rgba(244,63,94,.2)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid;display:inline-block}
+.b-green{background:var(--gg);color:var(--green);border-color:var(--gb)}
+.b-indigo{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
+.b-orange{background:var(--og);color:var(--orange);border-color:var(--ob)}
+.b-amber{background:var(--amg);color:var(--amber);border-color:var(--amb)}
+.b-red{background:var(--rg);color:#fda4af;border-color:var(--rb)}
+.alert{padding:10px 14px;border-radius:var(--rs);font-size:13px;border:1px solid;margin-bottom:12px;display:none}
+.alert-ok{background:var(--gg);border-color:var(--gb);color:var(--green)}
+.alert-err{background:var(--rg);border-color:var(--rb);color:#fda4af}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.85rem 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none;padding-bottom:0}
+.toggle-info h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.toggle-info p{font-size:12px;color:var(--t3)}
+.toggle{position:relative;width:40px;height:22px;cursor:pointer;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--border3);border-radius:11px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--indigo)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s}
+.toggle input:checked~.toggle-thumb{transform:translateX(18px)}
+.plan-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1rem}
+.plan-card{border:2px solid var(--border);border-radius:var(--r);padding:1.1rem;cursor:pointer;transition:all .2s;position:relative}
+.plan-card:hover{border-color:var(--indigo)}
+.plan-card.current{border-color:var(--indigo);background:var(--ig)}
+.plan-card.popular{border-color:var(--orange)}
+.plan-name{font-size:15px;font-weight:700;margin-bottom:3px}
+.plan-price{font-size:22px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
+.plan-price span{font-size:12px;font-weight:500;color:var(--t3)}
+.plan-desc{font-size:12px;color:var(--t3);margin-bottom:8px}
+.plan-features{font-size:12px;color:var(--t2);line-height:1.8}
+.plan-badge{position:absolute;top:-10px;right:10px;font-size:10px;font-weight:700;background:var(--orange);color:#fff;padding:3px 10px;border-radius:20px}
+.current-badge{position:absolute;top:-10px;left:10px;font-size:10px;font-weight:700;background:var(--indigo);color:#fff;padding:3px 10px;border-radius:20px}
+.usage-bar-wrap{margin-bottom:10px}
+.usage-bar-hd{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.usage-bar-bg{height:8px;background:var(--border2);border-radius:4px;overflow:hidden}
+.usage-bar-fill{height:100%;border-radius:4px;transition:width .8s}
+.payment-method{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+.pm-card{border:2px solid var(--border);border-radius:var(--r);padding:1.1rem;cursor:pointer;transition:all .2s;text-align:center}
+.pm-card:hover{border-color:var(--indigo)}
+.pm-card.selected{border-color:var(--indigo);background:var(--ig)}
+.pm-icon{font-size:28px;margin-bottom:6px}
+.pm-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.pm-desc{font-size:11px;color:var(--t3)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 12px;font-size:13px;color:var(--t2);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.team-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.danger-zone{border-color:var(--rb)!important}
+.danger-zone .card-title{color:var(--red)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem;width:90%;max-width:480px}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.modal-close:hover{color:var(--text)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.avatar-big{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;flex-shrink:0;border:3px solid var(--border2)}
+@media(max-width:700px){.form-row,.plan-cards,.payment-method{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/app" class="t-logo">
+    <div class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <span class="t-name">TalentScore<span style="color:#fb923c">AI</span></span>
+  </a>
+  <div class="t-right">
+    <a href="/app" class="t-btn">← Back to dashboard</a>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sb-section">Account</div>
+    <button class="sb-item act" onclick="nav('profile')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </button>
+    <button class="sb-item" onclick="nav('security')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Security
+    </button>
+    <div class="sb-section">Billing</div>
+    <button class="sb-item" onclick="nav('billing')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      Plan & Billing
+    </button>
+    <button class="sb-item" onclick="nav('usage')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Usage
+    </button>
+    <div class="sb-section">Team</div>
+    <button class="sb-item" onclick="nav('team')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team Members
+    </button>
+    <div class="sb-section">Preferences</div>
+    <button class="sb-item" onclick="nav('notifications')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Notifications
+    </button>
+    <button class="sb-item" onclick="nav('danger')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <span style="color:var(--red)">Danger Zone</span>
+    </button>
+  </aside>
+
+  <main class="main">
+
+    <!-- ── PROFILE ── -->
+    <div class="page act" id="page-profile">
+      <div class="page-hd"><h1>Profile</h1><p>Your company and personal information</p></div>
+      <div class="alert alert-ok" id="profile-ok">✓ Profile updated successfully!</div>
+      <div class="alert alert-err" id="profile-err"></div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Company profile</div></div>
+        <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem">
+          <div class="avatar-big" id="profile-avatar">TA</div>
+          <div>
+            <div style="font-size:16px;font-weight:700" id="profile-name-display">Loading...</div>
+            <div style="font-size:13px;color:var(--t2)" id="profile-email-display">—</div>
+            <div style="margin-top:6px"><span class="badge b-indigo" id="profile-plan-badge">Trial</span></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Company name</label><input class="form-input" id="p-company" placeholder="Acme Corp"></div>
+          <div class="form-group"><label class="form-label">Your full name</label><input class="form-input" id="p-fullname" placeholder="John Doe"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Phone number</label><input class="form-input" id="p-phone" placeholder="+880 17..."></div>
+          <div class="form-group"><label class="form-label">Company website</label><input class="form-input" id="p-website" placeholder="https://yourcompany.com"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Company address</label><input class="form-input" id="p-address" placeholder="Dhaka, Bangladesh"></div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-primary" onclick="saveProfile()">Save profile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECURITY ── -->
+    <div class="page" id="page-security">
+      <div class="page-hd"><h1>Security</h1><p>Manage your password and account security</p></div>
+      <div class="alert alert-ok" id="security-ok">✓ Password changed successfully!</div>
+      <div class="alert alert-err" id="security-err"></div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Change password</div></div>
+        <div class="form-group"><label class="form-label">Current password</label><input class="form-input" type="password" id="s-current" placeholder="••••••••"></div>
+        <div class="form-group"><label class="form-label">New password</label><input class="form-input" type="password" id="s-new" placeholder="Min 8 characters"><div class="form-hint">At least 8 characters, mix of letters and numbers recommended</div></div>
+        <div class="form-group"><label class="form-label">Confirm new password</label><input class="form-input" type="password" id="s-confirm" placeholder="Repeat new password"></div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-primary" onclick="changePassword()">Update password</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Active sessions</div><span class="card-sub">Your current session</span></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:.75rem 0">
+          <div style="width:36px;height:36px;border-radius:8px;background:var(--ig);border:1px solid var(--ib);display:flex;align-items:center;justify-content:center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600" id="session-browser">Current browser</div>
+            <div style="font-size:12px;color:var(--t3)">Active now · <span class="badge b-green" style="font-size:10px">Current session</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BILLING ── -->
+    <div class="page" id="page-billing">
+      <div class="page-hd"><h1>Plan & Billing</h1><p>Manage your subscription and payment method</p></div>
+
+      <!-- Current plan -->
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">Current plan</div>
+          <span class="badge b-indigo" id="current-plan-badge">Trial</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
+          <div>
+            <div style="font-size:22px;font-weight:800" id="current-plan-name">Trial Plan</div>
+            <div style="font-size:13px;color:var(--t2)" id="current-plan-desc">Free forever · 10 screenings/month</div>
+          </div>
+        </div>
+        <div id="current-sub-info" style="font-size:13px;color:var(--t3);margin-bottom:1rem"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="showUpgrade()">Upgrade plan</button>
+          <button class="btn btn-ghost btn-sm" id="cancel-sub-btn" style="display:none" onclick="cancelSubscription()">Cancel subscription</button>
+          <button class="btn btn-ghost btn-sm" id="manage-billing-btn" style="display:none" onclick="manageBilling()">Manage billing →</button>
+        </div>
+      </div>
+
+      <!-- Upgrade section (hidden by default) -->
+      <div id="upgrade-section" style="display:none">
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Choose your plan</div><button class="btn btn-ghost btn-sm" onclick="hideUpgrade()">Cancel</button></div>
+
+          <!-- Currency toggle -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+            <span style="font-size:13px;font-weight:500;color:var(--t2)">USD</span>
+            <label class="toggle"><input type="checkbox" id="currency-tog" onchange="toggleCurrency()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            <span style="font-size:13px;font-weight:500;color:var(--t2)">BDT</span>
+            <span class="badge b-green" style="font-size:10px">Bangladesh local payment</span>
+          </div>
+
+          <div class="plan-cards" id="plan-cards">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Payment method selection -->
+          <div id="payment-method-section" style="display:none">
+            <div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Choose payment method</div>
+            <div class="payment-method">
+              <div class="pm-card selected" id="pm-stripe" onclick="selectPayment('stripe')">
+                <div class="pm-icon">💳</div>
+                <div class="pm-name">Card Payment</div>
+                <div class="pm-desc">Visa, Mastercard, Amex<br>Powered by Stripe</div>
+              </div>
+              <div class="pm-card" id="pm-ssl" onclick="selectPayment('ssl')">
+                <div class="pm-icon">🏦</div>
+                <div class="pm-name">Bangladesh Payment</div>
+                <div class="pm-desc">bKash, Nagad, Rocket<br>Card, Net Banking<br>Powered by SSLCommerz</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
+              <button class="btn btn-primary" onclick="proceedPayment()" id="pay-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Proceed to payment
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment history -->
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Payment history</div></div>
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+          <tbody id="payment-history"><tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No payments yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── USAGE ── -->
+    <div class="page" id="page-usage">
+      <div class="page-hd"><h1>Usage</h1><p>Your screening usage and limits this month</p></div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Screenings this month</div><span class="card-sub" id="usage-reset">Resets monthly</span></div>
+        <div class="usage-bar-wrap">
+          <div class="usage-bar-hd">
+            <span id="usage-count">0 used</span>
+            <span id="usage-limit">of 10</span>
+          </div>
+          <div class="usage-bar-bg">
+            <div class="usage-bar-fill" id="usage-bar" style="width:0%;background:var(--indigo)"></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--t3);margin-top:6px" id="usage-note">Upgrade your plan to screen more candidates.</div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">All-time stats</div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:var(--indigo)" id="us-total">0</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Total screened</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:var(--green)" id="us-hires">0</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Strong hires</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
+            <div style="font-size:24px;font-weight:800;color:var(--orange)" id="us-avg">—</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Avg score</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TEAM ── -->
+    <div class="page" id="page-team">
+      <div class="page-hd"><h1>Team Members</h1><p>Invite colleagues to access your TalentScore AI workspace</p></div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">Your team</div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('invite-modal')">+ Invite member</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Member</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="team-tbl">
+            <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">You are the only member. Invite your team!</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card" style="border-color:var(--border2)">
+        <div class="card-title" style="margin-bottom:.5rem">Team roles</div>
+        <div style="font-size:13px;color:var(--t2);line-height:1.8">
+          <strong style="color:var(--text)">Admin</strong> — Full access, can invite/remove members, manage billing<br>
+          <strong style="color:var(--text)">Screener</strong> — Can screen CVs and view results, cannot manage team<br>
+          <strong style="color:var(--text)">Viewer</strong> — Can only view screening results, cannot run new screenings
+        </div>
+      </div>
+    </div>
+
+    <!-- ── NOTIFICATIONS ── -->
+    <div class="page" id="page-notifications">
+      <div class="page-hd"><h1>Notifications</h1><p>Control what emails and alerts you receive</p></div>
+      <div class="alert alert-ok" id="notif-ok">✓ Notification preferences saved!</div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Email notifications</div></div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Screening complete</h4><p>Get notified when a batch screening finishes</p></div>
+          <label class="toggle"><input type="checkbox" id="n-screen" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Strong hire found</h4><p>Alert when a candidate scores 80+ (Strong Hire)</p></div>
+          <label class="toggle"><input type="checkbox" id="n-hire" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Weekly summary</h4><p>Weekly digest of your hiring activity</p></div>
+          <label class="toggle"><input type="checkbox" id="n-weekly"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Usage warnings</h4><p>Alert when you reach 80% of your monthly limit</p></div>
+          <label class="toggle"><input type="checkbox" id="n-usage" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Billing & payment</h4><p>Invoices, payment confirmations, subscription changes</p></div>
+          <label class="toggle"><input type="checkbox" id="n-billing" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Product updates</h4><p>New features and platform announcements</p></div>
+          <label class="toggle"><input type="checkbox" id="n-updates"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+          <button class="btn btn-primary btn-sm" onclick="saveNotifications()">Save preferences</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DANGER ZONE ── -->
+    <div class="page" id="page-danger">
+      <div class="page-hd"><h1>Danger Zone</h1><p>Irreversible actions — please be careful</p></div>
+      <div class="card danger-zone">
+        <div class="card-hd"><div class="card-title" style="color:var(--red)">Delete all screening data</div></div>
+        <p style="font-size:13px;color:var(--t2);margin-bottom:1rem">Permanently delete all your CV screenings and candidate data. This cannot be undone.</p>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteData()">Delete all screening data</button>
+      </div>
+      <div class="card danger-zone">
+        <div class="card-hd"><div class="card-title" style="color:var(--red)">Delete account</div></div>
+        <p style="font-size:13px;color:var(--t2);margin-bottom:1rem">Permanently delete your company account, all data, and cancel your subscription. This cannot be undone.</p>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteAccount()">Delete my account</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- INVITE MODAL -->
+<div class="modal-overlay" id="invite-modal">
+  <div class="modal">
+    <div class="modal-hd"><h3 class="modal-title">Invite team member</h3><button class="modal-close" onclick="closeModal('invite-modal')">✕</button></div>
+    <div class="alert alert-err" id="invite-err" style="display:none"></div>
+    <div class="form-group"><label class="form-label">Email address *</label><input class="form-input" id="invite-email" type="email" placeholder="colleague@company.com"></div>
+    <div class="form-group"><label class="form-label">Role</label>
+      <select class="form-select" id="invite-role">
+        <option value="screener">Screener — can run screenings and view results</option>
+        <option value="viewer">Viewer — can only view results</option>
+      </select>
+    </div>
+    <div class="form-hint" style="margin-top:-4px">They'll receive an email invitation to join your workspace.</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('invite-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="sendInvite()">Send invitation</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let userData = null;
+let usageData = null;
+let selectedPlan = null;
+let selectedPayment = 'stripe';
+let useBDT = false;
+
+const PLANS = {
+  starter: { name:'Starter', usd:'$29', bdt:'৳3,200', period:'/month', screenings:100, features:['100 screenings/month','Batch up to 20 CVs','Full reports','5 job postings','Basic analytics'] },
+  pro:     { name:'Pro',     usd:'$79', bdt:'৳8,500', period:'/month', screenings:500, features:['500 screenings/month','Batch up to 100 CVs','Full reports + CV viewer','Unlimited jobs','Advanced analytics','Priority support'], popular:true },
+  enterprise: { name:'Enterprise', usd:'Custom', bdt:'কাস্টম', period:'', screenings:999999, features:['Unlimited screenings','Unlimited batch','White-label','API access','Account manager','SLA guarantee'] }
+};
+
+// ── NAVIGATION ──
+function nav(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
+  document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('act'));
+  document.getElementById('page-'+id).classList.add('act');
+  event.currentTarget.classList.add('act');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function showOk(id){const el=document.getElementById(id);el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
+function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.style.display='block';}
+
+// ── LOAD USER ──
+async function loadUser(){
+  try{
+    const [meRes,screenRes,statsRes,payRes]=await Promise.all([
+      fetch('/api/auth/me',{credentials:'include'}),
+      fetch('/api/screenings?limit=500',{credentials:'include'}),
+      fetch('/api/stats',{credentials:'include'}),
+      fetch('/api/payments',{credentials:'include'}),
+    ]);
+    if(meRes.status===401){window.location.href='/login';return;}
+    userData=await meRes.json();
+    const screenData=await screenRes.json();
+    const statsData=await statsRes.json();
+    const payData=payRes.ok?await payRes.json():{payments:[]};
+
+    // Profile tab
+    const initials=(userData.company||'TA').slice(0,2).toUpperCase();
+    document.getElementById('profile-avatar').textContent=initials;
+    document.getElementById('profile-name-display').textContent=userData.company||'Your company';
+    document.getElementById('profile-email-display').textContent=userData.email||'—';
+    document.getElementById('profile-plan-badge').textContent=(userData.plan||'trial').charAt(0).toUpperCase()+(userData.plan||'trial').slice(1);
+    document.getElementById('p-company').value=userData.company||'';
+    document.getElementById('p-fullname').value=userData.full_name||'';
+    document.getElementById('p-phone').value=userData.phone||'';
+    document.getElementById('p-website').value=userData.website||'';
+    document.getElementById('p-address').value=userData.address||'';
+
+    // Billing tab
+    const plan=userData.plan||'trial';
+    const planNames={trial:'Trial Plan',starter:'Starter Plan',pro:'Pro Plan',enterprise:'Enterprise Plan'};
+    const planDescs={trial:'Free forever · 10 screenings/month',starter:'$29/month · 100 screenings/month',pro:'$79/month · 500 screenings/month',enterprise:'Custom pricing · Unlimited screenings'};
+    document.getElementById('current-plan-badge').textContent=plan.charAt(0).toUpperCase()+plan.slice(1);
+    document.getElementById('current-plan-name').textContent=planNames[plan]||plan;
+    document.getElementById('current-plan-desc').textContent=planDescs[plan]||'';
+    if(plan!=='trial'){
+      document.getElementById('cancel-sub-btn').style.display='inline-flex';
+      document.getElementById('manage-billing-btn').style.display='inline-flex';
+    }
+    if(userData.subscription?.current_period_end){
+      const d=new Date(userData.subscription.current_period_end*1000);
+      document.getElementById('current-sub-info').textContent='Next billing: '+d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+    }
+
+    // Payment history
+    const payments=payData.payments||[];
+    document.getElementById('payment-history').innerHTML=payments.length
+      ?payments.map(p=>`<tr>
+          <td>${new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</td>
+          <td>${(p.plan||'').charAt(0).toUpperCase()+(p.plan||'').slice(1)}</td>
+          <td style="font-weight:600;color:var(--text)">${p.amount||'—'}</td>
+          <td><span class="badge b-indigo">${p.method||'—'}</span></td>
+          <td><span class="badge ${p.status==='paid'?'b-green':'b-amber'}">${p.status||'—'}</span></td>
+        </tr>`).join('')
+      :'<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No payment history yet</td></tr>';
+
+    // Usage tab
+    const screenings=screenData.screenings||[];
+    const limits={trial:10,starter:100,pro:500,enterprise:999999};
+    const limit=limits[plan]||10;
+    const used=userData.screening_count||0;
+    const pct=Math.min(100,Math.round(used/limit*100));
+    document.getElementById('usage-count').textContent=used+' used';
+    document.getElementById('usage-limit').textContent='of '+limit;
+    document.getElementById('usage-bar').style.width=pct+'%';
+    document.getElementById('usage-bar').style.background=pct>80?'var(--red)':pct>60?'var(--amber)':'var(--indigo)';
+    document.getElementById('usage-note').textContent=plan==='trial'?'Upgrade to Starter for 100 screenings/month.':'You have '+(limit-used)+' screenings remaining this month.';
+
+    const allScreenings=screenData.screenings||[];
+    document.getElementById('us-total').textContent=allScreenings.length;
+    document.getElementById('us-hires').textContent=allScreenings.filter(s=>s.recommendation==='STRONG HIRE').length;
+    document.getElementById('us-avg').textContent=statsData.avg_score||'—';
+
+    // Session info
+    document.getElementById('session-browser').textContent=navigator.userAgent.includes('Chrome')?'Chrome':'Current browser';
+
+    // Load notification prefs
+    const prefs=userData.notification_prefs||{};
+    if(prefs.screen!==undefined)document.getElementById('n-screen').checked=prefs.screen;
+    if(prefs.hire!==undefined)document.getElementById('n-hire').checked=prefs.hire;
+    if(prefs.weekly!==undefined)document.getElementById('n-weekly').checked=prefs.weekly;
+    if(prefs.usage!==undefined)document.getElementById('n-usage').checked=prefs.usage;
+    if(prefs.billing!==undefined)document.getElementById('n-billing').checked=prefs.billing;
+    if(prefs.updates!==undefined)document.getElementById('n-updates').checked=prefs.updates;
+
+  }catch(e){console.error(e);}
+}
+
+// ── PROFILE ──
+async function saveProfile(){
+  const errEl=document.getElementById('profile-err');
+  errEl.style.display='none';
+  try{
+    const fd=new FormData();
+    fd.append('company_name',document.getElementById('p-company').value);
+    fd.append('full_name',document.getElementById('p-fullname').value);
+    fd.append('phone',document.getElementById('p-phone').value);
+    fd.append('website',document.getElementById('p-website').value);
+    fd.append('address',document.getElementById('p-address').value);
+    const res=await fetch('/api/user/profile',{method:'POST',body:fd,credentials:'include'});
+    if(!res.ok)throw new Error('Failed to save profile');
+    showOk('profile-ok');
+    document.getElementById('profile-name-display').textContent=document.getElementById('p-company').value;
+  }catch(e){showErr('profile-err',e.message);}
+}
+
+// ── SECURITY ──
+async function changePassword(){
+  const current=document.getElementById('s-current').value;
+  const newp=document.getElementById('s-new').value;
+  const confirm=document.getElementById('s-confirm').value;
+  const errEl=document.getElementById('security-err');
+  errEl.style.display='none';
+  if(!current||!newp||!confirm){showErr('security-err','Please fill all fields.');return;}
+  if(newp.length<8){showErr('security-err','New password must be at least 8 characters.');return;}
+  if(newp!==confirm){showErr('security-err','Passwords do not match.');return;}
+  try{
+    const fd=new FormData();
+    fd.append('current_password',current);fd.append('new_password',newp);
+    const res=await fetch('/api/user/change-password',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    showOk('security-ok');
+    ['s-current','s-new','s-confirm'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){showErr('security-err',e.message);}
+}
+
+// ── BILLING ──
+function showUpgrade(){
+  document.getElementById('upgrade-section').style.display='block';
+  renderPlanCards();
+}
+function hideUpgrade(){document.getElementById('upgrade-section').style.display='none';}
+
+function toggleCurrency(){
+  useBDT=document.getElementById('currency-tog').checked;
+  renderPlanCards();
+}
+
+function renderPlanCards(){
+  const current=userData?.plan||'trial';
+  document.getElementById('plan-cards').innerHTML=Object.entries(PLANS).map(([id,p])=>`
+    <div class="plan-card ${id===current?'current':''} ${p.popular?'popular':''}" onclick="selectPlan('${id}')">
+      ${p.popular?'<div class="plan-badge">Most Popular</div>':''}
+      ${id===current?'<div class="current-badge">Current</div>':''}
+      <div class="plan-name">${p.name}</div>
+      <div class="plan-price">${useBDT?p.bdt:p.usd}<span>${p.period}</span></div>
+      <div class="plan-desc">${p.screenings>=999999?'Unlimited':p.screenings+' screenings/month'}</div>
+      <div class="plan-features">${p.features.map(f=>'✓ '+f).join('<br>')}</div>
+    </div>`).join('');
+}
+
+function selectPlan(id){
+  selectedPlan=id;
+  document.querySelectorAll('.plan-card').forEach(c=>c.style.borderColor='');
+  event.currentTarget.style.borderColor='var(--indigo)';
+  document.getElementById('payment-method-section').style.display='block';
+}
+
+function selectPayment(method){
+  selectedPayment=method;
+  document.getElementById('pm-stripe').classList.toggle('selected',method==='stripe');
+  document.getElementById('pm-ssl').classList.toggle('selected',method==='ssl');
+}
+
+async function proceedPayment(){
+  if(!selectedPlan){alert('Please select a plan first.');return;}
+  const btn=document.getElementById('pay-btn');
+  btn.innerHTML='<div class="spin"></div> Processing...';btn.disabled=true;
+  try{
+    const fd=new FormData();
+    fd.append('plan_id',selectedPlan);fd.append('payment_method',selectedPayment);
+    const res=await fetch('/api/payments/checkout',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Payment failed');
+    if(data.url)window.location.href=data.url;
+    else throw new Error('No payment URL received');
+  }catch(e){
+    alert('Payment error: '+e.message);
+    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Proceed to payment';
+    btn.disabled=false;
+  }
+}
+
+async function cancelSubscription(){
+  if(!confirm('Are you sure you want to cancel? Your plan stays active until the end of the billing period.'))return;
+  const res=await fetch('/api/payments/cancel',{method:'POST',credentials:'include'});
+  if(res.ok){alert('Subscription cancelled. You will keep access until end of billing period.');loadUser();}
+}
+
+async function manageBilling(){
+  const res=await fetch('/api/payments/portal',{method:'POST',credentials:'include'});
+  const data=await res.json();
+  if(data.url)window.location.href=data.url;
+}
+
+// ── TEAM ──
+async function sendInvite(){
+  const email=document.getElementById('invite-email').value.trim();
+  const role=document.getElementById('invite-role').value;
+  const errEl=document.getElementById('invite-err');
+  errEl.style.display='none';
+  if(!email){errEl.textContent='Please enter an email.';errEl.style.display='block';return;}
+  try{
+    const fd=new FormData();fd.append('email',email);fd.append('role',role);
+    const res=await fetch('/api/team/invite',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    closeModal('invite-modal');
+    document.getElementById('invite-email').value='';
+    alert('Invitation sent to '+email);
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+}
+
+// ── NOTIFICATIONS ──
+async function saveNotifications(){
+  const prefs={
+    screen:document.getElementById('n-screen').checked,
+    hire:document.getElementById('n-hire').checked,
+    weekly:document.getElementById('n-weekly').checked,
+    usage:document.getElementById('n-usage').checked,
+    billing:document.getElementById('n-billing').checked,
+    updates:document.getElementById('n-updates').checked,
+  };
+  const fd=new FormData();fd.append('prefs',JSON.stringify(prefs));
+  await fetch('/api/user/notifications',{method:'POST',body:fd,credentials:'include'});
+  showOk('notif-ok');
+}
+
+// ── DANGER ──
+function confirmDeleteData(){
+  const answer=prompt('Type DELETE to confirm you want to delete all your screening data:');
+  if(answer==='DELETE'){alert('Feature coming soon — contact support to delete data.');}
+}
+function confirmDeleteAccount(){
+  const answer=prompt('Type DELETE ACCOUNT to permanently delete your account:');
+  if(answer==='DELETE ACCOUNT'){alert('Please contact support at hello@linkx360.com to delete your account.');}
+}
+
+loadUser();
+</script>
+</body>
+</html>

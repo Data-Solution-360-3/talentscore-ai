@@ -11,6 +11,12 @@ import os
 import base64
 
 from scorer import extract_pdf_text, run_screening_pipeline
+from payment_service import (
+    create_stripe_checkout, verify_stripe_webhook,
+    create_sslcommerz_payment, verify_sslcommerz_payment,
+    cancel_stripe_subscription, create_stripe_portal_session,
+    STRIPE_PUBLISHABLE_KEY, PLANS
+)
 from email_service import generate_otp, send_verification_email, send_welcome_email
 from batch import run_batch_screening, CONCURRENCY_LIMIT
 from auth import (
@@ -29,7 +35,10 @@ from database import (
     update_user, increment_screening_count,
     store_otp, verify_otp, delete_pending,
     get_screenings_for_user, get_stats_for_user, get_jobs_for_user,
-    get_skills_gaps_for_user, get_dimension_averages_for_user, db
+    get_skills_gaps_for_user, get_dimension_averages_for_user, db,
+    save_payment, get_payments_for_user, update_user_subscription,
+    invite_team_member, get_team_members, get_team_invites,
+    update_user_profile, update_user_notifications, get_full_user
 )
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -632,6 +641,215 @@ async def get_batch(request: Request, batch_id: str):
 # ─────────────────────────────────────────────────────────────
 # HEALTH
 # ─────────────────────────────────────────────────────────────
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    token = get_token_from_request(request)
+    if not token or not decode_token(token):
+        return RedirectResponse("/login")
+    return read_template("settings.html")
+
+
+@app.get("/payment/success", response_class=HTMLResponse)
+async def payment_success(request: Request, plan: str = "", session_id: str = ""):
+    token = get_token_from_request(request)
+    if not token or not decode_token(token):
+        return RedirectResponse("/login")
+    user = decode_token(token)
+    if plan and plan in PLANS:
+        await update_user_subscription(user["user_id"], plan, {"session_id": session_id})
+    return RedirectResponse("/settings?tab=billing&payment=success")
+
+
+@app.get("/payment/sslcommerz/success")
+async def ssl_success(request: Request, plan: str = "", user_id: str = "", val_id: str = "", tran_id: str = ""):
+    verification = await verify_sslcommerz_payment(val_id)
+    if verification.get("valid") and user_id and plan:
+        await update_user_subscription(user_id, plan, {"tran_id": tran_id, "method": "sslcommerz"})
+        await save_payment({"user_id": user_id, "plan": plan, "amount": f"৳{PLANS.get(plan, {}).get('bdt_price', 0)}", "method": "SSLCommerz", "status": "paid", "tran_id": tran_id})
+    return RedirectResponse("/settings?tab=billing&payment=success")
+
+
+@app.get("/payment/sslcommerz/fail")
+async def ssl_fail():
+    return RedirectResponse("/settings?tab=billing&payment=failed")
+
+
+# ── USER PROFILE & SETTINGS ──
+
+@app.get("/api/auth/me/full")
+async def me_full(request: Request):
+    user = await get_current_user(request)
+    full = await get_full_user(user["user_id"])
+    return full or user
+
+
+@app.post("/api/user/profile")
+async def update_profile(
+    request: Request,
+    company_name: str = Form(""),
+    full_name: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    address: str = Form(""),
+):
+    user = await get_current_user(request)
+    await update_user_profile(user["user_id"], {
+        "company_name": company_name,
+        "full_name": full_name,
+        "phone": phone,
+        "website": website,
+        "address": address,
+    })
+    return {"success": True}
+
+
+@app.post("/api/user/change-password")
+async def change_password_endpoint(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+):
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or not verify_password(current_password, db_user.get("password", "")):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
+    from database import db as mongodb
+    from bson import ObjectId
+    await mongodb.users.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": {"password": hash_password(new_password)}}
+    )
+    return {"success": True}
+
+
+@app.post("/api/user/notifications")
+async def save_notifications(request: Request, prefs: str = Form(...)):
+    import json
+    user = await get_current_user(request)
+    prefs_dict = json.loads(prefs)
+    await update_user_notifications(user["user_id"], prefs_dict)
+    return {"success": True}
+
+
+# ── PAYMENTS ──
+
+@app.get("/api/payments")
+async def list_payments(request: Request):
+    user = await get_current_user(request)
+    payments = await get_payments_for_user(user["user_id"])
+    return {"payments": payments}
+
+
+@app.post("/api/payments/checkout")
+async def create_checkout(
+    request: Request,
+    plan_id: str = Form(...),
+    payment_method: str = Form("stripe"),
+):
+    user = await get_current_user(request)
+    db_user = await get_full_user(user["user_id"])
+
+    if payment_method == "stripe":
+        result = create_stripe_checkout(
+            plan_id=plan_id,
+            user_id=user["user_id"],
+            email=user["email"],
+            company=user["company"],
+        )
+    else:
+        result = await create_sslcommerz_payment(
+            plan_id=plan_id,
+            user_id=user["user_id"],
+            email=user["email"],
+            company=user["company"],
+            customer_name=db_user.get("full_name", user["company"]) if db_user else user["company"],
+            customer_phone=db_user.get("phone", "01700000000") if db_user else "01700000000",
+        )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Payment failed"))
+    return result
+
+
+@app.post("/api/payments/cancel")
+async def cancel_payment(request: Request):
+    user = await get_current_user(request)
+    db_user = await get_full_user(user["user_id"])
+    sub_id = db_user.get("subscription", {}).get("subscription_id") if db_user else None
+    if sub_id:
+        cancel_stripe_subscription(sub_id)
+    return {"success": True}
+
+
+@app.post("/api/payments/portal")
+async def billing_portal(request: Request):
+    user = await get_current_user(request)
+    db_user = await get_full_user(user["user_id"])
+    customer_id = db_user.get("subscription", {}).get("customer_id") if db_user else None
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No billing account found.")
+    url = create_stripe_portal_session(customer_id)
+    if not url:
+        raise HTTPException(status_code=400, detail="Could not open billing portal.")
+    return {"url": url}
+
+
+@app.post("/api/payments/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    event = verify_stripe_webhook(payload, sig)
+    if not event:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        user_id = session.get("metadata", {}).get("user_id")
+        plan_id = session.get("metadata", {}).get("plan_id")
+        if user_id and plan_id:
+            await update_user_subscription(user_id, plan_id, {
+                "session_id": session.get("id"),
+                "subscription_id": session.get("subscription"),
+                "customer_id": session.get("customer"),
+            })
+            await save_payment({
+                "user_id": user_id,
+                "plan": plan_id,
+                "amount": f"${PLANS.get(plan_id, {}).get('usd_price', 0)}",
+                "method": "Stripe",
+                "status": "paid",
+                "session_id": session.get("id"),
+            })
+    return {"received": True}
+
+
+# ── TEAM ──
+
+@app.post("/api/team/invite")
+async def team_invite(request: Request, email: str = Form(...), role: str = Form("screener")):
+    user = await get_current_user(request)
+    try:
+        invite_id = await invite_team_member(
+            owner_user_id=user["user_id"],
+            email=email,
+            role=role,
+            company_name=user["company"],
+        )
+        return {"success": True, "invite_id": invite_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/team")
+async def get_team(request: Request):
+    user = await get_current_user(request)
+    members = await get_team_members(user["user_id"])
+    invites = await get_team_invites(user["user_id"])
+    return {"members": members, "invites": invites}
+
 
 @app.get("/health")
 async def health():
