@@ -604,17 +604,25 @@ function isThisWeek(d){if(!d)return false;const now=new Date();const then=new Da
 // ── CV SCREENER ──
 let sf=null;
 const dz=document.getElementById('drop-zone');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
-dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.pdf'))setFile(f);});
-document.getElementById('cv-input').addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0]);});
-document.getElementById('jd').addEventListener('input',function(){
-  document.getElementById('jd-cnt').textContent=this.value.length+' chars';checkReady();
+if(dz){
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.pdf'))setFile(f);});
+}
+const cvInput=document.getElementById('cv-input');
+if(cvInput)cvInput.addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0]);});
+const jdEl=document.getElementById('jd');
+if(jdEl)jdEl.addEventListener('input',function(){
+  const cnt=document.getElementById('jd-cnt');
+  if(cnt)cnt.textContent=this.value.length+' chars';
+  checkReady();
 });
 
 function setFile(f){
   sf=f;
-  document.getElementById('file-preview').innerHTML=
+  const fp=document.getElementById('file-preview');
+  if(!fp){checkReady();return;}
+  fp.innerHTML=
     `<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);font-size:11px">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span style="flex:1;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
@@ -624,8 +632,8 @@ function setFile(f){
   dz.style.display='none';checkReady();
 }
 
-function clearFile(){sf=null;document.getElementById('file-preview').innerHTML='';document.getElementById('cv-input').value='';dz.style.display='';checkReady();}
-function checkReady(){document.getElementById('screen-btn').disabled=!(sf&&document.getElementById('jd').value.trim().length>=50);}
+function clearFile(){sf=null;const fp=document.getElementById('file-preview');if(fp)fp.innerHTML='';const ci=document.getElementById('cv-input');if(ci)ci.value='';if(dz)dz.style.display='';checkReady();}
+function checkReady(){const btn=document.getElementById('screen-btn');const jd=document.getElementById('jd');if(btn&&jd)btn.disabled=!(sf&&jd.value.trim().length>=50);}
 
 function setStep(n){for(let i=1;i<=4;i++){const el=document.getElementById('step'+i);el.classList.remove('act','done');if(i<n)el.classList.add('done');else if(i===n)el.classList.add('act');}}
 
@@ -1138,40 +1146,56 @@ async function loadFromDB(){
       fetch('/api/screenings?limit=500',{credentials:'include'}),
       fetch('/api/jobs',{credentials:'include'}),
     ]);
-    const screenData=screenRes.ok?await screenRes.json():{screenings:[]};
-    const jobsData=jobsRes.ok?await jobsRes.json():{jobs:[]};
-    console.log('[DEBUG] screenings count:',screenData.screenings?.length, 'me:',me.email, 'role:',me.role);
+    let screenData={screenings:[]},jobsData={jobs:[]};
+    try{
+      const st=screenRes.headers.get('content-type')||'';
+      if(screenRes.ok&&st.includes('application/json'))screenData=await screenRes.json();
+      else if(screenRes.status===401){window.location.href='/login';return;}
+      else console.warn('[SCREEN] bad response:',screenRes.status,await screenRes.text().then(t=>t.slice(0,100)));
+    }catch(e){console.warn('[SCREEN] parse error:',e.message);}
+    try{
+      const jt=jobsRes.headers.get('content-type')||'';
+      if(jobsRes.ok&&jt.includes('application/json'))jobsData=await jobsRes.json();
+    }catch(e){console.warn('[JOBS] parse error:',e.message);}
+    console.log('[DEBUG] screenings:',screenData.screenings?.length,'role:',me.role,'email:',me.email);
 
     document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
     document.getElementById('t-plan').textContent=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
     document.getElementById('sb-company').textContent=me.company||'';
 
-    // Job filter options
-    const fJob=document.getElementById('f-job');
+    // Process data
     allJobs=(jobsData.jobs||[]).map(j=>({...j,dept:j.department,loc:j.location,type:j.employment_type,status:j.status||'active'}));
-
     allResults=(screenData.screenings||[]).map(r=>({...r,score:Math.round(r.overall_score||0),rec:(r.recommendation||'MAYBE').toUpperCase()}));
 
-    // Populate job filter with actual job postings + unique job titles from screenings
-    if(fJob){
-      fJob.innerHTML='<option value="">All jobs</option>';
-      // First add actual job postings
-      allJobs.forEach(j=>{
-        const o=document.createElement('option');
-        o.value=j._id;
-        o.textContent=j.title+(j.dept?' ('+j.dept+')':'');
-        fJob.appendChild(o);
-      });
-      // Then add any unique job titles from screenings not already covered
-      const jobTitles=[...new Set(allResults.map(r=>r.job_title).filter(Boolean))];
-      const existingTitles=allJobs.map(j=>j.title);
-      jobTitles.filter(t=>!existingTitles.includes(t)).forEach(t=>{
-        const o=document.createElement('option');o.value=t;o.textContent=t+' (unlinked)';fJob.appendChild(o);
-      });
-    }
+    // Populate job filter safely
+    try{
+      const fJob=document.getElementById('f-job');
+      if(fJob){
+        fJob.innerHTML='<option value="">All jobs</option>';
+        allJobs.forEach(j=>{
+          const o=document.createElement('option');
+          o.value=j._id;
+          o.textContent=j.title+(j.dept?' ('+j.dept+')':'');
+          fJob.appendChild(o);
+        });
+        const jobTitles=[...new Set(allResults.map(r=>r.job_title).filter(Boolean))];
+        const existingTitles=allJobs.map(j=>j.title);
+        jobTitles.filter(t=>!existingTitles.includes(t)).forEach(t=>{
+          const o=document.createElement('option');o.value=t;o.textContent=t+' (unlinked)';fJob.appendChild(o);
+        });
+      }
+    }catch(e){console.warn('[JOBS FILTER]',e);}
 
+    console.log('[FINAL] allResults.length=',allResults.length,'role=',me.role,'user_id=',me.user_id);
     updateAll();
     addActivity('Dashboard loaded — '+allResults.length+' candidates','var(--indigo)');
+    // Show debug info on screen if 0 results
+    if(allResults.length===0){
+      const dbg=document.createElement('div');
+      dbg.style.cssText='position:fixed;bottom:10px;right:10px;background:#1e2333;border:1px solid #5b5ef4;border-radius:8px;padding:12px 16px;font-size:11px;color:#8b95b0;z-index:9999;max-width:400px';
+      dbg.innerHTML='<strong style="color:#a5b4fc">Debug info</strong><br>Email: '+me.email+'<br>Role: '+me.role+'<br>User ID: '+me.user_id+'<br>Screenings from API: '+(screenData.screenings?.length||0)+'<br><button onclick="fetch(\'/api/screenings?limit=3\',{credentials:\'include\'}).then(r=>r.text()).then(t=>alert(t.slice(0,500)))" style="margin-top:6px;padding:3px 8px;background:#5b5ef4;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">Test API</button>';
+      document.body.appendChild(dbg);
+    }
   }catch(e){console.error('[DB]',e);}
 }
 
