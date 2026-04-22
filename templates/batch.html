@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5ef4'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Batch Screening — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -143,6 +144,44 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="step-item" id="bs4"><span class="step-num">Complete</span>Results ready</div>
     </div>
 
+    <!-- JOB SELECTOR -->
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:.85rem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        Select job posting <span style="color:var(--red);font-size:11px;font-weight:500">* required to separate candidates by role</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;margin-bottom:6px">
+        <select id="batch-job-select" onchange="onJobSelect()" style="width:100%;padding:10px 13px;background:var(--bg);border:2px solid var(--border2);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);outline:none;transition:border-color .15s;cursor:pointer">
+          <option value="">— Select the job you are screening for —</option>
+        </select>
+        <button onclick="showCreateJob()" class="btn btn-ghost btn-sm" style="white-space:nowrap;padding:10px 12px">+ New job</button>
+      </div>
+      <div id="selected-job-info" style="display:none;background:var(--ig);border:1px solid var(--ib);border-radius:var(--rs);padding:9px 13px;display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><div style="font-size:13px;font-weight:700;color:var(--text)" id="sel-job-title">—</div><div style="font-size:11px;color:var(--t2);margin-top:1px" id="sel-job-meta">—</div></div>
+          <span class="badge b-green" style="font-size:10px">✓ Selected</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--t3);margin-top:5px">All CVs in this batch will be linked to the selected job — you can filter by job in the candidates dashboard.</div>
+
+      <!-- Inline create job -->
+      <div id="create-job-form" style="display:none;margin-top:12px;padding:12px;background:var(--s2);border-radius:var(--rs);border:1px solid var(--border2)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin-bottom:8px">Create new job posting</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+          <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:3px">Job title *</label><input id="nj-title" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none" placeholder="e.g. Data Analyst"></div>
+          <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:3px">Department</label><input id="nj-dept" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none" placeholder="e.g. Engineering"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+          <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:3px">Location</label><input id="nj-loc" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none" placeholder="Dhaka, Remote"></div>
+          <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:3px">Required skills</label><input id="nj-skills" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none" placeholder="Python, SQL, Excel"></div>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button onclick="hideCreateJob()" style="padding:6px 12px;border-radius:var(--rs);background:var(--s3);border:1px solid var(--border2);color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+          <button onclick="createJobAndSelect()" style="padding:6px 12px;border-radius:var(--rs);background:var(--indigo);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Create & select →</button>
+        </div>
+      </div>
+    </div>
+
     <div class="two-col">
       <div class="card">
         <div class="card-title">
@@ -268,7 +307,13 @@ function renderFileList(){
 function removeFile(i){selectedFiles.splice(i,1);renderFileList();checkReady();}
 
 function checkReady(){
-  const ok=document.getElementById('jd').value.trim().length>=50&&selectedFiles.length>0;
+  const jobSel=document.getElementById('batch-job-select').value;
+  const ok=jobSel&&document.getElementById('jd').value.trim().length>=50&&selectedFiles.length>0;
+  if(!jobSel&&(document.getElementById('jd').value.trim().length>0||selectedFiles.length>0)){
+    document.getElementById('batch-job-select').style.borderColor='var(--red)';
+  } else {
+    document.getElementById('batch-job-select').style.borderColor='var(--border2)';
+  }
   const btn=document.getElementById('run-btn');
   btn.disabled=!ok;
   if(selectedFiles.length){
@@ -295,10 +340,11 @@ async function runBatch(){
   const fd=new FormData();
   fd.append('job_description',jd);
   const batchJobSel=document.getElementById('batch-job-select');
-  if(batchJobSel&&batchJobSel.value){
-    const parts=batchJobSel.value.split('|');
+  const jobVal=batchJobSel?.value||'';
+  if(jobVal){
+    const parts=jobVal.split('|');
     fd.append('job_id',parts[0]||'');
-    fd.append('job_title',parts[1]||'');
+    fd.append('job_title',parts.slice(1).join('|')||'');
   }
   selectedFiles.forEach(f=>fd.append('cv_files',f));
 
@@ -418,6 +464,109 @@ function exportCSV(){
   a.download='talentscore-batch-results.csv';a.click();
 }
 
+// Job functions
+function onJobSelect(){
+  const sel=document.getElementById('batch-job-select');
+  const val=sel.value;
+  const info=document.getElementById('selected-job-info');
+  if(val){
+    const opt=sel.options[sel.selectedIndex];
+    document.getElementById('sel-job-title').textContent=opt.dataset.title||opt.textContent;
+    document.getElementById('sel-job-meta').textContent=opt.dataset.meta||'';
+    info.style.display='block';
+    sel.style.borderColor='var(--green)';
+    // Auto-fill JD if job has description
+    if(opt.dataset.desc&&!document.getElementById('jd').value.trim()){
+      document.getElementById('jd').value=opt.dataset.desc;
+      document.getElementById('jd-cnt').textContent=opt.dataset.desc.length+' chars ✓';
+    }
+  } else {
+    info.style.display='none';
+    sel.style.borderColor='var(--border2)';
+  }
+  checkReady();
+}
+
+function showCreateJob(){
+  document.getElementById('create-job-form').style.display='block';
+  document.getElementById('new-job-title').focus();
+}
+function hideCreateJob(){document.getElementById('create-job-form').style.display='none';}
+
+async function createJobAndSelect(){
+  const title=document.getElementById('new-job-title').value.trim();
+  if(!title){alert('Please enter a job title');return;}
+  const fd=new FormData();
+  fd.append('title',title);
+  fd.append('department',document.getElementById('new-job-dept').value);
+  fd.append('location',document.getElementById('new-job-loc').value);
+  fd.append('employment_type',document.getElementById('new-job-type').value);
+  fd.append('skills',document.getElementById('new-job-skills').value);
+  try{
+    const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    // Add to selector and select it
+    const sel=document.getElementById('batch-job-select');
+    const opt=document.createElement('option');
+    opt.value=data._id+'|'+title;
+    opt.textContent=title+(data.department?' ('+data.department+')':'');
+    opt.dataset.title=title;
+    opt.dataset.meta=(data.department||'')+(data.location?' · '+data.location:'');
+    sel.appendChild(opt);
+    sel.value=opt.value;
+    hideCreateJob();
+    onJobSelect();
+    ['new-job-title','new-job-dept','new-job-loc','new-job-skills'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){alert('Failed to create job: '+e.message);}
+}
+
+// ── JOB FUNCTIONS ──
+function onJobSelect(){
+  const sel=document.getElementById('batch-job-select');
+  const val=sel.value;
+  const info=document.getElementById('selected-job-info');
+  if(val){
+    const opt=sel.options[sel.selectedIndex];
+    document.getElementById('sel-job-title').textContent=opt.dataset.title||opt.text;
+    document.getElementById('sel-job-meta').textContent=opt.dataset.meta||'';
+    info.style.display='block';
+    sel.style.borderColor='var(--green)';
+    if(opt.dataset.desc&&!document.getElementById('jd').value.trim()){
+      document.getElementById('jd').value=opt.dataset.desc;
+      document.getElementById('jd-cnt').textContent=opt.dataset.desc.length+' chars ✓';
+    }
+  } else {
+    info.style.display='none';
+    sel.style.borderColor='var(--border2)';
+  }
+  checkReady();
+}
+function showCreateJob(){document.getElementById('create-job-form').style.display='block';document.getElementById('nj-title').focus();}
+function hideCreateJob(){document.getElementById('create-job-form').style.display='none';}
+async function createJobAndSelect(){
+  const title=document.getElementById('nj-title').value.trim();
+  if(!title){alert('Please enter a job title');return;}
+  const fd=new FormData();
+  fd.append('title',title);fd.append('department',document.getElementById('nj-dept').value);
+  fd.append('location',document.getElementById('nj-loc').value);fd.append('employment_type','Full-time');
+  fd.append('skills',document.getElementById('nj-skills').value);
+  try{
+    const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    const sel=document.getElementById('batch-job-select');
+    const opt=document.createElement('option');
+    const meta=[(document.getElementById('nj-dept').value||''),(document.getElementById('nj-loc').value||'')].filter(Boolean).join(' · ');
+    opt.value=data._id+'|'+title;opt.text=title+(meta?' · '+meta:'');
+    opt.dataset.title=title;opt.dataset.meta=meta;opt.dataset.desc='';
+    sel.appendChild(opt);sel.value=opt.value;
+    hideCreateJob();onJobSelect();
+    ['nj-title','nj-dept','nj-loc','nj-skills'].forEach(id=>document.getElementById(id).value='');
+    alert('✓ Job "'+title+'" created and selected!');
+  }catch(e){alert('Error: '+e.message);}
+}
+
 // Auth check + load jobs
 fetch('/api/auth/me',{credentials:'include'}).then(r=>{
   if(r.status===401){window.location.href='/login';return;}
@@ -429,9 +578,17 @@ fetch('/api/auth/me',{credentials:'include'}).then(r=>{
   (data.jobs||[]).forEach(j=>{
     const o=document.createElement('option');
     o.value=j._id+'|'+j.title;
-    o.textContent=j.title+(j.department?' ('+j.department+')':'');
+    o.textContent=j.title+(j.department?' · '+j.department:'')+(j.location?' · '+j.location:'');
+    o.dataset.title=j.title;
+    o.dataset.meta=(j.department||'')+(j.location?' · '+j.location:'')+(j.employment_type?' · '+j.employment_type:'');
+    o.dataset.desc=j.description||'';
     sel.appendChild(o);
   });
+  // If only one job, auto-select it
+  if((data.jobs||[]).length===1){
+    sel.selectedIndex=1;
+    onJobSelect();
+  }
 });
 
 function fillBatchJd(){
