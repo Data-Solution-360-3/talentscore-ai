@@ -239,10 +239,13 @@ async def get_user_by_email(email: str) -> dict | None:
 
 
 async def get_user_by_id(user_id: str) -> dict | None:
-    doc = await db.users.find_one({"_id": ObjectId(user_id)})
-    if doc:
-        doc["_id"] = str(doc["_id"])
-    return doc
+    try:
+        doc = await db.users.find_one({"_id": ObjectId(user_id)})
+        if doc:
+            doc["_id"] = str(doc["_id"])
+        return doc
+    except Exception:
+        return None
 
 
 async def get_all_users() -> list:

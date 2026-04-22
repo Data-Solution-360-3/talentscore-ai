@@ -11,6 +11,11 @@ import os
 import base64
 
 from scorer import extract_pdf_text, run_screening_pipeline
+from api_keys import (
+    create_api_key, get_keys_for_user, validate_api_key,
+    revoke_api_key, increment_api_usage, check_rate_limit,
+    log_api_call, API_PLAN_LIMITS
+)
 from payment_service import (
     create_stripe_checkout, verify_stripe_webhook,
     create_sslcommerz_payment, verify_sslcommerz_payment,
@@ -1200,6 +1205,245 @@ async def debug_screenings(request: Request):
         "screenings_matching": count,
         "sample_screenings": sample
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# PUBLIC API v1 — REST API for third-party integrations
+# ═══════════════════════════════════════════════════════════════
+
+async def get_api_user(request: Request) -> tuple[dict, dict]:
+    """Authenticate via X-API-Key header. Returns (key_doc, user_doc)."""
+    raw_key = request.headers.get("X-API-Key", "")
+    if not raw_key:
+        raise HTTPException(status_code=401, detail="Missing X-API-Key header.")
+    key_doc = await validate_api_key(raw_key)
+    if not key_doc:
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key.")
+    allowed, reason = await check_rate_limit(key_doc)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=reason)
+    user = await get_user_by_id(key_doc["user_id"])
+    if not user:
+        raise HTTPException(status_code=401, detail="Account not found.")
+    return key_doc, user
+
+
+@app.get("/api/v1/ping")
+async def api_ping(request: Request):
+    """Test your API key is working."""
+    raw_key = request.headers.get("X-API-Key", "")
+    if not raw_key:
+        return {"status": "ok", "message": "TopCandidate API v1 is running. Add X-API-Key header to authenticate."}
+    key_doc = await validate_api_key(raw_key)
+    if not key_doc:
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+    limits = API_PLAN_LIMITS.get(key_doc.get("plan", "trial"), {})
+    return {
+        "status": "ok",
+        "authenticated": True,
+        "key_name": key_doc.get("name"),
+        "plan": key_doc.get("plan", "trial"),
+        "screens_this_month": key_doc.get("screens_this_month", 0),
+        "monthly_limit": limits.get("screens_per_month", 10),
+        "screens_remaining": max(0, limits.get("screens_per_month", 10) - key_doc.get("screens_this_month", 0)),
+    }
+
+
+@app.post("/api/v1/screen")
+async def api_screen_cv(
+    request: Request,
+    cv_file: UploadFile = File(...),
+    job_description: str = Form(...),
+    job_title: str = Form(""),
+    candidate_name: str = Form(""),
+):
+    """
+    Screen a single CV against a job description.
+    
+    **Headers:** X-API-Key: tc_live_...
+    
+    **Form fields:**
+    - cv_file: PDF file (required)
+    - job_description: Full job description text (min 50 chars, required)
+    - job_title: Job title for labeling (optional)
+    - candidate_name: Override candidate name (optional)
+    
+    **Returns:** Full screening report with score, dimensions, recommendation
+    """
+    key_doc, user = await get_api_user(request)
+
+    if not cv_file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if len(job_description.strip()) < 50:
+        raise HTTPException(status_code=400, detail="job_description must be at least 50 characters.")
+
+    cv_bytes = await cv_file.read()
+    cv_text, error = extract_pdf_text(cv_bytes)
+    if error:
+        raise HTTPException(status_code=422, detail=f"Could not read PDF: {error}")
+
+    result, error = await run_screening_pipeline(cv_text, job_description.strip(), OPENAI_API_KEY)
+    if error:
+        raise HTTPException(status_code=500, detail=error)
+
+    if candidate_name:
+        result["candidate_name"] = candidate_name
+
+    import base64
+    result["user_id"] = user["_id"]
+    result["company"] = user.get("company_name", "")
+    result["job_title"] = job_title
+    result["api_key_id"] = key_doc["_id"]
+    result["source"] = "api_v1"
+    result["cv_pdf_b64"] = base64.b64encode(cv_bytes).decode()
+    result["cv_filename"] = cv_file.filename
+
+    doc_id = await save_screening(result)
+    await increment_api_usage(key_doc["_id"])
+    await log_api_call(key_doc["_id"], "/api/v1/screen", 200, user["_id"])
+
+    return {
+        "id": doc_id,
+        "candidate_name": result.get("candidate_name", "Unknown"),
+        "current_title": result.get("current_title", ""),
+        "years_experience": result.get("years_experience", 0),
+        "overall_score": result.get("overall_score", 0),
+        "recommendation": result.get("recommendation", "MAYBE"),
+        "skills_coverage_pct": result.get("skills_coverage_pct", 0),
+        "summary": result.get("summary", ""),
+        "key_strengths": result.get("key_strengths", []),
+        "critical_gaps": result.get("critical_gaps", []),
+        "interview_questions": result.get("interview_questions", []),
+        "hiring_risks": result.get("hiring_risks", []),
+        "dimensions": result.get("dimensions", []),
+        "score_consistency": result.get("score_consistency", {}),
+        "report_url": f"{APP_URL}/candidate?id={doc_id}",
+    }
+
+
+@app.get("/api/v1/results")
+async def api_list_results(
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    job_title: str = "",
+    recommendation: str = "",
+):
+    """
+    List your screening results.
+    
+    **Query params:**
+    - limit: Number of results (max 100, default 20)
+    - offset: Pagination offset
+    - job_title: Filter by job title
+    - recommendation: Filter by STRONG HIRE / HIRE / MAYBE / REJECT
+    """
+    key_doc, user = await get_api_user(request)
+    limit = min(limit, 100)
+
+    query = {"user_id": user["_id"], "source": "api_v1"}
+    if job_title:
+        query["job_title"] = {"$regex": job_title, "$options": "i"}
+    if recommendation:
+        query["recommendation"] = recommendation.upper()
+
+    cursor = db.screenings.find(query).sort("created_at", -1).skip(offset).limit(limit)
+    results = []
+    async for doc in cursor:
+        results.append({
+            "id": str(doc["_id"]),
+            "candidate_name": doc.get("candidate_name", "Unknown"),
+            "current_title": doc.get("current_title", ""),
+            "overall_score": doc.get("overall_score", 0),
+            "recommendation": doc.get("recommendation", "MAYBE"),
+            "skills_coverage_pct": doc.get("skills_coverage_pct", 0),
+            "job_title": doc.get("job_title", ""),
+            "years_experience": doc.get("years_experience", 0),
+            "screened_at": doc.get("created_at", "").isoformat() if doc.get("created_at") else "",
+            "report_url": f"{APP_URL}/candidate?id={str(doc['_id'])}",
+        })
+
+    total = await db.screenings.count_documents(query)
+    return {
+        "results": results,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": (offset + limit) < total,
+    }
+
+
+@app.get("/api/v1/results/{screening_id}")
+async def api_get_result(request: Request, screening_id: str):
+    """Get full details of a specific screening result."""
+    key_doc, user = await get_api_user(request)
+    from bson import ObjectId as BsonObjectId
+    try:
+        doc = await db.screenings.find_one({
+            "_id": BsonObjectId(screening_id),
+            "user_id": user["_id"]
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid screening ID.")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Screening not found.")
+    doc["_id"] = str(doc["_id"])
+    doc.pop("cv_pdf_b64", None)
+    return doc
+
+
+@app.get("/api/v1/usage")
+async def api_usage(request: Request):
+    """Get your current API usage and limits."""
+    key_doc, user = await get_api_user(request)
+    limits = API_PLAN_LIMITS.get(key_doc.get("plan", "trial"), {})
+    used = key_doc.get("screens_this_month", 0)
+    monthly = limits.get("screens_per_month", 10)
+    return {
+        "plan": key_doc.get("plan", "trial"),
+        "key_name": key_doc.get("name"),
+        "screens_this_month": used,
+        "monthly_limit": monthly,
+        "screens_remaining": max(0, monthly - used),
+        "screens_total_all_time": key_doc.get("screens_total", 0),
+        "last_used_at": key_doc.get("last_used_at", "").isoformat() if key_doc.get("last_used_at") else None,
+        "limits": limits,
+    }
+
+
+# ── API KEY MANAGEMENT (for dashboard users) ──
+
+@app.get("/api/keys")
+async def list_api_keys(request: Request):
+    """List all API keys for the logged-in user."""
+    user = await get_current_user(request)
+    keys = await get_keys_for_user(user["user_id"])
+    return {"keys": keys}
+
+
+@app.post("/api/keys")
+async def create_key(request: Request, name: str = Form(...)):
+    """Create a new API key."""
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    plan = db_user.get("plan", "trial") if db_user else "trial"
+    key_doc = await create_api_key(user["user_id"], name, plan)
+    return key_doc  # raw_key included here — only time it's shown
+
+
+@app.delete("/api/keys/{key_id}")
+async def delete_key(request: Request, key_id: str):
+    """Revoke an API key."""
+    user = await get_current_user(request)
+    revoked = await revoke_api_key(key_id, user["user_id"])
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Key not found.")
+    return {"success": True}
+
+
+@app.get("/docs", response_class=HTMLResponse)
+async def api_docs(request: Request):
+    return read_template("docs.html")
 
 
 @app.get("/health")

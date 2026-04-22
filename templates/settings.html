@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5ef4'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Settings — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -165,6 +166,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       Team Members
     </button>
     <div class="sb-section">Preferences</div>
+    <button class="sb-item" onclick="nav('api')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      API Keys
+    </button>
     <button class="sb-item" onclick="nav('notifications')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       Notifications
@@ -407,6 +412,55 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
 
+    <!-- ── API KEYS ── -->
+    <div class="page" id="page-api">
+      <div class="page-hd"><h1>API Keys</h1><p>Generate keys to integrate TopCandidate into your own platform. <a href="/docs" target="_blank" style="color:var(--indigo)">View API docs →</a></p></div>
+      <div class="alert alert-ok" id="api-ok">✓ Done!</div>
+      <div class="alert alert-err" id="api-err"></div>
+
+      <!-- Create key -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">Create new API key</div></div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="form-group" style="flex:1;margin:0"><label class="form-label">Key name</label><input class="form-input" id="key-name" placeholder="e.g. My ATS integration, Production app"></div>
+          <button class="btn btn-primary btn-sm" onclick="createApiKey()" style="flex-shrink:0">Generate key</button>
+        </div>
+      </div>
+
+      <!-- New key reveal -->
+      <div id="new-key-box" style="display:none;background:var(--gg);border:1px solid var(--gb);border-radius:var(--r);padding:1rem;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">⚠ Copy this key now — it will never be shown again</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <code id="new-key-value" style="font-family:monospace;font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:8px 12px;flex:1;word-break:break-all"></code>
+          <button class="btn btn-ghost btn-sm" onclick="copyKey()">Copy</button>
+        </div>
+      </div>
+
+      <!-- Existing keys -->
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Your API keys</div><a href="/docs" target="_blank" class="btn btn-ghost btn-sm">View docs</a></div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Key prefix</th><th>Plan</th><th>Used this month</th><th>Last used</th><th>Actions</th></tr></thead>
+          <tbody id="keys-tbl"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No API keys yet — create your first key above</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Plan info -->
+      <div class="card" style="border-color:var(--border2)">
+        <div class="card-title" style="margin-bottom:.75rem">API limits by plan</div>
+        <table class="tbl">
+          <thead><tr><th>Plan</th><th>Screens/month</th><th>Batch size</th><th>Rate limit</th></tr></thead>
+          <tbody>
+            <tr><td>Trial (free)</td><td>10</td><td>10</td><td>2/min</td></tr>
+            <tr><td>Starter ($29)</td><td>100</td><td>20</td><td>10/min</td></tr>
+            <tr><td>Pro ($79)</td><td>500</td><td>100</td><td>30/min</td></tr>
+            <tr><td>Enterprise</td><td>Unlimited</td><td>100</td><td>60/min</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:.75rem"><a href="/settings?tab=billing" class="btn btn-primary btn-sm">Upgrade plan →</a></div>
+      </div>
+    </div>
+
     <!-- ── DANGER ZONE ── -->
     <div class="page" id="page-danger">
       <div class="page-hd"><h1>Danger Zone</h1><p>Irreversible actions — please be careful</p></div>
@@ -464,6 +518,7 @@ function nav(id){
   document.querySelectorAll('.sb-item').forEach(s=>s.classList.remove('act'));
   document.getElementById('page-'+id).classList.add('act');
   event.currentTarget.classList.add('act');
+  if(id==='api')loadApiKeys();
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -472,6 +527,52 @@ function showOk(id){const el=document.getElementById(id);el.style.display='block
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.style.display='block';}
 
 // ── LOAD USER ──
+// ── API KEYS ──
+async function loadApiKeys(){
+  try{
+    const res=await fetch('/api/keys',{credentials:'include'});
+    const data=await res.json();
+    const keys=data.keys||[];
+    document.getElementById('keys-tbl').innerHTML=keys.length
+      ?keys.map(k=>`<tr>
+          <td style="font-weight:600;color:var(--text)">${k.name}</td>
+          <td><code style="font-family:monospace;font-size:11px;color:var(--indigo)">${k.key_prefix}...</code></td>
+          <td><span class="badge b-indigo">${k.plan||'trial'}</span></td>
+          <td>${k.screens_this_month||0} / ${{trial:10,starter:100,pro:500,enterprise:'∞'}[k.plan||'trial']}</td>
+          <td style="font-size:11px;color:var(--t3)">${k.last_used_at?new Date(k.last_used_at).toLocaleDateString('en-GB'):'Never'}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="revokeKey('${k._id}')">Revoke</button></td>
+        </tr>`).join('')
+      :'<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No API keys yet</td></tr>';
+  }catch(e){console.error(e);}
+}
+
+async function createApiKey(){
+  const name=document.getElementById('key-name').value.trim();
+  if(!name){showErr('api-err','Please enter a key name.');return;}
+  document.getElementById('api-err').style.display='none';
+  try{
+    const fd=new FormData();fd.append('name',name);
+    const res=await fetch('/api/keys',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    document.getElementById('new-key-value').textContent=data.raw_key;
+    document.getElementById('new-key-box').style.display='block';
+    document.getElementById('key-name').value='';
+    loadApiKeys();
+  }catch(e){showErr('api-err',e.message);}
+}
+
+function copyKey(){
+  const key=document.getElementById('new-key-value').textContent;
+  navigator.clipboard.writeText(key).then(()=>{showOk('api-ok');});
+}
+
+async function revokeKey(id){
+  if(!confirm('Revoke this API key? This cannot be undone.'))return;
+  await fetch('/api/keys/'+id,{method:'DELETE',credentials:'include'});
+  loadApiKeys();
+}
+
 async function loadUser(){
   try{
     const [meRes,screenRes,statsRes,payRes]=await Promise.all([

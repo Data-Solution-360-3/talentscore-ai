@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Documentation — TopCandidate.pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080f;--surface:#0f1117;--s2:#151a24;--s3:#1b2130;
+  --border:#1b2130;--border2:#212840;
+  --text:#eef0f8;--t2:#8b95b0;--t3:#4a5570;
+  --indigo:#5b5ef4;--ig:rgba(91,94,244,.1);--ib:rgba(91,94,244,.25);
+  --orange:#fb923c;--og:rgba(251,146,60,.1);--ob:rgba(251,146,60,.25);
+  --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.25);
+  --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.25);
+  --amber:#f59e0b;
+  --r:10px;--rs:7px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+
+/* SIDEBAR */
+.sidebar{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:1.5rem 1rem;position:fixed;top:0;left:0;height:100vh;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.logo-icon{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--indigo),var(--orange));display:flex;align-items:center;justify-content:center}
+.logo-name{font-size:14px;font-weight:800;color:var(--text)}
+.nav-section{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);margin:1.25rem 0 .4rem}
+.nav-item{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:var(--rs);font-size:12px;color:var(--t2);text-decoration:none;transition:all .12s;margin-bottom:1px}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.act{background:var(--ig);color:#a5b4fc;font-weight:600}
+.method{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;margin-left:auto;flex-shrink:0}
+.get{background:var(--gg);color:var(--green)}
+.post{background:var(--og);color:var(--orange)}
+.delete{background:var(--rg);color:#fda4af}
+
+/* MAIN */
+.main{margin-left:260px;flex:1;padding:2.5rem;max-width:900px}
+.page-hd{margin-bottom:2.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)}
+.page-hd h1{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+.page-hd p{font-size:14px;color:var(--t2);line-height:1.7}
+.version-badge{font-size:11px;font-weight:700;background:var(--ig);color:#a5b4fc;border:1px solid var(--ib);border-radius:20px;padding:3px 10px;margin-left:8px}
+
+/* SECTIONS */
+.section{margin-bottom:3rem;scroll-margin-top:2rem}
+.section h2{font-size:18px;font-weight:700;margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.section h3{font-size:15px;font-weight:700;margin-bottom:.6rem;margin-top:1.5rem;color:var(--text)}
+.section p{font-size:13px;color:var(--t2);line-height:1.75;margin-bottom:.75rem}
+
+/* ENDPOINT CARD */
+.endpoint{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:1.25rem;overflow:hidden}
+.endpoint-hd{display:flex;align-items:center;gap:10px;padding:1rem 1.25rem;cursor:pointer;transition:background .15s}
+.endpoint-hd:hover{background:var(--s2)}
+.method-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.mb-get{background:var(--gg);color:var(--green)}
+.mb-post{background:var(--og);color:var(--orange)}
+.mb-delete{background:var(--rg);color:#fda4af}
+.endpoint-path{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1}
+.endpoint-desc{font-size:12px;color:var(--t3);margin-left:auto}
+.endpoint-body{padding:1.25rem;border-top:1px solid var(--border);display:none}
+.endpoint-body.open{display:block}
+
+/* CODE BLOCKS */
+.code-block{background:#060810;border:1px solid var(--border2);border-radius:var(--rs);padding:1rem 1.1rem;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;overflow-x:auto;margin:.75rem 0;position:relative}
+.code-block .copy-btn{position:absolute;top:8px;right:8px;padding:3px 9px;background:var(--s3);border:1px solid var(--border2);border-radius:4px;font-size:10px;color:var(--t2);cursor:pointer;font-family:inherit;transition:all .15s}
+.code-block .copy-btn:hover{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+.kw{color:#fb923c}.str{color:#a5f3fc}.num{color:#a5b4fc}.key{color:#c4b5fd}.cmnt{color:#4a5570}.url{color:#6ee7b7}
+
+/* PARAMS TABLE */
+.params-table{width:100%;border-collapse:collapse;font-size:12px;margin:.75rem 0}
+.params-table th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);background:var(--s2)}
+.params-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--t2);vertical-align:top}
+.params-table tr:last-child td{border-bottom:none}
+.param-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text)}
+.param-type{font-size:10px;color:var(--amber);background:var(--amg);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace}
+.param-req{font-size:10px;color:var(--red);font-weight:600}
+.param-opt{font-size:10px;color:var(--t3)}
+
+/* RESPONSE */
+.response-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;margin-right:6px}
+.r-200{background:var(--gg);color:var(--green)}
+.r-400{background:var(--amg);color:var(--amber)}
+.r-401{background:var(--rg);color:#fda4af}
+.r-429{background:var(--og);color:var(--orange)}
+.r-500{background:var(--rg);color:#fda4af}
+
+/* AUTH BOX */
+.auth-box{background:var(--ig);border:1px solid var(--ib);border-radius:var(--r);padding:1.1rem 1.25rem;margin:1rem 0;display:flex;align-items:flex-start;gap:10px}
+.auth-box-icon{font-size:18px;flex-shrink:0}
+.auth-box p{font-size:13px;color:var(--t2);line-height:1.6;margin:0}
+
+/* PLAN TABLE */
+.plan-table{width:100%;border-collapse:collapse;font-size:12px}
+.plan-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);background:var(--s2)}
+.plan-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--t2)}
+.plan-table tr:last-child td{border-bottom:none}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:.75rem}
+.tab{padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:none;color:var(--t3);font-family:inherit;transition:all .15s}
+.tab.act{background:var(--s2);color:var(--text);border-color:var(--border3)}
+
+/* CTA */
+.cta-box{background:linear-gradient(135deg,rgba(91,94,244,.15),rgba(251,146,60,.1));border:1px solid var(--ib);border-radius:var(--r);padding:1.5rem;text-align:center;margin-top:2rem}
+.cta-box h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.cta-box p{font-size:13px;color:var(--t2);margin-bottom:1rem}
+.cta-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:var(--rs);background:var(--indigo);color:#fff;font-size:13px;font-weight:600;text-decoration:none;transition:all .15s}
+.cta-btn:hover{background:var(--indigo2,#4a4de0)}
+
+a{color:var(--indigo);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR NAV -->
+<aside class="sidebar">
+  <a href="/" class="logo">
+    <div class="logo-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+    <span class="logo-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
+  </a>
+
+  <div class="nav-section">Getting started</div>
+  <a href="#intro" class="nav-item act">Introduction</a>
+  <a href="#auth" class="nav-item">Authentication</a>
+  <a href="#errors" class="nav-item">Error handling</a>
+  <a href="#limits" class="nav-item">Rate limits & plans</a>
+
+  <div class="nav-section">Endpoints</div>
+  <a href="#ping" class="nav-item">Ping <span class="method get">GET</span></a>
+  <a href="#screen" class="nav-item">Screen CV <span class="method post">POST</span></a>
+  <a href="#results" class="nav-item">List results <span class="method get">GET</span></a>
+  <a href="#result-detail" class="nav-item">Get result <span class="method get">GET</span></a>
+  <a href="#usage" class="nav-item">API usage <span class="method get">GET</span></a>
+
+  <div class="nav-section">Resources</div>
+  <a href="#response-schema" class="nav-item">Response schema</a>
+  <a href="#quickstart" class="nav-item">Quickstart examples</a>
+  <a href="/app" class="nav-item">← Back to dashboard</a>
+</aside>
+
+<main class="main">
+
+  <!-- HEADER -->
+  <div class="page-hd">
+    <h1>API Documentation <span class="version-badge">v1</span></h1>
+    <p>Integrate AI-powered CV screening into your own platform. Send CVs to our API and get instant ranked results with match scores, skill gaps, interview questions and hiring recommendations.</p>
+    <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+      <span style="font-size:12px;background:var(--gg);color:var(--green);border:1px solid var(--gb);border-radius:5px;padding:3px 10px">✓ REST API</span>
+      <span style="font-size:12px;background:var(--ig);color:#a5b4fc;border:1px solid var(--ib);border-radius:5px;padding:3px 10px">GPT-4o powered</span>
+      <span style="font-size:12px;background:var(--og);color:var(--orange);border:1px solid var(--ob);border-radius:5px;padding:3px 10px">JSON responses</span>
+      <code style="font-size:12px;color:var(--t2);background:var(--s2);border:1px solid var(--border2);border-radius:5px;padding:3px 10px">Base URL: https://topcandidate.pro/api/v1</code>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <section class="section" id="intro">
+    <h2>Introduction</h2>
+    <p>The TopCandidate API lets you screen CVs programmatically using our AI pipeline. You can integrate it into your ATS, HR platform, job board, or any custom workflow.</p>
+    <p>Our 3-step AI pipeline extracts CV data, parses job requirements, then scores candidates across 6 dimensions — running twice and averaging for consistency.</p>
+
+    <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="cmnt"># Quick example — screen a CV in one API call</span>
+<span class="kw">curl</span> -X POST https://topcandidate.pro/api/v1/screen \
+  -H <span class="str">"X-API-Key: tc_live_your_key_here"</span> \
+  -F <span class="str">"cv_file=@candidate.pdf"</span> \
+  -F <span class="str">"job_description=We are looking for a Data Analyst..."</span> \
+  -F <span class="str">"job_title=Data Analyst"</span>
+    </div>
+  </section>
+
+  <!-- AUTH -->
+  <section class="section" id="auth">
+    <h2>Authentication</h2>
+    <p>All API requests must include your API key in the <code style="font-family:monospace;color:var(--orange)">X-API-Key</code> header.</p>
+
+    <div class="auth-box">
+      <span class="auth-box-icon">🔑</span>
+      <div>
+        <p><strong style="color:var(--text)">Generate your API key</strong> in the dashboard under <a href="/settings">Settings → API Keys</a>. Your key starts with <code style="font-family:monospace;color:var(--indigo)">tc_live_</code></p>
+        <p style="margin-top:6px;color:var(--red)">⚠ Never share your API key or commit it to version control. Revoke and regenerate immediately if compromised.</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="cmnt"># Include in every request</span>
+<span class="kw">X-API-Key</span>: <span class="str">tc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+    </div>
+  </section>
+
+  <!-- ERRORS -->
+  <section class="section" id="errors">
+    <h2>Error handling</h2>
+    <p>All errors return JSON with a <code style="font-family:monospace;color:var(--orange)">detail</code> field explaining the issue.</p>
+
+    <table class="params-table">
+      <thead><tr><th>Status</th><th>Meaning</th><th>Common cause</th></tr></thead>
+      <tbody>
+        <tr><td><span class="response-tag r-200">200</span></td><td>Success</td><td>Request processed correctly</td></tr>
+        <tr><td><span class="response-tag r-400">400</span></td><td>Bad Request</td><td>Missing field, file not PDF, JD too short</td></tr>
+        <tr><td><span class="response-tag r-401">401</span></td><td>Unauthorized</td><td>Missing or invalid X-API-Key</td></tr>
+        <tr><td><span class="response-tag r-429">429</span></td><td>Rate Limited</td><td>Monthly screening limit reached</td></tr>
+        <tr><td><span class="response-tag r-500">500</span></td><td>Server Error</td><td>AI processing failed, try again</td></tr>
+      </tbody>
+    </table>
+
+    <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="cmnt">// Error response format</span>
+{
+  <span class="key">"detail"</span>: <span class="str">"Monthly limit reached (10 screenings). Upgrade your plan."</span>
+}
+    </div>
+  </section>
+
+  <!-- LIMITS -->
+  <section class="section" id="limits">
+    <h2>Rate limits & plans</h2>
+    <p>API usage is tracked per API key, per calendar month.</p>
+    <table class="plan-table">
+      <thead><tr><th>Plan</th><th>Screens/month</th><th>Batch size</th><th>Requests/min</th><th>Price</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Trial</strong></td><td>10</td><td>10</td><td>2</td><td>Free</td></tr>
+        <tr><td><strong>Starter</strong></td><td>100</td><td>20</td><td>10</td><td>$29/mo</td></tr>
+        <tr><td><strong>Pro</strong></td><td>500</td><td>100</td><td>30</td><td>$79/mo</td></tr>
+        <tr><td><strong>Enterprise</strong></td><td>Unlimited</td><td>100</td><td>60</td><td>Custom</td></tr>
+      </tbody>
+    </table>
+    <p>Check remaining usage at any time with the <a href="#usage">/api/v1/usage</a> endpoint.</p>
+  </section>
+
+  <!-- PING -->
+  <section class="section" id="ping">
+    <h2>Endpoints</h2>
+    <div class="endpoint">
+      <div class="endpoint-hd" onclick="toggle(this)">
+        <span class="method-badge mb-get">GET</span>
+        <span class="endpoint-path">/api/v1/ping</span>
+        <span class="endpoint-desc">Test authentication</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Test that your API key is valid and see your current usage.</p>
+        <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">curl</span> https://topcandidate.pro/api/v1/ping \
+  -H <span class="str">"X-API-Key: tc_live_your_key"</span>
+        </div>
+        <p><strong style="font-size:12px;color:var(--text)">Response</strong></p>
+        <div class="code-block">{
+  <span class="key">"status"</span>: <span class="str">"ok"</span>,
+  <span class="key">"authenticated"</span>: <span class="kw">true</span>,
+  <span class="key">"key_name"</span>: <span class="str">"My integration"</span>,
+  <span class="key">"plan"</span>: <span class="str">"trial"</span>,
+  <span class="key">"screens_this_month"</span>: <span class="num">3</span>,
+  <span class="key">"monthly_limit"</span>: <span class="num">10</span>,
+  <span class="key">"screens_remaining"</span>: <span class="num">7</span>
+}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREEN -->
+  <div class="endpoint" id="screen">
+    <div class="endpoint-hd" onclick="toggle(this)">
+      <span class="method-badge mb-post">POST</span>
+      <span class="endpoint-path">/api/v1/screen</span>
+      <span class="endpoint-desc">Screen a single CV — uses 1 screening credit</span>
+    </div>
+    <div class="endpoint-body open">
+      <p>Upload a PDF CV and job description. Returns a full AI screening report in ~15-30 seconds.</p>
+      <p><strong style="font-size:12px;color:var(--text)">Request — multipart/form-data</strong></p>
+      <table class="params-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="param-name">cv_file</td><td><span class="param-type">file</span></td><td><span class="param-req">required</span></td><td>Candidate's CV as PDF (max 10MB)</td></tr>
+          <tr><td class="param-name">job_description</td><td><span class="param-type">string</span></td><td><span class="param-req">required</span></td><td>Full job description (min 50 chars)</td></tr>
+          <tr><td class="param-name">job_title</td><td><span class="param-type">string</span></td><td><span class="param-opt">optional</span></td><td>Job title for labeling results</td></tr>
+          <tr><td class="param-name">candidate_name</td><td><span class="param-type">string</span></td><td><span class="param-opt">optional</span></td><td>Override extracted candidate name</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tabs">
+        <button class="tab act" onclick="showTab(this,'curl')">cURL</button>
+        <button class="tab" onclick="showTab(this,'python')">Python</button>
+        <button class="tab" onclick="showTab(this,'js')">JavaScript</button>
+        <button class="tab" onclick="showTab(this,'php')">PHP</button>
+      </div>
+
+      <div class="code-block" id="tab-curl">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">curl</span> -X POST https://topcandidate.pro/api/v1/screen \
+  -H <span class="str">"X-API-Key: tc_live_your_key_here"</span> \
+  -F <span class="str">"cv_file=@/path/to/candidate_cv.pdf"</span> \
+  -F <span class="str">"job_description=We are looking for a Senior Data Analyst with 3+ years experience in Python, SQL and Power BI. The role involves building dashboards, conducting data analysis and working with cross-functional teams."</span> \
+  -F <span class="str">"job_title=Senior Data Analyst"</span>
+      </div>
+      <div class="code-block" id="tab-python" style="display:none">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">import</span> requests
+
+API_KEY = <span class="str">"tc_live_your_key_here"</span>
+
+<span class="kw">with</span> open(<span class="str">"candidate_cv.pdf"</span>, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+    response = requests.post(
+        <span class="str">"https://topcandidate.pro/api/v1/screen"</span>,
+        headers={<span class="str">"X-API-Key"</span>: API_KEY},
+        files={<span class="str">"cv_file"</span>: (<span class="str">"cv.pdf"</span>, f, <span class="str">"application/pdf"</span>)},
+        data={
+            <span class="str">"job_description"</span>: <span class="str">"We are looking for a Senior Data Analyst..."</span>,
+            <span class="str">"job_title"</span>: <span class="str">"Senior Data Analyst"</span>
+        }
+    )
+
+result = response.json()
+<span class="kw">print</span>(f<span class="str">"Score: {result['overall_score']}/100"</span>)
+<span class="kw">print</span>(f<span class="str">"Recommendation: {result['recommendation']}"</span>)
+<span class="kw">print</span>(f<span class="str">"Report: {result['report_url']}"</span>)
+      </div>
+      <div class="code-block" id="tab-js" style="display:none">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">const</span> form = <span class="kw">new</span> FormData();
+form.append(<span class="str">"cv_file"</span>, cvFileBlob, <span class="str">"candidate.pdf"</span>);
+form.append(<span class="str">"job_description"</span>, <span class="str">"We are looking for a Senior Data Analyst..."</span>);
+form.append(<span class="str">"job_title"</span>, <span class="str">"Senior Data Analyst"</span>);
+
+<span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">"https://topcandidate.pro/api/v1/screen"</span>, {
+  method: <span class="str">"POST"</span>,
+  headers: { <span class="str">"X-API-Key"</span>: <span class="str">"tc_live_your_key_here"</span> },
+  body: form
+});
+
+<span class="kw">const</span> result = <span class="kw">await</span> res.json();
+console.log(<span class="str">`Score: ${result.overall_score}/100`</span>);
+console.log(<span class="str">`Recommendation: ${result.recommendation}`</span>);
+      </div>
+      <div class="code-block" id="tab-php" style="display:none">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">&lt;?php</span>
+$apiKey = <span class="str">'tc_live_your_key_here'</span>;
+$cvPath = <span class="str">'/path/to/candidate_cv.pdf'</span>;
+
+$curl = curl_init();
+curl_setopt_array($curl, [
+  CURLOPT_URL => <span class="str">'https://topcandidate.pro/api/v1/screen'</span>,
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_POST => true,
+  CURLOPT_HTTPHEADER => [<span class="str">"X-API-Key: $apiKey"</span>],
+  CURLOPT_POSTFIELDS => [
+    <span class="str">'cv_file'</span> => new CURLFile($cvPath, <span class="str">'application/pdf'</span>),
+    <span class="str">'job_description'</span> => <span class="str">'We are looking for a Senior Data Analyst...'</span>,
+    <span class="str">'job_title'</span> => <span class="str">'Senior Data Analyst'</span>,
+  ]
+]);
+$result = json_decode(curl_exec($curl), true);
+echo <span class="str">"Score: {$result['overall_score']}/100\n"</span>;
+      </div>
+
+      <p style="margin-top:1rem"><strong style="font-size:12px;color:var(--text)">Response</strong></p>
+      <div class="code-block">{
+  <span class="key">"id"</span>: <span class="str">"64f3a2b1c8e4d5f6a7b8c9d0"</span>,
+  <span class="key">"candidate_name"</span>: <span class="str">"Md. Sakib Ahmed"</span>,
+  <span class="key">"current_title"</span>: <span class="str">"Junior Data Analyst"</span>,
+  <span class="key">"years_experience"</span>: <span class="num">2</span>,
+  <span class="key">"overall_score"</span>: <span class="num">76</span>,
+  <span class="key">"recommendation"</span>: <span class="str">"HIRE"</span>,
+  <span class="key">"skills_coverage_pct"</span>: <span class="num">68</span>,
+  <span class="key">"summary"</span>: <span class="str">"Strong analytical background with relevant Python and SQL experience..."</span>,
+  <span class="key">"key_strengths"</span>: [<span class="str">"Python proficiency"</span>, <span class="str">"SQL expertise"</span>, <span class="str">"Data visualization"</span>],
+  <span class="key">"critical_gaps"</span>: [<span class="str">"Limited Power BI experience"</span>, <span class="str">"No cross-functional leadership"</span>],
+  <span class="key">"interview_questions"</span>: [
+    <span class="str">"Describe your experience building data pipelines in Python..."</span>,
+    <span class="str">"Walk me through a complex SQL query you wrote recently..."</span>
+  ],
+  <span class="key">"hiring_risks"</span>: [<span class="str">"Limited senior-level experience"</span>],
+  <span class="key">"dimensions"</span>: [
+    { <span class="key">"name"</span>: <span class="str">"Technical Skills"</span>, <span class="key">"score"</span>: <span class="num">15.5</span>, <span class="key">"feedback"</span>: <span class="str">"Strong Python and SQL..."</span> },
+    { <span class="key">"name"</span>: <span class="str">"Experience Match"</span>, <span class="key">"score"</span>: <span class="num">13.0</span>, <span class="key">"feedback"</span>: <span class="str">"2 years slightly below 3+ requirement"</span> }
+  ],
+  <span class="key">"score_consistency"</span>: { <span class="key">"run_1"</span>: <span class="num">75</span>, <span class="key">"run_2"</span>: <span class="num">77</span>, <span class="key">"difference"</span>: <span class="num">2</span>, <span class="key">"confidence"</span>: <span class="str">"High"</span> },
+  <span class="key">"report_url"</span>: <span class="str">"https://topcandidate.pro/candidate?id=64f3a2b1c8e4d5f6a7b8c9d0"</span>
+}</div>
+    </div>
+  </div>
+
+  <!-- LIST RESULTS -->
+  <div class="endpoint" id="results">
+    <div class="endpoint-hd" onclick="toggle(this)">
+      <span class="method-badge mb-get">GET</span>
+      <span class="endpoint-path">/api/v1/results</span>
+      <span class="endpoint-desc">List screening results</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve your screening history with optional filters.</p>
+      <table class="params-table">
+        <thead><tr><th>Param</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="param-name">limit</td><td><span class="param-type">integer</span></td><td>20</td><td>Results per page (max 100)</td></tr>
+          <tr><td class="param-name">offset</td><td><span class="param-type">integer</span></td><td>0</td><td>Pagination offset</td></tr>
+          <tr><td class="param-name">job_title</td><td><span class="param-type">string</span></td><td>—</td><td>Filter by job title (partial match)</td></tr>
+          <tr><td class="param-name">recommendation</td><td><span class="param-type">string</span></td><td>—</td><td>STRONG HIRE / HIRE / MAYBE / REJECT</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">curl</span> <span class="str">"https://topcandidate.pro/api/v1/results?limit=10&recommendation=HIRE"</span> \
+  -H <span class="str">"X-API-Key: tc_live_your_key"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET RESULT -->
+  <div class="endpoint" id="result-detail">
+    <div class="endpoint-hd" onclick="toggle(this)">
+      <span class="method-badge mb-get">GET</span>
+      <span class="endpoint-path">/api/v1/results/{id}</span>
+      <span class="endpoint-desc">Get full screening report</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get the complete details of a specific screening by its ID.</p>
+      <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">curl</span> https://topcandidate.pro/api/v1/results/<span class="str">64f3a2b1c8e4d5f6a7b8c9d0</span> \
+  -H <span class="str">"X-API-Key: tc_live_your_key"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- USAGE -->
+  <div class="endpoint" id="usage">
+    <div class="endpoint-hd" onclick="toggle(this)">
+      <span class="method-badge mb-get">GET</span>
+      <span class="endpoint-path">/api/v1/usage</span>
+      <span class="endpoint-desc">Check usage and limits</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get your current month's usage and remaining credits.</p>
+      <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">curl</span> https://topcandidate.pro/api/v1/usage \
+  -H <span class="str">"X-API-Key: tc_live_your_key"</span>
+      </div>
+      <div class="code-block">{
+  <span class="key">"plan"</span>: <span class="str">"starter"</span>,
+  <span class="key">"screens_this_month"</span>: <span class="num">23</span>,
+  <span class="key">"monthly_limit"</span>: <span class="num">100</span>,
+  <span class="key">"screens_remaining"</span>: <span class="num">77</span>,
+  <span class="key">"screens_total_all_time"</span>: <span class="num">187</span>
+}</div>
+    </div>
+  </div>
+
+  <!-- RESPONSE SCHEMA -->
+  <section class="section" id="response-schema" style="margin-top:2rem">
+    <h2>Response schema</h2>
+    <h3>Recommendation values</h3>
+    <table class="params-table">
+      <thead><tr><th>Value</th><th>Score range</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span style="color:var(--green);font-weight:700;font-family:monospace">STRONG HIRE</span></td><td>82–100</td><td>Excellent match — interview immediately</td></tr>
+        <tr><td><span style="color:var(--green);font-weight:700;font-family:monospace">HIRE</span></td><td>68–81</td><td>Good fit — worth interviewing</td></tr>
+        <tr><td><span style="color:var(--amber);font-weight:700;font-family:monospace">MAYBE</span></td><td>50–67</td><td>Borderline — manual review needed</td></tr>
+        <tr><td><span style="color:var(--red);font-weight:700;font-family:monospace">REJECT</span></td><td>0–49</td><td>Poor fit for this role</td></tr>
+      </tbody>
+    </table>
+    <h3>Scoring dimensions</h3>
+    <p>Each CV is scored across 6 dimensions, each out of 20 (total 100):</p>
+    <table class="params-table">
+      <thead><tr><th>Dimension</th><th>What it measures</th></tr></thead>
+      <tbody>
+        <tr><td class="param-name">Technical Skills</td><td>Match of listed skills vs JD requirements</td></tr>
+        <tr><td class="param-name">Experience Match</td><td>Years and type of experience relevance</td></tr>
+        <tr><td class="param-name">Education</td><td>Degree relevance and qualification match</td></tr>
+        <tr><td class="param-name">Achievement Quality</td><td>Measurable results and impact shown</td></tr>
+        <tr><td class="param-name">Role Progression</td><td>Career growth and trajectory</td></tr>
+        <tr><td class="param-name">Keyword Relevance</td><td>JD keyword coverage across the CV</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- QUICKSTART -->
+  <section class="section" id="quickstart">
+    <h2>Quickstart — full workflow</h2>
+    <p>Here's a complete example: screen 3 CVs for a role and get ranked results.</p>
+    <div class="code-block">
+<button class="copy-btn" onclick="copy(this)">Copy</button><span class="kw">import</span> requests
+<span class="kw">import</span> os
+
+API_KEY = os.environ[<span class="str">"TOPCANDIDATE_API_KEY"</span>]
+BASE = <span class="str">"https://topcandidate.pro/api/v1"</span>
+HEADERS = {<span class="str">"X-API-Key"</span>: API_KEY}
+JD = <span class="str">"""We are hiring a Data Analyst with 3+ years experience.
+Required: Python, SQL, Power BI, Excel. Strong communication skills.
+Must have experience with large datasets and reporting."""</span>
+
+cv_files = [<span class="str">"candidate1.pdf"</span>, <span class="str">"candidate2.pdf"</span>, <span class="str">"candidate3.pdf"</span>]
+results = []
+
+<span class="kw">for</span> cv_path <span class="kw">in</span> cv_files:
+    <span class="kw">with</span> open(cv_path, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+        res = requests.post(
+            f<span class="str">"{BASE}/screen"</span>,
+            headers=HEADERS,
+            files={<span class="str">"cv_file"</span>: (cv_path, f, <span class="str">"application/pdf"</span>)},
+            data={<span class="str">"job_description"</span>: JD, <span class="str">"job_title"</span>: <span class="str">"Data Analyst"</span>}
+        )
+        results.append(res.json())
+
+<span class="cmnt"># Sort by score</span>
+ranked = sorted(results, key=<span class="kw">lambda</span> x: x[<span class="str">"overall_score"</span>], reverse=<span class="kw">True</span>)
+
+<span class="kw">for</span> i, r <span class="kw">in</span> enumerate(ranked, <span class="num">1</span>):
+    <span class="kw">print</span>(f<span class="str">"\n#{i} {r['candidate_name']}"</span>)
+    <span class="kw">print</span>(f<span class="str">"   Score: {r['overall_score']}/100 | {r['recommendation']}"</span>)
+    <span class="kw">print</span>(f<span class="str">"   Skills: {r['skills_coverage_pct']}% match"</span>)
+    <span class="kw">print</span>(f<span class="str">"   Report: {r['report_url']}"</span>)
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta-box">
+    <h3>Ready to integrate?</h3>
+    <p>Generate your API key from the dashboard and start screening in minutes.</p>
+    <a href="/settings" class="cta-btn">Get your API key →</a>
+  </div>
+
+</main>
+
+<script>
+function toggle(hd){
+  const body=hd.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+function showTab(btn, lang){
+  btn.closest('.section,.main').querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+  document.getElementById('tab-'+lang).style.display='block';
+  btn.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
+  btn.classList.add('act');
+}
+
+function copy(btn){
+  const block=btn.parentElement;
+  const text=block.innerText.replace('Copy\n','').trim();
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent='Copy',2000);
+  });
+}
+
+// Smooth scroll nav
+document.querySelectorAll('.nav-item').forEach(a=>{
+  a.addEventListener('click',function(e){
+    const href=this.getAttribute('href');
+    if(href.startsWith('#')){
+      e.preventDefault();
+      document.querySelector(href)?.scrollIntoView({behavior:'smooth'});
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('act'));
+      this.classList.add('act');
+    }
+  });
+});
+</script>
+</body>
+</html>
