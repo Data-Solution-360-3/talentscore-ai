@@ -61,26 +61,14 @@ async def lifespan(app: FastAPI):
         )
         print("[AUTH] Default admin created: admin@talentscore.ai / Admin@123")
 
-    # Always make tarafdersakib08@gmail.com admin
+    # Always make tarafdersakib08@gmail.com admin (role only, no data migration)
     sakib = await get_user_by_email("tarafdersakib08@gmail.com")
     if sakib:
         await mongodb.users.update_one(
             {"_id": ObjectId(sakib["_id"])},
             {"$set": {"role": "admin"}}
         )
-        print(f"[AUTH] tarafdersakib08@gmail.com → admin (id: {sakib['_id']})")
-
-        # Fix all screenings that have no user_id → assign to sakib
-        result = await mongodb.screenings.update_many(
-            {"$or": [
-                {"user_id": {"$exists": False}},
-                {"user_id": None},
-                {"user_id": ""}
-            ]},
-            {"$set": {"user_id": sakib["_id"], "company": sakib.get("company_name", "Data Solution 360")}}
-        )
-        if result.modified_count:
-            print(f"[MIGRATE] Assigned {result.modified_count} orphan screenings to tarafdersakib08@gmail.com")
+        print(f"[AUTH] tarafdersakib08@gmail.com → admin")
 
     yield
     await disconnect()
@@ -1127,6 +1115,23 @@ async def assign_screenings_to_email(email: str):
     count = await mongodb.screenings.count_documents({"user_id": uid})
     await mongodb.users.update_one({"_id": ObjectId(uid)}, {"$set": {"screening_count": count}})
     return {"assigned": result.modified_count, "total_for_user": count, "user": email}
+
+
+@app.get("/api/admin/fix-counts")
+async def fix_all_counts():
+    """Recalculate and fix screening_count for all users."""
+    from database import db as mongodb
+    from bson import ObjectId
+    fixed = []
+    async for u in mongodb.users.find({}, {"password": 0}):
+        uid = str(u["_id"])
+        count = await mongodb.screenings.count_documents({"user_id": uid})
+        await mongodb.users.update_one(
+            {"_id": ObjectId(uid)},
+            {"$set": {"screening_count": count}}
+        )
+        fixed.append({"email": u.get("email"), "correct_count": count})
+    return {"fixed": fixed}
 
 
 @app.get("/api/fix-now")

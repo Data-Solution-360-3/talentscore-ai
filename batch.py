@@ -28,6 +28,7 @@ async def screen_single_cv(
     semaphore: asyncio.Semaphore,
     on_progress: Callable,
     index: int,
+    extra_fields: dict = None,
 ) -> dict:
     """
     Screen one CV. Called concurrently for all CVs in the batch.
@@ -64,10 +65,12 @@ async def screen_single_cv(
                     "error": error,
                 }
 
-            # Step 3: Save to MongoDB (include PDF bytes)
+            # Step 3: Save to MongoDB (include PDF bytes + user tag)
             import base64
+            extra = extra_fields or {}
             doc_id = await save_screening({
                 **result,
+                **extra,
                 "source_file": filename,
                 "batch": True,
                 "cv_pdf_b64": base64.b64encode(file_bytes).decode("utf-8"),
@@ -98,6 +101,7 @@ async def run_batch_screening(
     api_key: str,
     on_progress: Callable,
     concurrency: int = CONCURRENCY_LIMIT,
+    extra_fields: dict = None,
 ) -> dict:
     """
     Screen a batch of CVs concurrently.
@@ -130,6 +134,7 @@ async def run_batch_screening(
             semaphore=semaphore,
             on_progress=on_progress,
             index=i,
+            extra_fields=extra_fields or {},
         )
         for i, (filename, file_bytes) in enumerate(files)
     ]
