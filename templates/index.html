@@ -1128,16 +1128,19 @@ function updateAll(){
 
 async function loadFromDB(){
   try{
-    const [meRes,screenRes,jobsRes,statsRes]=await Promise.all([
-      fetch('/api/auth/me',{credentials:'include'}),
-      fetch('/api/screenings?limit=500',{credentials:'include'}),
-      fetch('/api/jobs',{credentials:'include'}),
-      fetch('/api/stats',{credentials:'include'}),
-    ]);
+    // Fetch individually so one failure doesn't break everything
+    const meRes=await fetch('/api/auth/me',{credentials:'include'});
     if(meRes.status===401){window.location.href='/login';return;}
     const me=await meRes.json();
-    const screenData=await screenRes.json();
-    const jobsData=await jobsRes.json();
+
+    // Fetch screenings, jobs in parallel - don't let stats failure block
+    const [screenRes,jobsRes]=await Promise.all([
+      fetch('/api/screenings?limit=500',{credentials:'include'}),
+      fetch('/api/jobs',{credentials:'include'}),
+    ]);
+    const screenData=screenRes.ok?await screenRes.json():{screenings:[]};
+    const jobsData=jobsRes.ok?await jobsRes.json():{jobs:[]};
+    console.log('[DEBUG] screenings count:',screenData.screenings?.length, 'me:',me.email, 'role:',me.role);
 
     document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
     document.getElementById('t-plan').textContent=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
