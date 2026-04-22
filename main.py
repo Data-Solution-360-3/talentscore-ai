@@ -88,6 +88,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TopCandidate", version="5.0.0", lifespan=lifespan)
 
+# Always return JSON for API errors, never HTML
+from fastapi import Request as FastAPIRequest
+from fastapi.responses import JSONResponse as FJSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: FastAPIRequest, exc: StarletteHTTPException):
+    if request.url.path.startswith("/api/"):
+        return FJSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "status": exc.status_code}
+        )
+    # For non-API routes, redirect 401 to login
+    if exc.status_code == 401:
+        return RedirectResponse("/login")
+    return FJSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -489,7 +507,12 @@ async def batch_screen_endpoint(
 @app.get("/api/screenings")
 async def list_screenings(request: Request, limit: int = 200):
     user = await get_current_user(request)
-    if user["role"] == "admin":
+    try:
+        db_user = await get_user_by_id(user["user_id"])
+        fresh_role = db_user.get("role", "client") if db_user else user.get("role", "client")
+    except Exception:
+        fresh_role = user.get("role", "client")
+    if fresh_role == "admin":
         screenings = await get_all_screenings(limit=limit)
     else:
         screenings = await get_screenings_for_user(user["user_id"], limit=limit)
@@ -557,6 +580,9 @@ async def get_cv_pdf(request: Request, screening_id: str):
 @app.get("/api/stats")
 async def stats(request: Request):
     user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if db_user:
+        user = {**user, "role": db_user.get("role", user.get("role","client"))}
     if user["role"] == "admin":
         return await get_screening_stats()
     return await get_stats_for_user(user["user_id"])
@@ -589,6 +615,9 @@ async def dimension_averages(request: Request):
 @app.get("/api/jobs")
 async def list_jobs(request: Request):
     user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if db_user:
+        user = {**user, "role": db_user.get("role", user.get("role","client"))}
     if user["role"] == "admin":
         jobs = await get_all_jobs()
     else:
@@ -1044,6 +1073,55 @@ async def make_admin(request: Request, email: str):
         {"$set": {"role": "admin"}}
     )
     return {"success": True, "message": f"{email} is now admin"}
+
+
+@app.get("/api/fix-now")
+async def fix_now():
+    """One-time fix: assign all unowned screenings to tarafdersakib08@gmail.com"""
+    from database import db as mongodb
+    from bson import ObjectId
+    
+    # Find tarafdersakib
+    user = await get_user_by_email("tarafdersakib08@gmail.com")
+    if not user:
+        return {"error": "User not found"}
+    
+    uid = user["_id"]
+    
+    # Make admin
+    await mongodb.users.update_one(
+        {"_id": ObjectId(uid)},
+        {"$set": {"role": "admin"}}
+    )
+    
+    # Assign ALL unowned screenings
+    r1 = await mongodb.screenings.update_many(
+        {"$or": [
+            {"user_id": {"$exists": False}},
+            {"user_id": None},
+            {"user_id": ""}
+        ]},
+        {"$set": {"user_id": uid, "company": user.get("company_name","Data Solution 360")}}
+    )
+    
+    # Count total screenings for this user
+    total = await mongodb.screenings.count_documents({"user_id": uid})
+    
+    # Update screening count
+    await mongodb.users.update_one(
+        {"_id": ObjectId(uid)},
+        {"$set": {"screening_count": total, "role": "admin"}}
+    )
+    
+    return {
+        "success": True,
+        "user_id": uid,
+        "email": "tarafdersakib08@gmail.com",
+        "role": "admin",
+        "screenings_assigned": r1.modified_count,
+        "total_screenings": total,
+        "message": f"Done! Now sign out and sign back in at /login"
+    }
 
 
 @app.get("/api/debug/my-screenings")
