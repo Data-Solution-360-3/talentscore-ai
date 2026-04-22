@@ -244,14 +244,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="t-sep"></div>
   <nav class="t-nav">
     <button class="tn act" onclick="showPage('overview')">Overview</button>
-    <button class="tn" onclick="showPage('screener')">Screener</button>
     <button class="tn" onclick="showPage('candidates')">Candidates</button>
     <button class="tn" onclick="showPage('jobs')">Jobs</button>
     <button class="tn" onclick="showPage('analytics')">Analytics</button>
   </nav>
   <div class="t-right">
     <span class="t-plan" id="t-plan">Trial</span>
-    <a href="/batch" class="t-btn accent">Batch screen</a>
+    <a href="/batch" class="t-btn accent">⚡ Screen CVs</a>
     <a href="/settings" class="t-btn">Settings</a>
     <div class="t-avatar" id="t-avatar">TC</div>
     <button class="t-btn" onclick="logout()">Sign out</button>
@@ -267,10 +266,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     Dashboard
   </button>
   <div class="sb-sec">Screening</div>
-  <button class="sb-item" id="sb-screener" onclick="showPage('screener')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    CV Screener
-  </button>
+
   <button class="sb-item" id="sb-candidates" onclick="showPage('candidates')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
     All Candidates
@@ -316,7 +312,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
       <button class="btn btn-ghost btn-sm" id="claim-btn" onclick="claimScreenings()" title="If you see missing screenings, click this to assign them to your account">⬇ Claim my screenings</button>
-      <a href="/batch" class="btn btn-orange btn-sm">⚡ Batch screen CVs</a>
+      <a href="/batch" class="btn btn-orange btn-sm">⚡ Screen CVs now</a>
     </div>
   </div>
 
@@ -371,59 +367,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     2. CV SCREENER
-══════════════════════════════════════════ -->
+<!-- SCREENER REMOVED - redirect to batch -->
 <div class="page" id="page-screener">
-  <div class="ph-row">
-    <div class="ph"><h1>CV Screener</h1><p>Upload a CV and JD — get a full AI screening report in 60 seconds</p></div>
-    <a href="/batch" class="btn btn-orange btn-sm">⚡ Batch screen (100 CVs)</a>
-  </div>
-
-  <div class="steps-bar">
-    <div class="step-item act" id="step1"><span class="step-num">Step 1</span>Upload CV + JD</div>
-    <div class="step-item" id="step2"><span class="step-num">Step 2</span>Structure + Parse</div>
-    <div class="step-item" id="step3"><span class="step-num">Step 3</span>AI Double-Score</div>
-    <div class="step-item" id="step4"><span class="step-num">Done</span>Results ready</div>
-  </div>
-
-  <div id="screen-input">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div class="card">
-        <div class="card-hd"><div class="card-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Job Description</div><span class="card-sub" id="jd-cnt">0 chars</span></div>
-        <div class="form-group" style="margin-bottom:8px">
-          <label class="form-label">Select a job (optional)</label>
-          <select class="form-select" id="jd-job-select" onchange="fillJdFromJob()">
-            <option value="">— Select job or paste below —</option>
-          </select>
-        </div>
-        <textarea class="form-textarea" id="jd" rows="9" placeholder="Paste the full job description — role title, responsibilities, required skills, experience level, qualifications..."></textarea>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Candidate CV</div><span class="card-sub">PDF only</span></div>
-        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('cv-input').click()">
-          <div class="dz-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-          <div style="font-size:14px;font-weight:700;margin-bottom:3px">Drop CV here</div>
-          <div style="font-size:11px;color:var(--t3)">Single PDF · Max 10MB · Click to browse</div>
-        </div>
-        <input type="file" id="cv-input" accept=".pdf" style="display:none">
-        <div id="file-preview" style="margin-top:7px"></div>
-      </div>
-    </div>
-    <div class="alert alert-err" id="screen-err"></div>
-    <button class="btn btn-primary" id="screen-btn" onclick="runScreen()" disabled style="width:100%;padding:12px;font-size:14px;justify-content:center;box-shadow:0 4px 20px rgba(91,94,244,.3)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      Screen this CV with AI
-    </button>
-  </div>
-
-  <div id="screen-result" style="display:none">
-    <div style="display:flex;gap:7px;margin-bottom:10px">
-      <button class="btn btn-ghost btn-sm" onclick="resetScreen()">← Screen another CV</button>
-      <button class="btn btn-ghost btn-sm" id="view-detail-btn">View full report</button>
-      <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all candidates</button>
-    </div>
-    <div class="card" id="result-card"></div>
+  <div style="text-align:center;padding:4rem 2rem">
+    <div style="font-size:48px;margin-bottom:1rem">⚡</div>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Use Batch Screening</h2>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:1.5rem">Screen up to 100 CVs at once for better efficiency.</p>
+    <a href="/batch" class="btn btn-orange" style="font-size:15px;padding:12px 28px">Go to Batch Screener →</a>
   </div>
 </div>
 

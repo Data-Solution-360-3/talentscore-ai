@@ -279,6 +279,8 @@ async def screen_endpoint(
     job_id: str = Form(""),
     job_title: str = Form(""),
 ):
+    raise HTTPException(status_code=400, detail="Single CV screening is disabled. Please use batch screening at /batch.")
+    # Dead code below kept for reference
     user = await get_current_user(request)
 
     if not cv_file.filename.lower().endswith(".pdf"):
