@@ -285,10 +285,11 @@ async def login(
     if not user.get("active", True):
         raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
 
+    # Always use fresh role from DB (not cached value)
     token = create_token({
         "user_id": user["_id"],
         "email": user["email"],
-        "company": user["company_name"],
+        "company": user.get("company_name", ""),
         "role": user.get("role", "client"),
     })
     resp = JSONResponse({"success": True, "company": user["company_name"]})
@@ -447,11 +448,20 @@ async def batch_screen_endpoint(
         yield f"data: {json.dumps({'type':'start','batch_id':batch_id,'total':len(files),'concurrency':CONCURRENCY_LIMIT})}\n\n"
 
         async def run_with_user_tag():
+            # Build extra fields to save WITH each screening
+            extra = {
+                "user_id": user_id,
+                "company": company,
+            }
+            if job_id:    extra["job_id"]    = job_id
+            if job_title: extra["job_title"] = job_title
+
             results = await run_batch_screening(
                 files=files, jd_text=jd_text,
-                api_key=OPENAI_API_KEY, on_progress=on_progress
+                api_key=OPENAI_API_KEY, on_progress=on_progress,
+                extra_fields=extra
             )
-            # Tag each result with user
+            # Also tag results in memory for the response
             for r in results.get("results", []):
                 r["user_id"] = user_id
                 r["company"] = company
@@ -505,17 +515,19 @@ async def batch_screen_endpoint(
 # ─────────────────────────────────────────────────────────────
 
 @app.get("/api/screenings")
-async def list_screenings(request: Request, limit: int = 200):
+async def list_screenings(request: Request, limit: int = 500):
     user = await get_current_user(request)
     try:
         db_user = await get_user_by_id(user["user_id"])
         fresh_role = db_user.get("role", "client") if db_user else user.get("role", "client")
     except Exception:
         fresh_role = user.get("role", "client")
+
     if fresh_role == "admin":
         screenings = await get_all_screenings(limit=limit)
     else:
         screenings = await get_screenings_for_user(user["user_id"], limit=limit)
+
     return {"screenings": screenings, "count": len(screenings)}
 
 
