@@ -1087,6 +1087,48 @@ async def make_admin(request: Request, email: str):
     return {"success": True, "message": f"{email} is now admin"}
 
 
+@app.get("/api/admin/check-users")
+async def check_users_screenings():
+    """Show all users and their actual screening counts in DB."""
+    from database import db as mongodb
+    users = []
+    async for u in mongodb.users.find({}, {"password":0}):
+        uid = str(u["_id"])
+        count = await mongodb.screenings.count_documents({"user_id": uid})
+        users.append({
+            "id": uid,
+            "email": u.get("email"),
+            "company": u.get("company_name"),
+            "role": u.get("role"),
+            "db_screening_count": u.get("screening_count", 0),
+            "actual_screening_count": count
+        })
+    # Also count unassigned
+    unassigned = await mongodb.screenings.count_documents({
+        "$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]
+    })
+    total = await mongodb.screenings.count_documents({})
+    return {"users": users, "unassigned_screenings": unassigned, "total_screenings": total}
+
+
+@app.post("/api/admin/assign-to-email/{email}")
+async def assign_screenings_to_email(email: str):
+    """Assign ALL unassigned screenings to a specific email."""
+    from database import db as mongodb
+    from bson import ObjectId
+    user = await get_user_by_email(email)
+    if not user:
+        return {"error": f"User {email} not found"}
+    uid = user["_id"]
+    result = await mongodb.screenings.update_many(
+        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
+        {"$set": {"user_id": uid}}
+    )
+    count = await mongodb.screenings.count_documents({"user_id": uid})
+    await mongodb.users.update_one({"_id": ObjectId(uid)}, {"$set": {"screening_count": count}})
+    return {"assigned": result.modified_count, "total_for_user": count, "user": email}
+
+
 @app.get("/api/fix-now")
 async def fix_now():
     """One-time fix: assign all unowned screenings to tarafdersakib08@gmail.com"""
