@@ -862,17 +862,56 @@ async def get_team(request: Request):
 
 @app.post("/api/admin/migrate-screenings")
 async def migrate_screenings(request: Request):
-    """Admin tool: assign all unowned screenings to a specific user."""
+    """Admin tool: assign ALL screenings to the admin user."""
     user = await get_current_user(request)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only.")
     from database import db
-    # Find all screenings with no user_id
+    # Reassign ALL screenings to admin
     result = await db.screenings.update_many(
-        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
+        {},
         {"$set": {"user_id": user["user_id"], "company": user["company"]}}
     )
     return {"migrated": result.modified_count, "message": f"Assigned {result.modified_count} screenings to {user['email']}"}
+
+
+@app.post("/api/admin/transfer-to/{target_email}")
+async def transfer_to_user(request: Request, target_email: str):
+    """Admin: transfer ALL screenings to a specific user by email."""
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    target = await get_user_by_email(target_email)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User {target_email} not found.")
+    from database import db
+    result = await db.screenings.update_many(
+        {},
+        {"$set": {"user_id": target["_id"], "company": target["company_name"]}}
+    )
+    # Update screening counts
+    await db.users.update_many({}, {"$set": {"screening_count": 0}})
+    count = await db.screenings.count_documents({"user_id": target["_id"]})
+    from bson import ObjectId
+    await db.users.update_one(
+        {"_id": ObjectId(target["_id"])},
+        {"$set": {"screening_count": count}}
+    )
+    return {"transferred": result.modified_count, "to": target_email, "to_id": target["_id"]}
+
+
+@app.post("/api/admin/migrate-from/{source_user_id}")
+async def migrate_from_user(request: Request, source_user_id: str):
+    """Admin tool: move screenings from one user to admin."""
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db
+    result = await db.screenings.update_many(
+        {"user_id": source_user_id},
+        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
+    )
+    return {"migrated": result.modified_count}
 
 
 @app.post("/api/user/claim-screenings")
@@ -885,6 +924,46 @@ async def claim_my_screenings(request: Request):
         {"$set": {"user_id": user["user_id"], "company": user["company"]}}
     )
     return {"claimed": result.modified_count}
+
+
+@app.post("/api/admin/transfer-screenings")
+async def transfer_screenings(
+    request: Request,
+    from_user_id: str = Form(""),
+    to_user_id: str = Form(""),
+    to_email: str = Form(""),
+):
+    """Transfer all screenings from one user to another."""
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db
+    
+    # Find target user by email if user_id not provided
+    if not to_user_id and to_email:
+        target = await get_user_by_email(to_email)
+        if not target:
+            raise HTTPException(status_code=404, detail=f"User {to_email} not found.")
+        to_user_id = target["_id"]
+        to_company = target["company_name"]
+    else:
+        target = await get_user_by_id(to_user_id)
+        to_company = target["company_name"] if target else ""
+
+    # If no from_user_id, transfer from current admin
+    if not from_user_id:
+        from_user_id = user["user_id"]
+
+    result = await db.screenings.update_many(
+        {"user_id": from_user_id},
+        {"$set": {"user_id": to_user_id, "company": to_company}}
+    )
+    return {
+        "transferred": result.modified_count,
+        "from": from_user_id,
+        "to": to_user_id,
+        "to_email": to_email or to_company
+    }
 
 
 @app.get("/health")
