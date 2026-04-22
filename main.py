@@ -47,6 +47,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect()
+    from database import db as mongodb
+    from bson import ObjectId
+
     # Create default admin account if none exists
     admin = await get_user_by_email("admin@talentscore.ai")
     if not admin:
@@ -57,6 +60,28 @@ async def lifespan(app: FastAPI):
             role="admin"
         )
         print("[AUTH] Default admin created: admin@talentscore.ai / Admin@123")
+
+    # Always make tarafdersakib08@gmail.com admin
+    sakib = await get_user_by_email("tarafdersakib08@gmail.com")
+    if sakib:
+        await mongodb.users.update_one(
+            {"_id": ObjectId(sakib["_id"])},
+            {"$set": {"role": "admin"}}
+        )
+        print(f"[AUTH] tarafdersakib08@gmail.com → admin (id: {sakib['_id']})")
+
+        # Fix all screenings that have no user_id → assign to sakib
+        result = await mongodb.screenings.update_many(
+            {"$or": [
+                {"user_id": {"$exists": False}},
+                {"user_id": None},
+                {"user_id": ""}
+            ]},
+            {"$set": {"user_id": sakib["_id"], "company": sakib.get("company_name", "Data Solution 360")}}
+        )
+        if result.modified_count:
+            print(f"[MIGRATE] Assigned {result.modified_count} orphan screenings to tarafdersakib08@gmail.com")
+
     yield
     await disconnect()
 
@@ -125,7 +150,9 @@ async def admin_page(request: Request):
     if not token or not decode_token(token):
         return RedirectResponse("/login")
     payload = decode_token(token)
-    if payload.get("role") != "admin":
+    # Always check DB for latest role
+    db_user = await get_user_by_id(payload.get("user_id", ""))
+    if not db_user or db_user.get("role") != "admin":
         return RedirectResponse("/app")
     return read_template("admin.html")
 
@@ -198,11 +225,13 @@ async def verify_email(
     # Send welcome email
     send_welcome_email(to_email=email, company_name=pending["company_name"])
 
+    # Fetch user to get correct role from DB
+    new_user = await get_user_by_email(email)
     token = create_token({
         "user_id": user_id,
         "email": email.lower(),
         "company": pending["company_name"],
-        "role": "client"
+        "role": new_user.get("role", "client") if new_user else "client"
     })
     resp = JSONResponse({"success": True, "company": pending["company_name"]})
     resp.set_cookie("access_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
@@ -259,11 +288,27 @@ async def logout():
 @app.get("/api/auth/me")
 async def me(request: Request):
     user = await get_current_user(request)
+    # Always fetch fresh data from DB to get latest role/plan
+    db_user = await get_user_by_id(user["user_id"])
+    if db_user:
+        return {
+            "user_id": user["user_id"],
+            "email": db_user.get("email", user["email"]),
+            "company": db_user.get("company_name", user.get("company", "")),
+            "role": db_user.get("role", "client"),
+            "plan": db_user.get("plan", "trial"),
+            "screening_count": db_user.get("screening_count", 0),
+            "full_name": db_user.get("full_name", ""),
+            "phone": db_user.get("phone", ""),
+            "notification_prefs": db_user.get("notification_prefs", {}),
+        }
     return {
         "user_id": user["user_id"],
         "email": user["email"],
-        "company": user["company"],
-        "role": user["role"],
+        "company": user.get("company", ""),
+        "role": user.get("role", "client"),
+        "plan": "trial",
+        "screening_count": 0,
     }
 
 
@@ -449,6 +494,21 @@ async def list_screenings(request: Request, limit: int = 200):
     else:
         screenings = await get_screenings_for_user(user["user_id"], limit=limit)
     return {"screenings": screenings, "count": len(screenings)}
+
+
+@app.post("/api/admin/fix-user-role")
+async def fix_user_role(request: Request, email: str = Form(...), role: str = Form("admin")):
+    """Fix user role — accessible without auth for emergency use."""
+    from database import db
+    from bson import ObjectId
+    target = await get_user_by_email(email)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User {email} not found.")
+    await db.users.update_one(
+        {"_id": ObjectId(target["_id"])},
+        {"$set": {"role": role}}
+    )
+    return {"success": True, "email": email, "new_role": role}
 
 
 @app.get("/api/screenings/{screening_id}")
@@ -965,6 +1025,43 @@ async def transfer_screenings(
         "from": from_user_id,
         "to": to_user_id,
         "to_email": to_email or to_company
+    }
+
+
+@app.post("/api/admin/make-admin/{email}")
+async def make_admin(request: Request, email: str):
+    """Make any user an admin."""
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    target = await get_user_by_email(email)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User {email} not found.")
+    from database import db
+    from bson import ObjectId
+    await db.users.update_one(
+        {"_id": ObjectId(target["_id"])},
+        {"$set": {"role": "admin"}}
+    )
+    return {"success": True, "message": f"{email} is now admin"}
+
+
+@app.get("/api/debug/my-screenings")
+async def debug_screenings(request: Request):
+    """Debug: show what user_id is in token vs what screenings exist."""
+    user = await get_current_user(request)
+    from database import db
+    # Count screenings by this user_id
+    count = await db.screenings.count_documents({"user_id": user["user_id"]})
+    # Get a sample
+    sample = []
+    async for doc in db.screenings.find({}).limit(5):
+        sample.append({"_id": str(doc["_id"]), "user_id": doc.get("user_id", "NONE"), "name": doc.get("candidate_name", "?")})
+    return {
+        "token_user_id": user["user_id"],
+        "token_email": user["email"],
+        "screenings_matching": count,
+        "sample_screenings": sample
     }
 
 
