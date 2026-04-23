@@ -383,6 +383,16 @@ async function runBatch(){
 
   try{
     const res=await fetch('/api/batch/screen',{method:'POST',body:fd,credentials:'include'});
+
+    // If the server rejected the request (429 limit exceeded, 400 bad JD, 500, etc.)
+    // the response body is a JSON error, not an SSE stream. Show the error instead
+    // of silently reading zero events and leaving every card on "Waiting...".
+    if(!res.ok){
+      let detail='Request failed ('+res.status+')';
+      try{ const err=await res.json(); if(err.detail) detail=err.detail; }catch(_){}
+      throw new Error(detail);
+    }
+
     const reader=res.body.getReader();
     const decoder=new TextDecoder();
     let buffer='';
@@ -410,6 +420,15 @@ async function runBatch(){
 }
 
 function handleEvent(ev){
+  // Server sent an error event (batch task crashed) — show it and reset UI.
+  if(ev.type==='error'){
+    document.getElementById('err').textContent='Batch failed: '+(ev.message||'Unknown error');
+    document.getElementById('err').style.display='block';
+    document.getElementById('input-section').style.display='';
+    document.getElementById('prog-section').style.display='none';
+    setStep(1);
+    return;
+  }
   if(ev.type==='progress'||ev.type==='result'){
     const el=cvItems[ev.index];if(!el)return;
     if(ev.status==='processing'){

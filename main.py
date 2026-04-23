@@ -423,6 +423,7 @@ async def batch_screen_endpoint(
     # Re-sync count from actual DB records — never trust the cached field.
     # This is self-healing: if screening_count drifts from reality, this fixes it.
     current_count = await sync_screening_count(user["user_id"])
+    print(f"[BATCH-LIMIT] user={user['user_id']} plan={plan} count={current_count} limit={monthly_limit} uploading={len(cv_files)}")
 
     if current_count >= monthly_limit:
         raise HTTPException(
@@ -498,15 +499,41 @@ async def batch_screen_endpoint(
 
         completed = 0
         while completed < len(files):
+            # If the batch task crashed, stop waiting on the queue — bail immediately.
+            if batch_task.done() and batch_task.exception() is not None:
+                err = batch_task.exception()
+                import traceback
+                print(f"[BATCH-ERROR] Task crashed: {err}")
+                traceback.print_exception(type(err), err, err.__traceback__)
+                yield f"data: {json.dumps({'type':'error','message':f'Batch processing failed: {err}','batch_id':batch_id})}\n\n"
+                return
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=120.0)
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
                 yield f"data: {json.dumps(event, default=str)}\n\n"
                 if event.get("status") in ("done", "failed"):
                     completed += 1
             except asyncio.TimeoutError:
+                # Keepalive — but also re-check task state on every timeout
+                if batch_task.done():
+                    if batch_task.exception() is not None:
+                        err = batch_task.exception()
+                        import traceback
+                        print(f"[BATCH-ERROR] Task crashed during wait: {err}")
+                        traceback.print_exception(type(err), err, err.__traceback__)
+                        yield f"data: {json.dumps({'type':'error','message':f'Batch processing failed: {err}','batch_id':batch_id})}\n\n"
+                        return
+                    # Task finished cleanly but queue didn't deliver all events — exit loop
+                    break
                 yield f"data: {json.dumps({'type':'keepalive'})}\n\n"
 
-        summary = await batch_task
+        try:
+            summary = await batch_task
+        except Exception as e:
+            import traceback
+            print(f"[BATCH-ERROR] Awaiting task failed: {e}")
+            traceback.print_exception(type(e), e, e.__traceback__)
+            yield f"data: {json.dumps({'type':'error','message':f'Batch processing failed: {e}','batch_id':batch_id})}\n\n"
+            return
         await finish_batch_job(batch_id, summary)
         done_event = {
             "type": "done", "batch_id": batch_id,
@@ -527,9 +554,8 @@ async def batch_screen_endpoint(
             ],
         }
         yield f"data: {json.dumps(done_event, default=str)}\n\n"
-        # Increment by number of CVs actually processed
-        # FIX: was `results.get(...)` — results is local to run_with_user_tag, not in scope here.
-        # summary IS the results dict from run_batch_screening.
+        # Increment by number of CVs actually processed.
+        # `summary` IS the results dict from run_batch_screening.
         succeeded = summary.get("succeeded", 0)
         if succeeded > 0:
             await increment_screening_count(user_id, by=succeeded)
