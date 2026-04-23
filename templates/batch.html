@@ -195,7 +195,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           Job description
         </div>
         <textarea class="form-textarea" id="jd" rows="10" placeholder="Paste the full job description — role title, responsibilities, required skills, experience level, qualifications..."></textarea>
-        <div class="form-hint" id="jd-cnt" style="margin-top:6px">0 chars · Minimum 50</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+          <div class="form-hint" id="jd-cnt">0 chars · Minimum 50</div>
+          <button id="save-jd-btn" onclick="saveJdToJob()" style="display:none;font-size:10px;padding:3px 9px;background:var(--ig);color:#a5b4fc;border:1px solid var(--ib);border-radius:var(--rxs);cursor:pointer;font-family:inherit">Save JD to this job ↑</button>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">
@@ -286,6 +289,14 @@ document.getElementById('jd').addEventListener('input',function(){
   const l=this.value.length;
   document.getElementById('jd-cnt').textContent=l+' chars'+(l<50?' · Minimum 50':' ✓');
   checkReady();
+  // Show "save to job" button if job is selected and JD entered but job had no description
+  const sel=document.getElementById('batch-job-select');
+  const saveBtn=document.getElementById('save-jd-btn');
+  if(saveBtn&&sel.value&&l>=50){
+    const opt=sel.options[sel.selectedIndex];
+    if(!opt.dataset.desc||opt.dataset.desc.length<50)saveBtn.style.display='block';
+    else saveBtn.style.display='none';
+  }
 });
 
 function handleFiles(files){
@@ -528,37 +539,72 @@ async function createJobAndSelect(){
 }
 
 // ── JOB FUNCTIONS ──
-function onJobSelect(){
+async function saveJdToJob(){
+  const sel=document.getElementById('batch-job-select');
+  const val=sel.value;
+  if(!val)return;
+  const jobId=val.split('|')[0];
+  const jd=document.getElementById('jd').value.trim();
+  if(jd.length<50){alert('JD too short to save.');return;}
+  const fd=new FormData();fd.append('description',jd);
+  const res=await fetch('/api/jobs/'+jobId,{method:'PUT',body:fd,credentials:'include'});
+  if(res.ok){
+    const btn=document.getElementById('save-jd-btn');
+    if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--gg)';btn.style.color='var(--green)';setTimeout(()=>{btn.style.display='none';},2000);}
+    // Update the option's dataset
+    sel.options[sel.selectedIndex].dataset.desc=jd;
+  }
+}
+async function onJobSelect(){
   const sel=document.getElementById('batch-job-select');
   const val=sel.value;
   const info=document.getElementById('selected-job-info');
-  if(val){
-    const opt=sel.options[sel.selectedIndex];
-    const title=opt.dataset.title||opt.text;
-    const meta=opt.dataset.meta||'';
-    const desc=opt.dataset.desc||'';
-    const skills=opt.dataset.skills||'';
-    document.getElementById('sel-job-title').textContent=title;
-    document.getElementById('sel-job-meta').textContent=meta+(skills?' · Skills: '+skills:'');
-    info.style.display='block';
-    sel.style.borderColor='var(--green)';
+  if(!val){info.style.display='none';sel.style.borderColor='var(--border2)';checkReady();return;}
 
-    // Auto-fill JD from job description — ALWAYS fill if job has description
-    const jdEl=document.getElementById('jd');
-    if(desc){
-      jdEl.value=desc;
-      const cnt=document.getElementById('jd-cnt');
-      if(cnt)cnt.textContent=desc.length+' chars ✓ (auto-filled from job posting)';
-      // Visual feedback
-      jdEl.style.borderColor='var(--green)';
-      setTimeout(()=>jdEl.style.borderColor='',2000);
-    } else {
-      // No description saved — prompt user to paste
-      jdEl.placeholder='No description saved for this job. Paste the job description here...';
-    }
+  const opt=sel.options[sel.selectedIndex];
+  const parts=val.split('|');
+  const jobId=parts[0];
+  const title=opt.dataset.title||parts.slice(1).join('|')||opt.text;
+  const meta=opt.dataset.meta||'';
+
+  document.getElementById('sel-job-title').textContent=title;
+  document.getElementById('sel-job-meta').textContent=meta;
+  info.style.display='block';
+  sel.style.borderColor='var(--green)';
+
+  const jdEl=document.getElementById('jd');
+  const cnt=document.getElementById('jd-cnt');
+
+  // Try stored description first
+  let desc=opt.dataset.desc||'';
+
+  // If no stored description, fetch from API
+  if(!desc&&jobId){
+    jdEl.placeholder='Loading job description...';
+    try{
+      const res=await fetch('/api/jobs/'+jobId+'/details',{credentials:'include'});
+      if(res.ok){
+        const job=await res.json();
+        desc=job.description||'';
+        // Store in dataset for future
+        opt.dataset.desc=desc;
+        opt.dataset.skills=(job.skills||[]).join(', ');
+        document.getElementById('sel-job-meta').textContent=
+          [(job.department||''),(job.location||''),(job.employment_type||'')].filter(Boolean).join(' · ');
+      }
+    }catch(e){console.warn('Could not fetch job details',e);}
+  }
+
+  if(desc&&desc.length>=50){
+    jdEl.value=desc;
+    if(cnt)cnt.textContent=desc.length+' chars ✓ (auto-filled from "'+title+'" job posting)';
+    jdEl.style.borderColor='var(--green)';
+    jdEl.style.boxShadow='0 0 0 3px rgba(16,185,129,.15)';
+    setTimeout(()=>{jdEl.style.borderColor='';jdEl.style.boxShadow='';},2500);
   } else {
-    info.style.display='none';
-    sel.style.borderColor='var(--border2)';
+    jdEl.value='';
+    jdEl.placeholder='No description saved for "'+title+'". Paste the job description here — or edit the job in Jobs tab to add a description.';
+    if(cnt)cnt.textContent='0 chars · Paste description below';
   }
   checkReady();
 }

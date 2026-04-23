@@ -37,7 +37,7 @@ from database import (
     create_batch_job, update_batch_progress, finish_batch_job,
     get_batch_job, get_all_batch_jobs,
     create_user, get_user_by_email, get_user_by_id, get_all_users,
-    update_user, increment_screening_count,
+    update_user, increment_screening_count, sync_screening_count,
     store_otp, verify_otp, delete_pending,
     get_screenings_for_user, get_stats_for_user, get_jobs_for_user,
     get_skills_gaps_for_user, get_dimension_averages_for_user, db,
@@ -405,22 +405,37 @@ async def batch_screen_endpoint(
         raise HTTPException(status_code=400, detail="Max 100 CVs per batch.")
 
     # ── ENFORCE PLAN LIMITS ──
+    from datetime import datetime
     db_user = await get_user_by_id(user["user_id"])
     plan = db_user.get("plan", "trial") if db_user else "trial"
     plan_limits = {"trial": 10, "starter": 100, "pro": 500, "enterprise": 999999}
     monthly_limit = plan_limits.get(plan, 10)
-    current_count = db_user.get("screening_count", 0) if db_user else 0
+
+    # Reset monthly count if new month
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_reset = db_user.get("month_reset_at") if db_user else None
+    if not last_reset or (isinstance(last_reset, datetime) and last_reset < month_start):
+        from database import db as mongodb
+        from bson import ObjectId as BsonObjId
+        await mongodb.users.update_one(
+            {"_id": BsonObjId(user["user_id"])},
+            {"$set": {"screening_count": 0, "month_reset_at": month_start}}
+        )
+        current_count = 0
+    else:
+        current_count = db_user.get("screening_count", 0) if db_user else 0
 
     if current_count >= monthly_limit:
         raise HTTPException(
             status_code=429,
-            detail=f"Monthly screening limit reached ({monthly_limit} screenings on {plan.capitalize()} plan). Please upgrade your plan at /settings."
+            detail=f"Monthly limit reached ({current_count}/{monthly_limit} on {plan.capitalize()} plan). Upgrade at topcandidate.pro/settings"
         )
     remaining = monthly_limit - current_count
     if len(cv_files) > remaining:
         raise HTTPException(
             status_code=429,
-            detail=f"Only {remaining} screening(s) remaining on your {plan.capitalize()} plan. You uploaded {len(cv_files)} CVs. Upgrade to screen more."
+            detail=f"Only {remaining} screening(s) left this month on {plan.capitalize()} plan. You uploaded {len(cv_files)} CVs. Upgrade your plan."
         )
 
     files = []
@@ -514,7 +529,12 @@ async def batch_screen_endpoint(
             ],
         }
         yield f"data: {json.dumps(done_event, default=str)}\n\n"
-        await increment_screening_count(user_id)
+        # Increment by number of CVs actually processed
+        succeeded = results.get("succeeded", 0)
+        if succeeded > 0:
+            await increment_screening_count(user_id, by=succeeded)
+        # Also sync from actual DB count to stay accurate
+        await sync_screening_count(user_id)
 
     return StreamingResponse(
         event_generator(), media_type="text/event-stream",
@@ -673,6 +693,29 @@ async def create_job_endpoint(
     }
     job_id = await save_job(job)
     return {"_id": job_id, **job}
+
+
+@app.put("/api/jobs/{job_id}")
+async def update_job_endpoint(
+    request: Request,
+    job_id: str,
+    description: str = Form(""),
+    title: str = Form(""),
+    skills: str = Form(""),
+    status: str = Form(""),
+):
+    """Update job fields — used to save description to existing jobs."""
+    user = await get_current_user(request)
+    from database import db as mongodb
+    from bson import ObjectId
+    updates = {}
+    if description: updates["description"] = description
+    if title:       updates["title"] = title
+    if skills:      updates["skills"] = [s.strip() for s in skills.split(",") if s.strip()]
+    if status:      updates["status"] = status
+    if updates:
+        await mongodb.jobs.update_one({"_id": ObjectId(job_id), "user_id": user["user_id"]}, {"$set": updates})
+    return {"success": True}
 
 
 @app.delete("/api/jobs/{job_id}")
@@ -961,14 +1004,29 @@ async def stripe_webhook(request: Request):
 @app.post("/api/team/invite")
 async def team_invite(request: Request, email: str = Form(...), role: str = Form("screener")):
     user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    company = db_user.get("company_name", user["company"]) if db_user else user["company"]
     try:
         invite_id = await invite_team_member(
             owner_user_id=user["user_id"],
             email=email,
             role=role,
-            company_name=user["company"],
+            company_name=company,
         )
-        return {"success": True, "invite_id": invite_id}
+        # Send invitation email
+        from email_service import send_team_invite_email
+        email_sent = send_team_invite_email(
+            to_email=email,
+            invited_by=user["email"],
+            company_name=company,
+            role=role.capitalize(),
+        )
+        return {
+            "success": True,
+            "invite_id": invite_id,
+            "email_sent": email_sent,
+            "message": f"Invitation sent to {email}" if email_sent else f"Invite saved but email not sent — Gmail not configured in Render environment"
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1145,6 +1203,22 @@ async def assign_screenings_to_email(email: str):
     count = await mongodb.screenings.count_documents({"user_id": uid})
     await mongodb.users.update_one({"_id": ObjectId(uid)}, {"$set": {"screening_count": count}})
     return {"assigned": result.modified_count, "total_for_user": count, "user": email}
+
+
+@app.post("/api/admin/reset-my-count")
+async def reset_my_count(request: Request):
+    """Reset current user screening count to 0 (for testing)."""
+    user = await get_current_user(request)
+    from database import db as mongodb
+    from bson import ObjectId as BsonObjId
+    from datetime import datetime
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    await mongodb.users.update_one(
+        {"_id": BsonObjId(user["user_id"])},
+        {"$set": {"screening_count": 0, "month_reset_at": month_start}}
+    )
+    return {"success": True, "message": "Screening count reset to 0"}
 
 
 @app.get("/api/admin/fix-counts")
@@ -1541,6 +1615,35 @@ async def approve_manual_payment(request: Request, payment_id: str, plan: str = 
         {"$set": {"status": "approved", "approved_by": user["email"], "approved_at": __import__("datetime").datetime.utcnow()}}
     )
     return {"success": True, "message": f"Plan upgraded to {plan} for {payment['email']}"}
+
+
+@app.get("/api/jobs/{job_id}/details")
+async def get_job_details(request: Request, job_id: str):
+    """Get full job details including description for auto-fill."""
+    user = await get_current_user(request)
+    from database import db as mongodb
+    from bson import ObjectId as BsonObjId
+    try:
+        doc = await mongodb.jobs.find_one({"_id": BsonObjId(job_id)})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Job not found")
+        doc["_id"] = str(doc["_id"])
+        return doc
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/user/fix-count")
+async def user_fix_count(request: Request):
+    """Let user sync their own screening count from actual DB."""
+    user = await get_current_user(request)
+    await sync_screening_count(user["user_id"])
+    db_user = await get_user_by_id(user["user_id"])
+    return {
+        "success": True,
+        "screening_count": db_user.get("screening_count", 0) if db_user else 0,
+        "plan": db_user.get("plan", "trial") if db_user else "trial",
+    }
 
 
 @app.get("/health")

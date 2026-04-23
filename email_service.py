@@ -149,3 +149,65 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
     except Exception as e:
         print(f"[EMAIL] Welcome email failed: {e}")
         return False
+
+
+def send_team_invite_email(to_email: str, invited_by: str, company_name: str, role: str) -> bool:
+    """Send team invitation email."""
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        print(f"[EMAIL] SMTP not configured. Team invite for {to_email} from {company_name}")
+        return False  # Return False so we show proper error to user
+
+    subject = f"You're invited to join {company_name} on {APP_NAME}"
+    register_url = f"{APP_URL}/login?invite=1&email={to_email}&company={company_name}"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Inter',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+        <tr><td style="background:linear-gradient(135deg,#5b5ef4,#fb923c);padding:28px 32px;text-align:center">
+          <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800">TopCandidate<span style="color:#fde68a">.pro</span></h1>
+          <p style="margin:4px 0 0;color:rgba(255,255,255,.8);font-size:13px">by LinkX360</p>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <h2 style="margin:0 0 12px;font-size:20px;color:#111;font-weight:700">You've been invited! 🎉</h2>
+          <p style="margin:0 0 16px;font-size:14px;color:#555;line-height:1.7">
+            <strong>{invited_by}</strong> has invited you to join <strong>{company_name}</strong>'s workspace on {APP_NAME} as a <strong>{role}</strong>.
+          </p>
+          <p style="margin:0 0 24px;font-size:14px;color:#555;line-height:1.7">
+            {APP_NAME} uses AI to screen and rank CVs instantly — helping your team hire smarter and faster.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
+            <tr><td style="background:#5b5ef4;border-radius:8px;padding:12px 28px;text-align:center">
+              <a href="{register_url}" style="color:#fff;font-size:15px;font-weight:700;text-decoration:none">Accept invitation →</a>
+            </td></tr>
+          </table>
+          <p style="margin:0;font-size:12px;color:#999;text-align:center">
+            Or copy this link: <a href="{register_url}" style="color:#5b5ef4">{register_url}</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
+          <p style="margin:0;font-size:11px;color:#aaa">© 2026 {APP_NAME} by LinkX360 · Dhaka, Bangladesh</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{APP_NAME} <{GMAIL_USER}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Failed to send invite to {to_email}: {e}")
+        return False

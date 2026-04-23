@@ -263,10 +263,35 @@ async def update_user(user_id: str, updates: dict):
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
 
 
-async def increment_screening_count(user_id: str):
+async def increment_screening_count(user_id: str, by: int = 1):
+    """Increment monthly screening count. Resets at start of each month."""
+    from datetime import datetime
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if user:
+        last_reset = user.get("month_reset_at")
+        if not last_reset or last_reset < month_start:
+            # New month — reset count
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"screening_count": by, "month_reset_at": month_start}}
+            )
+            return
+    # Increment by batch size
     await db.users.update_one(
         {"_id": ObjectId(user_id)},
-        {"$inc": {"screening_count": 1}}
+        {"$inc": {"screening_count": by},
+         "$set": {"month_reset_at": month_start}}
+    )
+
+
+async def sync_screening_count(user_id: str):
+    """Recalculate screening_count from actual DB count — call after batch."""
+    count = await db.screenings.count_documents({"user_id": user_id})
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"screening_count": count}}
     )
 
 

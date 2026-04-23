@@ -901,7 +901,15 @@ async function sendInvite(){
     if(!res.ok)throw new Error(data.detail||'Failed');
     closeModal('invite-modal');
     document.getElementById('invite-email').value='';
-    alert('Invitation sent to '+email);
+    if(data.email_sent){
+      alert('✓ Invitation email sent to '+email+'!');
+    } else {
+      alert('Invite saved for '+email+'.
+
+Note: Email was not sent because Gmail is not configured in your server environment.
+
+To enable email invites, add GMAIL_USER and GMAIL_APP_PASSWORD to your Render environment variables.');
+    }
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
 

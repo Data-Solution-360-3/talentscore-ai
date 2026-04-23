@@ -1227,6 +1227,7 @@ async function loadFromDB(){
     console.log('[FINAL] allResults.length=',allResults.length,'role=',me.role,'user_id=',me.user_id);
     updateAll();
     addActivity('Dashboard loaded — '+allResults.length+' candidates','var(--indigo)');
+    fixCountOnLoad();
     // Show debug info on screen if 0 results
     if(allResults.length===0){
       const dbg=document.createElement('div');
