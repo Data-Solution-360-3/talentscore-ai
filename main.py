@@ -50,6 +50,130 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 
 
+# ─────────────────────────────────────────────────────────────
+# Standalone admin UI for manual payment review.
+# Served at /admin/payments. Self-contained HTML — doesn't depend
+# on admin.html being updated. Admins can bookmark this URL to
+# review pending payment submissions and approve them.
+# ─────────────────────────────────────────────────────────────
+MANUAL_PAYMENTS_ADMIN_HTML = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Manual Payments · Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#07080f;color:#eef0f8;padding:2rem;min-height:100vh}
+.wrap{max-width:1200px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem}
+h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.back{color:#8b95b0;text-decoration:none;font-size:13px;padding:8px 14px;border:1px solid #252b3b;border-radius:8px;background:#171b26}
+.back:hover{background:#1e2333;color:#eef0f8}
+.card{background:#0f1117;border:1px solid #1e2333;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+.card h3{font-size:14px;font-weight:700;margin-bottom:1rem;color:#a5b4fc}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:10px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#4a5270;border-bottom:1px solid #1e2333;background:#171b26}
+.tbl td{padding:12px;border-bottom:1px solid #1e2333;color:#8b95b0}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover{background:#0a0b12}
+.tid{font-family:monospace;font-size:11px;color:#a5b4fc;background:#171b26;padding:2px 8px;border-radius:4px}
+.badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid;display:inline-block}
+.b-pending{background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.3)}
+.b-approved{background:rgba(16,185,129,.1);color:#10b981;border-color:rgba(16,185,129,.3)}
+.b-rejected{background:rgba(244,63,94,.1);color:#fda4af;border-color:rgba(244,63,94,.3)}
+.btn{padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;margin-right:4px}
+.btn-ok{background:#10b981;color:#fff}.btn-ok:hover{background:#0ea672}
+.btn-bad{background:rgba(244,63,94,.15);color:#fda4af;border:1px solid rgba(244,63,94,.3)}.btn-bad:hover{background:rgba(244,63,94,.25)}
+.empty{text-align:center;padding:3rem;color:#4a5270}
+.sel{background:#171b26;border:1px solid #252b3b;color:#eef0f8;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
+.note{font-size:11px;color:#4a5270;max-width:200px;overflow-wrap:break-word}
+</style></head><body>
+<div class="wrap">
+ <div class="top">
+  <h1>💳 Manual Payment Submissions</h1>
+  <a class="back" href="/admin">← Admin home</a>
+ </div>
+ <div class="card">
+  <h3 style="color:#f59e0b">Pending review</h3>
+  <table class="tbl"><thead><tr>
+   <th>Submitted</th><th>Company</th><th>Email</th><th>Plan</th><th>Method</th>
+   <th>Transaction ID</th><th>Amount</th><th>Note</th><th>Actions</th>
+  </tr></thead><tbody id="pending-tbody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody></table>
+ </div>
+ <div class="card">
+  <h3 style="color:#10b981">Approved history</h3>
+  <table class="tbl"><thead><tr>
+   <th>Approved</th><th>Company</th><th>Email</th><th>Plan</th><th>Method</th>
+   <th>Transaction ID</th><th>Amount</th><th>Approved by</th>
+  </tr></thead><tbody id="approved-tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody></table>
+ </div>
+</div>
+<script>
+async function load(){
+ const res = await fetch('/api/admin/manual-payments',{credentials:'include'});
+ if(res.status===401){window.location.href='/login';return;}
+ if(res.status===403){document.body.innerHTML='<div style=\"padding:2rem;color:#fda4af\">Admin only.</div>';return;}
+ const data = await res.json();
+ const payments = data.payments || [];
+ const pending  = payments.filter(p=>p.status==='pending_review');
+ const approved = payments.filter(p=>p.status==='approved');
+
+ const fmt = d => d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+ const esc = s => String(s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));
+
+ document.getElementById('pending-tbody').innerHTML = pending.length ? pending.map(p=>`
+  <tr>
+   <td>${fmt(p.created_at)}</td>
+   <td style=\"color:#eef0f8;font-weight:600\">${esc(p.company)}</td>
+   <td>${esc(p.email)}</td>
+   <td><span class=\"badge b-pending\">${esc(p.plan_id)}</span></td>
+   <td>${esc(p.payment_method)}</td>
+   <td><span class=\"tid\">${esc(p.transaction_id)}</span></td>
+   <td style=\"color:#eef0f8;font-weight:600\">${esc(p.amount)}</td>
+   <td><div class=\"note\">${esc(p.note)||'—'}</div></td>
+   <td>
+    <select class=\"sel\" id=\"plan-${p._id}\">
+      <option value=\"starter\" ${p.plan_id==='starter'?'selected':''}>Starter</option>
+      <option value=\"pro\" ${p.plan_id==='pro'?'selected':''}>Pro</option>
+      <option value=\"enterprise\" ${p.plan_id==='enterprise'?'selected':''}>Enterprise</option>
+    </select>
+    <button class=\"btn btn-ok\" onclick=\"approve('${p._id}')\">Approve</button>
+    <button class=\"btn btn-bad\" onclick=\"reject('${p._id}')\">Reject</button>
+   </td>
+  </tr>`).join('') : '<tr><td colspan=\"9\" class=\"empty\">No pending submissions 🎉</td></tr>';
+
+ document.getElementById('approved-tbody').innerHTML = approved.length ? approved.map(p=>`
+  <tr>
+   <td>${fmt(p.approved_at||p.created_at)}</td>
+   <td style=\"color:#eef0f8;font-weight:600\">${esc(p.company)}</td>
+   <td>${esc(p.email)}</td>
+   <td><span class=\"badge b-approved\">${esc(p.plan_id)}</span></td>
+   <td>${esc(p.payment_method)}</td>
+   <td><span class=\"tid\">${esc(p.transaction_id)}</span></td>
+   <td style=\"color:#eef0f8;font-weight:600\">${esc(p.amount)}</td>
+   <td>${esc(p.approved_by)||'—'}</td>
+  </tr>`).join('') : '<tr><td colspan=\"8\" class=\"empty\">No approved payments yet.</td></tr>';
+}
+async function approve(id){
+ const plan = document.getElementById('plan-'+id).value;
+ if(!confirm('Approve this payment and upgrade user to '+plan+'?'))return;
+ const fd = new FormData(); fd.append('plan', plan);
+ const r = await fetch('/api/admin/manual-payments/'+id+'/approve',{method:'POST',body:fd,credentials:'include'});
+ const d = await r.json();
+ if(r.ok){alert('✓ '+(d.message||'Approved'));load();}
+ else alert('Error: '+(d.detail||'Failed'));
+}
+async function reject(id){
+ if(!confirm('Reject this payment submission? User will NOT be upgraded.'))return;
+ const fd = new FormData(); fd.append('status','rejected');
+ const r = await fetch('/api/admin/manual-payments/'+id+'/reject',{method:'POST',body:fd,credentials:'include'});
+ if(r.ok){alert('Rejected.');load();}
+ else{const d = await r.json().catch(()=>({})); alert('Error: '+(d.detail||'Failed'));}
+}
+load();
+</script>
+</body></html>"""
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect()
@@ -167,6 +291,20 @@ async def admin_page(request: Request):
     if not db_user or db_user.get("role") != "admin":
         return RedirectResponse("/app")
     return read_template("admin.html")
+
+
+@app.get("/admin/payments", response_class=HTMLResponse)
+async def admin_payments_page(request: Request):
+    """Standalone admin page for reviewing manual payment submissions.
+    Not part of admin.html yet — serves inline so admins can access it right away."""
+    token = get_token_from_request(request)
+    if not token or not decode_token(token):
+        return RedirectResponse("/login")
+    payload = decode_token(token)
+    db_user = await get_user_by_id(payload.get("user_id", ""))
+    if not db_user or db_user.get("role") != "admin":
+        return RedirectResponse("/app")
+    return HTMLResponse(MANUAL_PAYMENTS_ADMIN_HTML)
 
 
 @app.get("/batch", response_class=HTMLResponse)
@@ -824,13 +962,26 @@ async def admin_create_user(
 
 @app.post("/api/admin/users/{user_id}/plan")
 async def admin_change_plan(request: Request, user_id: str, plan: str = Form(...)):
+    from datetime import datetime
     user = await get_current_user(request)
-    if user["role"] != "admin":
+    # Read fresh role from DB, not the JWT, so a recently-elevated admin isn't blocked.
+    db_requester = await get_user_by_id(user["user_id"])
+    if not db_requester or db_requester.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin only.")
-    if plan not in ["trial","starter","pro","enterprise"]:
+    if plan not in ["trial", "starter", "pro", "enterprise"]:
         raise HTTPException(status_code=400, detail="Invalid plan.")
-    await update_user(user_id, {"plan": plan})
-    return {"plan": plan}
+    updates = {"plan": plan}
+    # When upgrading from trial to a paid plan, give a fresh monthly quota.
+    # When downgrading, DON'T reset — we don't want to hide that they're over the new limit.
+    target = await get_user_by_id(user_id)
+    if target:
+        old_plan = target.get("plan", "trial")
+        order = {"trial": 0, "starter": 1, "pro": 2, "enterprise": 3}
+        if order.get(plan, 0) > order.get(old_plan, 0):
+            updates["screening_count"] = 0
+            updates["month_reset_at"] = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    await update_user(user_id, updates)
+    return {"plan": plan, "updated_fields": list(updates.keys())}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1656,7 +1807,38 @@ async def approve_manual_payment(request: Request, payment_id: str, plan: str = 
         {"_id": ObjectId(payment_id)},
         {"$set": {"status": "approved", "approved_by": user["email"], "approved_at": __import__("datetime").datetime.utcnow()}}
     )
+    # Also create a payments history row so the user sees it on their settings page
+    await save_payment({
+        "user_id": payment["user_id"],
+        "plan": plan,
+        "amount": payment.get("amount", ""),
+        "method": payment.get("payment_method", "manual"),
+        "status": "paid",
+        "tran_id": payment.get("transaction_id", ""),
+    })
     return {"success": True, "message": f"Plan upgraded to {plan} for {payment['email']}"}
+
+
+@app.post("/api/admin/manual-payments/{payment_id}/reject")
+async def reject_manual_payment(request: Request, payment_id: str, status: str = Form("rejected")):
+    """Admin: reject a manual payment submission (does NOT upgrade the user)."""
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or db_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db as mongodb
+    from bson import ObjectId
+    result = await mongodb.manual_payments.update_one(
+        {"_id": ObjectId(payment_id)},
+        {"$set": {
+            "status": "rejected",
+            "rejected_by": user["email"],
+            "rejected_at": __import__("datetime").datetime.utcnow(),
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+    return {"success": True}
 
 
 @app.get("/api/jobs/{job_id}/details")

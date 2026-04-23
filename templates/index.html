@@ -1303,6 +1303,38 @@ async function loadFromDB(){
 }
 
 loadFromDB();
+
+// Poll /api/auth/me every 60 seconds to catch plan changes made by the admin,
+// so the client sees upgrades (trial → starter) within a minute — no page refresh needed.
+async function refreshPlan(){
+  try{
+    const r = await fetch('/api/auth/me',{credentials:'include'});
+    if(!r.ok) return;
+    const me = await r.json();
+    const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
+    const tp = document.getElementById('t-plan');
+    const prev = tp ? tp.textContent : '';
+    if(tp) tp.textContent = planName;
+    // Update usage bar with fresh values
+    const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
+    const limit=planLimits[me.plan||'trial']||10;
+    const used=me.screening_count||0;
+    const pct=Math.min(100,Math.round(used/limit*100));
+    const bar=document.getElementById('t-usage-bar');
+    const txt=document.getElementById('t-usage-text');
+    if(bar){bar.style.width=pct+'%';bar.style.background=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--indigo)';}
+    if(txt){txt.textContent=used+'/'+limit;txt.style.color=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--t2)';}
+    // Notify the user if their plan just changed
+    if(prev && prev !== planName){
+      const toast=document.createElement('div');
+      toast.style.cssText='position:fixed;top:70px;right:20px;background:#10b981;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(16,185,129,.3)';
+      toast.textContent='✓ Your plan was updated to '+planName;
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(), 5000);
+    }
+  }catch(e){console.warn('[PLAN-REFRESH]',e);}
+}
+setInterval(refreshPlan, 60000);
 </script>
 </body>
 </html>

@@ -631,6 +631,39 @@ function fillBatchJd(){
     jdEl.placeholder='Paste the job description for: '+title;
   }
 }
+
+// Poll /api/auth/me every 60s so admin plan upgrades are visible here too,
+// and so the "X left this month" usage info reflects reality if they screened
+// in another tab. Also updates the usage banner text at the top of the page.
+let lastKnownPlan=null;
+async function refreshPlan(){
+  try{
+    const r = await fetch('/api/auth/me',{credentials:'include'});
+    if(!r.ok)return;
+    const me = await r.json();
+    const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
+    const plan = me.plan||'trial';
+    const limit = planLimits[plan]||10;
+    const used = me.screening_count||0;
+    const remaining = Math.max(0, limit-used);
+    // Update the usage banner if it exists
+    const usageEl = document.getElementById('usage-info');
+    if(usageEl){
+      usageEl.textContent = plan.charAt(0).toUpperCase()+plan.slice(1)+' plan · '+used+'/'+limit+' screenings used · '+remaining+' remaining';
+    }
+    // Toast if the plan changed
+    if(lastKnownPlan && lastKnownPlan !== plan){
+      const toast=document.createElement('div');
+      toast.style.cssText='position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999';
+      toast.textContent='✓ Your plan was updated to '+plan.charAt(0).toUpperCase()+plan.slice(1);
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(), 5000);
+    }
+    lastKnownPlan = plan;
+  }catch(e){console.warn('[PLAN-REFRESH]',e);}
+}
+refreshPlan();
+setInterval(refreshPlan, 60000);
 </script>
 </body>
 </html>
