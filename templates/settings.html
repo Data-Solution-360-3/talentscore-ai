@@ -933,11 +933,11 @@ async function sendInvite(){
     if(data.email_sent){
       alert('✓ Invitation email sent to '+email+'!');
     } else {
-      alert('Invite saved for '+email+'.
+      alert(`Invite saved for ${email}.
 
 Note: Email was not sent because Gmail is not configured in your server environment.
 
-To enable email invites, add GMAIL_USER and GMAIL_APP_PASSWORD to your Render environment variables.');
+To enable email invites, add GMAIL_USER and GMAIL_APP_PASSWORD to your Render environment variables.`);
     }
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
