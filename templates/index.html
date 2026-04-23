@@ -741,6 +741,13 @@ function resetScreen(){
 }
 
 // ── CANDIDATES TABLE ──
+function stageBadge(stage){
+  // Small visual indicator next to the actions so you can see current decision at a glance
+  if(stage==='shortlisted')  return '<span class="badge b-green" style="font-size:9px;margin-right:4px">✓ Shortlisted</span>';
+  if(stage==='rejected')     return '<span class="badge b-red"   style="font-size:9px;margin-right:4px">✕ Rejected</span>';
+  if(stage==='interview')    return '<span class="badge b-amber" style="font-size:9px;margin-right:4px">→ Interview</span>';
+  return '';
+}
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
   if(!results||!results.length){tbody.innerHTML='<tr><td colspan="10" class="tbl-empty">No candidates match your filters</td></tr>';return;}
@@ -749,6 +756,9 @@ function renderCandidates(results){
     const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
     const missing=(r.critical_gaps||[]).slice(0,2);
     const edu=r.parsed_cv?.education?.[0];
+    const stage=r.stage||'pending';
+    const sl_active = stage==='shortlisted' ? 'box-shadow:0 0 0 2px var(--green);font-weight:700' : '';
+    const rj_active = stage==='rejected'    ? 'box-shadow:0 0 0 2px var(--red);font-weight:700'   : '';
     return`<tr>
       <td><a class="tbl-link" href="/candidate?id=${r._id}">${r.candidate_name||'Unknown'}</a></td>
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
@@ -757,13 +767,13 @@ function renderCandidates(results){
       <td>${missing.map(s=>`<span class="tag missing">${s}</span>`).join('')||'<span class="badge b-green" style="font-size:9px">None</span>'}</td>
       <td style="font-size:11px">${r.years_experience||'?'} yrs</td>
       <td style="font-size:10px;color:var(--t3)">${edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—'}</td>
-      <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
+      <td><span class="badge ${tbcls(rec)}">${rec}</span>${stageBadge(stage)}</td>
       <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
       <td>
         <div style="display:flex;gap:3px">
           <button class="btn btn-xs btn-ghost" onclick="openCandModal('${r._id}')">View</button>
-          <button class="btn btn-xs" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)" onclick="quickAction('${r._id}','shortlist')">✓</button>
-          <button class="btn btn-xs" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb)" onclick="quickAction('${r._id}','reject')">✕</button>
+          <button class="btn btn-xs" style="background:var(--gg);color:var(--green);border:1px solid var(--gb);${sl_active}" onclick="quickAction('${r._id}','shortlist')" title="Shortlist">✓</button>
+          <button class="btn btn-xs" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb);${rj_active}" onclick="quickAction('${r._id}','reject')" title="Reject">✕</button>
         </div>
       </td>
     </tr>`;
@@ -891,12 +901,46 @@ function openCandModal(id){
   openModal('cand-modal');
 }
 
-function quickAction(id,action){
-  addActivity(`Candidate ${action==='shortlist'?'shortlisted':'rejected'}: `+(allResults.find(r=>r._id===id)?.candidate_name||'Unknown'),action==='shortlist'?'var(--green)':'var(--red)');
+async function quickAction(id, action){
+  // action: 'shortlist' | 'reject' | 'interview'
+  const stage = action==='shortlist' ? 'shortlisted'
+              : action==='reject'    ? 'rejected'
+              : 'interview';
+  const cand = allResults.find(r=>r._id===id);
+  const name = cand?.candidate_name || 'Unknown';
+
+  // Optimistic update — update local state + UI before the server responds,
+  // so the buttons feel instant. If the server rejects, we revert.
+  const prevStage = cand?.stage || 'pending';
+  if(cand) cand.stage = stage;
+
+  // Re-render candidate table if we're viewing it
+  try{ renderCandidates(); }catch(_){}
+  try{ renderOverview(); }catch(_){}
+
+  const color = action==='shortlist' ? 'var(--green)' : action==='reject' ? 'var(--red)' : 'var(--orange)';
+  const label = action==='shortlist' ? 'shortlisted' : action==='reject' ? 'rejected' : 'moved to interview';
+  addActivity('Candidate '+label+': '+name, color);
+
+  try{
+    const fd = new FormData(); fd.append('stage', stage);
+    const res = await fetch('/api/screenings/'+id+'/stage',{method:'POST',body:fd,credentials:'include'});
+    if(!res.ok){
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.detail || ('Request failed ('+res.status+')'));
+    }
+  }catch(e){
+    // Revert on failure
+    if(cand) cand.stage = prevStage;
+    try{ renderCandidates(); }catch(_){}
+    try{ renderOverview(); }catch(_){}
+    alert('Could not save action: '+e.message);
+  }
 }
-function actionShortlist(){quickAction(currentCandId,'shortlist');closeModal('cand-modal');}
-function actionReject(){quickAction(currentCandId,'reject');closeModal('cand-modal');}
-function actionInterview(){addActivity('Moved to interview: '+(allResults.find(r=>r._id===currentCandId)?.candidate_name||'Unknown'),'var(--orange)');closeModal('cand-modal');}
+
+async function actionShortlist(){ await quickAction(currentCandId,'shortlist'); closeModal('cand-modal'); }
+async function actionReject(){    await quickAction(currentCandId,'reject');    closeModal('cand-modal'); }
+async function actionInterview(){ await quickAction(currentCandId,'interview'); closeModal('cand-modal'); }
 
 // ── OVERVIEW ──
 function renderOverview(){

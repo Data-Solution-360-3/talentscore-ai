@@ -767,6 +767,43 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
     return {"deleted": True}
 
 
+@app.post("/api/screenings/{screening_id}/stage")
+async def update_screening_stage(
+    request: Request,
+    screening_id: str,
+    stage: str = Form(...),
+):
+    """Update a candidate's pipeline stage: pending / shortlisted / interview / rejected.
+    Persists the decision from the candidate modal action buttons (Reject / Shortlist / Move to interview)
+    and the ✓/✗ quick-action buttons in the candidates table."""
+    from bson import ObjectId
+    from datetime import datetime as _dt
+    if stage not in ("pending", "shortlisted", "interview", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: pending, shortlisted, interview, rejected.")
+    user = await get_current_user(request)
+    try:
+        oid = ObjectId(screening_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid screening ID.")
+    doc = await db.screenings.find_one({"_id": oid}, {"user_id": 1})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Screening not found.")
+    # Tenant check — admins bypass
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    if not is_admin and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    await db.screenings.update_one(
+        {"_id": oid},
+        {"$set": {
+            "stage": stage,
+            "stage_updated_at": _dt.utcnow(),
+            "stage_updated_by": user["email"],
+        }}
+    )
+    return {"success": True, "screening_id": screening_id, "stage": stage}
+
+
 @app.get("/api/screenings/{screening_id}/cv")
 async def get_cv_pdf(request: Request, screening_id: str):
     from bson import ObjectId
