@@ -404,6 +404,25 @@ async def batch_screen_endpoint(
     if len(cv_files) > 100:
         raise HTTPException(status_code=400, detail="Max 100 CVs per batch.")
 
+    # ── ENFORCE PLAN LIMITS ──
+    db_user = await get_user_by_id(user["user_id"])
+    plan = db_user.get("plan", "trial") if db_user else "trial"
+    plan_limits = {"trial": 10, "starter": 100, "pro": 500, "enterprise": 999999}
+    monthly_limit = plan_limits.get(plan, 10)
+    current_count = db_user.get("screening_count", 0) if db_user else 0
+
+    if current_count >= monthly_limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Monthly screening limit reached ({monthly_limit} screenings on {plan.capitalize()} plan). Please upgrade your plan at /settings."
+        )
+    remaining = monthly_limit - current_count
+    if len(cv_files) > remaining:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Only {remaining} screening(s) remaining on your {plan.capitalize()} plan. You uploaded {len(cv_files)} CVs. Upgrade to screen more."
+        )
+
     files = []
     for f in cv_files:
         if not f.filename.lower().endswith(".pdf"):
@@ -638,12 +657,18 @@ async def create_job_endpoint(
     location: str = Form(""),
     employment_type: str = Form("Full-time"),
     skills: str = Form(""),
+    description: str = Form(""),
+    min_experience: str = Form(""),
+    status: str = Form("active"),
 ):
     user = await get_current_user(request)
     job = {
         "title": title, "department": department, "location": location,
         "employment_type": employment_type,
         "skills": [s.strip() for s in skills.split(",") if s.strip()],
+        "description": description,
+        "min_experience": min_experience,
+        "status": status,
         "user_id": user["user_id"], "company": user["company"],
     }
     job_id = await save_job(job)
@@ -1444,6 +1469,78 @@ async def delete_key(request: Request, key_id: str):
 @app.get("/docs", response_class=HTMLResponse)
 async def api_docs(request: Request):
     return read_template("docs.html")
+
+
+@app.post("/api/payments/manual")
+async def manual_payment_request(
+    request: Request,
+    plan_id: str = Form(...),
+    payment_method: str = Form(...),  # "bank" or "bkash" or "nagad"
+    transaction_id: str = Form(...),
+    amount: str = Form(...),
+    screenshot_note: str = Form(""),
+):
+    """Client submits manual payment proof. Admin reviews and upgrades plan."""
+    user = await get_current_user(request)
+    from database import db as mongodb
+    doc = {
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "company": user["company"],
+        "plan_id": plan_id,
+        "payment_method": payment_method,
+        "transaction_id": transaction_id,
+        "amount": amount,
+        "note": screenshot_note,
+        "status": "pending_review",
+        "created_at": __import__("datetime").datetime.utcnow(),
+    }
+    inserted = await mongodb.manual_payments.insert_one(doc)
+    return {
+        "success": True,
+        "request_id": str(inserted.inserted_id),
+        "message": "Payment submitted for review. Your plan will be upgraded within 24 hours after verification."
+    }
+
+
+@app.get("/api/admin/manual-payments")
+async def list_manual_payments(request: Request):
+    """Admin: list all pending manual payments."""
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or db_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db as mongodb
+    cursor = mongodb.manual_payments.find({}).sort("created_at", -1).limit(100)
+    payments = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        payments.append(doc)
+    return {"payments": payments}
+
+
+@app.post("/api/admin/manual-payments/{payment_id}/approve")
+async def approve_manual_payment(request: Request, payment_id: str, plan: str = Form(...)):
+    """Admin: approve a manual payment and upgrade user plan."""
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or db_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    from database import db as mongodb
+    from bson import ObjectId
+    payment = await mongodb.manual_payments.find_one({"_id": ObjectId(payment_id)})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+    # Upgrade the user's plan
+    await mongodb.users.update_one(
+        {"_id": ObjectId(payment["user_id"])},
+        {"$set": {"plan": plan, "screening_count": 0}}
+    )
+    await mongodb.manual_payments.update_one(
+        {"_id": ObjectId(payment_id)},
+        {"$set": {"status": "approved", "approved_by": user["email"], "approved_at": __import__("datetime").datetime.utcnow()}}
+    )
+    return {"success": True, "message": f"Plan upgraded to {plan} for {payment['email']}"}
 
 
 @app.get("/health")

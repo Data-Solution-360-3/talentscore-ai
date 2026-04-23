@@ -306,6 +306,100 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
 
+      <!-- Manual payment -->
+      <div class="card" style="border-color:var(--ob)">
+        <div class="card-hd">
+          <div class="card-title">🏦 Pay manually (Bangladesh)</div>
+          <span class="badge b-orange">BDT payment</span>
+        </div>
+        <p style="font-size:12px;color:var(--t2);margin-bottom:1rem;line-height:1.7">Pay via bank transfer or mobile banking and enter your transaction ID. Your plan will be upgraded within 24 hours after verification.</p>
+
+        <!-- Bank & mobile banking details -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem">
+          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">🏦 Bank Transfer</div>
+            <div style="font-size:12px;color:var(--t2);line-height:2">
+              <strong style="color:var(--text)">Bank:</strong> Dutch-Bangla Bank Ltd<br>
+              <strong style="color:var(--text)">Account:</strong> 2581234567890<br>
+              <strong style="color:var(--text)">Name:</strong> LinkX360 Limited<br>
+              <strong style="color:var(--text)">Branch:</strong> Dhaka Main Branch<br>
+              <strong style="color:var(--text)">Routing:</strong> 090262503
+            </div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">📱 Mobile Banking</div>
+            <div style="font-size:12px;color:var(--t2);line-height:2">
+              <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:14px">💚</span>
+                <div><strong style="color:var(--text)">bKash:</strong> 01712-345678 (Personal)</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:14px">🟠</span>
+                <div><strong style="color:var(--text)">Nagad:</strong> 01712-345678</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding:4px 0">
+                <span style="font-size:14px">🔴</span>
+                <div><strong style="color:var(--text)">Rocket:</strong> 01712-3456780</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prices reminder -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:1.25rem">
+          <div style="background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:.6rem;text-align:center">
+            <div style="font-size:14px;font-weight:700;color:var(--text)">৳3,200</div>
+            <div style="font-size:10px;color:var(--t3)">Starter · 100 screens</div>
+          </div>
+          <div style="background:var(--ig);border:1px solid var(--ib);border-radius:var(--rs);padding:.6rem;text-align:center">
+            <div style="font-size:14px;font-weight:700;color:var(--indigo)">৳8,500</div>
+            <div style="font-size:10px;color:var(--t3)">Pro · 500 screens</div>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:.6rem;text-align:center">
+            <div style="font-size:14px;font-weight:700;color:var(--orange)">Custom</div>
+            <div style="font-size:10px;color:var(--t3)">Enterprise · Unlimited</div>
+          </div>
+        </div>
+
+        <!-- Submission form -->
+        <div class="alert alert-ok" id="manual-pay-ok" style="display:none">✓ Payment submitted! We will verify and upgrade your plan within 24 hours.</div>
+        <div class="alert alert-err" id="manual-pay-err" style="display:none"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Plan you are paying for</label>
+            <select class="form-select" id="mp-plan">
+              <option value="starter">Starter — ৳3,200/month</option>
+              <option value="pro">Pro — ৳8,500/month</option>
+              <option value="enterprise">Enterprise — Contact us</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Payment method used</label>
+            <select class="form-select" id="mp-method">
+              <option value="bank">Bank Transfer (DBBL)</option>
+              <option value="bkash">bKash</option>
+              <option value="nagad">Nagad</option>
+              <option value="rocket">Rocket</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Transaction ID *</label>
+            <input class="form-input" id="mp-txn" placeholder="e.g. TXN1234567890">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Amount paid (BDT)</label>
+            <input class="form-input" id="mp-amount" placeholder="e.g. 3200">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Note (optional)</label>
+          <input class="form-input" id="mp-note" placeholder="Any extra info for verification">
+        </div>
+        <button class="btn btn-orange" onclick="submitManualPayment()">Submit payment for verification →</button>
+      </div>
+
       <!-- Payment history -->
       <div class="card">
         <div class="card-hd"><div class="card-title">Payment history</div></div>
@@ -753,6 +847,32 @@ async function proceedPayment(){
     btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Proceed to payment';
     btn.disabled=false;
   }
+}
+
+async function submitManualPayment(){
+  const plan=document.getElementById('mp-plan').value;
+  const method=document.getElementById('mp-method').value;
+  const txn=document.getElementById('mp-txn').value.trim();
+  const amount=document.getElementById('mp-amount').value.trim();
+  const note=document.getElementById('mp-note').value.trim();
+  const errEl=document.getElementById('manual-pay-err');
+  const okEl=document.getElementById('manual-pay-ok');
+  errEl.style.display='none';okEl.style.display='none';
+  if(!txn){errEl.textContent='Please enter your transaction ID.';errEl.style.display='block';return;}
+  if(!amount){errEl.textContent='Please enter the amount you paid.';errEl.style.display='block';return;}
+  try{
+    const fd=new FormData();
+    fd.append('plan_id',plan);fd.append('payment_method',method);
+    fd.append('transaction_id',txn);fd.append('amount',amount);
+    fd.append('screenshot_note',note);
+    const res=await fetch('/api/payments/manual',{method:'POST',body:fd,credentials:'include'});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||'Failed');
+    okEl.style.display='block';
+    document.getElementById('mp-txn').value='';
+    document.getElementById('mp-amount').value='';
+    document.getElementById('mp-note').value='';
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
 
 async function cancelSubscription(){

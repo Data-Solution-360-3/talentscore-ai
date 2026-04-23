@@ -249,11 +249,30 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tn" onclick="showPage('analytics')">Analytics</button>
   </nav>
   <div class="t-right">
-    <span class="t-plan" id="t-plan">Trial</span>
-    <a href="/batch" class="t-btn accent">⚡ Screen CVs</a>
-    <a href="/settings" class="t-btn">Settings</a>
-    <div class="t-avatar" id="t-avatar">TC</div>
-    <button class="t-btn" onclick="logout()">Sign out</button>
+    <!-- Usage indicator -->
+    <div id="t-usage-wrap" style="display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:4px 10px;cursor:pointer" onclick="showPage('dashboard');showUsageModal()" title="Click to see usage">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:80px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)">Screenings</span>
+          <span class="t-plan" id="t-plan" style="font-size:9px;padding:1px 6px">Trial</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;min-width:50px">
+            <div id="t-usage-bar" style="height:100%;background:var(--indigo);border-radius:2px;width:0%;transition:width .5s"></div>
+          </div>
+          <span id="t-usage-text" style="font-size:10px;font-weight:600;color:var(--t2);white-space:nowrap">0/10</span>
+        </div>
+      </div>
+    </div>
+    <a href="/batch" class="t-btn accent" style="background:var(--indigo);color:#fff;border-color:var(--indigo)">⚡ Screen CVs</a>
+    <a href="/settings" class="t-btn">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+    <div style="display:flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:4px 8px;cursor:pointer" onclick="logout()" title="Sign out">
+      <div class="t-avatar" id="t-avatar" style="width:22px;height:22px;font-size:9px">TC</div>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </div>
   </div>
 </header>
 
@@ -557,7 +576,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
     <div class="form-group"><label class="form-label">Required skills (comma separated)</label><input class="form-input" id="j-skills" placeholder="Python, SQL, Machine Learning, Data Analysis"></div>
-    <div class="form-group"><label class="form-label">Job description (paste here)</label><textarea class="form-textarea" id="j-desc" rows="4" placeholder="Paste full job description..."></textarea></div>
+    <div class="form-group"><label class="form-label">Job description *</label><textarea class="form-textarea" id="j-desc" rows="5" placeholder="Paste the full job description here — this will be auto-filled on the batch screening page when you select this job."></textarea><div class="form-hint">This description will automatically fill the JD field when screening CVs for this role.</div></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Min experience (years)</label><input class="form-input" id="j-exp" type="number" placeholder="2"></div>
       <div class="form-group"><label class="form-label">Status</label>
@@ -1006,6 +1025,7 @@ async function saveJob(){
   fd.append('location',document.getElementById('j-loc').value);
   fd.append('employment_type',document.getElementById('j-type').value);
   fd.append('skills',document.getElementById('j-skills').value);
+  fd.append('description',document.getElementById('j-desc')?.value||'');
   try{
     const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
     const data=await res.json();
@@ -1160,8 +1180,26 @@ async function loadFromDB(){
     console.log('[DEBUG] screenings:',screenData.screenings?.length,'role:',me.role,'email:',me.email);
 
     document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
-    document.getElementById('t-plan').textContent=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
+    const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
+    document.getElementById('t-plan').textContent=planName;
     document.getElementById('sb-company').textContent=me.company||'';
+    // Update usage bar
+    const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
+    const limit=planLimits[me.plan||'trial']||10;
+    const used=me.screening_count||0;
+    const pct=Math.min(100,Math.round(used/limit*100));
+    const remaining=Math.max(0,limit-used);
+    const bar=document.getElementById('t-usage-bar');
+    const txt=document.getElementById('t-usage-text');
+    if(bar)bar.style.width=pct+'%';
+    if(bar)bar.style.background=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--indigo)';
+    if(txt)txt.textContent=used+'/'+limit;
+    if(txt)txt.style.color=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--t2)';
+    // Show upgrade prompt if near limit
+    if(remaining<=2&&remaining>0){
+      const wrap=document.getElementById('t-usage-wrap');
+      if(wrap)wrap.title='Only '+remaining+' screenings left! Click to upgrade.';
+    }
 
     // Process data
     allJobs=(jobsData.jobs||[]).map(j=>({...j,dept:j.department,loc:j.location,type:j.employment_type,status:j.status||'active'}));
