@@ -287,12 +287,20 @@ async def increment_screening_count(user_id: str, by: int = 1):
 
 
 async def sync_screening_count(user_id: str):
-    """Recalculate screening_count from actual DB count — call after batch."""
-    count = await db.screenings.count_documents({"user_id": user_id})
+    """Recalculate this month's screening_count from actual DB records."""
+    from datetime import datetime
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Count screenings from this month only
+    count = await db.screenings.count_documents({
+        "user_id": user_id,
+        "created_at": {"$gte": month_start}
+    })
     await db.users.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"screening_count": count}}
+        {"$set": {"screening_count": count, "month_reset_at": month_start}}
     )
+    return count
 
 
 # ─────────────────────────────────────────────────────────────
