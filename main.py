@@ -47,6 +47,7 @@ from database import (
 )
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 
 
 @asynccontextmanager
@@ -405,26 +406,23 @@ async def batch_screen_endpoint(
         raise HTTPException(status_code=400, detail="Max 100 CVs per batch.")
 
     # ── ENFORCE PLAN LIMITS ──
-    from datetime import datetime
     db_user = await get_user_by_id(user["user_id"])
     plan = db_user.get("plan", "trial") if db_user else "trial"
-    plan_limits = {"trial": 10, "starter": 100, "pro": 500, "enterprise": 999999}
+    plan_limits       = {"trial": 10, "starter": 100, "pro": 500, "enterprise": 999999}
+    plan_batch_limits = {"trial": 10, "starter": 20,  "pro": 100, "enterprise": 100}
     monthly_limit = plan_limits.get(plan, 10)
+    batch_limit   = plan_batch_limits.get(plan, 10)
 
-    # Reset monthly count if new month
-    now = datetime.utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    last_reset = db_user.get("month_reset_at") if db_user else None
-    if not last_reset or (isinstance(last_reset, datetime) and last_reset < month_start):
-        from database import db as mongodb
-        from bson import ObjectId as BsonObjId
-        await mongodb.users.update_one(
-            {"_id": BsonObjId(user["user_id"])},
-            {"$set": {"screening_count": 0, "month_reset_at": month_start}}
+    # Per-plan batch-size ceiling (was only capped at global 100 before)
+    if len(cv_files) > batch_limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"{plan.capitalize()} plan allows {batch_limit} CVs per batch. You uploaded {len(cv_files)}. Upgrade for larger batches."
         )
-        current_count = 0
-    else:
-        current_count = db_user.get("screening_count", 0) if db_user else 0
+
+    # Re-sync count from actual DB records — never trust the cached field.
+    # This is self-healing: if screening_count drifts from reality, this fixes it.
+    current_count = await sync_screening_count(user["user_id"])
 
     if current_count >= monthly_limit:
         raise HTTPException(
@@ -530,10 +528,13 @@ async def batch_screen_endpoint(
         }
         yield f"data: {json.dumps(done_event, default=str)}\n\n"
         # Increment by number of CVs actually processed
-        succeeded = results.get("succeeded", 0)
+        # FIX: was `results.get(...)` — results is local to run_with_user_tag, not in scope here.
+        # summary IS the results dict from run_batch_screening.
+        succeeded = summary.get("succeeded", 0)
         if succeeded > 0:
             await increment_screening_count(user_id, by=succeeded)
-        # Also sync from actual DB count to stay accurate
+        # Always sync from actual DB count — source of truth.
+        # This is what keeps screening_count accurate after every batch.
         await sync_screening_count(user_id)
 
     return StreamingResponse(
@@ -1619,18 +1620,26 @@ async def approve_manual_payment(request: Request, payment_id: str, plan: str = 
 
 @app.get("/api/jobs/{job_id}/details")
 async def get_job_details(request: Request, job_id: str):
-    """Get full job details including description for auto-fill."""
+    """Get full job details including description for auto-fill on batch page."""
     user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
     from database import db as mongodb
     from bson import ObjectId as BsonObjId
+    # Validate ObjectId format first, separately from the find_one call,
+    # so legitimate 404s aren't collapsed into 400s.
     try:
-        doc = await mongodb.jobs.find_one({"_id": BsonObjId(job_id)})
-        if not doc:
-            raise HTTPException(status_code=404, detail="Job not found")
-        doc["_id"] = str(doc["_id"])
-        return doc
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        oid = BsonObjId(job_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid job ID format.")
+    query = {"_id": oid}
+    if not is_admin:
+        query["user_id"] = user["user_id"]   # tenant isolation
+    doc = await mongodb.jobs.find_one(query)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    doc["_id"] = str(doc["_id"])
+    return doc
 
 
 @app.post("/api/user/fix-count")
