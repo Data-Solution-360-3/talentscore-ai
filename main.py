@@ -704,19 +704,34 @@ async def update_job_endpoint(
     title: str = Form(""),
     skills: str = Form(""),
     status: str = Form(""),
+    department: str = Form(""),
+    location: str = Form(""),
+    employment_type: str = Form(""),
+    min_experience: str = Form(""),
 ):
-    """Update job fields — used to save description to existing jobs."""
+    """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
     from database import db as mongodb
     from bson import ObjectId
     updates = {}
-    if description: updates["description"] = description
-    if title:       updates["title"] = title
-    if skills:      updates["skills"] = [s.strip() for s in skills.split(",") if s.strip()]
-    if status:      updates["status"] = status
+    # Only update fields that were actually submitted (non-empty).
+    # Empty string means "field was not in the form", NOT "clear the field".
+    if description:     updates["description"] = description
+    if title:           updates["title"] = title
+    if skills:          updates["skills"] = [s.strip() for s in skills.split(",") if s.strip()]
+    if status:          updates["status"] = status
+    if department:      updates["department"] = department
+    if location:        updates["location"] = location
+    if employment_type: updates["employment_type"] = employment_type
+    if min_experience:  updates["min_experience"] = min_experience
     if updates:
-        await mongodb.jobs.update_one({"_id": ObjectId(job_id), "user_id": user["user_id"]}, {"$set": updates})
-    return {"success": True}
+        result = await mongodb.jobs.update_one(
+            {"_id": ObjectId(job_id), "user_id": user["user_id"]},
+            {"$set": updates}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Job not found.")
+    return {"success": True, "updated_fields": list(updates.keys())}
 
 
 @app.delete("/api/jobs/{job_id}")

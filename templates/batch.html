@@ -481,63 +481,6 @@ function exportCSV(){
   a.download='talentscore-batch-results.csv';a.click();
 }
 
-// Job functions
-function onJobSelect(){
-  const sel=document.getElementById('batch-job-select');
-  const val=sel.value;
-  const info=document.getElementById('selected-job-info');
-  if(val){
-    const opt=sel.options[sel.selectedIndex];
-    document.getElementById('sel-job-title').textContent=opt.dataset.title||opt.textContent;
-    document.getElementById('sel-job-meta').textContent=opt.dataset.meta||'';
-    info.style.display='block';
-    sel.style.borderColor='var(--green)';
-    // Auto-fill JD if job has description
-    if(opt.dataset.desc&&!document.getElementById('jd').value.trim()){
-      document.getElementById('jd').value=opt.dataset.desc;
-      document.getElementById('jd-cnt').textContent=opt.dataset.desc.length+' chars ✓';
-    }
-  } else {
-    info.style.display='none';
-    sel.style.borderColor='var(--border2)';
-  }
-  checkReady();
-}
-
-function showCreateJob(){
-  document.getElementById('create-job-form').style.display='block';
-  document.getElementById('new-job-title').focus();
-}
-function hideCreateJob(){document.getElementById('create-job-form').style.display='none';}
-
-async function createJobAndSelect(){
-  const title=document.getElementById('new-job-title').value.trim();
-  if(!title){alert('Please enter a job title');return;}
-  const fd=new FormData();
-  fd.append('title',title);
-  fd.append('department',document.getElementById('new-job-dept').value);
-  fd.append('location',document.getElementById('new-job-loc').value);
-  fd.append('employment_type',document.getElementById('new-job-type').value);
-  fd.append('skills',document.getElementById('new-job-skills').value);
-  try{
-    const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.detail||'Failed');
-    // Add to selector and select it
-    const sel=document.getElementById('batch-job-select');
-    const opt=document.createElement('option');
-    opt.value=data._id+'|'+title;
-    opt.textContent=title+(data.department?' ('+data.department+')':'');
-    opt.dataset.title=title;
-    opt.dataset.meta=(data.department||'')+(data.location?' · '+data.location:'');
-    sel.appendChild(opt);
-    sel.value=opt.value;
-    hideCreateJob();
-    onJobSelect();
-    ['new-job-title','new-job-dept','new-job-loc','new-job-skills'].forEach(id=>document.getElementById(id).value='');
-  }catch(e){alert('Failed to create job: '+e.message);}
-}
-
 // ── JOB FUNCTIONS ──
 async function saveJdToJob(){
   const sel=document.getElementById('batch-job-select');

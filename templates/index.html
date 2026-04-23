@@ -491,7 +491,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="page" id="page-jobs">
   <div class="ph-row">
     <div class="ph"><h1>Job Postings</h1><p>Manage open roles, scoring weights, and applicant flow</p></div>
-    <button class="btn btn-primary btn-sm" onclick="openModal('job-modal')">+ Create new job</button>
+    <button class="btn btn-primary btn-sm" onclick="openJobModal()">+ Create new job</button>
   </div>
   <div class="card">
     <div class="tbl-wrap">
@@ -1017,26 +1017,90 @@ function renderJobs(){
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
+
+// Track which job is being edited. null = creating a new one.
+let editingJobId=null;
+
+function openJobModal(){
+  // Fresh "Create" flow — reset state + clear form
+  editingJobId=null;
+  document.getElementById('job-modal-title').textContent='Create job posting';
+  ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const typeEl=document.getElementById('j-type');       if(typeEl)   typeEl.selectedIndex=0;
+  const statusEl=document.getElementById('j-status');   if(statusEl) statusEl.value='active';
+  openModal('job-modal');
+}
+
+async function editJob(id){
+  // Pre-populate modal with the existing job's data, then open in "edit" mode
+  editingJobId=id;
+  document.getElementById('job-modal-title').textContent='Edit job posting';
+  try{
+    const res=await fetch('/api/jobs/'+id+'/details',{credentials:'include'});
+    if(!res.ok)throw new Error('Could not load job');
+    const j=await res.json();
+    document.getElementById('j-title').value   = j.title||'';
+    document.getElementById('j-dept').value    = j.department||'';
+    document.getElementById('j-loc').value     = j.location||'';
+    document.getElementById('j-skills').value  = Array.isArray(j.skills)?j.skills.join(', '):(j.skills||'');
+    document.getElementById('j-desc').value    = j.description||'';
+    document.getElementById('j-exp').value     = j.min_experience||'';
+    const typeEl=document.getElementById('j-type');
+    if(typeEl&&j.employment_type){
+      [...typeEl.options].forEach((o,i)=>{ if(o.value===j.employment_type||o.text===j.employment_type) typeEl.selectedIndex=i; });
+    }
+    const statusEl=document.getElementById('j-status');
+    if(statusEl&&j.status) statusEl.value=j.status;
+    openModal('job-modal');
+  }catch(e){alert('Failed to load job: '+e.message);}
+}
+
 async function saveJob(){
   const title=document.getElementById('j-title').value.trim();
   if(!title){alert('Please enter a job title');return;}
+  const desc=document.getElementById('j-desc').value;
   const fd=new FormData();
-  fd.append('title',title);fd.append('department',document.getElementById('j-dept').value);
+  fd.append('title',title);
+  fd.append('department',document.getElementById('j-dept').value);
   fd.append('location',document.getElementById('j-loc').value);
   fd.append('employment_type',document.getElementById('j-type').value);
   fd.append('skills',document.getElementById('j-skills').value);
-  fd.append('description',document.getElementById('j-desc')?.value||'');
+  fd.append('description',desc);
+  fd.append('min_experience',document.getElementById('j-exp').value||'');
+  fd.append('status',document.getElementById('j-status').value||'active');
   try{
-    const res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
-    const data=await res.json();
-    const desc=document.getElementById('j-desc').value;
-    allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,status:'active',description:desc,_id:data._id});
+    let res, data;
+    if(editingJobId){
+      // UPDATE existing job
+      res=await fetch('/api/jobs/'+editingJobId,{method:'PUT',body:fd,credentials:'include'});
+      if(!res.ok){data=await res.json().catch(()=>({}));throw new Error(data.detail||'Failed to update');}
+      // Update the local cache
+      const idx=allJobs.findIndex(j=>j._id===editingJobId);
+      if(idx>=0){
+        allJobs[idx]={...allJobs[idx],
+          title,
+          dept:document.getElementById('j-dept').value,
+          loc:document.getElementById('j-loc').value,
+          type:document.getElementById('j-type').value,
+          description:desc,
+          status:document.getElementById('j-status').value||'active'};
+      }
+      addActivity('Job updated: '+title,'var(--indigo)');
+    } else {
+      // CREATE new job
+      res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
+      data=await res.json();
+      if(!res.ok)throw new Error(data.detail||'Failed');
+      allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,status:'active',description:desc,_id:data._id});
+      addActivity('Job posted: '+title,'var(--orange)');
+    }
     closeModal('job-modal');renderJobs();renderOverview();
-    addActivity('Job posted: '+title,'var(--orange)');
-    ['j-title','j-dept','j-loc','j-skills','j-desc'].forEach(id=>document.getElementById(id).value='');
+    editingJobId=null;
+    ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>document.getElementById(id).value='');
   }catch(e){alert('Failed: '+e.message);}
 }
-function editJob(id){openModal('job-modal');}
 async function deleteJob(id){
   if(!confirm('Delete this job?'))return;
   await fetch('/api/jobs/'+id,{method:'DELETE',credentials:'include'});
