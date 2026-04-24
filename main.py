@@ -776,6 +776,11 @@ async def update_screening_stage(
     """Update a candidate's pipeline stage: pending / shortlisted / interview / rejected.
     Persists the decision from the candidate modal action buttons (Reject / Shortlist / Move to interview)
     and the ✓/✗ quick-action buttons in the candidates table."""
+    # IMPORTANT: import db inside the function. `db` is assigned via `global` inside
+    # database.connect() on startup — any module-level import captures the pre-startup
+    # value (None) and stays None forever. Every other endpoint in this file uses the
+    # same in-function import pattern for this reason.
+    from database import db as mongodb
     from bson import ObjectId
     from datetime import datetime as _dt
     if stage not in ("pending", "shortlisted", "interview", "rejected"):
@@ -785,7 +790,7 @@ async def update_screening_stage(
         oid = ObjectId(screening_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid screening ID.")
-    doc = await db.screenings.find_one({"_id": oid}, {"user_id": 1})
+    doc = await mongodb.screenings.find_one({"_id": oid}, {"user_id": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="Screening not found.")
     # Tenant check — admins bypass
@@ -793,12 +798,12 @@ async def update_screening_stage(
     is_admin = bool(db_user and db_user.get("role") == "admin")
     if not is_admin and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
-    await db.screenings.update_one(
+    await mongodb.screenings.update_one(
         {"_id": oid},
         {"$set": {
             "stage": stage,
             "stage_updated_at": _dt.utcnow(),
-            "stage_updated_by": user["email"],
+            "stage_updated_by": user.get("email", ""),
         }}
     )
     return {"success": True, "screening_id": screening_id, "stage": stage}
