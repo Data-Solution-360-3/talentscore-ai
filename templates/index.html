@@ -101,6 +101,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-ghost:hover{background:var(--s3);color:var(--text)}
 .btn-sm{padding:4px 9px;font-size:11px}
 .btn-xs{padding:3px 7px;font-size:10px;border-radius:5px}
+.pb-act{padding:3px 8px;font-size:11px;font-weight:700;border-radius:5px;cursor:pointer;font-family:inherit;transition:transform .1s}
+.pb-act:hover{transform:scale(1.1)}
 .btn-green{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
 .btn-red{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
 .btn-amber{background:var(--amg);color:var(--amber);border:1px solid var(--amb)}
@@ -917,6 +919,7 @@ async function quickAction(id, action){
   // Re-render candidate table if we're viewing it
   try{ renderCandidates(); }catch(_){}
   try{ renderOverview(); }catch(_){}
+  try{ renderPipeline(); }catch(_){}
 
   const color = action==='shortlist' ? 'var(--green)' : action==='reject' ? 'var(--red)' : 'var(--orange)';
   const label = action==='shortlist' ? 'shortlisted' : action==='reject' ? 'rejected' : 'moved to interview';
@@ -934,6 +937,7 @@ async function quickAction(id, action){
     if(cand) cand.stage = prevStage;
     try{ renderCandidates(); }catch(_){}
     try{ renderOverview(); }catch(_){}
+    try{ renderPipeline(); }catch(_){}
     alert('Could not save action: '+e.message);
   }
 }
@@ -996,37 +1000,105 @@ function renderOverview(){
 
 // ── PIPELINE ──
 function renderPipeline(){
+  // Dedupe by candidate name — keep the most recent screening
   const seen=new Set();const unique=[];
   [...allResults].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).forEach(r=>{
     const key=(r.candidate_name||'unknown').toLowerCase().trim();
     if(!seen.has(key)){seen.add(key);unique.push(r);}
   });
+
+  // Column routing: STAGE (what user decided) wins over AI recommendation.
+  // Candidates you haven't acted on fall back to rec-based placement.
+  //   col 0: Screening  — MAYBE + HIRE that you haven't triaged yet
+  //   col 1: Interview  — STRONG HIRE (default) + anything you moved to interview
+  //   col 2: Offer      — explicitly shortlisted by you (final stage before hire)
+  //   col 3: Rejected   — REJECT (AI) + anything you rejected
   const cols=[[],[],[],[]];
   unique.forEach(r=>{
-    const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
-    if(rec==='STRONG HIRE')cols[1].push(r);
-    else if(rec==='HIRE')cols[0].push(r);
-    else if(rec==='MAYBE')cols[0].push(r);
-    else cols[3].push(r);
+    const stage=r.stage;   // user-set
+    if(stage==='rejected')        cols[3].push(r);
+    else if(stage==='interview')  cols[1].push(r);
+    else if(stage==='shortlisted')cols[2].push(r);
+    else {
+      // No user decision yet — use AI recommendation as the default column
+      const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+      if(rec==='STRONG HIRE')   cols[1].push(r);
+      else if(rec==='REJECT')   cols[3].push(r);
+      else                      cols[0].push(r);   // HIRE + MAYBE
+    }
   });
   cols.forEach(col=>col.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)));
-  const badgeCls=['b-indigo','b-amber','b-orange','b-red'];
+
   for(let i=0;i<4;i++){
     document.getElementById('kb-cnt-'+i).textContent=cols[i].length;
     document.getElementById('kb-'+i).innerHTML=cols[i].length
-      ?cols[i].map(r=>{const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();const c=gc(score);
-        return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s" onmouseover="this.style.borderColor='var(--indigo)'" onmouseout="this.style.borderColor='var(--border)'">
+      ?cols[i].map(r=>{
+        const score=r.score||Math.round(r.overall_score||0);
+        const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+        const c=gc(score);
+        // Only show action buttons relevant to the current column —
+        // e.g. in Screening column you can move to Interview, Offer, or Rejected.
+        let actions='';
+        if(i===0){ // Screening → can go to Interview / Shortlist / Reject
+          actions=`
+            <button class="pb-act" title="Move to interview" onclick="event.stopPropagation();pipelineMove('${r._id}','interview')" style="background:var(--og);color:var(--orange);border:1px solid var(--ob)">→</button>
+            <button class="pb-act" title="Shortlist for offer" onclick="event.stopPropagation();pipelineMove('${r._id}','shortlisted')" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)">✓</button>
+            <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb)">✕</button>`;
+        } else if(i===1){ // Interview → can shortlist or reject
+          actions=`
+            <button class="pb-act" title="Shortlist for offer" onclick="event.stopPropagation();pipelineMove('${r._id}','shortlisted')" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)">✓</button>
+            <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb)">✕</button>`;
+        } else if(i===2){ // Offer → can reject or send back to interview
+          actions=`
+            <button class="pb-act" title="Back to interview" onclick="event.stopPropagation();pipelineMove('${r._id}','interview')" style="background:var(--og);color:var(--orange);border:1px solid var(--ob)">←</button>
+            <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:#fda4af;border:1px solid var(--rb)">✕</button>`;
+        } else { // Rejected → can un-reject (move back to screening)
+          actions=`<button class="pb-act" title="Move back to screening" onclick="event.stopPropagation();pipelineMove('${r._id}','pending')" style="background:var(--s2);color:var(--t2);border:1px solid var(--border)">↩</button>`;
+        }
+        return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s;margin-bottom:6px" onmouseover="this.style.borderColor='var(--indigo)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
-          <div style="font-size:10px;color:var(--t3);margin-bottom:5px">${r.current_title||'—'}</div>
-          <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:6px">${r.current_title||'—'}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <span style="font-size:13px;font-weight:700;color:${c}">${score}/100</span>
             <span class="badge ${tbcls(rec)}" style="font-size:9px">${rec}</span>
           </div>
+          <div style="display:flex;gap:3px;justify-content:flex-end">${actions}</div>
         </div>`;}).join('')
       :`<div style="color:var(--t3);font-size:11px;text-align:center;padding:1.5rem">Empty</div>`;
   }
   const removed=allResults.length-unique.length;
-  if(removed>0)document.getElementById('pipeline-notice').textContent=removed+' duplicate'+(removed>1?'s':'')+' hidden';
+  document.getElementById('pipeline-notice').textContent=removed>0?(removed+' duplicate'+(removed>1?'s':'')+' hidden'):'';
+}
+
+// Move a candidate card directly from the pipeline board.
+// Mirrors quickAction but always re-renders the pipeline so the card visibly moves.
+async function pipelineMove(id, stage){
+  const cand = allResults.find(r=>r._id===id);
+  if(!cand){ return; }
+  const prevStage = cand.stage || 'pending';
+  cand.stage = stage;   // optimistic
+  renderPipeline();
+  try{ renderCandidates(allResults); }catch(_){}
+  try{ renderOverview(); }catch(_){}
+
+  const stageLabels = {shortlisted:'shortlisted for offer', interview:'moved to interview', rejected:'rejected', pending:'moved back to screening'};
+  const stageColor  = {shortlisted:'var(--green)', interview:'var(--orange)', rejected:'var(--red)', pending:'var(--indigo)'};
+  addActivity('Candidate '+stageLabels[stage]+': '+(cand.candidate_name||'Unknown'), stageColor[stage]||'var(--indigo)');
+
+  try{
+    const fd = new FormData(); fd.append('stage', stage);
+    const res = await fetch('/api/screenings/'+id+'/stage',{method:'POST',body:fd,credentials:'include'});
+    if(!res.ok){
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.detail || ('Request failed ('+res.status+')'));
+    }
+  }catch(e){
+    // Revert on failure
+    cand.stage = prevStage;
+    renderPipeline();
+    try{ renderCandidates(allResults); }catch(_){}
+    alert('Could not save action: '+e.message);
+  }
 }
 
 // ── JOBS ──
