@@ -1129,17 +1129,17 @@ function renderJobs(){
         const related=allResults.filter(r=>r.job_id===j._id||r.job_title===j.title||r.company===j.title);
         const avgS=related.length?Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length):0;
         const shl=related.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-        const hi=related.length?Math.max(...related.map(r=>r.score||r.overall_score||0)):0;
-        const lo=related.length?Math.min(...related.map(r=>r.score||r.overall_score||0)):0;
-        return`<tr>
-          <td style="font-weight:600;color:var(--text)">${j.title}</td>
+        // Whole row click → open job details modal. Action buttons stopPropagation so they don't trigger the row click.
+        return`<tr class="job-row" onclick="viewJobDetails('${j._id}')" style="cursor:pointer">
+          <td style="font-weight:600;color:var(--text)"><span style="color:var(--orange)">${j.title}</span></td>
           <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
-          <td style="font-weight:600;color:var(--indigo)">${related.length}</td>
+          <td style="font-weight:600;color:var(--orange)">${related.length}</td>
           <td style="font-weight:600;color:${gc(avgS)}">${avgS||'—'}</td>
           <td><span class="badge b-green">${shl}</span></td>
           <td><span class="badge ${statusCls}">${j.status||'active'}</span></td>
           <td>
-            <div style="display:flex;gap:3px">
+            <div style="display:flex;gap:3px" onclick="event.stopPropagation()">
+              <button class="btn btn-xs btn-ghost" onclick="viewCandidatesForJob('${j._id}')" title="See candidates screened for this role">View candidates</button>
               <button class="btn btn-xs btn-ghost" onclick="editJob('${j._id}')">Edit</button>
               <button class="btn btn-xs btn-red" onclick="deleteJob('${j._id}')">Delete</button>
             </div>
@@ -1148,7 +1148,123 @@ function renderJobs(){
     :'<tr><td colspan="9" class="tbl-empty">No jobs yet — create your first job posting to organize screenings</td></tr>';
 }
 
-function openModal(id){document.getElementById(id).classList.add('open');}
+// Show job description + key stats + candidates list in a modal.
+// Hiring managers asked for this — they want to see the JD they wrote without going into edit mode,
+// and get a quick read on how the role is performing without leaving the Jobs tab.
+async function viewJobDetails(jobId){
+  const j = allJobs.find(x=>x._id===jobId);
+  if(!j){ alert('Job not found in local cache. Refresh the page.'); return; }
+  // Fetch the full job (description lives there, not on the cached list rows)
+  let full = j;
+  try{
+    const res = await fetch('/api/jobs/'+jobId+'/details',{credentials:'include'});
+    if(res.ok) full = await res.json();
+  }catch(_){}
+  const related = allResults.filter(r=>r.job_id===jobId||r.job_title===j.title||r.company===j.title);
+  const avgS = related.length ? Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length) : 0;
+  const stages = {pending:0, shortlisted:0, interview:0, rejected:0};
+  related.forEach(r=>{ stages[r.stage||'pending'] = (stages[r.stage||'pending']||0)+1; });
+  // Top 5 candidates by score for a quick "who's the best fit" snapshot
+  const top = [...related].sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)).slice(0,5);
+
+  const html = `
+    <div class="modal-hd">
+      <h3 class="modal-title">${full.title||j.title}</h3>
+      <button class="modal-close" onclick="closeModal('job-detail-modal')">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;font-size:11px;color:var(--t2)">
+      <span>📂 ${full.department||j.dept||'—'}</span>
+      <span>•</span>
+      <span>📍 ${full.location||j.loc||'—'}</span>
+      <span>•</span>
+      <span>💼 ${full.employment_type||j.type||'Full-time'}</span>
+      ${full.min_experience?`<span>•</span><span>${full.min_experience} exp</span>`:''}
+    </div>
+
+    <!-- Per-job key stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Applicants</div>
+        <div style="font-size:22px;font-weight:800;color:var(--text)">${related.length}</div>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg score</div>
+        <div style="font-size:22px;font-weight:800;color:${gc(avgS)}">${avgS||'—'}</div>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Shortlisted</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green)">${stages.shortlisted}</div>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Rejected</div>
+        <div style="font-size:22px;font-weight:800;color:var(--red)">${stages.rejected}</div>
+      </div>
+    </div>
+
+    <!-- Job description -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">Job description</div>
+      ${full.description
+        ? `<div style="font-size:13px;color:var(--t2);line-height:1.6;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;max-height:240px;overflow-y:auto;white-space:pre-wrap">${escapeHtml(full.description)}</div>`
+        : `<div style="font-size:12px;color:var(--t3);font-style:italic">No description saved. Click <strong>Edit</strong> to add one — without a description, batch screenings won't auto-fill the JD.</div>`}
+    </div>
+
+    <!-- Top 5 candidates for this job -->
+    <div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Top candidates</div>
+        ${related.length>5?`<span style="font-size:11px;color:var(--t3)">Showing top 5 of ${related.length}</span>`:''}
+      </div>
+      ${top.length
+        ? top.map(r=>{
+            const s = r.score || Math.round(r.overall_score||0);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;cursor:pointer" onclick="closeModal('job-detail-modal');openCandModal('${r._id}')">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${r.candidate_name||'Unknown'}</div>
+                <div style="font-size:11px;color:var(--t3)">${r.current_title||'—'}</div>
+              </div>
+              <div style="font-size:16px;font-weight:800;color:${gc(s)}">${s}</div>
+            </div>`;
+          }).join('')
+        : `<div style="font-size:12px;color:var(--t3)">No candidates screened for this job yet.</div>`}
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn btn-ghost" onclick="closeModal('job-detail-modal')">Close</button>
+      <button class="btn btn-ghost" onclick="closeModal('job-detail-modal');editJob('${jobId}')">Edit job</button>
+      <button class="btn btn-orange" onclick="closeModal('job-detail-modal');viewCandidatesForJob('${jobId}')">View all candidates →</button>
+    </div>`;
+
+  // Ensure the modal exists in the DOM, then show it
+  let modal = document.getElementById('job-detail-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'job-detail-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal" style="max-width:680px"></div>';
+    modal.addEventListener('click', e=>{ if(e.target===modal) closeModal('job-detail-modal'); });
+    document.body.appendChild(modal);
+  }
+  modal.querySelector('.modal').innerHTML = html;
+  openModal('job-detail-modal');
+}
+
+// Jump to Candidates page filtered by this job. Shared by Jobs page row clicks,
+// "View candidates" button, and Analytics drill-in.
+function viewCandidatesForJob(jobId){
+  showPage('candidates');
+  const fJob = document.getElementById('f-job');
+  if(fJob){
+    fJob.value = jobId;
+    if(typeof applyFilters==='function') applyFilters();
+  }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// Small HTML-escape helper for user-supplied strings rendered into innerHTML
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // Track which job is being edited. null = creating a new one.
 let editingJobId=null;
@@ -1301,8 +1417,13 @@ function renderAnalytics(){
     const progressed = r.shortlisted + r.interview;
     const conv = Math.round(progressed / r.screened * 100);
     const convCol = conv >= 25 ? 'var(--green)' : conv >= 10 ? 'var(--amber)' : 'var(--red)';
-    return `<tr>
-      <td style="font-weight:600;color:var(--text)">${r.title}</td>
+    // job_id is the source of truth for routing. We stash it on the byJob key during grouping,
+    // but lost it here — recover it from any matching screening so the click handler works.
+    const sampleJob = allResults.find(x=>(x.job_title||'(no job linked)')===r.title);
+    const jobId = sampleJob?.job_id || '';
+    const clickable = jobId ? `onclick="viewCandidatesForJob('${jobId}')" style="cursor:pointer" title="Click to see all candidates for this role"` : '';
+    return `<tr ${clickable}>
+      <td style="font-weight:600;color:${jobId?'var(--orange)':'var(--text)'}">${r.title}</td>
       <td><span style="font-weight:600;color:var(--text)">${r.screened}</span></td>
       <td><span style="font-weight:700;color:${col}">${avgScore}</span></td>
       <td><span class="badge b-green" style="font-size:10px">${r.shortlisted}</span></td>
