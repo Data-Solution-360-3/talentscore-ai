@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TopCandidate.pro — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -337,7 +336,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
-      <button class="btn btn-ghost btn-sm" id="claim-btn" onclick="claimScreenings()" title="If you see missing screenings, click this to assign them to your account">⬇ Claim my screenings</button>
       <a href="/batch" class="btn btn-orange btn-sm">⚡ Screen CVs now</a>
     </div>
   </div>
@@ -514,23 +512,36 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
      6. ANALYTICS
 ══════════════════════════════════════════ -->
 <div class="page" id="page-analytics">
-  <div class="ph"><h1>Analytics & Insights</h1><p>Data-driven insights into your hiring performance</p></div>
+  <div class="ph"><h1>Analytics & Insights</h1><p>How each of your job postings is performing</p></div>
+
+  <!-- Headline numbers — kept because hiring managers always want these at a glance -->
   <div class="stats-grid">
-    <div class="stat"><div class="stat-bar" style="background:var(--indigo)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="an-total">0</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="an-total">0</div></div>
     <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Avg match score</div><div class="stat-val" id="an-avg">—</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Shortlist rate</div><div class="stat-val" id="an-rate">—</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--navy)"></div><div class="stat-lbl">Shortlist rate</div><div class="stat-val" id="an-rate">—</div></div>
     <div class="stat"><div class="stat-bar" style="background:var(--amber)"></div><div class="stat-lbl">Time saved</div><div class="stat-val" id="an-time">—</div><div class="stat-sub">vs manual review</div></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    <div class="card"><div class="card-hd"><div class="card-title">Most common missing skills</div><span class="card-sub">Top gaps across all CVs</span></div><div id="gaps-chart"></div></div>
-    <div class="card"><div class="card-hd"><div class="card-title">Score distribution</div></div><canvas id="score-chart" height="180"></canvas></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div class="card"><div class="card-hd"><div class="card-title">Dimension performance</div><span class="card-sub">Avg score per dimension</span></div><div id="dims-chart"></div></div>
-    <div class="card"><div class="card-hd"><div class="card-title">AI insights</div></div>
-      <div style="display:flex;flex-direction:column;gap:8px" id="insights-list">
-        <div style="font-size:12px;color:var(--t3)">Screen more CVs to unlock insights</div>
-      </div>
+
+  <!-- Job-wise performance: the main analytics view -->
+  <div class="card" style="margin-top:10px">
+    <div class="card-hd">
+      <div class="card-title">Job-wise performance</div>
+      <span class="card-sub">Per-role breakdown — screened, average score, decisions</span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Job title</th>
+          <th>Screened</th>
+          <th>Avg score</th>
+          <th>Shortlisted</th>
+          <th>In interview</th>
+          <th>Rejected</th>
+          <th>Pending review</th>
+          <th>Conversion</th>
+        </tr></thead>
+        <tbody id="job-perf-tbl"><tr><td colspan="8" class="tbl-empty">No data yet — screen some CVs against a job posting to see performance here.</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -599,7 +610,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <script>
 // ── STATE ──
-let allResults=[], allJobs=[], filteredResults=[], currentCandId=null, scoreChart=null;
+let allResults=[], allJobs=[], filteredResults=[], currentCandId=null;
 const PLAN_LIMITS={trial:10,starter:100,pro:500,enterprise:999999};
 
 // ── NAVIGATION ──
@@ -1230,60 +1241,77 @@ async function deleteJob(id){
 
 // ── ANALYTICS ──
 function renderAnalytics(){
-  const total=allResults.length;
-  const avg=total?Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total):0;
-  const shl=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-  document.getElementById('an-total').textContent=total;
-  document.getElementById('an-avg').textContent=total?avg:'—';
-  document.getElementById('an-rate').textContent=total?Math.round(shl/total*100)+'%':'—';
-  document.getElementById('an-time').textContent=total?(total*8)+'h':'—';
+  // Headline stats
+  const total = allResults.length;
+  const avg   = total ? Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total) : 0;
+  const shl   = allResults.filter(r=>{
+    const rec=(r.rec||r.recommendation||'').toUpperCase();
+    return rec==='STRONG HIRE' || rec==='HIRE' || r.stage==='shortlisted' || r.stage==='interview';
+  }).length;
+  document.getElementById('an-total').textContent = total;
+  document.getElementById('an-avg').textContent   = total ? avg : '—';
+  document.getElementById('an-rate').textContent  = total ? Math.round(shl/total*100)+'%' : '—';
+  // ~8 minutes saved per CV is the figure we show across the app. 53 CVs → 7h, not 424h.
+  // The previous code multiplied by 8 hours per CV which was nonsense.
+  const minsSaved = total * 8;
+  document.getElementById('an-time').textContent = total
+    ? (minsSaved >= 60 ? Math.round(minsSaved/60)+'h' : minsSaved+'m')
+    : '—';
 
-  // Score distribution chart
-  if(scoreChart)scoreChart.destroy();
-  const ctx=document.getElementById('score-chart').getContext('2d');
-  const bins=[0,0,0,0,0];
-  allResults.forEach(r=>{const s=r.score||r.overall_score||0;const b=Math.min(4,Math.floor(s/20));bins[b]++;});
-  scoreChart=new Chart(ctx,{type:'bar',data:{labels:['0–20','21–40','41–60','61–80','81–100'],datasets:[{data:bins,backgroundColor:['#f43f5e','#f43f5e','#f59e0b','#10b981','#10b981'],borderRadius:5,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a5570',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a5570',font:{size:10},stepSize:1}}}}});
+  // ── Job-wise table ──
+  // Group screenings by job_id (falling back to job_title for older records that
+  // were created before we started saving job_id). Compute stage counts + avg score.
+  const byJob = {};
+  allResults.forEach(r=>{
+    const key = r.job_id || ('title:'+(r.job_title||'(no job linked)'));
+    if(!byJob[key]){
+      byJob[key] = {
+        title: r.job_title || '(no job linked)',
+        screened: 0, sumScore: 0,
+        shortlisted: 0, interview: 0, rejected: 0, pending: 0,
+      };
+    }
+    const row = byJob[key];
+    row.screened++;
+    row.sumScore += (r.score || r.overall_score || 0);
+    const stage = r.stage || 'pending';
+    if(stage==='shortlisted')      row.shortlisted++;
+    else if(stage==='interview')   row.interview++;
+    else if(stage==='rejected')    row.rejected++;
+    else                           row.pending++;
+  });
 
-  // Gaps chart
-  const gaps={};
-  allResults.forEach(r=>(r.critical_gaps||[]).forEach(g=>{gaps[g]=(gaps[g]||0)+1;}));
-  const topGaps=Object.entries(gaps).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxG=topGaps[0]?.[1]||1;
-  document.getElementById('gaps-chart').innerHTML=topGaps.length
-    ?topGaps.map(([k,v])=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
-        <span style="font-size:11px;color:var(--t2);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
-        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/maxG*100)}%;background:var(--red);border-radius:3px"></div></div>
-        <span style="font-size:10px;font-weight:700;color:var(--t3);width:18px;text-align:right">${v}</span>
-      </div>`).join('')
-    :'<p style="color:var(--t3);font-size:12px">No data yet</p>';
+  // Sort: most-screened jobs first (most relevant), then by avg score desc.
+  const rows = Object.values(byJob).sort((a,b)=>{
+    if(b.screened !== a.screened) return b.screened - a.screened;
+    return (b.sumScore/b.screened) - (a.sumScore/a.screened);
+  });
 
-  // Dims chart
-  const dims={};const dimCnt={};
-  allResults.forEach(r=>(r.dimensions||[]).forEach(d=>{dims[d.name]=(dims[d.name]||0)+d.score;dimCnt[d.name]=(dimCnt[d.name]||0)+1;}));
-  const dimList=Object.entries(dims).map(([k,v])=>([k,v/dimCnt[k]])).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('dims-chart').innerHTML=dimList.length
-    ?dimList.map(([k,v])=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
-        <span style="font-size:11px;color:var(--t2);width:110px;flex-shrink:0">${k}</span>
-        <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(v/20*100)}%;background:${gc(v/20*100)};border-radius:3px"></div></div>
-        <span style="font-size:10px;font-weight:700;color:var(--t3);width:28px;text-align:right">${v.toFixed(1)}</span>
-      </div>`).join('')
-    :'<p style="color:var(--t3);font-size:12px">No data yet</p>';
-
-  // AI insights
-  const insights=[];
-  if(total>0){
-    insights.push({icon:'🎯',txt:`Average match score is <strong style="color:${gc(avg)}">${avg}/100</strong> across ${total} candidates`});
-    if(topGaps[0])insights.push({icon:'❌',txt:`Most common missing skill: <strong>${topGaps[0][0]}</strong> (missing in ${topGaps[0][1]} CVs)`});
-    const strongRate=Math.round(shl/total*100);
-    insights.push({icon:`${strongRate>30?'✅':'⚠️'}`,txt:`<strong>${strongRate}%</strong> of candidates are shortlisted — ${strongRate>30?'good quality pool':'consider widening your search'}`});
-    insights.push({icon:'⏱',txt:`Estimated time saved: <strong style="color:var(--green)">${total*8} hours</strong> vs manual screening`});
-    const highScore=allResults.filter(r=>(r.score||r.overall_score||0)>=80).length;
-    if(highScore>0)insights.push({icon:'⭐',txt:`<strong>${highScore} candidate${highScore>1?'s':''}</strong> scored 80+ and are strong hire recommendations`});
+  const tbody = document.getElementById('job-perf-tbl');
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="8" class="tbl-empty">No data yet — screen some CVs against a job posting to see performance here.</td></tr>';
+    return;
   }
-  document.getElementById('insights-list').innerHTML=insights.length
-    ?insights.map(i=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:14px;flex-shrink:0">${i.icon}</span><div style="font-size:12px;color:var(--t2);line-height:1.5">${i.txt}</div></div>`).join('')
-    :'<div style="font-size:12px;color:var(--t3)">Screen more CVs to unlock AI insights</div>';
+  tbody.innerHTML = rows.map(r=>{
+    const avgScore = Math.round(r.sumScore / r.screened);
+    const col = gc(avgScore);
+    // Conversion = % of candidates that progressed past initial screen (shortlist + interview).
+    // This is the most actionable single number: how well does AI scoring agree with
+    // your team's actual hiring decisions for this role?
+    const progressed = r.shortlisted + r.interview;
+    const conv = Math.round(progressed / r.screened * 100);
+    const convCol = conv >= 25 ? 'var(--green)' : conv >= 10 ? 'var(--amber)' : 'var(--red)';
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${r.title}</td>
+      <td><span style="font-weight:600;color:var(--text)">${r.screened}</span></td>
+      <td><span style="font-weight:700;color:${col}">${avgScore}</span></td>
+      <td><span class="badge b-green" style="font-size:10px">${r.shortlisted}</span></td>
+      <td><span class="badge b-amber" style="font-size:10px">${r.interview}</span></td>
+      <td><span class="badge b-red" style="font-size:10px">${r.rejected}</span></td>
+      <td><span style="color:var(--t2);font-size:11px">${r.pending}</span></td>
+      <td><span style="font-weight:700;color:${convCol}">${conv}%</span></td>
+    </tr>`;
+  }).join('');
 }
 
 // ── AUDIT TRAIL ──
