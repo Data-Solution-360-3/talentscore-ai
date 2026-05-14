@@ -237,16 +237,18 @@ def analyze_tenure(cv_profile: dict) -> dict:
     arithmetic on parsed dates is more reliable than asking a model to count, and
     we want this to be exactly reproducible across runs.
 
-    Definitions (industry-standard rule of thumb):
-    - "Short stint" = role under 12 months
-    - "Job hopper" = 3+ short stints in last 5 jobs, OR average tenure < 18 months
-    - "Stable"     = average tenure >= 30 months and at most 1 short stint
+    Important: "frequent switcher" is only a meaningful label for a candidate
+    who has had enough career to demonstrate the pattern. A fresh grad with
+    1 internship + 1 first job isn't job-hopping — they're just starting out.
+    We require BOTH a minimum total career (~2 yrs) AND a minimum role count (3)
+    before the trust flag can fire.
     """
     roles = cv_profile.get("work_experience", []) or []
     if not roles:
         return {
             "total_roles": 0,
             "avg_tenure_years": None,
+            "total_career_years": 0.0,
             "short_stints": 0,
             "current_role_years": None,
             "stability": "Unknown",
@@ -263,49 +265,83 @@ def analyze_tenure(cv_profile: dict) -> dict:
             y = 0.0
         years_list.append(max(0.0, y))
 
-    total_roles = len(years_list)
-    avg_tenure = sum(years_list) / total_roles if total_roles else 0.0
+    total_roles  = len(years_list)
+    total_career = sum(years_list)
+    avg_tenure   = total_career / total_roles if total_roles else 0.0
     short_stints = sum(1 for y in years_list if 0 < y < 1.0)
     current_role_years = years_list[0] if years_list else 0.0
 
-    # Look only at the most recent 5 roles for "recent pattern" — early-career
-    # internships shouldn't haunt a candidate forever.
+    # Use the most recent 5 roles for "recent pattern" — early-career internships
+    # shouldn't haunt a candidate forever.
     recent = years_list[:5]
     recent_short = sum(1 for y in recent if 0 < y < 1.0)
-    avg_recent = sum(recent) / len(recent) if recent else 0.0
+    avg_recent   = sum(recent) / len(recent) if recent else 0.0
 
-    if avg_recent < 1.5 or recent_short >= 3:
+    # ── Minimum career threshold for the "job hopper" pattern to be meaningful ──
+    # If a candidate has under ~2 years of total career, or fewer than 3 roles,
+    # there isn't enough data to call them a "frequent switcher" — they're just
+    # early-career. We label these neutrally and never raise the trust flag.
+    MIN_CAREER_YEARS_FOR_FLAG = 2.0
+    MIN_ROLES_FOR_FLAG = 3
+
+    if total_career < MIN_CAREER_YEARS_FOR_FLAG or total_roles < MIN_ROLES_FOR_FLAG:
+        stability = "Early career"
+        trust_flag = False
+        notes = (
+            f"Total career {total_career:.1f} yrs across {total_roles} role(s). "
+            f"Insufficient history to assess long-term tenure pattern."
+        )
+        return {
+            "total_roles":             total_roles,
+            "total_career_years":      round(total_career, 1),
+            "avg_tenure_years":        round(avg_tenure, 1),
+            "avg_recent_tenure_years": round(avg_recent, 1),
+            "short_stints":            short_stints,
+            "current_role_years":      round(current_role_years, 1),
+            "stability":               stability,
+            "trust_flag":              trust_flag,
+            "notes":                   notes,
+        }
+
+    # ── Pattern classification (only reached when candidate has enough career history) ──
+    # Heuristic ratio: how much of the candidate's career has been spent in <1yr stints?
+    # If half their career is short stints, that's a real pattern regardless of average.
+    short_stint_total = sum(y for y in years_list if 0 < y < 1.0)
+    short_ratio = short_stint_total / total_career if total_career > 0 else 0
+
+    if avg_recent < 1.5 or recent_short >= 3 or short_ratio > 0.5:
         stability = "Frequent switcher"
         trust_flag = True
         notes = (
             f"{recent_short} role(s) under 12 months in last {len(recent)} positions. "
-            f"Average tenure {avg_recent:.1f} yrs. May indicate job-hopping — verify "
-            f"reasons in interview."
+            f"Average recent tenure {avg_recent:.1f} yrs across {total_career:.1f} yrs "
+            f"total career. May indicate job-hopping — verify reasons in interview."
         )
     elif avg_recent < 2.5 or recent_short >= 2:
         stability = "Moderate"
         trust_flag = False
         notes = (
-            f"Average recent tenure {avg_recent:.1f} yrs across {len(recent)} roles. "
-            f"Reasonable but worth probing."
+            f"Average recent tenure {avg_recent:.1f} yrs across {len(recent)} roles "
+            f"({total_career:.1f} yrs total career). Reasonable but worth probing."
         )
     else:
         stability = "Stable"
         trust_flag = False
         notes = (
-            f"Average tenure {avg_recent:.1f} yrs across recent roles. "
-            f"Shows commitment."
+            f"Average tenure {avg_recent:.1f} yrs across recent roles "
+            f"({total_career:.1f} yrs total career). Shows commitment."
         )
 
     return {
-        "total_roles": total_roles,
-        "avg_tenure_years": round(avg_tenure, 1),
+        "total_roles":             total_roles,
+        "total_career_years":      round(total_career, 1),
+        "avg_tenure_years":        round(avg_tenure, 1),
         "avg_recent_tenure_years": round(avg_recent, 1),
-        "short_stints": short_stints,
-        "current_role_years": round(current_role_years, 1),
-        "stability": stability,
-        "trust_flag": trust_flag,
-        "notes": notes,
+        "short_stints":            short_stints,
+        "current_role_years":      round(current_role_years, 1),
+        "stability":               stability,
+        "trust_flag":              trust_flag,
+        "notes":                   notes,
     }
 
 
@@ -442,7 +478,8 @@ DIMENSION CRITERIA (each 0-20):
 - Role Alignment (15%): Does career trajectory point toward this role?
   20 = same/adjacent role with progression. 12 = related field. 5 = pivot. 0 = unrelated.
 - Stability & Tenure (10%): Use the pre-computed tenure signals.
-  20 = "Stable". 12 = "Moderate". 5 = "Frequent switcher" with valid context. 0 = severe job hopping.
+  20 = "Stable". 15 = "Early career" (insufficient history — give benefit of doubt, this is not a negative signal).
+  12 = "Moderate". 5 = "Frequent switcher" with valid context. 0 = severe job hopping.
 
 Compute overall_score as weighted sum of dimension scores (each dim is 0-20):
   overall = (skills*0.25 + experience*0.20 + education*0.10 + achievement*0.20 + alignment*0.15 + stability*0.10) * 5
