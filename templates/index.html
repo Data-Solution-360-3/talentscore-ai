@@ -84,7 +84,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
+.stat:hover{border-color:var(--border3);transform:translateY(-1px);box-shadow:0 4px 12px rgba(20,40,72,.06)}
 .stat:hover{border-color:var(--border3);transform:translateY(-1px)}
 .stat-bar{position:absolute;top:0;left:0;right:0;height:2px}
 .stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px}
@@ -138,7 +139,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .score-num{font-weight:700;min-width:24px;font-size:12px}
 
 /* ── PIPELINE FUNNEL ── */
-.funnel{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px}
+.funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
 .funnel-stage{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem .6rem;text-align:center;transition:all .2s;cursor:pointer}
 .funnel-stage:hover{border-color:var(--indigo);transform:translateY(-2px)}
 .funnel-stage.act{border-color:var(--indigo);background:var(--ig)}
@@ -340,54 +341,59 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- 7 key stats -->
-  <div class="stats-grid-7">
-    <div class="stat"><div class="stat-bar" style="background:var(--indigo)"></div><div class="stat-lbl">Total CVs</div><div class="stat-val" id="ov-total">0</div><div class="stat-sub">screened</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Shortlisted</div><div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div><div class="stat-sub">strong hire + hire</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--amber)"></div><div class="stat-lbl">Review needed</div><div class="stat-val" id="ov-maybe" style="color:var(--amber)">0</div><div class="stat-sub">maybe candidates</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--red)"></div><div class="stat-lbl">Rejected</div><div class="stat-val" id="ov-rejected" style="color:var(--red)">0</div><div class="stat-sub">not suitable</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--blue)"></div><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg" style="color:var(--blue)">—</div><div class="stat-sub">out of 100</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Jobs posted</div><div class="stat-val" id="ov-jobs" style="color:var(--orange)">0</div><div class="stat-sub">active roles</div></div>
-    <div class="stat"><div class="stat-bar" style="background:#a855f7"></div><div class="stat-lbl">This week</div><div class="stat-val" id="ov-week" style="color:#a855f7">0</div><div class="stat-sub">new applications</div></div>
+  <!-- 4 focused KPIs (was 7). Each one is action-oriented: total work done, what's good, what needs attention, where to invest more. -->
+  <div class="stats-grid">
+    <div class="stat" onclick="showPage('candidates')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--navy)"></div>
+      <div class="stat-lbl">Total screened</div>
+      <div class="stat-val" id="ov-total">0</div>
+      <div class="stat-sub">candidates evaluated</div>
+    </div>
+    <div class="stat" onclick="filterByStage('strong')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--green)"></div>
+      <div class="stat-lbl">Shortlisted</div>
+      <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
+      <div class="stat-sub">strong matches</div>
+    </div>
+    <div class="stat" onclick="filterByStage('maybe')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--amber)"></div>
+      <div class="stat-lbl">Review needed</div>
+      <div class="stat-val" id="ov-maybe" style="color:var(--amber)">0</div>
+      <div class="stat-sub">manual decision</div>
+    </div>
+    <div class="stat" onclick="showPage('jobs')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--orange)"></div>
+      <div class="stat-lbl">Active jobs</div>
+      <div class="stat-val" id="ov-jobs" style="color:var(--orange)">0</div>
+      <div class="stat-sub">open roles</div>
+    </div>
   </div>
 
-  <!-- Pipeline funnel -->
+  <!-- Pipeline funnel: 5 meaningful stages (was 8). Drop duplicates: "High Match"≈"Shortlisted", and Interview/Hired which are empty until used. -->
   <div class="card" style="margin-bottom:10px">
-    <div class="card-hd"><div class="card-title">Candidate pipeline funnel</div><span class="card-sub">Click a stage to filter candidates</span></div>
+    <div class="card-hd"><div class="card-title">Candidate pipeline</div><span class="card-sub">Click any stage to filter candidates</span></div>
     <div class="funnel" id="funnel-row">
-      <div class="funnel-stage" onclick="filterByStage('all')"><div class="funnel-num" id="fn-all">0</div><div class="funnel-lbl">Applied</div><div class="funnel-bar" style="background:var(--indigo)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('screened')"><div class="funnel-num" id="fn-screened">0</div><div class="funnel-lbl">Screened</div><div class="funnel-bar" style="background:#7c7ff7"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('strong')"><div class="funnel-num" id="fn-strong">0</div><div class="funnel-lbl">High Match</div><div class="funnel-bar" style="background:var(--green)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('maybe')"><div class="funnel-num" id="fn-maybe">0</div><div class="funnel-lbl">Manual Review</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('all')"><div class="funnel-num" id="fn-all">0</div><div class="funnel-lbl">Screened</div><div class="funnel-bar" style="background:var(--navy)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('maybe')"><div class="funnel-num" id="fn-maybe">0</div><div class="funnel-lbl">Review needed</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:var(--green)"></div></div>
       <div class="funnel-stage" onclick="filterByStage('interview')"><div class="funnel-num" id="fn-interview">0</div><div class="funnel-lbl">Interview</div><div class="funnel-bar" style="background:var(--orange)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:#a855f7"></div></div>
       <div class="funnel-stage" onclick="filterByStage('rejected')"><div class="funnel-num" id="fn-rejected">0</div><div class="funnel-lbl">Rejected</div><div class="funnel-bar" style="background:var(--red)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('hired')"><div class="funnel-num" id="fn-hired">0</div><div class="funnel-lbl">Hired</div><div class="funnel-bar" style="background:var(--green)"></div></div>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
-    <!-- Recent applicants -->
-    <div class="card">
-      <div class="card-hd"><div class="card-title">Recent applicants</div><button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button></div>
-      <div class="tbl-wrap">
-        <table class="tbl">
-          <thead><tr><th>Candidate</th><th>Score</th><th>Match</th><th>Result</th><th>Action</th></tr></thead>
-          <tbody id="ov-recent-tbl"><tr><td colspan="5" class="tbl-empty">Screen your first CV to see results here</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-    <!-- Job performance -->
-    <div class="card">
-      <div class="card-hd"><div class="card-title">Jobs performance</div></div>
-      <div id="jobs-perf-list"><p style="color:var(--t3);font-size:12px;text-align:center;padding:1.5rem">No jobs posted yet</p></div>
-    </div>
-  </div>
-
-  <!-- Activity log -->
+  <!-- Recent applicants (full-width). The old layout split this into a 2/3 + 1/3 column with "Jobs performance" on the right,
+       but Jobs performance is already on the Analytics page and the Jobs page. Less duplication = cleaner dashboard. -->
   <div class="card">
-    <div class="card-hd"><div class="card-title">Activity log</div><span class="card-sub">Recent actions</span></div>
-    <div id="activity-log"><p style="color:var(--t3);font-size:12px;padding:.5rem 0">No recent activity</p></div>
+    <div class="card-hd">
+      <div class="card-title">Recent applicants</div>
+      <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
+        <tbody id="ov-recent-tbl"><tr><td colspan="5" class="tbl-empty">Screen your first CV to see results here</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -964,54 +970,45 @@ async function actionInterview(){ await quickAction(currentCandId,'interview'); 
 
 // ── OVERVIEW ──
 function renderOverview(){
-  const total=allResults.length;
-  const shortlisted=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-  const maybe=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='MAYBE').length;
-  const rejected=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='REJECT').length;
-  const avg=total?Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total):0;
-  const thisWeek=allResults.filter(r=>isThisWeek(r.created_at)).length;
+  const rec = r => (r.rec || r.recommendation || '').toUpperCase();
+  const total       = allResults.length;
+  const shortlisted = allResults.filter(r => rec(r)==='STRONG HIRE' || rec(r)==='HIRE').length;
+  const maybe       = allResults.filter(r => rec(r)==='MAYBE').length;
+  const rejected    = allResults.filter(r => rec(r)==='REJECT').length;
 
-  document.getElementById('ov-total').textContent=total;
-  document.getElementById('ov-shortlisted').textContent=shortlisted;
-  document.getElementById('ov-maybe').textContent=maybe;
-  document.getElementById('ov-rejected').textContent=rejected;
-  document.getElementById('ov-avg').textContent=total?avg:'—';
-  document.getElementById('ov-jobs').textContent=allJobs.length;
-  document.getElementById('ov-week').textContent=thisWeek;
+  // ── 4 stat cards ──
+  document.getElementById('ov-total').textContent       = total;
+  document.getElementById('ov-shortlisted').textContent = shortlisted;
+  document.getElementById('ov-maybe').textContent       = maybe;
+  document.getElementById('ov-jobs').textContent        = allJobs.length;
 
-  // Funnel
-  document.getElementById('fn-all').textContent=total;
-  document.getElementById('fn-screened').textContent=total;
-  document.getElementById('fn-strong').textContent=allResults.filter(r=>(r.score||r.overall_score||0)>=80).length;
-  document.getElementById('fn-maybe').textContent=maybe;
-  document.getElementById('fn-interview').textContent=allResults.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE').length;
-  document.getElementById('fn-shortlisted').textContent=shortlisted;
-  document.getElementById('fn-rejected').textContent=rejected;
-  document.getElementById('fn-hired').textContent=0;
+  // ── 5-stage pipeline funnel ──
+  // Stage counts use the user-set stage where available, fall back to AI rec for untouched candidates
+  const inStage = stage => allResults.filter(r => (r.stage||'pending') === stage).length;
+  const interviewCount  = inStage('interview');
+  const shortlistedStage = inStage('shortlisted') || shortlisted;   // fall back to AI-rec shortlists if user hasn't acted
+  document.getElementById('fn-all').textContent         = total;
+  document.getElementById('fn-maybe').textContent       = maybe;
+  document.getElementById('fn-shortlisted').textContent = shortlistedStage;
+  document.getElementById('fn-interview').textContent   = interviewCount;
+  document.getElementById('fn-rejected').textContent    = rejected;
 
-  // Recent applicants
-  const recent=allResults.slice(0,6);
-  document.getElementById('ov-recent-tbl').innerHTML=recent.length
-    ?recent.map(r=>{const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();return`<tr onclick="openCandModal('${r._id}')">
-        <td><span class="tbl-link">${r.candidate_name||'Unknown'}</span><div style="font-size:10px;color:var(--t3)">${r.current_title||'—'}</div></td>
-        <td style="font-weight:700;color:${gc(score)}">${score}</td>
-        <td style="font-size:10px">${r.skills_coverage_pct||0}%</td>
-        <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
-        <td><button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();openCandModal('${r._id}')">View</button></td>
-      </tr>`;}).join('')
-    :'<tr><td colspan="5" class="tbl-empty">No candidates yet</td></tr>';
-
-  // Jobs performance
-  document.getElementById('jobs-perf-list').innerHTML=allJobs.length
-    ?allJobs.map(j=>{
-        const related=allResults.filter(r=>r.job_id===j._id||r.job_title===j.title||r.company===j.title);
-        const avgS=related.length?Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length):0;
-        const shl=related.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-        return`<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-          <div><div style="font-size:12px;font-weight:600;color:var(--text)">${j.title}</div><div style="font-size:10px;color:var(--t3)">${related.length} applicants · ${shl} shortlisted</div></div>
-          <div style="text-align:right"><div style="font-size:14px;font-weight:700;color:${avgS>=70?'var(--green)':avgS>=50?'var(--amber)':'var(--red)'}">${avgS||'—'}</div><div style="font-size:9px;color:var(--t3)">avg score</div></div>
-        </div>`;}).join('')
-    :'<p style="color:var(--t3);font-size:12px;text-align:center;padding:1rem">No jobs posted yet</p>';
+  // ── Recent applicants (now shows applied job) ──
+  const recent = allResults.slice(0, 8);
+  document.getElementById('ov-recent-tbl').innerHTML = recent.length
+    ? recent.map(r => {
+        const score   = r.score || Math.round(r.overall_score || 0);
+        const recVal  = rec(r) || 'MAYBE';
+        const jobName = r.job_title || r.company || '—';
+        return `<tr onclick="openCandModal('${r._id}')">
+          <td><span class="tbl-link">${r.candidate_name||'Unknown'}</span><div style="font-size:10px;color:var(--t3)">${r.current_title||'—'}</div></td>
+          <td style="font-size:12px;color:var(--t2)">${jobName}</td>
+          <td style="font-weight:700;color:${gc(score)}">${score}</td>
+          <td><span class="badge ${tbcls(recVal)}">${recVal}</span></td>
+          <td><button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();openCandModal('${r._id}')">View</button></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" class="tbl-empty">No candidates yet</td></tr>';
 }
 
 // ── PIPELINE ──
@@ -1453,19 +1450,11 @@ function renderAudit(){
 }
 
 // ── ACTIVITY LOG ──
-const activityItems=[];
-function addActivity(txt,color){
-  activityItems.unshift({txt,color,time:new Date()});
-  renderActivity();
-}
-function renderActivity(){
-  document.getElementById('activity-log').innerHTML=activityItems.slice(0,8).map(a=>`
-    <div class="activity-item">
-      <div class="activity-dot" style="background:${a.color}"></div>
-      <div class="activity-txt">${a.txt}</div>
-      <div class="activity-time">${a.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
-    </div>`).join('')||'<p style="color:var(--t3);font-size:12px;padding:.5rem 0">No recent activity</p>';
-}
+// Activity log was removed from the dashboard — it was session-only state that
+// reset on every refresh, which made it more confusing than useful. We keep the
+// function as a no-op so existing call sites don't need to be edited.
+function addActivity(_txt, _color){ /* removed from dashboard */ }
+function renderActivity(){ /* removed from dashboard */ }
 
 // ── EXPORT ──
 function exportCandidates(){
