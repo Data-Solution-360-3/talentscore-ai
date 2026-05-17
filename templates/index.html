@@ -607,6 +607,39 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <select class="form-select" id="j-status"><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select>
       </div>
     </div>
+
+    <!-- Per-job scoring weights. Collapsed by default; recruiters who don't open it get the balanced default.
+         The template dropdown sets reasonable starting weights for common role types, then sliders fine-tune. -->
+    <details id="j-weights-details" style="margin:8px 0 6px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
+      <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">
+        ⚖️ Scoring weights <span style="font-weight:400;color:var(--t3);font-size:11px" id="j-weights-summary-text">— using balanced defaults</span>
+      </summary>
+      <div style="padding:6px 12px 14px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:10px;line-height:1.5">
+          Tune what matters for this role. Sales hires need Achievement; juniors need Education; engineering needs Skills. Pick a starting template or adjust sliders directly — totals are auto-normalized.
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Starting template</label>
+          <select class="form-select" id="j-weights-preset" onchange="applyWeightPreset(this.value)">
+            <option value="balanced">Balanced (default)</option>
+            <option value="sales">Sales / BD — Achievement-heavy</option>
+            <option value="engineering_senior">Senior Engineering — Skills + Impact</option>
+            <option value="engineering_junior">Junior Engineering — Skills + Education</option>
+            <option value="manager">Manager / Leadership — Stability + Track record</option>
+            <option value="operations">Operations / Support — Experience + Alignment</option>
+            <option value="data_analytics">Data / Analytics — Skills-heavy</option>
+            <option value="creative">Creative / Design — Portfolio impact</option>
+            <option value="custom">Custom (use sliders below)</option>
+          </select>
+        </div>
+        <div id="j-weights-sliders" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+          <span style="font-size:11px;color:var(--t3)">Total <span id="j-weights-total" style="font-weight:700;color:var(--text)">100%</span> <span id="j-weights-total-note" style="color:var(--t3)"></span></span>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="applyWeightPreset('balanced')">Reset to balanced</button>
+        </div>
+      </div>
+    </details>
+
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('job-modal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveJob()">Save job posting</button>
@@ -861,9 +894,22 @@ function openCandModal(id){
   if(!r)return;
   currentCandId=id;
   const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();const cov=r.skills_coverage_pct||0;const sc=r.score_consistency||{};
+  const auth = r.authenticity || {};
+  const bd   = r.score_breakdown || null;
+
+  // ── Authenticity badge color (matches likelihood %) ──
+  const authPct = auth.ai_likelihood_pct || 0;
+  const authColor = authPct >= 50 ? 'var(--red)' : authPct >= 25 ? 'var(--amber)' : 'var(--green)';
+  const authCls   = authPct >= 50 ? 'b-red'      : authPct >= 25 ? 'b-amber'      : 'b-green';
+
   document.getElementById('cand-modal-name').textContent=(r.candidate_name||'Candidate')+' — AI Report';
   document.getElementById('open-full-report').onclick=()=>{window.location.href='/candidate?id='+id;};
   document.getElementById('cand-modal-body').innerHTML=`
+    ${r.recommendation_note ? `
+    <div style="background:var(--amg);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
+      <span style="font-size:14px;flex-shrink:0">⚠</span>
+      <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Confidence flag:</strong> ${escapeHtml(r.recommendation_note)}</div>
+    </div>` : ''}
     <div class="cand-detail-grid">
       <div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
@@ -871,10 +917,15 @@ function openCandModal(id){
             <span style="font-size:17px;font-weight:800;color:${col}">${score}</span>
             <span style="font-size:8px;color:var(--t3)">/100</span>
           </div>
-          <div>
+          <div style="flex:1;min-width:0">
             <div style="font-size:15px;font-weight:700;margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
             <div style="font-size:11px;color:var(--t2);margin-bottom:5px">${r.current_title||'—'} · ${r.years_experience||'?'} yrs</div>
-            <span class="badge ${tbcls(rec)}">${rec}</span>
+            <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+              <span class="badge ${tbcls(rec)}">${rec}</span>
+              ${auth.is_flagged
+                ? `<span class="badge ${authCls}" title="${escapeHtml(auth.notes||'')}">🤖 ${authPct}% AI-likelihood</span>`
+                : (authPct > 0 ? `<span class="badge b-green" title="${escapeHtml(auth.notes||'')}">✓ Authentic</span>` : '')}
+            </div>
           </div>
         </div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">AI Summary</div>
@@ -887,7 +938,7 @@ function openCandModal(id){
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <span style="font-size:10px;color:var(--t3);width:90px">AI Confidence</span>
           <span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span>
-          <span style="font-size:10px;color:var(--t3)">Run 1: ${sc.run_1||'—'} · Run 2: ${sc.run_2||'—'} · Δ${sc.difference||0}</span>
+          <span style="font-size:10px;color:var(--t3)">Strict: ${sc.strict_pass||'—'} · Upside: ${sc.upside_pass||'—'} · Δ${sc.difference||0}</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <div style="background:var(--gg);border:1px solid var(--gb);border-radius:var(--rs);padding:.6rem">
@@ -913,14 +964,61 @@ function openCandModal(id){
             </div>`;}).join('')}
         </div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Interview questions</div>
-        ${(r.interview_questions||[]).slice(0,3).map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:var(--indigo);font-weight:700;flex-shrink:0">${i+1}.</span>${q}</div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
+        ${(r.interview_questions||[]).slice(0,3).map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:var(--orange);font-weight:700;flex-shrink:0">${i+1}.</span>${q}</div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
         ${r.hiring_risks&&r.hiring_risks.length?`
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);margin-top:8px;margin-bottom:5px">⚠ Hiring risks</div>
-        ${r.hiring_risks.slice(0,2).map(risk=>`<div style="font-size:11px;color:var(--amber);padding:3px 0">${risk}</div>`).join('')}`:''}
+        ${r.hiring_risks.slice(0,3).map(risk=>`<div style="font-size:11px;color:var(--amber);padding:3px 0">${risk}</div>`).join('')}`:''}
       </div>
     </div>
+
+    ${bd ? `
+    <!-- Visible score math: show the formula so the user can verify "why this score". -->
+    <details style="margin-top:10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs)">
+      <summary style="padding:8px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);user-select:none">
+        🔢 How was this score calculated?
+      </summary>
+      <div style="padding:4px 12px 12px;font-family:monospace;font-size:11px;line-height:1.7">
+        ${bd.rows.map(row=>`
+          <div style="display:flex;justify-content:space-between;color:var(--t2)">
+            <span>${escapeHtml(row.name)} <span style="color:var(--t3)">(${row.dim_score}/20 × ${row.weight_pct}% × 5)</span></span>
+            <span style="font-weight:700;color:var(--text)">${row.contribution > 0 ? '+' : ''}${row.contribution.toFixed(1)}</span>
+          </div>`).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;color:var(--t2)">
+          <span>Subtotal (weighted sum)</span>
+          <span style="font-weight:700;color:var(--text)">${bd.subtotal.toFixed(1)}</span>
+        </div>
+        ${bd.hard_gap_penalty > 0 ? `
+        <div style="display:flex;justify-content:space-between;color:var(--red)">
+          <span>Hard-requirement penalty <span style="color:var(--t3)">(${bd.hard_gap_details.map(g=>escapeHtml(g.kind)).join(', ')})</span></span>
+          <span style="font-weight:700">−${bd.hard_gap_penalty}</span>
+        </div>` : ''}
+        <div style="border-top:2px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;color:var(--text);font-weight:800">
+          <span>Final score</span>
+          <span style="color:${col}">${bd.final}/100</span>
+        </div>
+      </div>
+    </details>` : ''}
+
+    ${auth && auth.signals && auth.signals.length ? `
+    <!-- Authenticity details (always collapsed; opens if the user wants to inspect) -->
+    <details style="margin-top:8px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs)">
+      <summary style="padding:8px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);user-select:none">
+        🤖 CV authenticity check — ${authPct}% AI-likelihood (${auth.confidence||'Low'} confidence)
+      </summary>
+      <div style="padding:4px 12px 12px;font-size:11px;line-height:1.6">
+        <div style="color:var(--t2);margin-bottom:6px">${escapeHtml(auth.notes||'')}</div>
+        ${auth.signals.length ? `
+          <div style="color:var(--t3);font-size:10px;text-transform:uppercase;font-weight:700;margin-bottom:4px">Signals detected</div>
+          ${auth.signals.map(s=>`<div style="color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:${authColor}">•</span>${escapeHtml(s)}</div>`).join('')}
+        ` : '<div style="color:var(--t3);font-style:italic">No suspicious patterns detected.</div>'}
+        <div style="margin-top:8px;font-size:10px;color:var(--t3);font-style:italic">
+          This score does NOT affect the candidate's match score. AI-polished CVs are common and not disqualifying — but flagged candidates may deserve closer interview verification.
+        </div>
+      </div>
+    </details>` : ''}
+
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:8px">
-      <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · Confidence: ${(r.score_consistency?.confidence||'High')} · Variance: ${r.score_consistency?.difference||0} pts · 2 AI runs averaged
+      <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · Confidence: ${sc.confidence||'High'} · Variance: ${sc.difference||0} pts · 2 AI runs averaged
     </div>`;
   openModal('cand-modal');
 }
@@ -1206,6 +1304,24 @@ async function viewJobDetails(jobId){
         : `<div style="font-size:12px;color:var(--t3);font-style:italic">No description saved. Click <strong>Edit</strong> to add one — without a description, batch screenings won't auto-fill the JD.</div>`}
     </div>
 
+    <!-- Scoring weights — show what's actually being used. Helps recruiter sanity-check their own settings. -->
+    <div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Scoring weights</div>
+        <span style="font-size:11px;color:var(--t3)">${full.weights ? 'Custom' : 'Default (balanced)'}</span>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px 12px">
+        ${(() => {
+          const w = full.weights || {'Skills Match':0.25,'Experience Relevance':0.20,'Education & Certifications':0.10,'Achievement & Impact':0.20,'Role Alignment':0.15,'Stability & Tenure':0.10};
+          return Object.entries(w).map(([k,v])=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px">
+              <span style="color:var(--t2)">${escapeHtml(k)}</span>
+              <span style="font-weight:700;color:var(--text);font-family:monospace">${Math.round(v*100)}%</span>
+            </div>`).join('');
+        })()}
+      </div>
+    </div>
+
     <!-- Top 5 candidates for this job -->
     <div style="margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -1266,6 +1382,123 @@ function escapeHtml(s){
 // Track which job is being edited. null = creating a new one.
 let editingJobId=null;
 
+// ── PER-JOB SCORING WEIGHTS ──
+// Mirrors scorer.py — must stay in sync. The 6 dimensions and their balanced default.
+const WEIGHT_DIMS = [
+  {key:'Skills Match',               label:'Skills Match',               desc:'Required skills present in CV'},
+  {key:'Experience Relevance',       label:'Experience Relevance',       desc:'Years + domain match'},
+  {key:'Education & Certifications', label:'Education & Certifications', desc:'Degrees, certs, relevance'},
+  {key:'Achievement & Impact',       label:'Achievement & Impact',       desc:'Quantified results, metrics'},
+  {key:'Role Alignment',             label:'Role Alignment',             desc:'Career trajectory toward this role'},
+  {key:'Stability & Tenure',         label:'Stability & Tenure',         desc:'Avg tenure, switching pattern'},
+];
+const WEIGHT_PRESETS_JS = {
+  balanced:           {'Skills Match':25,'Experience Relevance':20,'Education & Certifications':10,'Achievement & Impact':20,'Role Alignment':15,'Stability & Tenure':10},
+  sales:              {'Skills Match':10,'Experience Relevance':20,'Education & Certifications':5, 'Achievement & Impact':35,'Role Alignment':20,'Stability & Tenure':10},
+  engineering_senior: {'Skills Match':30,'Experience Relevance':20,'Education & Certifications':5, 'Achievement & Impact':20,'Role Alignment':15,'Stability & Tenure':10},
+  engineering_junior: {'Skills Match':30,'Experience Relevance':10,'Education & Certifications':25,'Achievement & Impact':10,'Role Alignment':20,'Stability & Tenure':5},
+  manager:            {'Skills Match':10,'Experience Relevance':25,'Education & Certifications':10,'Achievement & Impact':25,'Role Alignment':20,'Stability & Tenure':10},
+  operations:         {'Skills Match':15,'Experience Relevance':25,'Education & Certifications':10,'Achievement & Impact':20,'Role Alignment':20,'Stability & Tenure':10},
+  data_analytics:     {'Skills Match':30,'Experience Relevance':20,'Education & Certifications':15,'Achievement & Impact':15,'Role Alignment':15,'Stability & Tenure':5},
+  creative:           {'Skills Match':20,'Experience Relevance':15,'Education & Certifications':5, 'Achievement & Impact':30,'Role Alignment':20,'Stability & Tenure':10},
+};
+
+function buildWeightSliders(){
+  // Render sliders the first time the panel opens. After that we just update values.
+  const root=document.getElementById('j-weights-sliders');
+  if(!root||root.dataset.built==='1') return;
+  root.innerHTML = WEIGHT_DIMS.map(d=>`
+    <div class="weight-row" style="display:grid;grid-template-columns:140px 1fr 38px;gap:10px;align-items:center">
+      <label style="font-size:11px;color:var(--text);font-weight:500" title="${d.desc}">${d.label}</label>
+      <input type="range" min="0" max="50" step="1" value="0" id="jw-${cssId(d.key)}" oninput="updateWeightSummary()" style="width:100%">
+      <span id="jw-${cssId(d.key)}-val" style="font-size:11px;font-weight:700;color:var(--text);text-align:right;font-family:monospace">0%</span>
+    </div>`).join('');
+  root.dataset.built='1';
+}
+
+function cssId(s){ return s.replace(/[^a-z0-9]/gi,'_').toLowerCase(); }
+
+function applyWeightPreset(name){
+  buildWeightSliders();
+  const preset = WEIGHT_PRESETS_JS[name];
+  if(!preset) return;   // 'custom' or unknown — leave sliders untouched
+  WEIGHT_DIMS.forEach(d=>{
+    const slider = document.getElementById('jw-'+cssId(d.key));
+    if(slider) slider.value = preset[d.key];
+  });
+  updateWeightSummary();
+}
+
+// Read current slider values; returns {dim: pct} where pct is 0-100 (not normalized).
+function readWeightSliders(){
+  const out = {};
+  WEIGHT_DIMS.forEach(d=>{
+    const slider = document.getElementById('jw-'+cssId(d.key));
+    out[d.key] = slider ? Number(slider.value) : 0;
+  });
+  return out;
+}
+
+function updateWeightSummary(){
+  const vals = readWeightSliders();
+  const total = WEIGHT_DIMS.reduce((s,d)=>s+vals[d.key], 0);
+  // Update each slider's % display — show what the value WILL BE after normalization,
+  // so the user sees realistic percentages even if they set sliders to weird raw values.
+  WEIGHT_DIMS.forEach(d=>{
+    const v = vals[d.key];
+    const pct = total > 0 ? Math.round((v/total)*100) : 0;
+    const valEl = document.getElementById('jw-'+cssId(d.key)+'-val');
+    if(valEl) valEl.textContent = pct + '%';
+  });
+  // Summary header text
+  const totalEl = document.getElementById('j-weights-total');
+  const noteEl  = document.getElementById('j-weights-total-note');
+  const summary = document.getElementById('j-weights-summary-text');
+  if(totalEl) totalEl.textContent = (total > 0 ? '100%' : '—');
+  if(noteEl)  noteEl.textContent  = total > 0 ? ` (raw ${total}, auto-normalized to 100%)` : ' — no weights set';
+  // Detect which preset matches the current sliders (if any)
+  const matching = Object.entries(WEIGHT_PRESETS_JS).find(([_, preset]) =>
+    WEIGHT_DIMS.every(d => preset[d.key] === vals[d.key])
+  );
+  if(summary){
+    summary.textContent = matching ? '— '+matching[0].replace(/_/g,' ')+' preset' : '— custom';
+  }
+  const presetSel = document.getElementById('j-weights-preset');
+  if(presetSel && matching && presetSel.value !== matching[0]) presetSel.value = matching[0];
+  else if(presetSel && !matching) presetSel.value = 'custom';
+}
+
+// Build weights payload to send to backend. Returns null if user left it at default
+// (saves storage and signals "use defaults" downstream).
+function getWeightsToSubmit(){
+  const vals = readWeightSliders();
+  const total = WEIGHT_DIMS.reduce((s,d)=>s+vals[d.key], 0);
+  if(total <= 0) return null;
+  // Check if current values match the balanced default — if so, don't send (use default flow)
+  const balanced = WEIGHT_PRESETS_JS.balanced;
+  if(WEIGHT_DIMS.every(d => vals[d.key] === balanced[d.key])) return null;
+  // Normalize to fractions summing to 1.0
+  const out = {};
+  WEIGHT_DIMS.forEach(d=>{ out[d.key] = vals[d.key] / total; });
+  return out;
+}
+
+// Populate sliders from a job's saved weights (which are fractions 0..1)
+function setWeightsFromJob(weights){
+  buildWeightSliders();
+  if(!weights || typeof weights !== 'object'){
+    applyWeightPreset('balanced');
+    return;
+  }
+  // Convert fractions back to 0-100 slider scale (×100, rounded)
+  WEIGHT_DIMS.forEach(d=>{
+    const slider = document.getElementById('jw-'+cssId(d.key));
+    const v = weights[d.key];
+    if(slider) slider.value = typeof v === 'number' ? Math.round(v * 100) : (WEIGHT_PRESETS_JS.balanced[d.key]);
+  });
+  updateWeightSummary();
+}
+
 function openJobModal(){
   // Fresh "Create" flow — reset state + clear form
   editingJobId=null;
@@ -1275,6 +1508,12 @@ function openJobModal(){
   });
   const typeEl=document.getElementById('j-type');       if(typeEl)   typeEl.selectedIndex=0;
   const statusEl=document.getElementById('j-status');   if(statusEl) statusEl.value='active';
+  // Build weights UI if not yet built; reset to balanced preset
+  document.getElementById('j-weights-preset').value = 'balanced';
+  applyWeightPreset('balanced');
+  // Collapse the weights section for new jobs — most users won't change it
+  const det = document.getElementById('j-weights-details');
+  if(det) det.open = false;
   openModal('job-modal');
 }
 
@@ -1298,6 +1537,10 @@ async function editJob(id){
     }
     const statusEl=document.getElementById('j-status');
     if(statusEl&&j.status) statusEl.value=j.status;
+    // Load weights (if saved) into the sliders. Auto-expand the section if the job has custom weights.
+    setWeightsFromJob(j.weights);
+    const det = document.getElementById('j-weights-details');
+    if(det) det.open = !!j.weights;
     openModal('job-modal');
   }catch(e){alert('Failed to load job: '+e.message);}
 }
@@ -1315,13 +1558,14 @@ async function saveJob(){
   fd.append('description',desc);
   fd.append('min_experience',document.getElementById('j-exp').value||'');
   fd.append('status',document.getElementById('j-status').value||'active');
+  // Only send weights if user actually customized them — null means "use defaults"
+  const weights = getWeightsToSubmit();
+  if(weights) fd.append('weights', JSON.stringify(weights));
   try{
     let res, data;
     if(editingJobId){
-      // UPDATE existing job
       res=await fetch('/api/jobs/'+editingJobId,{method:'PUT',body:fd,credentials:'include'});
       if(!res.ok){data=await res.json().catch(()=>({}));throw new Error(data.detail||'Failed to update');}
-      // Update the local cache
       const idx=allJobs.findIndex(j=>j._id===editingJobId);
       if(idx>=0){
         allJobs[idx]={...allJobs[idx],
@@ -1330,15 +1574,15 @@ async function saveJob(){
           loc:document.getElementById('j-loc').value,
           type:document.getElementById('j-type').value,
           description:desc,
-          status:document.getElementById('j-status').value||'active'};
+          status:document.getElementById('j-status').value||'active',
+          weights: weights || allJobs[idx].weights};
       }
       addActivity('Job updated: '+title,'var(--indigo)');
     } else {
-      // CREATE new job
       res=await fetch('/api/jobs',{method:'POST',body:fd,credentials:'include'});
       data=await res.json();
       if(!res.ok)throw new Error(data.detail||'Failed');
-      allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,status:'active',description:desc,_id:data._id});
+      allJobs.unshift({title,dept:data.department,loc:data.location,type:data.employment_type,status:'active',description:desc,_id:data._id,weights:weights||null});
       addActivity('Job posted: '+title,'var(--orange)');
     }
     closeModal('job-modal');renderJobs();renderOverview();

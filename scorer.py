@@ -115,6 +115,115 @@ def normalize_skill_list(skills: list) -> set:
 
 
 # ─────────────────────────────────────────────────────────────
+# DIMENSION WEIGHTS
+# ─────────────────────────────────────────────────────────────
+# The six scoring dimensions. Weights must sum to 1.0 — we normalize on read.
+# Per-job custom weights let recruiters tune what matters for each role:
+# a sales role weighs Achievement & Impact heavier than Education; a junior
+# dev role does the opposite. Without per-job weights, we use the balanced default.
+
+DIMENSION_NAMES = [
+    "Skills Match",
+    "Experience Relevance",
+    "Education & Certifications",
+    "Achievement & Impact",
+    "Role Alignment",
+    "Stability & Tenure",
+]
+
+DEFAULT_WEIGHTS = {
+    "Skills Match":               0.25,
+    "Experience Relevance":       0.20,
+    "Education & Certifications": 0.10,
+    "Achievement & Impact":       0.20,
+    "Role Alignment":             0.15,
+    "Stability & Tenure":         0.10,
+}
+
+# Curated presets — chosen to reflect what experienced recruiters actually
+# emphasize for these role types. Each preset must sum to 1.0.
+# Recruiters pick one as a starting point, then fine-tune with sliders.
+WEIGHT_PRESETS = {
+    "balanced": {
+        "Skills Match": 0.25, "Experience Relevance": 0.20, "Education & Certifications": 0.10,
+        "Achievement & Impact": 0.20, "Role Alignment": 0.15, "Stability & Tenure": 0.10,
+    },
+    # Sales / BD roles: hire on track record of hitting numbers, not credentials.
+    "sales": {
+        "Skills Match": 0.10, "Experience Relevance": 0.20, "Education & Certifications": 0.05,
+        "Achievement & Impact": 0.35, "Role Alignment": 0.20, "Stability & Tenure": 0.10,
+    },
+    # Senior engineering: deep skill match + demonstrated impact + relevant trajectory.
+    "engineering_senior": {
+        "Skills Match": 0.30, "Experience Relevance": 0.20, "Education & Certifications": 0.05,
+        "Achievement & Impact": 0.20, "Role Alignment": 0.15, "Stability & Tenure": 0.10,
+    },
+    # Junior engineering / entry-level: weigh education + raw skills, light on experience.
+    "engineering_junior": {
+        "Skills Match": 0.30, "Experience Relevance": 0.10, "Education & Certifications": 0.25,
+        "Achievement & Impact": 0.10, "Role Alignment": 0.20, "Stability & Tenure": 0.05,
+    },
+    # Manager / leadership: track record, stability, alignment matter more than raw skills.
+    "manager": {
+        "Skills Match": 0.10, "Experience Relevance": 0.25, "Education & Certifications": 0.10,
+        "Achievement & Impact": 0.25, "Role Alignment": 0.20, "Stability & Tenure": 0.10,
+    },
+    # Customer-facing operations / support: experience + alignment + soft signals.
+    "operations": {
+        "Skills Match": 0.15, "Experience Relevance": 0.25, "Education & Certifications": 0.10,
+        "Achievement & Impact": 0.20, "Role Alignment": 0.20, "Stability & Tenure": 0.10,
+    },
+    # Data / analytics: skills heavy with education credit (often degree-gated).
+    "data_analytics": {
+        "Skills Match": 0.30, "Experience Relevance": 0.20, "Education & Certifications": 0.15,
+        "Achievement & Impact": 0.15, "Role Alignment": 0.15, "Stability & Tenure": 0.05,
+    },
+    # Creative / design: portfolio impact > credentials.
+    "creative": {
+        "Skills Match": 0.20, "Experience Relevance": 0.15, "Education & Certifications": 0.05,
+        "Achievement & Impact": 0.30, "Role Alignment": 0.20, "Stability & Tenure": 0.10,
+    },
+}
+
+
+def normalize_weights(weights: dict | None) -> dict:
+    """Return a clean weights dict that always:
+       - contains all 6 dimensions (missing ones get default)
+       - sums to exactly 1.0 (rescaled if user input doesn't)
+       - has no negative or NaN values
+
+    If `weights` is None/empty/invalid, returns DEFAULT_WEIGHTS unchanged.
+    This is the gate: every caller of scoring goes through this so we never
+    hit a divide-by-zero or weights summing to 1.04 from JS floating point."""
+    if not weights or not isinstance(weights, dict):
+        return dict(DEFAULT_WEIGHTS)
+
+    cleaned = {}
+    for name in DIMENSION_NAMES:
+        v = weights.get(name, DEFAULT_WEIGHTS[name])
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            v = DEFAULT_WEIGHTS[name]
+        cleaned[name] = max(0.0, v)   # clamp negatives to 0
+
+    total = sum(cleaned.values())
+    if total <= 0:
+        # All zero (or all junk) — fall back to default rather than divide by zero
+        return dict(DEFAULT_WEIGHTS)
+    # Rescale so they sum to exactly 1.0
+    return {k: v / total for k, v in cleaned.items()}
+
+
+def weighted_overall(dim_scores: dict, weights: dict) -> float:
+    """Compute overall_score (0-100) from per-dimension scores (each 0-20) using weights.
+    The scoring rubric in the prompt asks for dim scores 0-20; final formula is:
+       overall = sum(dim_score * weight) * 5
+    Multiplying by 5 maps the 0-20 weighted sum to a 0-100 scale."""
+    return sum(dim_scores.get(name, 0) * weights[name] for name in DIMENSION_NAMES) * 5
+
+
+# ─────────────────────────────────────────────────────────────
 # STEP 1A — STRUCTURE THE CV
 # ─────────────────────────────────────────────────────────────
 
@@ -418,6 +527,155 @@ def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
 
 
 # ─────────────────────────────────────────────────────────────
+# CV AUTHENTICITY DETECTION
+# ─────────────────────────────────────────────────────────────
+# Lexical-only detector for ChatGPT-written CVs. No extra GPT call — just text
+# pattern matching on the raw CV text. The signals chosen here are heuristics
+# that, individually, are weak; together they form a useful flag. We surface
+# the result as a *separate* signal (does NOT lower the score) because (a) it's
+# not reliable enough to penalize, and (b) recruiters want the data, not the
+# decision — many candidates legitimately use AI to polish their CVs.
+
+# Phrases that GPT/Claude love and human CVs rarely contain organically.
+# Each match = +1 to the AI-likelihood score (lowercase comparison).
+_AI_CLICHES = [
+    "leveraged", "leverage", "spearheaded", "spearhead", "results-oriented",
+    "results-driven", "proven track record", "synergize", "synergy", "synergies",
+    "championed", "orchestrated", "spearheading", "results oriented",
+    "strategic initiatives", "cross-functional", "stakeholder management",
+    "value proposition", "drove revenue", "drove growth", "drove success",
+    "demonstrated proficiency", "demonstrated expertise", "in-depth knowledge",
+    "comprehensive understanding", "deep understanding of", "deep expertise",
+    "actionable insights", "data-driven decision", "robust solutions",
+    "innovative solutions", "cutting-edge", "best practices", "best-in-class",
+    "world-class", "transformative", "transformational", "passionate about",
+    "deeply passionate", "thrive in", "enthusiastic about",
+    "elevated", "optimized workflows", "streamlined operations",
+    "collaborated cross-functionally", "fostering collaboration",
+    "delivered exceptional", "exceptional results", "exceeded expectations consistently",
+]
+
+
+def detect_cv_authenticity(cv_text: str) -> dict:
+    """Estimate likelihood that a CV was AI-written. Returns a dict with:
+       - ai_likelihood_pct: int 0-100
+       - confidence: Low | Medium | High
+       - signals: list of which heuristics fired (for transparency)
+       - is_flagged: bool — convenience for UI ("show the badge?")
+
+    This is intentionally a separate signal from the match score. We don't want
+    to penalize AI-polished CVs (many strong candidates use AI); we just want
+    recruiters to know which CVs deserve extra interview scrutiny."""
+    if not cv_text or len(cv_text) < 200:
+        return {
+            "ai_likelihood_pct": 0,
+            "confidence": "Low",
+            "signals": [],
+            "is_flagged": False,
+            "notes": "CV too short to analyze.",
+        }
+
+    text  = cv_text.lower()
+    words = re.findall(r"\b[a-z]+\b", text)
+    word_count = len(words)
+    if word_count < 80:
+        return {
+            "ai_likelihood_pct": 0,
+            "confidence": "Low",
+            "signals": [],
+            "is_flagged": False,
+            "notes": "CV too short to analyze.",
+        }
+
+    signals = []
+    score   = 0   # raw points, will be converted to percent at the end
+
+    # ── 1. AI cliché density (per 1000 words) ──
+    # Genuine human CVs typically have 0-2 of these phrases. AI CVs often have 8+.
+    cliche_hits = sum(1 for phrase in _AI_CLICHES if phrase in text)
+    cliche_density = cliche_hits / (word_count / 1000)   # hits per 1000 words
+    if cliche_density >= 8:
+        signals.append(f"Very high AI-cliché density ({cliche_hits} matches, {cliche_density:.1f}/1k words)")
+        score += 35
+    elif cliche_density >= 4:
+        signals.append(f"Elevated AI-cliché density ({cliche_hits} matches)")
+        score += 18
+    elif cliche_density >= 2:
+        signals.append(f"Some AI-style phrasing ({cliche_hits} matches)")
+        score += 8
+
+    # ── 2. Average sentence length variance ──
+    # Humans write with bursty rhythm (3-word sentences next to 25-word ones).
+    # LLM output is much more uniform. We measure the coefficient of variation
+    # of sentence lengths; very low CoV is a giveaway.
+    sentences = [s.strip() for s in re.split(r"[.!?\n]+", cv_text) if s.strip()]
+    sent_lens = [len(s.split()) for s in sentences if len(s.split()) >= 3]
+    if len(sent_lens) >= 8:
+        mean = sum(sent_lens) / len(sent_lens)
+        if mean > 0:
+            var  = sum((x - mean) ** 2 for x in sent_lens) / len(sent_lens)
+            std  = var ** 0.5
+            cov  = std / mean
+            if cov < 0.35:
+                signals.append(f"Unusually uniform sentence rhythm (CoV={cov:.2f})")
+                score += 15
+            elif cov < 0.5:
+                signals.append(f"Low sentence rhythm variance (CoV={cov:.2f})")
+                score += 6
+
+    # ── 3. Bullet-point parallelism ──
+    # AI CVs tend to start every bullet with a strong action verb in identical
+    # gerund/past-tense form. Real CVs have more inconsistency (people mix
+    # "Built X", "Was responsible for Y", "Achieved Z").
+    lines = [l.strip() for l in cv_text.split("\n") if l.strip()]
+    bullet_lines = [l for l in lines if l[:3] in ("•  ", "•\t", "- ", "* ", "– ") or re.match(r"^[•\-*–]\s", l)]
+    if len(bullet_lines) >= 5:
+        first_words = [re.sub(r"^[•\-*–]\s*", "", l).split(" ", 1)[0].lower() for l in bullet_lines]
+        # How many END with an "ed" past-tense verb (the AI-CV signature)
+        ed_count = sum(1 for w in first_words if w.endswith("ed") and len(w) > 4)
+        ed_ratio = ed_count / len(bullet_lines)
+        if ed_ratio > 0.85:
+            signals.append(f"Nearly all bullets start with past-tense verbs ({ed_count}/{len(bullet_lines)})")
+            score += 12
+        elif ed_ratio > 0.7:
+            signals.append(f"Heavy past-tense bullet parallelism ({ed_count}/{len(bullet_lines)})")
+            score += 5
+
+    # ── 4. Suspiciously perfect formatting ──
+    # Em dashes (—), curly quotes, en dashes in dates. These come for free from
+    # GPT but require effort in Word. Each is a weak signal; together they add up.
+    has_em_dash  = "—" in cv_text
+    has_en_dash  = "–" in cv_text
+    has_curly_q  = "" in cv_text or "" in cv_text
+    typography_score = sum([has_em_dash, has_en_dash, has_curly_q])
+    if typography_score >= 2:
+        signals.append("AI-style punctuation (em/en dashes, curly quotes)")
+        score += 6
+
+    # ── Final score & confidence ──
+    score = max(0, min(100, score))
+    # Confidence reflects how many independent signals fired, not just the magnitude.
+    # 1 signal at 35 points is less reliable than 3 signals at 12 each.
+    n_signals = len(signals)
+    if n_signals >= 3 and score >= 40:
+        confidence = "High"
+    elif n_signals >= 2 and score >= 25:
+        confidence = "Medium"
+    else:
+        confidence = "Low"
+
+    return {
+        "ai_likelihood_pct": score,
+        "confidence":        confidence,
+        "signals":           signals,
+        "is_flagged":        score >= 40 and confidence in ("Medium", "High"),
+        "notes":             ("This CV shows multiple patterns common in AI-written text. "
+                              "Verify specific claims in the interview." if score >= 40
+                              else "No strong indicators of AI authorship."),
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # STEP 2 — MATCH & SCORE
 # ─────────────────────────────────────────────────────────────
 
@@ -454,7 +712,27 @@ UPSIDE_ANGLE = """Adopt an UPSIDE-FOCUSED hiring manager perspective for this sc
 """
 
 
-def build_scoring_prompt(cv_profile: dict, jd_requirements: dict, tenure: dict, angle: str) -> str:
+def build_scoring_prompt(cv_profile: dict, jd_requirements: dict, tenure: dict,
+                          angle: str, weights: dict | None = None) -> str:
+    """Build the scoring prompt with per-job weights baked in.
+
+    Weights influence three things in the prompt:
+      1. The percentage shown next to each DIMENSION CRITERIA line — so the
+         model knows what's emphasized for THIS role.
+      2. The overall_score formula at the bottom — the model is asked to
+         compute the score using THESE weights, not generic defaults.
+      3. The `weight` field inside each dimension entry in the JSON output —
+         keeps the downstream UI consistent with what was actually used.
+
+    We still compute the final overall_score ourselves in reconcile_scores() to
+    guard against the model getting the arithmetic slightly wrong, but giving
+    the model the right weights still helps because it adjusts which dimensions
+    it scrutinizes most.
+    """
+    w = normalize_weights(weights)
+
+    def pct(name): return f"{int(round(w[name] * 100))}%"
+
     return f"""{angle}
 
 STRUCTURED JOB REQUIREMENTS:
@@ -466,23 +744,25 @@ STRUCTURED CANDIDATE PROFILE:
 PRE-COMPUTED TENURE SIGNALS (use these for the Stability & Tenure dimension; do not recompute):
 {json.dumps(tenure, indent=2)}
 
-DIMENSION CRITERIA (each 0-20):
-- Skills Match (25%): How many of jd.required_skills + jd.required_technologies are found in the CV?
+DIMENSION CRITERIA (each 0-20). Note the weight percentages — for THIS role they reflect
+what the hiring team has prioritized. A high-weight dimension deserves extra scrutiny:
+- Skills Match ({pct("Skills Match")}): How many of jd.required_skills + jd.required_technologies are found in the CV?
   20 = ALL required matched with evidence. 15 = 80% matched. 10 = ~50%. 5 = <30%. 0 = none.
-- Experience Relevance (20%): Years AND domain relevance vs jd.required_experience_years.
+- Experience Relevance ({pct("Experience Relevance")}): Years AND domain relevance vs jd.required_experience_years.
   20 = meets/exceeds years AND domain matches. 10 = close on years OR adjacent domain. 0 = neither.
-- Education & Certifications (10%): Compare cv.education + cv.certifications vs jd.required_education + jd.required_certifications.
+- Education & Certifications ({pct("Education & Certifications")}): Compare cv.education + cv.certifications vs jd.required_education + jd.required_certifications.
   20 = meets or exceeds. 10 = related field. 5 = unrelated but has degree. 0 = no relevant education.
-- Achievement & Impact (20%): Count quantified achievements (numbers, %, $, scale) across work_experience.
+- Achievement & Impact ({pct("Achievement & Impact")}): Count quantified achievements (numbers, %, $, scale) across work_experience.
   20 = 5+ quantified achievements. 12 = 2-3. 5 = 1 vague. 0 = no metrics anywhere.
-- Role Alignment (15%): Does career trajectory point toward this role?
+- Role Alignment ({pct("Role Alignment")}): Does career trajectory point toward this role?
   20 = same/adjacent role with progression. 12 = related field. 5 = pivot. 0 = unrelated.
-- Stability & Tenure (10%): Use the pre-computed tenure signals.
+- Stability & Tenure ({pct("Stability & Tenure")}): Use the pre-computed tenure signals.
   20 = "Stable". 15 = "Early career" (insufficient history — give benefit of doubt, this is not a negative signal).
   12 = "Moderate". 5 = "Frequent switcher" with valid context. 0 = severe job hopping.
 
 Compute overall_score as weighted sum of dimension scores (each dim is 0-20):
-  overall = (skills*0.25 + experience*0.20 + education*0.10 + achievement*0.20 + alignment*0.15 + stability*0.10) * 5
+  overall = (skills*{w["Skills Match"]:.2f} + experience*{w["Experience Relevance"]:.2f} + education*{w["Education & Certifications"]:.2f}
+             + achievement*{w["Achievement & Impact"]:.2f} + alignment*{w["Role Alignment"]:.2f} + stability*{w["Stability & Tenure"]:.2f}) * 5
 
 Respond ONLY with this JSON:
 {{
@@ -494,12 +774,12 @@ Respond ONLY with this JSON:
   "recommendation_reason": "<1 precise sentence citing specific evidence>",
   "summary": "<3-4 sentences referencing specific CV facts vs JD requirements>",
   "dimensions": [
-    {{"name": "Skills Match",              "score": <0-20>, "weight": 0.25, "feedback": "<cite specific matched/missing skills>", "matched_skills": ["<exact name>"], "missing_skills": ["<exact name>"]}},
-    {{"name": "Experience Relevance",      "score": <0-20>, "weight": 0.20, "feedback": "<cite years and domain>", "matched_skills": [], "missing_skills": []}},
-    {{"name": "Education & Certifications","score": <0-20>, "weight": 0.10, "feedback": "<cite degree/certs>", "matched_skills": [], "missing_skills": []}},
-    {{"name": "Achievement & Impact",      "score": <0-20>, "weight": 0.20, "feedback": "<cite specific metrics or note their absence>", "matched_skills": [], "missing_skills": []}},
-    {{"name": "Role Alignment",            "score": <0-20>, "weight": 0.15, "feedback": "<cite title progression>", "matched_skills": [], "missing_skills": []}},
-    {{"name": "Stability & Tenure",        "score": <0-20>, "weight": 0.10, "feedback": "<reference the tenure signals>", "matched_skills": [], "missing_skills": []}}
+    {{"name": "Skills Match",              "score": <0-20>, "weight": {w["Skills Match"]:.2f}, "feedback": "<cite specific matched/missing skills>", "matched_skills": ["<exact name>"], "missing_skills": ["<exact name>"]}},
+    {{"name": "Experience Relevance",      "score": <0-20>, "weight": {w["Experience Relevance"]:.2f}, "feedback": "<cite years and domain>", "matched_skills": [], "missing_skills": []}},
+    {{"name": "Education & Certifications","score": <0-20>, "weight": {w["Education & Certifications"]:.2f}, "feedback": "<cite degree/certs>", "matched_skills": [], "missing_skills": []}},
+    {{"name": "Achievement & Impact",      "score": <0-20>, "weight": {w["Achievement & Impact"]:.2f}, "feedback": "<cite specific metrics or note their absence>", "matched_skills": [], "missing_skills": []}},
+    {{"name": "Role Alignment",            "score": <0-20>, "weight": {w["Role Alignment"]:.2f}, "feedback": "<cite title progression>", "matched_skills": [], "missing_skills": []}},
+    {{"name": "Stability & Tenure",        "score": <0-20>, "weight": {w["Stability & Tenure"]:.2f}, "feedback": "<reference the tenure signals>", "matched_skills": [], "missing_skills": []}}
   ],
   "key_strengths": ["<specific strength with evidence>", "<strength 2>", "<strength 3>"],
   "critical_gaps": ["<specific gap referencing JD requirement>", "<gap 2>", "<gap 3>"],
@@ -536,10 +816,19 @@ async def gpt_json_call(client: AsyncOpenAI, system: str, user: str,
 # RECONCILE TWO RUNS + APPLY HARD-GAP PENALTIES
 # ─────────────────────────────────────────────────────────────
 
-def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict) -> dict:
+def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
+                     weights: dict | None = None) -> dict:
     """Combine the strict + upside perspective runs and apply hard-gap penalties.
     The two perspectives disagreeing is INFORMATION — it tells us the candidate is
-    borderline. Blend (strict slightly weighted) and then subtract hard-gap penalties."""
+    borderline. Blend (strict slightly weighted) and then subtract hard-gap penalties.
+
+    Weights affect this in two ways:
+      1. The per-dim scores are blended as before.
+      2. The overall_score is RECOMPUTED from the blended per-dim scores using the
+         actual weights — we don't trust the model's arithmetic. This is what
+         actually makes the score reflect the custom weights, not just the prompt.
+    """
+    w = normalize_weights(weights)
 
     # 60/40 toward strict — generosity is a known LLM failure mode.
     def blend(a, b):
@@ -552,18 +841,21 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict) 
 
     overall_strict = strict.get("overall_score", 0)
     overall_upside = upside.get("overall_score", 0)
-    blended = blend(overall_strict, overall_upside)
 
     # Average dimension scores
     dims_strict = {d["name"]: d for d in strict.get("dimensions", [])}
     dims_upside = {d["name"]: d for d in upside.get("dimensions", [])}
     averaged_dims = []
+    blended_dim_scores = {}     # for the deterministic overall recomputation
     for dim in strict.get("dimensions", []):
         name = dim["name"]
         ds = dims_strict.get(name, {}).get("score", 0)
         du = dims_upside.get(name, {}).get("score", 0)
         avg_dim = dict(dim)
         avg_dim["score"] = blend(ds, du)
+        # Overwrite the weight to the canonical one so downstream UI is consistent
+        avg_dim["weight"] = w.get(name, avg_dim.get("weight", 0))
+        blended_dim_scores[name] = avg_dim["score"]
         if "matched_skills" in dim:
             a_set = set(dims_strict.get(name, {}).get("matched_skills", []) or [])
             b_set = set(dims_upside.get(name, {}).get("matched_skills", []) or [])
@@ -581,7 +873,13 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict) 
     # don't auto-reject". 35 is enough to flip HIRE → REJECT but won't nuke a
     # genuinely promising adjacent candidate.
     total_penalty = min(sum(g.get("penalty", 0) for g in hard_gaps), 35)
-    final_score = max(0, min(100, int(round(blended - total_penalty))))
+
+    # KEY STEP: recompute overall from blended per-dim scores using the *actual* weights.
+    # This is what makes per-job custom weights truly take effect:
+    #   - the model saw the weights in its prompt and emphasized accordingly
+    #   - but we don't trust its multiplication; we redo the math ourselves here
+    weighted_pre_penalty = weighted_overall(blended_dim_scores, w)
+    final_score = max(0, min(100, int(round(weighted_pre_penalty - total_penalty))))
     result["overall_score"] = final_score
 
     # Merge critical_gaps — prepend hard gaps for visibility
@@ -607,15 +905,41 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict) 
         if total > 0:
             result["skills_coverage_pct"] = round(len(all_matched) / total * 100)
 
-    # Recompute recommendation from final score (after penalty)
+    # ── Score consistency (computed early so recommendation logic can use it) ──
+    diff = abs(float(overall_strict) - float(overall_upside))
+    confidence_level = "High" if diff <= 5 else "Medium" if diff <= 12 else "Low"
+
+    # ── Recommendation: score-based, with confidence-based downgrade ──
+    # The base recommendation comes from the final blended score after hard-gap penalty.
+    # BUT: if the two passes disagreed wildly (confidence Low), don't make a confident
+    # call — downgrade HIRE/STRONG HIRE to MAYBE so the recruiter takes a closer look.
+    # We don't upgrade REJECT — even if the passes disagree, a low score is a low score
+    # and the recruiter shouldn't be falsely lured into reviewing a clear miss.
     if final_score >= 80:
-        result["recommendation"] = "STRONG HIRE"
+        base_rec = "STRONG HIRE"
     elif final_score >= 65:
-        result["recommendation"] = "HIRE"
+        base_rec = "HIRE"
     elif final_score >= 48:
-        result["recommendation"] = "MAYBE"
+        base_rec = "MAYBE"
     else:
-        result["recommendation"] = "REJECT"
+        base_rec = "REJECT"
+
+    if confidence_level == "Low" and base_rec in ("STRONG HIRE", "HIRE"):
+        result["recommendation"] = "MAYBE"
+        result["recommendation_note"] = (
+            f"Passes disagreed significantly ({overall_strict:.0f} vs {overall_upside:.0f}). "
+            f"Downgraded from {base_rec} for manual review."
+        )
+    elif confidence_level == "Low" and base_rec == "MAYBE":
+        result["recommendation"] = "MAYBE"
+        result["recommendation_note"] = (
+            f"Borderline candidate, passes disagree ({overall_strict:.0f} vs {overall_upside:.0f}). "
+            f"Manual review essential."
+        )
+    else:
+        result["recommendation"] = base_rec
+        # Clear any stale note from a previous run
+        result.pop("recommendation_note", None)
 
     # Surface tenure as first-class data
     result["tenure_analysis"] = tenure
@@ -627,13 +951,41 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict) 
     result["hiring_risks"] = risks
 
     # Diagnostic metadata
-    diff = abs(float(overall_strict) - float(overall_upside))
     result["score_consistency"] = {
         "strict_pass":     overall_strict,
         "upside_pass":     overall_upside,
         "difference":      round(diff, 1),
         "penalty_applied": total_penalty,
-        "confidence":      "High" if diff <= 5 else "Medium" if diff <= 12 else "Low",
+        "confidence":      confidence_level,
+    }
+
+    # ── Score breakdown: visible math, so recruiters can see WHY the score is what it is ──
+    # Each dimension contribution = dim_score (0-20) × weight × 5
+    # Summing those gives the pre-penalty score; subtract hard-gap penalty for final.
+    # Stored as a list of {name, score, weight, contribution} so the UI can render
+    # a formula like "Skills 16×0.25 + Experience 14×0.20 + ... = 70.5, −10 hard gap, = 60.5".
+    breakdown_rows = []
+    for name in DIMENSION_NAMES:
+        dim_score = blended_dim_scores.get(name, 0)
+        wt        = w[name]
+        contrib   = dim_score * wt * 5    # contribution to the 0-100 scale
+        breakdown_rows.append({
+            "name":         name,
+            "dim_score":    round(dim_score, 1),
+            "weight":       round(wt, 3),
+            "weight_pct":   int(round(wt * 100)),
+            "contribution": round(contrib, 1),
+        })
+    breakdown_subtotal = round(sum(r["contribution"] for r in breakdown_rows), 1)
+    result["score_breakdown"] = {
+        "rows":               breakdown_rows,
+        "subtotal":           breakdown_subtotal,
+        "hard_gap_penalty":   total_penalty,
+        "final":              final_score,
+        "hard_gap_details":   [
+            {"requirement": g.get("requirement"), "penalty": g.get("penalty"), "kind": g.get("kind")}
+            for g in hard_gaps
+        ],
     }
 
     return result
@@ -661,8 +1013,12 @@ def cv_is_self_consistent(cv: dict) -> tuple[bool, str]:
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
 
-async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str) -> tuple[dict, str | None]:
-    """Full screening pipeline. Returns (result_dict, error_str_or_None)."""
+async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
+                                  weights: dict | None = None) -> tuple[dict, str | None]:
+    """Full screening pipeline. Returns (result_dict, error_str_or_None).
+
+    `weights` is an optional per-job override of the dimension weights. If None,
+    DEFAULT_WEIGHTS is used (which matches the v1 behavior — backward compatible)."""
     try:
         client = AsyncOpenAI(api_key=api_key)
 
@@ -684,9 +1040,9 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str) -> tu
         # ── STEP 1C: deterministic tenure analysis (no GPT) ──
         tenure = analyze_tenure(cv_profile)
 
-        # ── STEP 2: score with two perspectives in parallel ──
-        strict_prompt = build_scoring_prompt(cv_profile, jd_requirements, tenure, STRICT_ANGLE)
-        upside_prompt = build_scoring_prompt(cv_profile, jd_requirements, tenure, UPSIDE_ANGLE)
+        # ── STEP 2: score with two perspectives in parallel, using job-specific weights ──
+        strict_prompt = build_scoring_prompt(cv_profile, jd_requirements, tenure, STRICT_ANGLE, weights)
+        upside_prompt = build_scoring_prompt(cv_profile, jd_requirements, tenure, UPSIDE_ANGLE, weights)
         strict_result, upside_result = await asyncio.gather(
             gpt_json_call(client, SCORING_SYSTEM_PROMPT, strict_prompt, temperature=0.2),
             gpt_json_call(client, SCORING_SYSTEM_PROMPT, upside_prompt, temperature=0.3),
@@ -695,12 +1051,28 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str) -> tu
         # ── Detect hard-requirement gaps deterministically ──
         hard_gaps = detect_hard_gaps(cv_profile, jd_requirements)
 
-        # ── Reconcile, apply penalties, finalize ──
-        final = reconcile_scores(strict_result, upside_result, hard_gaps, tenure)
+        # ── Authenticity check (deterministic, no GPT) ──
+        # Operates on the raw CV text (not the parsed structure) so we catch
+        # writing-style signals before the parser smooths them out.
+        authenticity = detect_cv_authenticity(cv_text)
 
-        # ── Attach parsed structures for transparency in the candidate report ──
+        # ── Reconcile (applies the same weights to deterministic overall recomputation) ──
+        final = reconcile_scores(strict_result, upside_result, hard_gaps, tenure, weights)
+
+        # ── Attach parsed structures + extras (so the UI can display the breakdown) ──
         final["parsed_cv"] = cv_profile
         final["parsed_jd"] = jd_requirements
+        final["weights_used"] = normalize_weights(weights)
+        final["authenticity"] = authenticity
+
+        # If authenticity is strongly flagged, surface it as a hiring risk so it
+        # shows up in the existing risks list (without lowering the score).
+        if authenticity.get("is_flagged"):
+            risks = final.get("hiring_risks", []) or []
+            msg = f"CV authenticity: {authenticity['ai_likelihood_pct']}% AI-likelihood. {authenticity.get('notes', '')}"
+            if not any("AI-likelihood" in r for r in risks):
+                risks = [msg] + [r for r in risks if r != "None identified"]
+                final["hiring_risks"] = risks
 
         # ── Validate score range ──
         final["overall_score"] = max(0, min(100, int(final["overall_score"])))
