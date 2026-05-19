@@ -256,29 +256,28 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tn" onclick="showPage('analytics')">Analytics</button>
   </nav>
   <div class="t-right">
-    <!-- Usage indicator -->
-    <div id="t-usage-wrap" style="display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:4px 10px;cursor:pointer" onclick="showPage('dashboard');showUsageModal()" title="Click to see usage">
-      <div style="display:flex;flex-direction:column;gap:2px;min-width:80px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+    <!-- Usage indicator — single primary location for "how many screenings used" -->
+    <div id="t-usage-wrap" style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:6px 12px;cursor:pointer;transition:border-color .15s" onclick="showPage('dashboard');showUsageModal()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Click to see usage details">
+      <div style="display:flex;flex-direction:column;gap:3px;min-width:90px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)">Screenings</span>
-          <span class="t-plan" id="t-plan" style="font-size:9px;padding:1px 6px">Trial</span>
+          <span class="t-plan" id="t-plan" style="font-size:9px;padding:1px 7px;line-height:1.4">Trial</span>
         </div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <div style="flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;min-width:50px">
-            <div id="t-usage-bar" style="height:100%;background:var(--indigo);border-radius:2px;width:0%;transition:width .5s"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden;min-width:60px">
+            <div id="t-usage-bar" style="height:100%;background:linear-gradient(90deg,var(--orange),#E16A1F);border-radius:3px;width:0%;transition:width .5s"></div>
           </div>
-          <span id="t-usage-text" style="font-size:10px;font-weight:600;color:var(--t2);white-space:nowrap">0/10</span>
+          <span id="t-usage-text" style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums">0/10</span>
         </div>
       </div>
     </div>
-    <a href="/batch" class="t-btn accent">⚡ Screen CVs</a>
-    <a href="/settings" class="t-btn">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Settings
+    <a href="/batch" class="t-btn accent" style="padding:7px 14px;font-weight:600">⚡ Screen CVs</a>
+    <a href="/settings" class="t-btn" title="Settings">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </a>
-    <div style="display:flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:4px 8px;cursor:pointer" onclick="logout()" title="Sign out">
+    <div style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:5px 9px;cursor:pointer;transition:border-color .15s" onclick="logout()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Sign out">
       <div class="t-avatar" id="t-avatar" style="width:22px;height:22px;font-size:9px">TC</div>
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     </div>
   </div>
 </header>
@@ -337,7 +336,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
-      <a href="/batch" class="btn btn-orange btn-sm">⚡ Screen CVs now</a>
     </div>
   </div>
 
@@ -579,8 +577,59 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="btn btn-red btn-sm" onclick="actionReject()">✕ Reject</button>
       <button class="btn btn-amber btn-sm" onclick="actionInterview()">→ Move to interview</button>
       <button class="btn btn-green btn-sm" onclick="actionShortlist()">✓ Shortlist</button>
+      <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()">📧 Send email</button>
       <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL COMPOSER MODAL — recruiter sends email to candidate -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hd">
+      <h3 class="modal-title">📧 Send email to candidate</h3>
+      <button class="modal-close" onclick="closeModal('email-modal')">✕</button>
+    </div>
+
+    <!-- Template selector — picks one of the saved templates as a starting point -->
+    <div class="form-row" style="margin-bottom:6px">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Template</label>
+        <select class="form-select" id="em-template" onchange="applyEmailTemplate(this.value)">
+          <option value="interview">📅 Interview invite</option>
+          <option value="rejection">✕ Rejection</option>
+          <option value="offer">🎉 Offer</option>
+          <option value="custom">Custom (blank)</option>
+        </select>
+        <div class="form-hint">Edit your default templates in Settings → Email templates</div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:6px">
+      <label class="form-label">To</label>
+      <input class="form-input" id="em-to" placeholder="Will be auto-filled from CV if available">
+      <div class="form-hint" id="em-to-hint" style="display:none">⚠ No email found in this CV — please enter one manually</div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:6px">
+      <label class="form-label">Subject</label>
+      <input class="form-input" id="em-subject" placeholder="Email subject">
+    </div>
+
+    <div class="form-group" style="margin-bottom:6px">
+      <label class="form-label">Message</label>
+      <textarea class="form-textarea" id="em-body" rows="11" style="font-family:inherit;font-size:13px;line-height:1.6" placeholder="Email body"></textarea>
+      <div class="form-hint">Placeholders like <code>{candidate_name}</code>, <code>{job_title}</code>, <code>{company_name}</code>, <code>{recruiter_name}</code> are auto-filled when you click Send.</div>
+    </div>
+
+    <div id="em-history" style="display:none;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;margin-bottom:8px;font-size:11px;color:var(--t2)"></div>
+
+    <div id="em-error" style="display:none;background:var(--rg);border:1px solid var(--rb);color:var(--red);padding:8px 12px;border-radius:var(--rs);margin-bottom:8px;font-size:12px"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('email-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="em-send-btn" onclick="sendCandidateEmail()">Send email</button>
     </div>
   </div>
 </div>
@@ -1065,6 +1114,170 @@ async function quickAction(id, action){
 async function actionShortlist(){ await quickAction(currentCandId,'shortlist'); closeModal('cand-modal'); }
 async function actionReject(){    await quickAction(currentCandId,'reject');    closeModal('cand-modal'); }
 async function actionInterview(){ await quickAction(currentCandId,'interview'); closeModal('cand-modal'); }
+
+// ── CANDIDATE EMAIL COMPOSER ──
+// State for the composer
+let emailTemplates = null;   // cached after first load — invalidated when user saves new ones
+
+async function loadEmailTemplates(){
+  // Cache templates after first fetch. Settings page calls invalidateEmailTemplates() after save.
+  if(emailTemplates) return emailTemplates;
+  try{
+    const r = await fetch('/api/user/email-templates', {credentials:'include'});
+    if(!r.ok) throw new Error('Could not load templates');
+    const data = await r.json();
+    emailTemplates = data.templates || {};
+    return emailTemplates;
+  }catch(e){
+    console.warn('[email-templates]', e);
+    emailTemplates = {};
+    return {};
+  }
+}
+
+function invalidateEmailTemplates(){ emailTemplates = null; }   // called by settings page
+
+// Replace {placeholders} client-side for live preview before sending. Backend doesn't
+// substitute anymore — we send the final text — so what the recruiter sees is what's sent.
+function fillTemplateVars(text, vars){
+  if(!text) return '';
+  let out = text;
+  for(const [key, val] of Object.entries(vars||{})){
+    if(val === null || val === undefined) continue;
+    out = out.split('{'+key+'}').join(String(val));
+  }
+  return out;
+}
+
+async function openEmailComposer(){
+  if(!currentCandId){ alert('No candidate selected'); return; }
+  const r = allResults.find(x=>x._id===currentCandId);
+  if(!r){ alert('Candidate not found in local cache'); return; }
+
+  // Variables we'll substitute into the template
+  const candEmail = r.parsed_cv?.personal?.email || '';
+  const recruiterName = (window._meCache && window._meCache.name) || (window._meCache && window._meCache.company) || '';
+  const companyName   = (window._meCache && window._meCache.company) || '';
+
+  // Pre-fill the form
+  document.getElementById('em-to').value = candEmail;
+  document.getElementById('em-to-hint').style.display = candEmail ? 'none' : 'block';
+  document.getElementById('em-error').style.display = 'none';
+  document.getElementById('em-history').style.display = 'none';
+
+  // Pick default template based on candidate's current stage — this is a small
+  // ergonomic win: if you just shortlisted someone, the modal opens to the
+  // interview template, not "Custom blank".
+  const stage = r.stage || 'pending';
+  let defaultTpl = 'interview';
+  if(stage === 'rejected')        defaultTpl = 'rejection';
+  else if(stage === 'shortlisted') defaultTpl = 'offer';
+  else if(stage === 'interview')   defaultTpl = 'interview';
+  document.getElementById('em-template').value = defaultTpl;
+
+  await loadEmailTemplates();
+  applyEmailTemplate(defaultTpl);
+
+  // Fetch any history for this candidate to warn about double-sends
+  try{
+    const histRes = await fetch('/api/candidates/'+currentCandId+'/email-history',{credentials:'include'});
+    if(histRes.ok){
+      const histData = await histRes.json();
+      const hist = histData.history || [];
+      if(hist.length){
+        const histEl = document.getElementById('em-history');
+        histEl.style.display = 'block';
+        histEl.innerHTML = '<strong style="color:var(--text)">⚠ Previously emailed:</strong> '
+          + hist.slice(0,3).map(h=>{
+              const when = new Date(h.sent_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+              return `${h.template_type} · ${when}`;
+            }).join(' · ');
+      }
+    }
+  }catch(_){ /* non-fatal */ }
+
+  openModal('email-modal');
+}
+
+function applyEmailTemplate(kind){
+  const r = allResults.find(x=>x._id===currentCandId);
+  if(!r) return;
+  const vars = {
+    candidate_name: r.candidate_name || 'there',
+    job_title:      r.job_title || r.parsed_jd?.role_title || 'the role',
+    company_name:   (window._meCache && window._meCache.company) || '[your company]',
+    recruiter_name: (window._meCache && window._meCache.company) || '[your name]',
+    score:          r.score || Math.round(r.overall_score || 0),
+  };
+
+  if(kind === 'custom'){
+    document.getElementById('em-subject').value = '';
+    document.getElementById('em-body').value = '';
+    return;
+  }
+
+  const tpl = (emailTemplates || {})[kind];
+  if(!tpl){
+    // Templates not loaded yet — defer
+    document.getElementById('em-subject').value = '';
+    document.getElementById('em-body').value = '';
+    return;
+  }
+  document.getElementById('em-subject').value = fillTemplateVars(tpl.subject, vars);
+  document.getElementById('em-body').value    = fillTemplateVars(tpl.body, vars);
+}
+
+async function sendCandidateEmail(){
+  const to       = document.getElementById('em-to').value.trim();
+  const subject  = document.getElementById('em-subject').value.trim();
+  const body     = document.getElementById('em-body').value.trim();
+  const template = document.getElementById('em-template').value;
+  const errEl    = document.getElementById('em-error');
+  const btn      = document.getElementById('em-send-btn');
+
+  errEl.style.display = 'none';
+
+  if(!to || !to.includes('@')){
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block'; return;
+  }
+  if(!subject){ errEl.textContent = 'Subject is required.'; errEl.style.display='block'; return; }
+  if(!body){    errEl.textContent = 'Message body is required.';   errEl.style.display='block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try{
+    const fd = new FormData();
+    fd.append('subject', subject);
+    fd.append('body', body);
+    fd.append('template_type', template);
+    fd.append('to_email', to);
+    const r = await fetch('/api/candidates/'+currentCandId+'/email', {
+      method:'POST', body:fd, credentials:'include'
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.detail || ('Send failed ('+r.status+')'));
+    // Success — close modal, show toast
+    closeModal('email-modal');
+    showToast('✓ Email sent to '+to, 'var(--green)');
+  }catch(e){
+    errEl.textContent = 'Failed: '+e.message;
+    errEl.style.display = 'block';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Send email';
+  }
+}
+
+// Tiny toast helper (used by email-send and could be re-used elsewhere)
+function showToast(msg, color){
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;top:70px;right:20px;background:'+(color||'var(--green)')
+    +';color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 4000);
+}
 
 // ── OVERVIEW ──
 function renderOverview(){
@@ -1727,6 +1940,8 @@ async function loadFromDB(){
     const meRes=await fetch('/api/auth/me',{credentials:'include'});
     if(meRes.status===401){window.location.href='/login';return;}
     const me=await meRes.json();
+    // Cache for the email composer and any other code that needs the recruiter's identity
+    window._meCache = me;
 
     // Fetch screenings, jobs in parallel - don't let stats failure block
     const [screenRes,jobsRes]=await Promise.all([
@@ -1814,6 +2029,7 @@ async function refreshPlan(){
     const r = await fetch('/api/auth/me',{credentials:'include'});
     if(!r.ok) return;
     const me = await r.json();
+    window._meCache = me;   // keep the cache fresh for email composer
     const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
     const tp = document.getElementById('t-plan');
     const prev = tp ? tp.textContent : '';
