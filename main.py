@@ -494,10 +494,23 @@ async def screen_endpoint(
     if error:
         raise HTTPException(status_code=422, detail=error)
 
+    # Look up the job's custom weights (if any) — same flow as batch endpoint
+    job_weights = None
+    if job_id:
+        try:
+            from database import db as mongodb
+            from bson import ObjectId
+            job_doc = await mongodb.jobs.find_one({"_id": ObjectId(job_id)}, {"weights": 1})
+            if job_doc and isinstance(job_doc.get("weights"), dict):
+                job_weights = job_doc["weights"]
+        except Exception:
+            pass
+
     result, error = await run_screening_pipeline(
         cv_text=cv_text,
         jd_text=job_description.strip(),
-        api_key=OPENAI_API_KEY
+        api_key=OPENAI_API_KEY,
+        weights=job_weights,
     )
     if error:
         raise HTTPException(status_code=500, detail=error)
@@ -592,6 +605,21 @@ async def batch_screen_endpoint(
     batch_id = await create_batch_job(total=len(files), jd_preview=jd_text[:200])
     queue    = asyncio.Queue()
 
+    # ── Look up per-job custom weights (if any) ──
+    # Without job_id, fall through to scorer defaults. Same path for any job that
+    # hasn't had weights set — preserves backward compat for existing data.
+    job_weights = None
+    if job_id:
+        try:
+            from database import db as mongodb
+            from bson import ObjectId
+            job_doc = await mongodb.jobs.find_one({"_id": ObjectId(job_id)}, {"weights": 1})
+            if job_doc and isinstance(job_doc.get("weights"), dict):
+                job_weights = job_doc["weights"]
+                print(f"[BATCH-WEIGHTS] using custom weights for job {job_id}: {job_weights}")
+        except Exception as e:
+            print(f"[BATCH-WEIGHTS] failed to load weights for job {job_id}: {e}")
+
     async def on_progress(index, status, filename, result, error=None):
         score = result.get("overall_score") if result else None
         rec   = result.get("recommendation") if result else None
@@ -623,7 +651,8 @@ async def batch_screen_endpoint(
             results = await run_batch_screening(
                 files=files, jd_text=jd_text,
                 api_key=OPENAI_API_KEY, on_progress=on_progress,
-                extra_fields=extra
+                extra_fields=extra,
+                weights=job_weights,
             )
             # Also tag results in memory for the response
             for r in results.get("results", []):
@@ -887,8 +916,19 @@ async def create_job_endpoint(
     description: str = Form(""),
     min_experience: str = Form(""),
     status: str = Form("active"),
+    weights: str = Form(""),   # JSON-encoded dict of {dim_name: float}
 ):
     user = await get_current_user(request)
+    # Parse weights JSON if provided. Invalid JSON → ignore (job will use default weights at score time).
+    weights_dict = None
+    if weights:
+        try:
+            import json as _json
+            parsed = _json.loads(weights)
+            if isinstance(parsed, dict) and parsed:
+                weights_dict = parsed
+        except Exception:
+            weights_dict = None
     job = {
         "title": title, "department": department, "location": location,
         "employment_type": employment_type,
@@ -898,6 +938,8 @@ async def create_job_endpoint(
         "status": status,
         "user_id": user["user_id"], "company": user["company"],
     }
+    if weights_dict is not None:
+        job["weights"] = weights_dict
     job_id = await save_job(job)
     return {"_id": job_id, **job}
 
@@ -914,6 +956,7 @@ async def update_job_endpoint(
     location: str = Form(""),
     employment_type: str = Form(""),
     min_experience: str = Form(""),
+    weights: str = Form(""),
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
@@ -930,6 +973,14 @@ async def update_job_endpoint(
     if location:        updates["location"] = location
     if employment_type: updates["employment_type"] = employment_type
     if min_experience:  updates["min_experience"] = min_experience
+    if weights:
+        try:
+            import json as _json
+            parsed = _json.loads(weights)
+            if isinstance(parsed, dict) and parsed:
+                updates["weights"] = parsed
+        except Exception:
+            pass   # silently ignore bad JSON — caller can retry
     if updates:
         result = await mongodb.jobs.update_one(
             {"_id": ObjectId(job_id), "user_id": user["user_id"]},
