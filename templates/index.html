@@ -132,6 +132,33 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tbl-link{color:var(--indigo);font-weight:600;text-decoration:none}
 .tbl-link:hover{text-decoration:underline}
 
+/* ── EMPTY STATES ──
+   One pattern used everywhere:
+   - Compact icon circle (orange-tinted background)
+   - Bold short headline (what's missing / what this page is)
+   - Light body text (1-2 sentences explaining what to do next)
+   - Primary CTA button
+   - Optional secondary link below
+   Two variants: .empty-state (full page / card) and .empty-state.compact (smaller, for sidebars / sections) */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 2rem;color:var(--t2)}
+.empty-state.compact{padding:2rem 1rem}
+.empty-state.tiny{padding:1.25rem 1rem}
+.es-icon{width:56px;height:56px;border-radius:50%;background:var(--og);color:var(--orange);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;flex-shrink:0}
+.empty-state.compact .es-icon{width:44px;height:44px;margin-bottom:.75rem}
+.empty-state.tiny .es-icon{width:36px;height:36px;margin-bottom:.5rem}
+.es-icon svg{width:24px;height:24px;stroke-width:1.6}
+.empty-state.compact .es-icon svg{width:20px;height:20px}
+.empty-state.tiny .es-icon svg{width:18px;height:18px}
+.es-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:.4rem;letter-spacing:-.2px}
+.empty-state.compact .es-title{font-size:13px}
+.empty-state.tiny .es-title{font-size:12px;margin-bottom:.25rem}
+.es-body{font-size:12px;color:var(--t3);line-height:1.6;max-width:380px;margin-bottom:1rem}
+.empty-state.tiny .es-body{font-size:11px;margin-bottom:.5rem;max-width:none}
+.es-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.es-link{font-size:11px;color:var(--t3);margin-top:.5rem;text-decoration:none}
+.es-link:hover{color:var(--orange);text-decoration:underline}
+.es-secondary-text{font-size:11px;color:var(--t3);margin-top:.5rem}
+
 /* ── SCORE BAR ── */
 .score-bar{display:flex;align-items:center;gap:6px}
 .score-bar-bg{flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;min-width:50px}
@@ -389,7 +416,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
-        <tbody id="ov-recent-tbl"><tr><td colspan="5" class="tbl-empty">Screen your first CV to see results here</td></tr></tbody>
+        <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen your first CV</a></div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -469,7 +496,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody id="cands-tbl"><tr><td colspan="10" class="tbl-empty">No candidates yet — run your first CV screening</td></tr></tbody>
+        <tbody id="cands-tbl"><tr><td colspan="10" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates screened yet</div><div class="es-body">Upload CVs against a job description to see them ranked, analyzed, and ready for review here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen your first CV</a><button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">Create a job first</button></div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -506,7 +533,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg score</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="jobs-tbl"><tr><td colspan="9" class="tbl-empty">No jobs yet — create your first job posting</td></tr></tbody>
+        <tbody id="jobs-tbl"><tr><td colspan="9" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="es-title">No job postings yet</div><div class="es-body">Create a job to set required skills, custom scoring weights, and organize candidates by role.</div><div class="es-actions"><button class="btn btn-primary btn-sm" onclick="openJobModal()">+ Create your first job</button></div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -544,7 +571,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <th>Pending review</th>
           <th>Conversion</th>
         </tr></thead>
-        <tbody id="job-perf-tbl"><tr><td colspan="8" class="tbl-empty">No data yet — screen some CVs against a job posting to see performance here.</td></tr></tbody>
+        <tbody id="job-perf-tbl"><tr><td colspan="8" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="es-title">No analytics data yet</div><div class="es-body">Screen some CVs against a job posting and per-role performance will appear here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen CVs</a></div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -559,7 +586,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th>Candidate</th><th>Screened at</th><th>AI confidence</th><th>Run 1</th><th>Run 2</th><th>Δ Variance</th><th>Final score</th><th>Result</th><th>JD used</th></tr></thead>
-        <tbody id="audit-tbl"><tr><td colspan="9" class="tbl-empty">No screenings yet</td></tr></tbody>
+        <tbody id="audit-tbl"><tr><td colspan="9" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><div class="es-title">No screening history yet</div><div class="es-body">Every CV you screen will be logged here for traceability.</div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -726,6 +753,66 @@ function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-
 function fmtTime(d){if(!d)return'—';try{const dt=new Date(d);return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return'—';}}
 function isThisWeek(d){if(!d)return false;const now=new Date();const then=new Date(d);const diff=(now-then)/(1000*60*60*24);return diff<=7;}
 
+// ── EMPTY STATE HELPER ──
+// Returns the HTML for a consistent empty state block. Used everywhere we have
+// "no data yet" or "filter excluded everything" or "screen your first CV".
+// Curated icon set for the contexts we have — pick one per call.
+const EMPTY_ICONS = {
+  candidates: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  filter:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
+  jobs:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+  analytics:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  search:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  pipeline:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  upload:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+  email:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+  inbox:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+};
+
+/**
+ * Build empty-state HTML. Use inside a card or as a table-cell fallback.
+ * @param {object} opts
+ * @param {string} opts.icon      — key into EMPTY_ICONS
+ * @param {string} opts.title     — short bold headline
+ * @param {string} opts.body      — 1-2 sentence explanation (optional)
+ * @param {string} opts.cta       — primary CTA text (optional)
+ * @param {string} opts.ctaAction — onclick code for the CTA button (optional)
+ * @param {string} opts.ctaHref   — href for the CTA if it's a link (optional)
+ * @param {string} opts.secondary — small text link below (optional, e.g. "Clear filters")
+ * @param {string} opts.secondaryAction — onclick for secondary link
+ * @param {string} opts.size      — '' | 'compact' | 'tiny'
+ */
+function emptyState(opts){
+  const icon = EMPTY_ICONS[opts.icon] || EMPTY_ICONS.candidates;
+  const size = opts.size ? ' '+opts.size : '';
+  let cta = '';
+  if(opts.cta){
+    if(opts.ctaHref){
+      cta = `<a href="${opts.ctaHref}" class="btn btn-primary btn-sm">${opts.cta}</a>`;
+    } else if(opts.ctaAction){
+      cta = `<button class="btn btn-primary btn-sm" onclick="${opts.ctaAction}">${opts.cta}</button>`;
+    }
+  }
+  const secondary = opts.secondary
+    ? (opts.secondaryAction
+        ? `<a href="javascript:void(0)" class="es-link" onclick="${opts.secondaryAction}">${opts.secondary}</a>`
+        : `<div class="es-secondary-text">${opts.secondary}</div>`)
+    : '';
+  return `<div class="empty-state${size}">
+    <div class="es-icon">${icon}</div>
+    ${opts.title ? `<div class="es-title">${opts.title}</div>` : ''}
+    ${opts.body ? `<div class="es-body">${opts.body}</div>` : ''}
+    ${cta ? `<div class="es-actions">${cta}</div>` : ''}
+    ${secondary}
+  </div>`;
+}
+
+/** Same as emptyState() but wrapped in a table row so it can replace tbody contents.
+ *  @param {number} colspan — must match the table's column count */
+function emptyStateRow(colspan, opts){
+  return `<tr><td colspan="${colspan}" style="padding:0;border:none">${emptyState(opts)}</td></tr>`;
+}
+
 // ── CV SCREENER ──
 let sf=null;
 const dz=document.getElementById('drop-zone');
@@ -856,7 +943,31 @@ function stageBadge(stage){
 }
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
-  if(!results||!results.length){tbody.innerHTML='<tr><td colspan="10" class="tbl-empty">No candidates match your filters</td></tr>';return;}
+  if(!results||!results.length){
+    // Distinguish "you have no candidates yet" from "your filters excluded everyone".
+    // Same blank table cell otherwise looks identical and confuses users.
+    const hasAnyData = allResults && allResults.length > 0;
+    if(hasAnyData){
+      // Filters are hiding everything — guide them to clear filters
+      tbody.innerHTML = emptyStateRow(10, {
+        icon: 'filter',
+        title: 'No candidates match these filters',
+        body: 'Try widening your filters or clearing them to see all '+allResults.length+' candidates.',
+        cta: 'Clear all filters',
+        ctaAction: 'clearFilters()',
+      });
+    } else {
+      // Never had any data — onboard them
+      tbody.innerHTML = emptyStateRow(10, {
+        icon: 'candidates',
+        title: 'No candidates screened yet',
+        body: 'Upload some CVs against a job description to see them ranked and analyzed here.',
+        cta: '⚡ Screen your first CV',
+        ctaHref: '/batch',
+      });
+    }
+    return;
+  }
   tbody.innerHTML=results.map(r=>{
     const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
@@ -1319,7 +1430,14 @@ function renderOverview(){
           <td><button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();openCandModal('${r._id}')">View</button></td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="5" class="tbl-empty">No candidates yet</td></tr>';
+    : emptyStateRow(5, {
+        icon: 'candidates',
+        size: 'compact',
+        title: 'No candidates yet',
+        body: 'Once you screen CVs, the most recent applicants will show up here.',
+        cta: '⚡ Screen your first CV',
+        ctaHref: '/batch',
+      });
 }
 
 // ── PIPELINE ──
@@ -1388,7 +1506,13 @@ function renderPipeline(){
           </div>
           <div style="display:flex;gap:3px;justify-content:flex-end">${actions}</div>
         </div>`;}).join('')
-      :`<div style="color:var(--t3);font-size:11px;text-align:center;padding:1.5rem">Empty</div>`;
+      // Per-column empty hint — short, contextual, no CTA (the global CTA is at the top)
+      : emptyState({
+          icon: ['candidates','pipeline','candidates','candidates'][i] || 'candidates',
+          size: 'tiny',
+          title: ['No candidates','No interviews','No offers yet','None rejected'][i] || 'Empty',
+          body: ['Use the arrow buttons to move candidates here','Move candidates to interview from the Screening column','Shortlist top candidates from interviews','Reject candidates by clicking ✕'][i] || '',
+        });
   }
   const removed=allResults.length-unique.length;
   document.getElementById('pipeline-notice').textContent=removed>0?(removed+' duplicate'+(removed>1?'s':'')+' hidden'):'';
@@ -1453,7 +1577,13 @@ function renderJobs(){
             </div>
           </td>
         </tr>`;}).join('')
-    :'<tr><td colspan="9" class="tbl-empty">No jobs yet — create your first job posting to organize screenings</td></tr>';
+    : emptyStateRow(9, {
+        icon: 'jobs',
+        title: 'No job postings yet',
+        body: 'Create a job to set required skills, custom scoring weights, and organize candidates by role.',
+        cta: '+ Create your first job',
+        ctaAction: 'openJobModal()',
+      });
 }
 
 // Show job description + key stats + candidates list in a modal.
@@ -1552,7 +1682,12 @@ async function viewJobDetails(jobId){
               <div style="font-size:16px;font-weight:800;color:${gc(s)}">${s}</div>
             </div>`;
           }).join('')
-        : `<div style="font-size:12px;color:var(--t3)">No candidates screened for this job yet.</div>`}
+        : emptyState({
+            icon: 'candidates',
+            size: 'tiny',
+            title: 'No candidates yet for this job',
+            body: 'Use ⚡ Screen CVs to evaluate CVs against this role.',
+          })}
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
@@ -1859,7 +1994,14 @@ function renderAnalytics(){
 
   const tbody = document.getElementById('job-perf-tbl');
   if(!rows.length){
-    tbody.innerHTML = '<tr><td colspan="8" class="tbl-empty">No data yet — screen some CVs against a job posting to see performance here.</td></tr>';
+    tbody.innerHTML = emptyStateRow(8, {
+      icon: 'analytics',
+      size: 'compact',
+      title: 'No analytics data yet',
+      body: 'Screen some CVs against a job posting and per-role performance will appear here.',
+      cta: '⚡ Screen CVs',
+      ctaHref: '/batch',
+    });
     return;
   }
   tbody.innerHTML = rows.map(r=>{
@@ -1903,7 +2045,12 @@ function renderAudit(){
         <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
         <td style="font-size:10px;color:var(--t3)">v1 · standard</td>
       </tr>`;}).join('')
-    :'<tr><td colspan="9" class="tbl-empty">No screenings yet</td></tr>';
+    : emptyStateRow(9, {
+        icon: 'inbox',
+        size: 'compact',
+        title: 'No screening history yet',
+        body: 'Every CV you screen will be logged here for traceability.',
+      });
 }
 
 // ── ACTIVITY LOG ──
