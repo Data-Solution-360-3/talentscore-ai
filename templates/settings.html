@@ -18,7 +18,15 @@
   --green:#16A34A;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.25);
   --red:#DC2626;--rg:rgba(220,38,38,.08);--rb:rgba(220,38,38,.25);
   --amber:#D97706;--amg:rgba(217,119,6,.10);--amb:rgba(217,119,6,.28);
-  --r:12px;--rs:8px;--rxs:6px;
+  --score-good:#15803d;--score-good-bg:rgba(21,128,61,.10);
+  --score-mid:#B45309; --score-mid-bg:rgba(180,83,9,.10);
+  --score-bad:#BE3144; --score-bad-bg:rgba(190,49,68,.08);
+  --r-xs:4px;--r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+  --r:var(--r-lg);--rs:var(--r-md);--rxs:var(--r-sm);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;box-shadow:0 1px 3px rgba(20,40,72,.04)}
@@ -44,7 +52,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .page-hd{margin-bottom:1.5rem}
 .page-hd h1{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-bottom:4px}
 .page-hd p{font-size:13px;color:var(--t2)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:12px;box-shadow:var(--shadow-sm)}
 .card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
 .card-title{font-size:14px;font-weight:700}
 .card-sub{font-size:12px;color:var(--t3)}
@@ -127,6 +135,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .avatar-big{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;flex-shrink:0;border:3px solid var(--border2)}
+
+.form-input:focus-visible,.form-select:focus-visible,.form-textarea:focus-visible{
+  border-color:var(--orange);box-shadow:0 0 0 3px rgba(245,124,46,.18);
+}
+.btn:focus-visible,.t-btn:focus-visible,.sb-item:focus-visible{
+  outline:none;box-shadow:0 0 0 3px rgba(245,124,46,.30);
+}
 @media(max-width:700px){.form-row,.plan-cards,.payment-method{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}}
 </style>
 </head>
@@ -546,7 +561,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <label class="form-label">Email body</label>
           <textarea class="form-textarea" id="et-interview-body" rows="8" style="font-family:inherit"></textarea>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('interview')">↺ Reset to default</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('interview')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Reset to default</button>
       </div>
 
       <!-- Rejection template -->
@@ -560,7 +575,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <label class="form-label">Email body</label>
           <textarea class="form-textarea" id="et-rejection-body" rows="8" style="font-family:inherit"></textarea>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('rejection')">↺ Reset to default</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('rejection')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Reset to default</button>
       </div>
 
       <!-- Offer template -->
@@ -574,7 +589,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <label class="form-label">Email body</label>
           <textarea class="form-textarea" id="et-offer-body" rows="8" style="font-family:inherit"></textarea>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('offer')">↺ Reset to default</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('offer')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Reset to default</button>
       </div>
 
       <button class="btn btn-primary" onclick="saveEmailTemplates()">Save all templates</button>
@@ -597,7 +612,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <!-- New key reveal -->
       <div id="new-key-box" style="display:none;background:var(--gg);border:1px solid var(--gb);border-radius:var(--r);padding:1rem;margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">⚠ Copy this key now — it will never be shown again</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;display:flex;align-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Copy this key now — it will never be shown again</div>
         <div style="display:flex;gap:8px;align-items:center">
           <code id="new-key-value" style="font-family:monospace;font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:8px 12px;flex:1;word-break:break-all"></code>
           <button class="btn btn-ghost btn-sm" onclick="copyKey()">Copy</button>

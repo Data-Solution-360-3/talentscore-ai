@@ -22,7 +22,25 @@
   --red:#DC2626;--rg:rgba(220,38,38,.08);--rb:rgba(220,38,38,.25);
   --amber:#D97706;--amg:rgba(217,119,6,.10);--amb:rgba(217,119,6,.28);
   --blue:#2563EB;--blg:rgba(37,99,235,.10);--blb:rgba(37,99,235,.25);
-  --r:12px;--rs:8px;--rxs:6px;
+  /* Softer score-tier accent colors (matches the deeper, more muted score palette in gc()).
+     Used for badges + cell highlights so the score column matches the score circle. */
+  --score-good:#15803d;--score-good-bg:rgba(21,128,61,.10);
+  --score-mid:#B45309; --score-mid-bg:rgba(180,83,9,.10);
+  --score-bad:#BE3144; --score-bad-bg:rgba(190,49,68,.08);
+  /* Radius scale — every rounded thing in the app uses one of these. No ad-hoc values. */
+  --r-xs:4px;   /* tiny pills, sort indicators */
+  --r-sm:6px;   /* small buttons, inputs */
+  --r-md:8px;   /* default buttons, badges */
+  --r-lg:12px;  /* cards, modals */
+  --r-xl:16px;  /* feature cards, big surfaces */
+  --r-pill:9999px; /* full pills */
+  /* Shadow scale — same idea. Pick the one that matches elevation. */
+  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+  /* Legacy aliases — kept so existing code doesn't break. Map to the new scale. */
+  --r:var(--r-lg);--rs:var(--r-md);--rxs:var(--r-sm);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
@@ -75,7 +93,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .ph-row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
 
 /* ── CARDS ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;box-shadow:var(--shadow-sm)}
 .card+.card{margin-top:10px}
 .card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem}
 .card-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
@@ -105,12 +123,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border2)}
 .btn-ghost:hover{background:var(--s3);color:var(--text)}
 .btn-sm{padding:4px 9px;font-size:11px}
-.btn-xs{padding:3px 7px;font-size:10px;border-radius:5px}
-.pb-act{padding:3px 8px;font-size:11px;font-weight:700;border-radius:5px;cursor:pointer;font-family:inherit;transition:transform .1s}
-.pb-act:hover{transform:scale(1.1)}
+.btn-xs{padding:3px 7px;font-size:10px;border-radius:var(--r-xs)}
+.pb-act{padding:3px 8px;font-size:11px;font-weight:700;border-radius:var(--r-xs);cursor:pointer;font-family:inherit;transition:transform .1s,filter .1s}
+.pb-act:hover{transform:scale(1.1);filter:brightness(.95)}
 .btn-green{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
-.btn-red{background:var(--rg);color:#fda4af;border:1px solid var(--rb)}
+.btn-green:hover{background:rgba(22,163,74,.18);border-color:var(--green)}
+.btn-red{background:var(--rg);color:var(--red);border:1px solid var(--rb)}
+.btn-red:hover{background:rgba(220,38,38,.14);border-color:var(--red)}
 .btn-amber{background:var(--amg);color:var(--amber);border:1px solid var(--amb)}
+.btn-amber:hover{background:rgba(217,119,6,.18);border-color:var(--amber)}
+.btn:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
 
 /* ── BADGES ── */
 .badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid;display:inline-block;white-space:nowrap}
@@ -122,15 +144,41 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .b-blue{background:var(--blg);color:var(--blue);border-color:var(--blb)}
 
 /* ── TABLES ── */
-.tbl-wrap{overflow-x:auto}
-.tbl{width:100%;border-collapse:collapse;font-size:12px}
-.tbl th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--s2)}
-.tbl td{padding:9px 10px;color:var(--t2);border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 280px);position:relative;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface)}
+.tbl-wrap.no-scroll{max-height:none;overflow-x:auto}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.tbl th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--s2);position:sticky;top:0;z-index:5;user-select:none}
+.tbl th.sortable{cursor:pointer;transition:color .15s,background .15s}
+.tbl th.sortable:hover{color:var(--text);background:var(--s3)}
+.tbl th.sortable .sort-ind{display:inline-block;width:10px;margin-left:3px;color:var(--t3);opacity:.4;font-size:8px;vertical-align:1px}
+.tbl th.sortable.sort-asc .sort-ind,.tbl th.sortable.sort-desc .sort-ind{color:var(--orange);opacity:1}
+.tbl td{padding:10px 12px;color:var(--t2);border-bottom:1px solid var(--border);vertical-align:middle;transition:background .12s}
 .tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:var(--s2);cursor:pointer}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr:hover td{background:var(--s2);cursor:pointer}
 .tbl-empty{text-align:center;padding:2.5rem;color:var(--t3);font-size:12px}
 .tbl-link{color:var(--indigo);font-weight:600;text-decoration:none}
 .tbl-link:hover{text-decoration:underline}
+
+/* Table footer with pagination + summary */
+.tbl-foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:10px 14px;border-top:1px solid var(--border);background:var(--s2);font-size:11px;color:var(--t3);border-radius:0 0 var(--rs) var(--rs)}
+.tbl-foot-info{display:flex;align-items:center;gap:8px}
+.tbl-foot-nav{display:flex;align-items:center;gap:4px}
+.tbl-foot-nav button{background:var(--surface);border:1px solid var(--border2);color:var(--t2);font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;cursor:pointer;font-family:inherit;transition:all .12s}
+.tbl-foot-nav button:hover:not(:disabled){background:var(--s2);color:var(--text);border-color:var(--border3)}
+.tbl-foot-nav button:disabled{opacity:.4;cursor:not-allowed}
+.tbl-foot-nav .page-num{padding:4px 8px;color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+.tbl-foot select{background:var(--surface);border:1px solid var(--border2);color:var(--t2);font-size:11px;font-family:inherit;padding:3px 6px;border-radius:5px;cursor:pointer}
+
+/* ── SKELETON LOADERS ── */
+/* Shimmer animation — moves a soft gradient across the placeholder once per 1.4s */
+@keyframes skl-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+.skl{display:inline-block;background:linear-gradient(90deg,var(--s2) 0%,var(--s3) 50%,var(--s2) 100%);background-size:200% 100%;animation:skl-shimmer 1.4s linear infinite;border-radius:4px;height:12px;vertical-align:middle}
+.skl-line{display:block;height:12px;margin:6px 0}
+.skl-w-30{width:30%}.skl-w-40{width:40%}.skl-w-50{width:50%}.skl-w-60{width:60%}.skl-w-70{width:70%}.skl-w-80{width:80%}.skl-w-90{width:90%}.skl-w-100{width:100%}
+.skl-circle{display:inline-block;border-radius:50%;background:linear-gradient(90deg,var(--s2) 0%,var(--s3) 50%,var(--s2) 100%);background-size:200% 100%;animation:skl-shimmer 1.4s linear infinite;vertical-align:middle}
+.skl-tall{height:24px}
+.skl-stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem}
 
 /* ── EMPTY STATES ──
    One pattern used everywhere:
@@ -188,16 +236,37 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .form-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
-.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s,box-shadow .12s}
+
+/* ── FOCUS RINGS ──
+   :focus-visible only shows the ring for keyboard users (Tab navigation), not mouse clicks.
+   That gives accessibility without the "click-and-see-ugly-blue-outline" experience.
+   We use box-shadow instead of outline so the ring sits inside any container without
+   shifting layout and can be rounded to match the element. */
+.form-input:focus-visible,.form-select:focus-visible,.form-textarea:focus-visible,
+.filter-input:focus-visible,.filter-select:focus-visible{
+  border-color:var(--orange);
+  box-shadow:0 0 0 3px rgba(245,124,46,.18);
+}
+.btn:focus-visible,.t-btn:focus-visible,.sb-item:focus-visible,.tn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(245,124,46,.30);
+}
+/* Sortable table headers — keyboard users need a focus indicator too */
+.tbl th.sortable:focus-visible{
+  outline:none;
+  box-shadow:inset 0 0 0 2px var(--orange);
+}
 .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--ig)}
 .form-input::placeholder,.form-textarea::placeholder{color:var(--t3)}
 .form-textarea{resize:vertical;line-height:1.6}
 .form-hint{font-size:10px;color:var(--t3);margin-top:2px}
 
 /* ── MODAL ── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.modal-overlay.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.35rem;width:90%;max-width:560px;max-height:85vh;overflow-y:auto}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;transition:opacity .15s ease-out}
+.modal-overlay.open{display:flex;opacity:1}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.35rem;width:90%;max-width:560px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-xl);transform:scale(.96);transition:transform .18s cubic-bezier(.2,.7,.3,1)}
+.modal-overlay.open .modal{transform:scale(1)}
 .modal-lg{max-width:800px}
 .modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
 .modal-title{font-size:15px;font-weight:700}
@@ -298,7 +367,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
     </div>
-    <a href="/batch" class="t-btn accent" style="padding:7px 14px;font-weight:600">⚡ Screen CVs</a>
+    <a href="/batch" class="t-btn accent" style="padding:7px 14px;font-weight:600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen CVs</a>
     <a href="/settings" class="t-btn" title="Settings">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </a>
@@ -362,7 +431,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="ph-row">
     <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ Export all</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportAll()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export all</button>
     </div>
   </div>
 
@@ -413,10 +482,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="card-title">Recent applicants</div>
       <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button>
     </div>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap no-scroll">
       <table class="tbl">
         <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
-        <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen your first CV</a></div></div></td></tr></tbody>
+        <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a></div></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -425,7 +494,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- SCREENER REMOVED - redirect to batch -->
 <div class="page" id="page-screener">
   <div style="text-align:center;padding:4rem 2rem">
-    <div style="font-size:48px;margin-bottom:1rem">⚡</div>
+    <div style="width:80px;height:80px;border-radius:50%;background:var(--og);color:var(--orange);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
     <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Use Batch Screening</h2>
     <p style="font-size:14px;color:var(--t2);margin-bottom:1.5rem">Screen up to 100 CVs at once for better efficiency.</p>
     <a href="/batch" class="btn btn-orange" style="font-size:15px;padding:12px 28px">Go to Batch Screener →</a>
@@ -482,22 +551,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="card">
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead>
-          <tr>
-            <th>Candidate</th>
-            <th>Applied job</th>
-            <th>Score</th>
-            <th>Skills matched</th>
-            <th>Missing skills</th>
-            <th>Experience</th>
-            <th>Education</th>
-            <th>Result</th>
-            <th>Date</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="cands-tbl"><tr><td colspan="10" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates screened yet</div><div class="es-body">Upload CVs against a job description to see them ranked, analyzed, and ready for review here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen your first CV</a><button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">Create a job first</button></div></div></td></tr></tbody>
+        <thead id="cands-thead"><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Skills matched</th><th>Missing skills</th><th>Experience</th><th>Education</th><th>Result</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="cands-tbl"><tr><td colspan="10" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates screened yet</div><div class="es-body">Upload CVs against a job description to see them ranked, analyzed, and ready for review here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a><button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">Create a job first</button></div></div></td></tr></tbody>
       </table>
+      <div id="cands-foot"></div>
     </div>
   </div>
 </div>
@@ -532,9 +589,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="card">
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg score</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead id="jobs-thead"><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg score</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="jobs-tbl"><tr><td colspan="9" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="es-title">No job postings yet</div><div class="es-body">Create a job to set required skills, custom scoring weights, and organize candidates by role.</div><div class="es-actions"><button class="btn btn-primary btn-sm" onclick="openJobModal()">+ Create your first job</button></div></div></td></tr></tbody>
       </table>
+      <div id="jobs-foot"></div>
     </div>
   </div>
 </div>
@@ -561,7 +619,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr>
+        <thead id="job-perf-thead"><tr>
           <th>Job title</th>
           <th>Screened</th>
           <th>Avg score</th>
@@ -571,8 +629,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <th>Pending review</th>
           <th>Conversion</th>
         </tr></thead>
-        <tbody id="job-perf-tbl"><tr><td colspan="8" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="es-title">No analytics data yet</div><div class="es-body">Screen some CVs against a job posting and per-role performance will appear here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm">⚡ Screen CVs</a></div></div></td></tr></tbody>
+        <tbody id="job-perf-tbl"><tr><td colspan="8" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="es-title">No analytics data yet</div><div class="es-body">Screen some CVs against a job posting and per-role performance will appear here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen CVs</a></div></div></td></tr></tbody>
       </table>
+      <div id="job-perf-foot"></div>
     </div>
   </div>
 </div>
@@ -604,7 +663,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="btn btn-red btn-sm" onclick="actionReject()">✕ Reject</button>
       <button class="btn btn-amber btn-sm" onclick="actionInterview()">→ Move to interview</button>
       <button class="btn btn-green btn-sm" onclick="actionShortlist()">✓ Shortlist</button>
-      <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()">📧 Send email</button>
+      <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>Send email</button>
       <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
     </div>
@@ -615,7 +674,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="email-modal">
   <div class="modal" style="max-width:640px">
     <div class="modal-hd">
-      <h3 class="modal-title">📧 Send email to candidate</h3>
+      <h3 class="modal-title" style="display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>Send email to candidate</h3>
       <button class="modal-close" onclick="closeModal('email-modal')">✕</button>
     </div>
 
@@ -688,7 +747,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
          The template dropdown sets reasonable starting weights for common role types, then sliders fine-tune. -->
     <details id="j-weights-details" style="margin:8px 0 6px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
       <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">
-        ⚖️ Scoring weights <span style="font-weight:400;color:var(--t3);font-size:11px" id="j-weights-summary-text">— using balanced defaults</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 3v18M5 21h14M5 8l-3 6c0 2 1.5 3 3 3s3-1 3-3l-3-6zM19 8l-3 6c0 2 1.5 3 3 3s3-1 3-3l-3-6z"/></svg>Scoring weights <span style="font-weight:400;color:var(--t3);font-size:11px" id="j-weights-summary-text">— using balanced defaults</span>
       </summary>
       <div style="padding:6px 12px 14px">
         <div style="font-size:11px;color:var(--t2);margin-bottom:10px;line-height:1.5">
@@ -743,15 +802,103 @@ function showPage(id){
 }
 
 // ── MODALS ──
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+// ── MODAL HELPERS ──
+// open/close maintain a stack so ESC closes the topmost modal (not all at once).
+window._modalStack = window._modalStack || [];
+
+function openModal(id){
+  const m = document.getElementById(id);
+  if(!m) return;
+  m.classList.add('open');
+  // Push to stack — needed because we might layer modals (e.g. job-detail-modal opens cand-modal)
+  if(!window._modalStack.includes(id)) window._modalStack.push(id);
+  // Auto-focus the first visible interactive element so keyboard users can start typing
+  // without having to click first. Skip if there's nothing focusable.
+  setTimeout(() => {
+    const first = m.querySelector('input:not([type=hidden]),textarea,select,button[type=submit],.btn-primary');
+    if(first && typeof first.focus === 'function') first.focus({preventScroll: true});
+  }, 60);
+}
+
+function closeModal(id){
+  const m = document.getElementById(id);
+  if(m) m.classList.remove('open');
+  window._modalStack = window._modalStack.filter(x => x !== id);
+}
+
+// Global ESC handler — closes the topmost open modal
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if(!window._modalStack.length) return;
+  const top = window._modalStack[window._modalStack.length - 1];
+  closeModal(top);
+});
+
+// Backdrop click → close (click on the overlay itself, not the modal content)
+// We do this once on the document so newly-created modals are covered automatically.
+if(!window._modalBackdropHandlerAttached){
+  window._modalBackdropHandlerAttached = true;
+  document.addEventListener('click', e => {
+    if(e.target.classList && e.target.classList.contains('modal-overlay') && e.target.classList.contains('open')){
+      closeModal(e.target.id);
+    }
+  });
+}
+
 
 // ── HELPERS ──
-function gc(s){if(s>=80)return'#10b981';if(s>=60)return'#f59e0b';return'#f43f5e';}
+// Score-tier colors. Softer than traffic-light primaries so recruiters reviewing
+// 50+ candidates aren't blasted with saturated red and green.
+function gc(s){
+  if(s>=80) return '#15803d';   // deep muted green
+  if(s>=60) return '#B45309';   // warm amber (was bright orange — too loud)
+  return '#BE3144';              // dusty rose (was hot pink)
+}
 function tbcls(r){return{'STRONG HIRE':'b-green','HIRE':'b-green','MAYBE':'b-amber','REJECT':'b-red'}[r]||'b-amber';}
 function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch{return'—';}}
 function fmtTime(d){if(!d)return'—';try{const dt=new Date(d);return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return'—';}}
 function isThisWeek(d){if(!d)return false;const now=new Date();const then=new Date(d);const diff=(now-then)/(1000*60*60*24);return diff<=7;}
+
+// ── ICON SYSTEM ──
+// Curated Lucide-style SVG icons. Returns inline <svg> ready to drop into HTML.
+// `size` defaults to 14 (button-sized). Use icon('check', 12) for tighter buttons.
+// All icons use stroke="currentColor" so they inherit text color — important
+// for buttons where the icon should match the label color in all states.
+const _ICON_PATHS = {
+  // Actions / status
+  check:     '<polyline points="20 6 9 17 4 12"/>',
+  x:         '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  arrowRight:'<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  arrowLeft: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  arrowUp:   '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+  arrowDown: '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>',
+  cornerLeft:'<polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/>',
+  // Brand / app actions
+  bolt:      '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  mail:      '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/>',
+  // Domain
+  scale:     '<path d="M12 3v18M5 21h14M5 8l-3 6c0 2 1.5 3 3 3s3-1 3-3l-3-6zM19 8l-3 6c0 2 1.5 3 3 3s3-1 3-3l-3-6z"/>',
+  calculator:'<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/>',
+  bot:       '<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
+  // States
+  alert:     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/>',
+  refresh:   '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  search:    '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  calendar:  '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  party:     '<path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.7.34a2.89 2.89 0 0 0-2.21 2.74v.13c0 1-.68 1.79-1.65 1.92l-3.2.4"/><path d="M11 2c.49.79.7 1.51.62 2.5C11.5 6 10.07 7 8.5 7s-3 .5-3 2"/>',
+};
+
+/** Build an inline SVG icon by name.
+ *  @param {string} name — key from _ICON_PATHS
+ *  @param {number} size — width/height in px (default 14, button-sized)
+ *  @param {string} extra — any extra style (e.g. 'margin-right:4px') */
+function icon(name, size, extra){
+  const p = _ICON_PATHS[name];
+  if(!p) return '';
+  size = size || 14;
+  const style = 'vertical-align:-2px;flex-shrink:0' + (extra ? ';'+extra : '');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="${style}">${p}</svg>`;
+}
 
 // ── EMPTY STATE HELPER ──
 // Returns the HTML for a consistent empty state block. Used everywhere we have
@@ -811,6 +958,155 @@ function emptyState(opts){
  *  @param {number} colspan — must match the table's column count */
 function emptyStateRow(colspan, opts){
   return `<tr><td colspan="${colspan}" style="padding:0;border:none">${emptyState(opts)}</td></tr>`;
+}
+
+// ── TABLE SORT STATE ──
+// Per-table sort state, keyed by table id. Each entry: {key, dir}.
+// `key` is the field name in the row object; `dir` is 'asc' or 'desc'.
+// We store this on `window` so it survives re-renders (which is what we want —
+// click a sort, sort persists across stage updates / filter changes).
+window._sortState = window._sortState || {};
+
+/** Toggle sort for a given table + key, then re-render. */
+function toggleSort(tableId, key, defaultDir){
+  const cur = window._sortState[tableId];
+  // First click: use defaultDir (typically 'desc' for scores, 'asc' for names).
+  // Second click on the same column: flip direction.
+  // Third click: clear sort (back to natural order).
+  let next;
+  if(!cur || cur.key !== key){
+    next = {key, dir: defaultDir || 'desc'};
+  } else if(cur.dir === (defaultDir || 'desc')){
+    next = {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'};
+  } else {
+    next = null;
+  }
+  if(next) window._sortState[tableId] = next;
+  else delete window._sortState[tableId];
+
+  // Re-render the right table based on its id — this is the only spot we tie
+  // tableId to a render function, so adding a new sortable table needs an entry here.
+  if(tableId === 'cands-tbl') applyFilters();
+  else if(tableId === 'jobs-tbl') renderJobs();
+  else if(tableId === 'job-perf-tbl') renderAnalytics();
+}
+
+/** Sort an array of rows according to the current state for a table. Mutates a COPY. */
+function applySort(rows, tableId){
+  const st = window._sortState[tableId];
+  if(!st || !rows || !rows.length) return rows;
+  // Generic comparator. Numbers sort numerically; strings sort case-insensitive; null/undefined sink.
+  const sorted = [...rows].sort((a, b) => {
+    let av = a[st.key], bv = b[st.key];
+    // Handle null/undefined consistently — always end up at the bottom regardless of direction.
+    if(av == null && bv == null) return 0;
+    if(av == null) return 1;
+    if(bv == null) return -1;
+    if(typeof av === 'number' && typeof bv === 'number') return av - bv;
+    return String(av).toLowerCase().localeCompare(String(bv).toLowerCase());
+  });
+  return st.dir === 'desc' ? sorted.reverse() : sorted;
+}
+
+/** Render a sortable <th> header. label = display text, key = field name, defaultDir = 'asc'|'desc'.
+ *  tableId is what toggleSort uses to know which table re-rendered. */
+function sortableHeader(tableId, label, key, defaultDir){
+  const st = window._sortState[tableId];
+  const active = st && st.key === key;
+  const cls = active ? 'sortable sort-' + st.dir : 'sortable';
+  const ind = active ? (st.dir === 'asc' ? '▲' : '▼') : '↕';
+  return `<th class="${cls}" onclick="toggleSort('${tableId}','${key}','${defaultDir||'desc'}')">${label}<span class="sort-ind">${ind}</span></th>`;
+}
+
+// ── PAGINATION STATE ──
+// Same shape as sort: {tableId: {page: 0, pageSize: 25}}
+window._pagState = window._pagState || {};
+function getPag(tableId, defaultSize){
+  if(!window._pagState[tableId]) window._pagState[tableId] = {page: 0, pageSize: defaultSize || 25};
+  return window._pagState[tableId];
+}
+function setPagPage(tableId, page){ getPag(tableId).page = page; }
+function setPagSize(tableId, size){
+  // Reset to page 0 when size changes so user isn't stranded on a phantom page
+  const p = getPag(tableId);
+  p.pageSize = parseInt(size,10) || 25;
+  p.page = 0;
+}
+
+/** Apply pagination — returns the slice of rows for the current page + the total. */
+function applyPagination(rows, tableId){
+  const p = getPag(tableId);
+  const total = rows.length;
+  const maxPage = Math.max(0, Math.ceil(total / p.pageSize) - 1);
+  if(p.page > maxPage) p.page = maxPage;
+  const start = p.page * p.pageSize;
+  return {slice: rows.slice(start, start + p.pageSize), total, page: p.page, pageSize: p.pageSize, maxPage};
+}
+
+/** Render a table footer with pagination controls. `onChange` is the JS string
+ *  that gets called when page/size changes — typically the render fn name. */
+function paginationFooter(tableId, total, page, pageSize, maxPage, renderFn){
+  if(total === 0) return '';
+  const from = total === 0 ? 0 : (page * pageSize + 1);
+  const to   = Math.min(total, (page + 1) * pageSize);
+  return `<div class="tbl-foot">
+    <div class="tbl-foot-info">
+      <span>Showing <strong style="color:var(--text)">${from}-${to}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <span style="color:var(--border3)">·</span>
+      <select onchange="setPagSize('${tableId}',this.value); ${renderFn}()">
+        <option value="10" ${pageSize===10?'selected':''}>10 per page</option>
+        <option value="25" ${pageSize===25?'selected':''}>25 per page</option>
+        <option value="50" ${pageSize===50?'selected':''}>50 per page</option>
+        <option value="100" ${pageSize===100?'selected':''}>100 per page</option>
+      </select>
+    </div>
+    <div class="tbl-foot-nav">
+      <button onclick="setPagPage('${tableId}',0); ${renderFn}()" ${page===0?'disabled':''} title="First page">«</button>
+      <button onclick="setPagPage('${tableId}',${page-1}); ${renderFn}()" ${page===0?'disabled':''} title="Previous">‹</button>
+      <span class="page-num">${page+1} / ${maxPage+1}</span>
+      <button onclick="setPagPage('${tableId}',${page+1}); ${renderFn}()" ${page>=maxPage?'disabled':''} title="Next">›</button>
+      <button onclick="setPagPage('${tableId}',${maxPage}); ${renderFn}()" ${page>=maxPage?'disabled':''} title="Last page">»</button>
+    </div>
+  </div>`;
+}
+
+// ── SKELETON LOADERS ──
+// Returns the HTML for skeleton placeholders. Use while data is loading so users
+// see structure immediately instead of a blank flash.
+function skeleton(opts){
+  opts = opts || {};
+  const w = opts.width || 80;
+  return `<span class="skl skl-w-${w}" style="${opts.tall?'height:24px;':''}${opts.style||''}"></span>`;
+}
+
+/** Build a skeleton row for a table with `cols` cells. */
+function skeletonRow(cols){
+  const tds = [];
+  // Vary widths so it doesn't look like a fence
+  const widths = [70, 50, 40, 60, 30, 80, 50];
+  for(let i=0; i<cols; i++){
+    tds.push(`<td><span class="skl skl-w-${widths[i % widths.length]}"></span></td>`);
+  }
+  return '<tr>' + tds.join('') + '</tr>';
+}
+
+/** Fill a tbody with `n` skeleton rows of `cols` cells each. */
+function skeletonTableBody(tbodyId, n, cols){
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  let html = '';
+  for(let i=0; i<n; i++) html += skeletonRow(cols);
+  tbody.innerHTML = html;
+}
+
+/** Stat-card skeleton block. */
+function skeletonStat(){
+  return `<div class="stat">
+    <div class="stat-bar" style="background:var(--s3)"></div>
+    <div style="height:9px"><span class="skl skl-w-50" style="height:9px"></span></div>
+    <div style="margin:6px 0"><span class="skl skl-w-30" style="height:22px;border-radius:5px"></span></div>
+    <div style="height:9px"><span class="skl skl-w-40" style="height:9px"></span></div>
+  </div>`;
 }
 
 // ── CV SCREENER ──
@@ -943,12 +1239,26 @@ function stageBadge(stage){
 }
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
+  // Render the sortable thead each time so the sort indicator stays in sync.
+  // (cheap — only 10 columns and only when this page is visible)
+  const thead = document.getElementById('cands-thead');
+  if(thead){
+    thead.innerHTML = '<tr>' +
+      sortableHeader('cands-tbl', 'Candidate', 'candidate_name', 'asc') +
+      sortableHeader('cands-tbl', 'Applied job', 'job_title', 'asc') +
+      sortableHeader('cands-tbl', 'Score', 'score', 'desc') +
+      '<th>Skills matched</th><th>Missing skills</th>' +
+      sortableHeader('cands-tbl', 'Experience', 'years_experience', 'desc') +
+      '<th>Education</th>' +
+      sortableHeader('cands-tbl', 'Result', 'rec', 'asc') +
+      sortableHeader('cands-tbl', 'Date', 'created_at', 'desc') +
+      '<th>Actions</th></tr>';
+  }
   if(!results||!results.length){
     // Distinguish "you have no candidates yet" from "your filters excluded everyone".
     // Same blank table cell otherwise looks identical and confuses users.
     const hasAnyData = allResults && allResults.length > 0;
     if(hasAnyData){
-      // Filters are hiding everything — guide them to clear filters
       tbody.innerHTML = emptyStateRow(10, {
         icon: 'filter',
         title: 'No candidates match these filters',
@@ -957,18 +1267,24 @@ function renderCandidates(results){
         ctaAction: 'clearFilters()',
       });
     } else {
-      // Never had any data — onboard them
       tbody.innerHTML = emptyStateRow(10, {
         icon: 'candidates',
         title: 'No candidates screened yet',
         body: 'Upload some CVs against a job description to see them ranked and analyzed here.',
-        cta: '⚡ Screen your first CV',
+        cta: icon('bolt',12,'margin-right:4px')+'Screen your first CV',
         ctaHref: '/batch',
       });
     }
+    // Hide the pagination footer when there's no data
+    const foot = document.getElementById('cands-foot'); if(foot) foot.innerHTML = '';
     return;
   }
-  tbody.innerHTML=results.map(r=>{
+
+  // Sort (if a sort is active) then paginate.
+  const sorted = applySort(results, 'cands-tbl');
+  const pg = applyPagination(sorted, 'cands-tbl');
+
+  tbody.innerHTML=pg.slice.map(r=>{
     const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
     const missing=(r.critical_gaps||[]).slice(0,2);
@@ -995,6 +1311,12 @@ function renderCandidates(results){
       </td>
     </tr>`;
   }).join('');
+
+  // Pagination footer — show "Showing X-Y of Z" + page controls
+  const foot = document.getElementById('cands-foot');
+  if(foot){
+    foot.innerHTML = paginationFooter('cands-tbl', pg.total, pg.page, pg.pageSize, pg.maxPage, 'applyFilters');
+  }
 }
 
 // ── FILTERS ──
@@ -1083,7 +1405,7 @@ function openCandModal(id){
             <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
               <span class="badge ${tbcls(rec)}">${rec}</span>
               ${auth.is_flagged
-                ? `<span class="badge ${authCls}" title="${escapeHtml(auth.notes||'')}">🤖 ${authPct}% AI-likelihood</span>`
+                ? `<span class="badge ${authCls}" title="${escapeHtml(auth.notes||'')}" style="display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>${authPct}% AI-likelihood</span>`
                 : (authPct > 0 ? `<span class="badge b-green" title="${escapeHtml(auth.notes||'')}">✓ Authentic</span>` : '')}
             </div>
           </div>
@@ -1126,7 +1448,7 @@ function openCandModal(id){
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Interview questions</div>
         ${(r.interview_questions||[]).slice(0,3).map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:var(--orange);font-weight:700;flex-shrink:0">${i+1}.</span>${q}</div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
         ${r.hiring_risks&&r.hiring_risks.length?`
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);margin-top:8px;margin-bottom:5px">⚠ Hiring risks</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);margin-top:8px;margin-bottom:5px;display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Hiring risks</div>
         ${r.hiring_risks.slice(0,3).map(risk=>`<div style="font-size:11px;color:var(--amber);padding:3px 0">${risk}</div>`).join('')}`:''}
       </div>
     </div>
@@ -1135,7 +1457,7 @@ function openCandModal(id){
     <!-- Visible score math: show the formula so the user can verify "why this score". -->
     <details style="margin-top:10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs)">
       <summary style="padding:8px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);user-select:none">
-        🔢 How was this score calculated?
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>How was this score calculated?
       </summary>
       <div style="padding:4px 12px 12px;font-family:monospace;font-size:11px;line-height:1.7">
         ${bd.rows.map(row=>`
@@ -1163,7 +1485,7 @@ function openCandModal(id){
     <!-- Authenticity details (always collapsed; opens if the user wants to inspect) -->
     <details style="margin-top:8px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs)">
       <summary style="padding:8px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);user-select:none">
-        🤖 CV authenticity check — ${authPct}% AI-likelihood (${auth.confidence||'Low'} confidence)
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>CV authenticity check — ${authPct}% AI-likelihood (${auth.confidence||'Low'} confidence)
       </summary>
       <div style="padding:4px 12px 12px;font-size:11px;line-height:1.6">
         <div style="color:var(--t2);margin-bottom:6px">${escapeHtml(auth.notes||'')}</div>
@@ -1603,7 +1925,7 @@ function renderOverview(){
         size: 'compact',
         title: 'No candidates yet',
         body: 'Once you screen CVs, the most recent applicants will show up here.',
-        cta: '⚡ Screen your first CV',
+        cta: icon('bolt',12,'margin-right:4px')+'Screen your first CV',
         ctaHref: '/batch',
       });
 }
@@ -1723,35 +2045,65 @@ function renderJobs(){
   const sel=document.getElementById('jd-job-select');
   if(sel){sel.innerHTML='<option value="">— Select job or paste below —</option>';allJobs.forEach(j=>{const o=document.createElement('option');o.value=j._id;o.textContent=j.title;sel.appendChild(o);});}
   document.getElementById('sb-job-cnt').textContent=allJobs.length;
-  tbody.innerHTML=allJobs.length
-    ?allJobs.map(j=>{
-        const statusCls={'active':'b-green','paused':'b-amber','closed':'b-red'}[j.status||'active']||'b-green';
-        const related=allResults.filter(r=>r.job_id===j._id||r.job_title===j.title||r.company===j.title);
-        const avgS=related.length?Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length):0;
-        const shl=related.filter(r=>(r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE'||(r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-        // Whole row click → open job details modal. Action buttons stopPropagation so they don't trigger the row click.
-        return`<tr class="job-row" onclick="viewJobDetails('${j._id}')" style="cursor:pointer">
-          <td style="font-weight:600;color:var(--text)"><span style="color:var(--orange)">${j.title}</span></td>
-          <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
-          <td style="font-weight:600;color:var(--orange)">${related.length}</td>
-          <td style="font-weight:600;color:${gc(avgS)}">${avgS||'—'}</td>
-          <td><span class="badge b-green">${shl}</span></td>
-          <td><span class="badge ${statusCls}">${j.status||'active'}</span></td>
-          <td>
-            <div style="display:flex;gap:3px" onclick="event.stopPropagation()">
-              <button class="btn btn-xs btn-ghost" onclick="viewCandidatesForJob('${j._id}')" title="See candidates screened for this role">View candidates</button>
-              <button class="btn btn-xs btn-ghost" onclick="editJob('${j._id}')">Edit</button>
-              <button class="btn btn-xs btn-red" onclick="deleteJob('${j._id}')">Delete</button>
-            </div>
-          </td>
-        </tr>`;}).join('')
-    : emptyStateRow(9, {
-        icon: 'jobs',
-        title: 'No job postings yet',
-        body: 'Create a job to set required skills, custom scoring weights, and organize candidates by role.',
-        cta: '+ Create your first job',
-        ctaAction: 'openJobModal()',
-      });
+
+  // Sortable headers — render thead each time so sort indicator stays in sync
+  const thead = document.getElementById('jobs-thead');
+  if(thead){
+    thead.innerHTML = '<tr>' +
+      sortableHeader('jobs-tbl', 'Job title', 'title', 'asc') +
+      sortableHeader('jobs-tbl', 'Department', 'dept', 'asc') +
+      sortableHeader('jobs-tbl', 'Location', 'loc', 'asc') +
+      '<th>Type</th>' +
+      sortableHeader('jobs-tbl', 'Applicants', '_applicants', 'desc') +
+      sortableHeader('jobs-tbl', 'Avg score', '_avg', 'desc') +
+      sortableHeader('jobs-tbl', 'Shortlisted', '_shl', 'desc') +
+      sortableHeader('jobs-tbl', 'Status', 'status', 'asc') +
+      '<th>Actions</th></tr>';
+  }
+
+  if(!allJobs.length){
+    tbody.innerHTML = emptyStateRow(9, {
+      icon: 'jobs',
+      title: 'No job postings yet',
+      body: 'Create a job to set required skills, custom scoring weights, and organize candidates by role.',
+      cta: '+ Create your first job',
+      ctaAction: 'openJobModal()',
+    });
+    const foot = document.getElementById('jobs-foot'); if(foot) foot.innerHTML = '';
+    return;
+  }
+
+  // Enrich jobs with computed fields so they can be sorted on those
+  const enriched = allJobs.map(j => {
+    const related = allResults.filter(r => r.job_id===j._id || r.job_title===j.title || r.company===j.title);
+    const avgS = related.length ? Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length) : 0;
+    const shl = related.filter(r => (r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE' || (r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
+    return Object.assign({}, j, { _applicants: related.length, _avg: avgS, _shl: shl });
+  });
+
+  const sorted = applySort(enriched, 'jobs-tbl');
+  const pg = applyPagination(sorted, 'jobs-tbl');
+
+  tbody.innerHTML = pg.slice.map(j=>{
+    const statusCls={'active':'b-green','paused':'b-amber','closed':'b-red'}[j.status||'active']||'b-green';
+    return`<tr class="job-row" onclick="viewJobDetails('${j._id}')" style="cursor:pointer">
+      <td style="font-weight:600;color:var(--text)"><span style="color:var(--orange)">${j.title}</span></td>
+      <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
+      <td style="font-weight:600;color:var(--orange)">${j._applicants}</td>
+      <td style="font-weight:600;color:${gc(j._avg)}">${j._avg||'—'}</td>
+      <td><span class="badge b-green">${j._shl}</span></td>
+      <td><span class="badge ${statusCls}">${j.status||'active'}</span></td>
+      <td>
+        <div style="display:flex;gap:3px" onclick="event.stopPropagation()">
+          <button class="btn btn-xs btn-ghost" onclick="viewCandidatesForJob('${j._id}')" title="See candidates screened for this role">View candidates</button>
+          <button class="btn btn-xs btn-ghost" onclick="editJob('${j._id}')">Edit</button>
+          <button class="btn btn-xs btn-red" onclick="deleteJob('${j._id}')">Delete</button>
+        </div>
+      </td>
+    </tr>`;}).join('');
+
+  const foot = document.getElementById('jobs-foot');
+  if(foot) foot.innerHTML = paginationFooter('jobs-tbl', pg.total, pg.page, pg.pageSize, pg.maxPage, 'renderJobs');
 }
 
 // Show job description + key stats + candidates list in a modal.
@@ -1854,7 +2206,7 @@ async function viewJobDetails(jobId){
             icon: 'candidates',
             size: 'tiny',
             title: 'No candidates yet for this job',
-            body: 'Use ⚡ Screen CVs to evaluate CVs against this role.',
+            body: 'Use the Screen CVs button (top right) to evaluate CVs against this role.',
           })}
     </div>
 
@@ -2163,11 +2515,36 @@ function renderAnalytics(){
     else                           row.pending++;
   });
 
-  // Sort: most-screened jobs first (most relevant), then by avg score desc.
-  const rows = Object.values(byJob).sort((a,b)=>{
-    if(b.screened !== a.screened) return b.screened - a.screened;
-    return (b.sumScore/b.screened) - (a.sumScore/a.screened);
-  });
+  // Sortable headers
+  const thead = document.getElementById('job-perf-thead');
+  if(thead){
+    thead.innerHTML = '<tr>' +
+      sortableHeader('job-perf-tbl', 'Job title', 'title', 'asc') +
+      sortableHeader('job-perf-tbl', 'Screened', 'screened', 'desc') +
+      sortableHeader('job-perf-tbl', 'Avg score', '_avgScore', 'desc') +
+      sortableHeader('job-perf-tbl', 'Shortlisted', 'shortlisted', 'desc') +
+      sortableHeader('job-perf-tbl', 'In interview', 'interview', 'desc') +
+      sortableHeader('job-perf-tbl', 'Rejected', 'rejected', 'desc') +
+      sortableHeader('job-perf-tbl', 'Pending review', 'pending', 'desc') +
+      sortableHeader('job-perf-tbl', 'Conversion', '_conv', 'desc') +
+      '</tr>';
+  }
+
+  // Pre-compute avg score + conversion so they can be sort keys
+  const enrichedRows = Object.values(byJob).map(r => Object.assign({}, r, {
+    _avgScore: Math.round(r.sumScore / r.screened),
+    _conv:     Math.round((r.shortlisted + r.interview) / r.screened * 100),
+  }));
+  // Default sort (when user hasn't clicked): most-screened first, then avg score
+  let rows;
+  if(window._sortState['job-perf-tbl']){
+    rows = applySort(enrichedRows, 'job-perf-tbl');
+  } else {
+    rows = enrichedRows.sort((a,b) => {
+      if(b.screened !== a.screened) return b.screened - a.screened;
+      return b._avgScore - a._avgScore;
+    });
+  }
 
   const tbody = document.getElementById('job-perf-tbl');
   if(!rows.length){
@@ -2176,36 +2553,35 @@ function renderAnalytics(){
       size: 'compact',
       title: 'No analytics data yet',
       body: 'Screen some CVs against a job posting and per-role performance will appear here.',
-      cta: '⚡ Screen CVs',
+      cta: icon('bolt',12,'margin-right:4px')+'Screen CVs',
       ctaHref: '/batch',
     });
+    const foot = document.getElementById('job-perf-foot'); if(foot) foot.innerHTML = '';
     return;
   }
-  tbody.innerHTML = rows.map(r=>{
-    const avgScore = Math.round(r.sumScore / r.screened);
-    const col = gc(avgScore);
-    // Conversion = % of candidates that progressed past initial screen (shortlist + interview).
-    // This is the most actionable single number: how well does AI scoring agree with
-    // your team's actual hiring decisions for this role?
-    const progressed = r.shortlisted + r.interview;
-    const conv = Math.round(progressed / r.screened * 100);
-    const convCol = conv >= 25 ? 'var(--green)' : conv >= 10 ? 'var(--amber)' : 'var(--red)';
-    // job_id is the source of truth for routing. We stash it on the byJob key during grouping,
-    // but lost it here — recover it from any matching screening so the click handler works.
+
+  const pg = applyPagination(rows, 'job-perf-tbl');
+
+  tbody.innerHTML = pg.slice.map(r=>{
+    const col = gc(r._avgScore);
+    const convCol = r._conv >= 25 ? 'var(--green)' : r._conv >= 10 ? 'var(--amber)' : 'var(--red)';
     const sampleJob = allResults.find(x=>(x.job_title||'(no job linked)')===r.title);
     const jobId = sampleJob?.job_id || '';
     const clickable = jobId ? `onclick="viewCandidatesForJob('${jobId}')" style="cursor:pointer" title="Click to see all candidates for this role"` : '';
     return `<tr ${clickable}>
       <td style="font-weight:600;color:${jobId?'var(--orange)':'var(--text)'}">${r.title}</td>
       <td><span style="font-weight:600;color:var(--text)">${r.screened}</span></td>
-      <td><span style="font-weight:700;color:${col}">${avgScore}</span></td>
+      <td><span style="font-weight:700;color:${col}">${r._avgScore}</span></td>
       <td><span class="badge b-green" style="font-size:10px">${r.shortlisted}</span></td>
       <td><span class="badge b-amber" style="font-size:10px">${r.interview}</span></td>
       <td><span class="badge b-red" style="font-size:10px">${r.rejected}</span></td>
       <td><span style="color:var(--t2);font-size:11px">${r.pending}</span></td>
-      <td><span style="font-weight:700;color:${convCol}">${conv}%</span></td>
+      <td><span style="font-weight:700;color:${convCol}">${r._conv}%</span></td>
     </tr>`;
   }).join('');
+
+  const foot = document.getElementById('job-perf-foot');
+  if(foot) foot.innerHTML = paginationFooter('job-perf-tbl', pg.total, pg.page, pg.pageSize, pg.maxPage, 'renderAnalytics');
 }
 
 // ── AUDIT TRAIL ──
@@ -2259,6 +2635,27 @@ function updateAll(){
 }
 
 async function loadFromDB(){
+  // ── SKELETONS: show placeholders immediately so the user isn't staring at a
+  // blank page while the API responds. We replace them when real data arrives.
+  // Tables: 6 skeleton rows roughly matches what a real result set looks like.
+  try{
+    skeletonTableBody('cands-tbl',     6, 10);
+    skeletonTableBody('jobs-tbl',      4, 9);
+    skeletonTableBody('job-perf-tbl',  4, 8);
+    skeletonTableBody('ov-recent-tbl', 5, 5);
+    // Stat-card skeletons on the dashboard (4 cards)
+    const statsGrid = document.querySelector('#page-overview .stats-grid');
+    if(statsGrid && !statsGrid.dataset.sklShown){
+      statsGrid.dataset.sklShown = '1';
+      statsGrid.dataset.origHtml = statsGrid.innerHTML;
+      statsGrid.innerHTML = skeletonStat() + skeletonStat() + skeletonStat() + skeletonStat();
+    }
+    // Pipeline funnel numbers — show shimmer instead of zeros
+    document.querySelectorAll('#funnel-row .funnel-num').forEach(el=>{
+      if(!el.dataset.origText){ el.dataset.origText = el.textContent; el.innerHTML = '<span class="skl skl-w-50" style="height:18px"></span>'; }
+    });
+  }catch(e){ /* skeleton errors are non-fatal */ }
+
   try{
     // Fetch individually so one failure doesn't break everything
     const meRes=await fetch('/api/auth/me',{credentials:'include'});
@@ -2331,6 +2728,20 @@ async function loadFromDB(){
     }catch(e){console.warn('[JOBS FILTER]',e);}
 
     console.log('[FINAL] allResults.length=',allResults.length,'role=',me.role,'user_id=',me.user_id);
+
+    // Restore the stats grid HTML we replaced with skeletons. updateAll() expects
+    // the real <div class="stat">…</div> blocks with their #ov-total, #ov-shortlisted etc. ids.
+    const statsGrid = document.querySelector('#page-overview .stats-grid');
+    if(statsGrid && statsGrid.dataset.origHtml){
+      statsGrid.innerHTML = statsGrid.dataset.origHtml;
+      delete statsGrid.dataset.sklShown;
+      delete statsGrid.dataset.origHtml;
+    }
+    // Restore funnel placeholders too
+    document.querySelectorAll('#funnel-row .funnel-num').forEach(el=>{
+      if(el.dataset.origText){ el.textContent = el.dataset.origText; delete el.dataset.origText; }
+    });
+
     updateAll();
     addActivity('Dashboard loaded — '+allResults.length+' candidates','var(--indigo)');
     fixCountOnLoad();
