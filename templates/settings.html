@@ -168,6 +168,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       Team Members
     </button>
     <div class="sb-section">Preferences</div>
+    <button class="sb-item" onclick="nav('email-templates',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      Email Templates
+    </button>
     <button class="sb-item" onclick="nav('api',this)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       API Keys
@@ -508,6 +512,74 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
 
+    <!-- ── EMAIL TEMPLATES ── -->
+    <div class="page" id="page-email-templates">
+      <div class="page-hd">
+        <h1>Email Templates</h1>
+        <p>Customize the emails you send to candidates from the candidate report. Edit once, use forever.</p>
+      </div>
+      <div class="alert alert-ok" id="et-ok">✓ Templates saved!</div>
+      <div class="alert alert-err" id="et-err"></div>
+
+      <!-- Help: which placeholders work -->
+      <div class="card" style="margin-bottom:12px;background:var(--s2)">
+        <div style="font-size:12px;color:var(--t2);line-height:1.7">
+          <strong style="color:var(--text)">Available placeholders</strong> — these are filled in automatically when you send an email:
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+            <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">{candidate_name}</code>
+            <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">{job_title}</code>
+            <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">{company_name}</code>
+            <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">{recruiter_name}</code>
+            <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">{score}</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interview template -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">📅 Interview invite</div><span class="card-sub" id="et-interview-status">Using default</span></div>
+        <div class="form-group">
+          <label class="form-label">Subject line</label>
+          <input class="form-input" id="et-interview-subject">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email body</label>
+          <textarea class="form-textarea" id="et-interview-body" rows="8" style="font-family:inherit"></textarea>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('interview')">↺ Reset to default</button>
+      </div>
+
+      <!-- Rejection template -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">✕ Rejection</div><span class="card-sub" id="et-rejection-status">Using default</span></div>
+        <div class="form-group">
+          <label class="form-label">Subject line</label>
+          <input class="form-input" id="et-rejection-subject">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email body</label>
+          <textarea class="form-textarea" id="et-rejection-body" rows="8" style="font-family:inherit"></textarea>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('rejection')">↺ Reset to default</button>
+      </div>
+
+      <!-- Offer template -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">🎉 Offer</div><span class="card-sub" id="et-offer-status">Using default</span></div>
+        <div class="form-group">
+          <label class="form-label">Subject line</label>
+          <input class="form-input" id="et-offer-subject">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email body</label>
+          <textarea class="form-textarea" id="et-offer-body" rows="8" style="font-family:inherit"></textarea>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="resetEmailTemplate('offer')">↺ Reset to default</button>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveEmailTemplates()">Save all templates</button>
+    </div>
+
     <!-- ── API KEYS ── -->
     <div class="page" id="page-api">
       <div class="page-hd"><h1>API Keys</h1><p>Generate keys to integrate TopCandidate into your own platform. <a href="/docs" target="_blank" style="color:var(--indigo)">View API docs →</a></p></div>
@@ -596,6 +668,79 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <script>
+// ── NOTIFICATION SYSTEM (shared) — toast() + confirmDialog() + promptDialog() ──
+function _getToastContainer(){
+  let c = document.getElementById('_toast_container');
+  if(!c){
+    c = document.createElement('div');
+    c.id = '_toast_container';
+    c.style.cssText = 'position:fixed;top:72px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+const _TOAST_CONFIG = {
+  success: {icon:'\u2713', color:'var(--green)', bg:'#F0FDF4', border:'#86EFAC'},
+  error:   {icon:'\u2715', color:'var(--red)',   bg:'#FEF2F2', border:'#FCA5A5'},
+  info:    {icon:'\u2139', color:'var(--orange)',bg:'#FFF7ED', border:'#FED7AA'},
+  warning: {icon:'\u26A0', color:'var(--amber)', bg:'#FFFBEB', border:'#FCD34D'},
+};
+function toast(message, opts){
+  opts = opts || {};
+  const cfg = _TOAST_CONFIG[opts.type||'info'] || _TOAST_CONFIG.info;
+  const duration = opts.duration || (opts.type==='error' ? 8000 : opts.type==='warning' ? 6000 : 4000);
+  const el = document.createElement('div');
+  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(20,40,72,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
+  el.innerHTML = `<span style="font-size:16px;color:${cfg.color};font-weight:700;flex-shrink:0;line-height:1.2">${cfg.icon}</span><div style="flex:1;min-width:0;word-wrap:break-word">${String(message).replace(/</g,'&lt;')}</div>`;
+  _getToastContainer().appendChild(el);
+  requestAnimationFrame(()=>{ el.style.transform='translateX(0)'; el.style.opacity='1'; });
+  const dismiss = ()=>{ el.style.transform='translateX(120%)'; el.style.opacity='0'; setTimeout(()=>el.remove(), 250); };
+  el.addEventListener('click', dismiss);
+  setTimeout(dismiss, duration);
+}
+function showToast(msg, c){ if(typeof c==='string' && _TOAST_CONFIG[c]) toast(msg,{type:c}); else toast(msg,{type: c&&c.includes('green')?'success':c&&c.includes('red')?'error':c&&c.includes('amber')?'warning':'info'}); }
+function promptDialog(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    const danger = !!opts.danger;
+    const cClass = danger ? 'btn-red' : 'btn-primary';
+    const requiredHint = opts.mustMatch ? `<div style="font-size:11px;color:var(--t3);margin-top:4px">Type <code style="background:var(--s2);padding:1px 5px;border-radius:3px;font-size:11px">${opts.mustMatch}</code> to confirm</div>` : '';
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Confirm').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<input type="text" class="form-input" id="_promptInput" placeholder="${opts.placeholder||''}" style="margin-bottom:4px">${requiredHint}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem"><button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button><button class="btn ${cClass} btn-sm" data-action="confirm">${opts.confirmText||'Confirm'}</button></div></div>`;
+    document.body.appendChild(overlay);
+    const dialog = overlay.firstElementChild;
+    const input = dialog.querySelector('#_promptInput');
+    requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });
+    const close = r => { overlay.style.opacity='0'; dialog.style.transform='scale(.96)'; setTimeout(()=>{ overlay.remove(); document.removeEventListener('keydown', esc); }, 150); resolve(r); };
+    const tryConfirm = () => { const v = input.value.trim(); if(opts.mustMatch && v !== opts.mustMatch){ input.style.borderColor='var(--red)'; input.focus(); return; } close(v); };
+    const esc = e => { if(e.key==='Escape') close(null); else if(e.key==='Enter') tryConfirm(); };
+    document.addEventListener('keydown', esc);
+    overlay.addEventListener('click', e => { if(e.target===overlay) return close(null); const a = e.target.closest('[data-action]')?.dataset.action; if(a==='confirm') tryConfirm(); else if(a==='cancel') close(null); });
+    setTimeout(()=>input.focus(), 50);
+  });
+}
+
+function confirmDialog(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    const danger = !!opts.danger;
+    const cText = opts.confirmText || (danger ? 'Delete' : 'Confirm');
+    const cClass = danger ? 'btn-red' : 'btn-primary';
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="cancel">${opts.cancelText||'Cancel'}</button><button class="btn ${cClass} btn-sm" data-action="confirm">${cText}</button></div></div>`;
+    document.body.appendChild(overlay);
+    const dialog = overlay.firstElementChild;
+    requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });
+    const close = r => { overlay.style.opacity='0'; dialog.style.transform='scale(.96)'; setTimeout(()=>{ overlay.remove(); document.removeEventListener('keydown', esc); }, 150); resolve(r); };
+    const esc = e => { if(e.key==='Escape') close(false); else if(e.key==='Enter') close(true); };
+    document.addEventListener('keydown', esc);
+    overlay.addEventListener('click', e => { if(e.target===overlay) return close(false); const a = e.target.closest('[data-action]')?.dataset.action; if(a==='confirm') close(true); else if(a==='cancel') close(false); });
+    setTimeout(()=>dialog.querySelector('[data-action="confirm"]')?.focus(), 50);
+  });
+}
+
 let userData = null;
 let usageData = null;
 let selectedPlan = null;
@@ -619,6 +764,83 @@ function nav(id, el){
   if(btn) btn.classList.add('act');
   if(id==='api') loadApiKeys();
   if(id==='usage') refreshUsage();
+  if(id==='email-templates') loadEmailTemplatesPage();
+}
+
+// ── EMAIL TEMPLATES ──
+// Default templates — kept in sync with email_service.py DEFAULT_TEMPLATES.
+// We need these client-side so "Reset to default" works without a network round-trip.
+const ET_DEFAULTS = {
+  interview: {
+    subject: "Interview invitation — {job_title} at {company_name}",
+    body: "Hi {candidate_name},\n\nThank you for applying for the {job_title} role at {company_name}. We were impressed with your application and would like to invite you to the next stage of our process.\n\nPlease reply with a few times that work for you next week for a 30-minute conversation, and we'll get something on the calendar.\n\nLooking forward to speaking with you.\n\nBest regards,\n{recruiter_name}\n{company_name}",
+  },
+  rejection: {
+    subject: "Update on your application — {job_title}",
+    body: "Hi {candidate_name},\n\nThank you for your interest in the {job_title} role at {company_name} and for taking the time to apply.\n\nAfter careful review, we've decided to move forward with other candidates whose background more closely matches what we're looking for in this position. This was a difficult decision — we received many strong applications.\n\nWe genuinely appreciate your interest in {company_name} and wish you the best in your job search.\n\nBest regards,\n{recruiter_name}\n{company_name}",
+  },
+  offer: {
+    subject: "Offer — {job_title} at {company_name}",
+    body: "Hi {candidate_name},\n\nWe're delighted to offer you the {job_title} position at {company_name}!\n\nWe were very impressed throughout the interview process and believe you'd be a great addition to our team. The formal offer document is attached / will be sent separately with full details on compensation, benefits, and start date.\n\nPlease review and let us know if you have any questions. We'd love to have your decision by [DATE].\n\nCongratulations, and we hope to welcome you onboard soon.\n\nBest regards,\n{recruiter_name}\n{company_name}",
+  },
+};
+
+async function loadEmailTemplatesPage(){
+  // Hide any old success/error banners
+  document.getElementById('et-ok').style.display='none';
+  document.getElementById('et-err').style.display='none';
+  try{
+    const r = await fetch('/api/user/email-templates', {credentials:'include'});
+    if(!r.ok) throw new Error('Could not load templates');
+    const data = await r.json();
+    for(const kind of ['interview','rejection','offer']){
+      const tpl = (data.templates || {})[kind] || ET_DEFAULTS[kind];
+      document.getElementById('et-'+kind+'-subject').value = tpl.subject || ET_DEFAULTS[kind].subject;
+      document.getElementById('et-'+kind+'-body').value    = tpl.body    || ET_DEFAULTS[kind].body;
+      const status = document.getElementById('et-'+kind+'-status');
+      if(status) status.textContent = tpl.is_custom ? 'Custom' : 'Using default';
+    }
+  }catch(e){
+    showErr('et-err', 'Failed to load templates: '+e.message);
+  }
+}
+
+function resetEmailTemplate(kind){
+  const def = ET_DEFAULTS[kind];
+  if(!def) return;
+  document.getElementById('et-'+kind+'-subject').value = def.subject;
+  document.getElementById('et-'+kind+'-body').value    = def.body;
+  const status = document.getElementById('et-'+kind+'-status');
+  if(status) status.textContent = 'Reset — click Save to apply';
+}
+
+async function saveEmailTemplates(){
+  document.getElementById('et-ok').style.display='none';
+  document.getElementById('et-err').style.display='none';
+  // Build the payload — only include templates that diverge from defaults to keep
+  // the user document clean. (Backend handles either way.)
+  const templates = {};
+  for(const kind of ['interview','rejection','offer']){
+    const subj = document.getElementById('et-'+kind+'-subject').value.trim();
+    const body = document.getElementById('et-'+kind+'-body').value.trim();
+    if(!subj || !body){
+      showErr('et-err', `${kind} template — subject and body are both required.`);
+      return;
+    }
+    templates[kind] = {subject: subj, body: body};
+  }
+  try{
+    const fd = new FormData();
+    fd.append('templates', JSON.stringify(templates));
+    const r = await fetch('/api/user/email-templates', {method:'PUT', body:fd, credentials:'include'});
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.detail || ('Save failed ('+r.status+')'));
+    showOk('et-ok');
+    // Reload to refresh "Custom" / "Using default" status badges
+    loadEmailTemplatesPage();
+  }catch(e){
+    showErr('et-err', e.message);
+  }
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -668,7 +890,7 @@ function copyKey(){
 }
 
 async function revokeKey(id){
-  if(!confirm('Revoke this API key? This cannot be undone.'))return;
+  if(!await confirmDialog({title:'Revoke this API key?', body:'This cannot be undone. Any integrations using this key will stop working immediately.', danger:true, confirmText:'Revoke key'})) return;
   await fetch('/api/keys/'+id,{method:'DELETE',credentials:'include'});
   loadApiKeys();
 }
@@ -862,7 +1084,7 @@ function selectPayment(method){
 }
 
 async function proceedPayment(){
-  if(!selectedPlan){alert('Please select a plan first.');return;}
+  if(!selectedPlan){ toast('Please select a plan first', {type:'warning'}); return; }
   const btn=document.getElementById('pay-btn');
   btn.innerHTML='<div class="spin"></div> Processing...';btn.disabled=true;
   try{
@@ -874,7 +1096,7 @@ async function proceedPayment(){
     if(data.url)window.location.href=data.url;
     else throw new Error('No payment URL received');
   }catch(e){
-    alert('Payment error: '+e.message);
+    toast('Payment error: '+e.message, {type:'error'});
     btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Proceed to payment';
     btn.disabled=false;
   }
@@ -907,9 +1129,9 @@ async function submitManualPayment(){
 }
 
 async function cancelSubscription(){
-  if(!confirm('Are you sure you want to cancel? Your plan stays active until the end of the billing period.'))return;
+  if(!await confirmDialog({title:'Cancel your subscription?', body:'Your plan stays active until the end of the current billing period. You can resubscribe anytime.', danger:true, confirmText:'Cancel subscription'})) return;
   const res=await fetch('/api/payments/cancel',{method:'POST',credentials:'include'});
-  if(res.ok){alert('Subscription cancelled. You will keep access until end of billing period.');loadUser();}
+  if(res.ok){ toast('Subscription cancelled — access until end of billing period', {type:'success'}); loadUser(); }
 }
 
 async function manageBilling(){
@@ -933,13 +1155,9 @@ async function sendInvite(){
     closeModal('invite-modal');
     document.getElementById('invite-email').value='';
     if(data.email_sent){
-      alert('✓ Invitation email sent to '+email+'!');
+      toast('Invitation email sent to '+email, {type:'success'});
     } else {
-      alert(`Invite saved for ${email}.
-
-Note: Email was not sent because Gmail is not configured in your server environment.
-
-To enable email invites, add GMAIL_USER and GMAIL_APP_PASSWORD to your Render environment variables.`);
+      toast('Invite saved for '+email+', but email could not be sent — Gmail is not configured on the server', {type:'warning', duration:10000});
     }
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
@@ -960,13 +1178,29 @@ async function saveNotifications(){
 }
 
 // ── DANGER ──
-function confirmDeleteData(){
-  const answer=prompt('Type DELETE to confirm you want to delete all your screening data:');
-  if(answer==='DELETE'){alert('Feature coming soon — contact support to delete data.');}
+async function confirmDeleteData(){
+  const answer = await promptDialog({
+    title: 'Delete all your screening data?',
+    body: 'This will permanently remove every CV you have screened. Your account stays active. This cannot be undone.',
+    mustMatch: 'DELETE',
+    danger: true,
+    confirmText: 'Delete data',
+  });
+  if(answer === 'DELETE'){
+    toast('This feature is not yet self-serve. Please email hello@linkx360.com to delete your data.', {type:'info', duration:9000});
+  }
 }
-function confirmDeleteAccount(){
-  const answer=prompt('Type DELETE ACCOUNT to permanently delete your account:');
-  if(answer==='DELETE ACCOUNT'){alert('Please contact support at hello@linkx360.com to delete your account.');}
+async function confirmDeleteAccount(){
+  const answer = await promptDialog({
+    title: 'Permanently delete your account?',
+    body: 'This removes your account, all team members, and all screening data. This cannot be undone.',
+    mustMatch: 'DELETE ACCOUNT',
+    danger: true,
+    confirmText: 'Delete account',
+  });
+  if(answer === 'DELETE ACCOUNT'){
+    toast('Please email hello@linkx360.com to delete your account — self-serve deletion is not yet available.', {type:'info', duration:9000});
+  }
 }
 
 loadUser();

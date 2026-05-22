@@ -1218,7 +1218,7 @@ async function quickAction(id, action){
     try{ renderCandidates(); }catch(_){}
     try{ renderOverview(); }catch(_){}
     try{ renderPipeline(); }catch(_){}
-    alert('Could not save action: '+e.message);
+    toast('Could not save: '+e.message, {type:'error'});
   }
 }
 
@@ -1261,9 +1261,9 @@ function fillTemplateVars(text, vars){
 }
 
 async function openEmailComposer(){
-  if(!currentCandId){ alert('No candidate selected'); return; }
+  if(!currentCandId){ toast('No candidate selected', {type:'warning'}); return; }
   const r = allResults.find(x=>x._id===currentCandId);
-  if(!r){ alert('Candidate not found in local cache'); return; }
+  if(!r){ toast('Candidate not found — please refresh', {type:'error'}); return; }
 
   // Variables we'll substitute into the template
   const candEmail = r.parsed_cv?.personal?.email || '';
@@ -1380,14 +1380,182 @@ async function sendCandidateEmail(){
   }
 }
 
-// Tiny toast helper (used by email-send and could be re-used elsewhere)
-function showToast(msg, color){
-  const t = document.createElement('div');
-  t.style.cssText = 'position:fixed;top:70px;right:20px;background:'+(color||'var(--green)')
-    +';color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 4000);
+// ── NOTIFICATION SYSTEM ──
+// One central place for in-app feedback. Replaces alert() and confirm() so the
+// UI doesn't get interrupted by 1995-era browser popups.
+//
+// Public API:
+//   toast(message, options)
+//     options: {type: 'success'|'error'|'info'|'warning', duration: ms}
+//     duration defaults: success/info 4s, warning 6s, error 8s (stays longer so users can read it)
+//   confirmDialog({title, body, confirmText, cancelText, danger}) → Promise<boolean>
+//   promptDialog({title, body, placeholder, mustMatch, confirmText, danger}) → Promise<string|null>
+//
+// Kept showToast() as an alias for backward compat with existing call sites.
+
+// Lazy-create the toast container the first time we need it. Top-right, stacks vertically.
+function _getToastContainer(){
+  let c = document.getElementById('_toast_container');
+  if(!c){
+    c = document.createElement('div');
+    c.id = '_toast_container';
+    c.style.cssText = 'position:fixed;top:72px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+
+// Visual config per type — emoji icon + accent color + bg/border tints (light theme palette)
+const _TOAST_CONFIG = {
+  success: {icon:'✓', color:'var(--green)', bg:'#F0FDF4', border:'#86EFAC'},
+  error:   {icon:'✕', color:'var(--red)',   bg:'#FEF2F2', border:'#FCA5A5'},
+  info:    {icon:'ℹ', color:'var(--orange)',bg:'#FFF7ED', border:'#FED7AA'},
+  warning: {icon:'⚠', color:'var(--amber)', bg:'#FFFBEB', border:'#FCD34D'},
+};
+
+function toast(message, opts){
+  opts = opts || {};
+  const type = opts.type || 'info';
+  const cfg = _TOAST_CONFIG[type] || _TOAST_CONFIG.info;
+  // Errors stay longer than successes — users need time to read what went wrong.
+  const duration = opts.duration || (type==='error' ? 8000 : type==='warning' ? 6000 : 4000);
+
+  const el = document.createElement('div');
+  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(20,40,72,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
+  el.innerHTML = `<span style="font-size:16px;color:${cfg.color};font-weight:700;flex-shrink:0;line-height:1.2">${cfg.icon}</span><div style="flex:1;min-width:0;word-wrap:break-word">${String(message).replace(/</g,'&lt;')}</div>`;
+
+  _getToastContainer().appendChild(el);
+  // Trigger slide-in on next frame (so the initial transform takes effect)
+  requestAnimationFrame(()=>{ el.style.transform='translateX(0)'; el.style.opacity='1'; });
+
+  const dismiss = ()=>{
+    el.style.transform='translateX(120%)';
+    el.style.opacity='0';
+    setTimeout(()=>el.remove(), 250);
+  };
+  el.addEventListener('click', dismiss);   // click to dismiss
+  setTimeout(dismiss, duration);
+}
+
+// Backward-compat shim — old call sites that used showToast(msg, color) still work
+function showToast(msg, colorOrType){
+  // Detect if it's one of the new type strings vs an old CSS color
+  if(typeof colorOrType === 'string' && _TOAST_CONFIG[colorOrType]){
+    toast(msg, {type: colorOrType});
+  } else {
+    // Old-style: green = success, red = error, anything else = info
+    let type = 'info';
+    if(colorOrType && colorOrType.includes('green')) type = 'success';
+    else if(colorOrType && colorOrType.includes('red')) type = 'error';
+    else if(colorOrType && colorOrType.includes('amber')) type = 'warning';
+    toast(msg, {type});
+  }
+}
+
+// ── CONFIRM DIALOG ──
+// Promise-based replacement for window.confirm. Use:
+//   if(await confirmDialog({title:'Delete job?', body:'This cannot be undone.', danger:true})) { ... }
+function confirmDialog(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    const danger = !!opts.danger;
+    const confirmText = opts.confirmText || (danger ? 'Delete' : 'Confirm');
+    const cancelText  = opts.cancelText  || 'Cancel';
+    const confirmBtnClass = danger ? 'btn-red' : 'btn-primary';
+
+    overlay.innerHTML = `
+      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
+        <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>
+        ${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" data-action="cancel">${cancelText}</button>
+          <button class="btn ${confirmBtnClass} btn-sm" data-action="confirm">${confirmText}</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    const dialog = overlay.firstElementChild;
+    requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });
+
+    const close = (result) => {
+      overlay.style.opacity = '0';
+      dialog.style.transform = 'scale(.96)';
+      setTimeout(()=>{ overlay.remove(); document.removeEventListener('keydown', escHandler); }, 150);
+      resolve(result);
+    };
+    const escHandler = e => { if(e.key === 'Escape') close(false); else if(e.key === 'Enter') close(true); };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.addEventListener('click', e => {
+      if(e.target === overlay) { close(false); return; }   // backdrop click cancels
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if(action === 'confirm') close(true);
+      else if(action === 'cancel') close(false);
+    });
+
+    // Auto-focus the confirm button for keyboard users (Enter = confirm)
+    setTimeout(()=>dialog.querySelector('[data-action="confirm"]')?.focus(), 50);
+  });
+}
+
+// ── PROMPT DIALOG ──
+// Like confirmDialog but with a text input. Use for "Type DELETE to confirm" flows.
+//   const value = await promptDialog({title:'Delete account', body:'Type DELETE to confirm', mustMatch:'DELETE'})
+// Returns the entered string, or null if cancelled / didn't match.
+function promptDialog(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    const danger = !!opts.danger;
+    const confirmText = opts.confirmText || 'Confirm';
+    const confirmBtnClass = danger ? 'btn-red' : 'btn-primary';
+    const requiredHint = opts.mustMatch ? `<div style="font-size:11px;color:var(--t3);margin-top:4px">Type <code style="background:var(--s2);padding:1px 5px;border-radius:3px;font-size:11px">${opts.mustMatch}</code> to confirm</div>` : '';
+
+    overlay.innerHTML = `
+      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
+        <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Confirm').replace(/</g,'&lt;')}</h3>
+        ${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}
+        <input type="text" class="form-input" id="_promptInput" placeholder="${opts.placeholder||''}" style="margin-bottom:4px">
+        ${requiredHint}
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem">
+          <button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button>
+          <button class="btn ${confirmBtnClass} btn-sm" data-action="confirm">${confirmText}</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    const dialog = overlay.firstElementChild;
+    const input  = dialog.querySelector('#_promptInput');
+    requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });
+
+    const close = (result) => {
+      overlay.style.opacity='0'; dialog.style.transform='scale(.96)';
+      setTimeout(()=>{ overlay.remove(); document.removeEventListener('keydown', escHandler); }, 150);
+      resolve(result);
+    };
+    const tryConfirm = () => {
+      const val = input.value.trim();
+      if(opts.mustMatch && val !== opts.mustMatch) {
+        input.style.borderColor = 'var(--red)';
+        input.focus();
+        return;
+      }
+      close(val);
+    };
+    const escHandler = e => { if(e.key === 'Escape') close(null); else if(e.key === 'Enter') tryConfirm(); };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.addEventListener('click', e => {
+      if(e.target === overlay) { close(null); return; }
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if(action === 'confirm') tryConfirm();
+      else if(action === 'cancel') close(null);
+    });
+    setTimeout(()=>input.focus(), 50);
+  });
 }
 
 // ── OVERVIEW ──
@@ -1545,7 +1713,7 @@ async function pipelineMove(id, stage){
     cand.stage = prevStage;
     renderPipeline();
     try{ renderCandidates(allResults); }catch(_){}
-    alert('Could not save action: '+e.message);
+    toast('Could not save: '+e.message, {type:'error'});
   }
 }
 
@@ -1591,7 +1759,7 @@ function renderJobs(){
 // and get a quick read on how the role is performing without leaving the Jobs tab.
 async function viewJobDetails(jobId){
   const j = allJobs.find(x=>x._id===jobId);
-  if(!j){ alert('Job not found in local cache. Refresh the page.'); return; }
+  if(!j){ toast('Job not found — please refresh the page', {type:'error'}); return; }
   // Fetch the full job (description lives there, not on the cached list rows)
   let full = j;
   try{
@@ -1890,12 +2058,12 @@ async function editJob(id){
     const det = document.getElementById('j-weights-details');
     if(det) det.open = !!j.weights;
     openModal('job-modal');
-  }catch(e){alert('Failed to load job: '+e.message);}
+  }catch(e){ toast('Failed to load job: '+e.message, {type:'error'}); }
 }
 
 async function saveJob(){
   const title=document.getElementById('j-title').value.trim();
-  if(!title){alert('Please enter a job title');return;}
+  if(!title){ toast('Please enter a job title', {type:'warning'}); return; }
   const desc=document.getElementById('j-desc').value;
   const fd=new FormData();
   fd.append('title',title);
@@ -1936,12 +2104,21 @@ async function saveJob(){
     closeModal('job-modal');renderJobs();renderOverview();
     editingJobId=null;
     ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>document.getElementById(id).value='');
-  }catch(e){alert('Failed: '+e.message);}
+    toast(editingJobId===null ? 'Job saved' : 'Job created: '+title, {type:'success'});
+  }catch(e){ toast('Failed: '+e.message, {type:'error'}); }
 }
 async function deleteJob(id){
-  if(!confirm('Delete this job?'))return;
-  await fetch('/api/jobs/'+id,{method:'DELETE',credentials:'include'});
-  allJobs=allJobs.filter(j=>j._id!==id);renderJobs();renderOverview();
+  const j = allJobs.find(x=>x._id===id);
+  const jobTitle = j?.title || 'this job';
+  if(!await confirmDialog({title:'Delete "'+jobTitle+'"?', body:'This will remove the job posting, but existing screenings against it will remain in the candidates list.', danger:true, confirmText:'Delete job'})) return;
+  try{
+    const res = await fetch('/api/jobs/'+id,{method:'DELETE',credentials:'include'});
+    if(!res.ok) throw new Error('Server returned '+res.status);
+    allJobs=allJobs.filter(j=>j._id!==id);renderJobs();renderOverview();
+    toast('Deleted: '+jobTitle, {type:'success'});
+  }catch(e){
+    toast('Could not delete: '+e.message, {type:'error'});
+  }
 }
 
 // ── ANALYTICS ──

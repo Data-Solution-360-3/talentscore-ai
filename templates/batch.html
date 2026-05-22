@@ -240,7 +240,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="stat-mini"><div class="stat-mini-val" style="color:var(--red)" id="ps-fail">0</div><div class="stat-mini-lbl">Failed</div></div>
       </div>
       <div class="cv-grid" id="cv-grid"></div>
-      <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="if(confirm('Cancel batch?'))location.reload()">Cancel</button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="(async()=>{ if(await confirmDialog({title:'Cancel this batch?', body:'In-progress screenings will be lost.', danger:true, confirmText:'Cancel batch'})) location.reload(); })()">Cancel</button>
     </div>
   </div>
 
@@ -277,6 +277,57 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <script>
+// ── NOTIFICATION SYSTEM (shared) — toast() + confirmDialog() + promptDialog() ──
+function _getToastContainer(){
+  let c = document.getElementById('_toast_container');
+  if(!c){
+    c = document.createElement('div');
+    c.id = '_toast_container';
+    c.style.cssText = 'position:fixed;top:72px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+const _TOAST_CONFIG = {
+  success: {icon:'\u2713', color:'var(--green)', bg:'#F0FDF4', border:'#86EFAC'},
+  error:   {icon:'\u2715', color:'var(--red)',   bg:'#FEF2F2', border:'#FCA5A5'},
+  info:    {icon:'\u2139', color:'var(--orange)',bg:'#FFF7ED', border:'#FED7AA'},
+  warning: {icon:'\u26A0', color:'var(--amber)', bg:'#FFFBEB', border:'#FCD34D'},
+};
+function toast(message, opts){
+  opts = opts || {};
+  const cfg = _TOAST_CONFIG[opts.type||'info'] || _TOAST_CONFIG.info;
+  const duration = opts.duration || (opts.type==='error' ? 8000 : opts.type==='warning' ? 6000 : 4000);
+  const el = document.createElement('div');
+  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(20,40,72,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
+  el.innerHTML = `<span style="font-size:16px;color:${cfg.color};font-weight:700;flex-shrink:0;line-height:1.2">${cfg.icon}</span><div style="flex:1;min-width:0;word-wrap:break-word">${String(message).replace(/</g,'&lt;')}</div>`;
+  _getToastContainer().appendChild(el);
+  requestAnimationFrame(()=>{ el.style.transform='translateX(0)'; el.style.opacity='1'; });
+  const dismiss = ()=>{ el.style.transform='translateX(120%)'; el.style.opacity='0'; setTimeout(()=>el.remove(), 250); };
+  el.addEventListener('click', dismiss);
+  setTimeout(dismiss, duration);
+}
+function showToast(msg, c){ if(typeof c==='string' && _TOAST_CONFIG[c]) toast(msg,{type:c}); else toast(msg,{type: c&&c.includes('green')?'success':c&&c.includes('red')?'error':c&&c.includes('amber')?'warning':'info'}); }
+function confirmDialog(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    const danger = !!opts.danger;
+    const cText = opts.confirmText || (danger ? 'Delete' : 'Confirm');
+    const cClass = danger ? 'btn-red' : 'btn-primary';
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="cancel">${opts.cancelText||'Cancel'}</button><button class="btn ${cClass} btn-sm" data-action="confirm">${cText}</button></div></div>`;
+    document.body.appendChild(overlay);
+    const dialog = overlay.firstElementChild;
+    requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });
+    const close = r => { overlay.style.opacity='0'; dialog.style.transform='scale(.96)'; setTimeout(()=>{ overlay.remove(); document.removeEventListener('keydown', esc); }, 150); resolve(r); };
+    const esc = e => { if(e.key==='Escape') close(false); else if(e.key==='Enter') close(true); };
+    document.addEventListener('keydown', esc);
+    overlay.addEventListener('click', e => { if(e.target===overlay) return close(false); const a = e.target.closest('[data-action]')?.dataset.action; if(a==='confirm') close(true); else if(a==='cancel') close(false); });
+    setTimeout(()=>dialog.querySelector('[data-action="confirm"]')?.focus(), 50);
+  });
+}
+
 let selectedFiles=[];
 let batchState={total:0,done:0,proc:0,failed:0};
 let cvItems={};
@@ -509,7 +560,7 @@ async function saveJdToJob(){
   if(!val)return;
   const jobId=val.split('|')[0];
   const jd=document.getElementById('jd').value.trim();
-  if(jd.length<50){alert('JD too short to save.');return;}
+  if(jd.length<50){ toast('JD is too short to save — paste the full description', {type:'warning'}); return; }
   const fd=new FormData();fd.append('description',jd);
   const res=await fetch('/api/jobs/'+jobId,{method:'PUT',body:fd,credentials:'include'});
   if(res.ok){
@@ -576,7 +627,7 @@ function showCreateJob(){document.getElementById('create-job-form').style.displa
 function hideCreateJob(){document.getElementById('create-job-form').style.display='none';}
 async function createJobAndSelect(){
   const title=document.getElementById('nj-title').value.trim();
-  if(!title){alert('Please enter a job title');return;}
+  if(!title){ toast('Please enter a job title', {type:'warning'}); return; }
   const fd=new FormData();
   fd.append('title',title);fd.append('department',document.getElementById('nj-dept').value);
   fd.append('location',document.getElementById('nj-loc').value);fd.append('employment_type','Full-time');
@@ -593,8 +644,8 @@ async function createJobAndSelect(){
     sel.appendChild(opt);sel.value=opt.value;
     hideCreateJob();onJobSelect();
     ['nj-title','nj-dept','nj-loc','nj-skills'].forEach(id=>document.getElementById(id).value='');
-    alert('✓ Job "'+title+'" created and selected!');
-  }catch(e){alert('Error: '+e.message);}
+    toast('Job created: '+title, {type:'success'});
+  }catch(e){ toast('Error: '+e.message, {type:'error'}); }
 }
 
 // Auth check + load jobs
