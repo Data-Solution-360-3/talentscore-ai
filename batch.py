@@ -29,10 +29,12 @@ async def screen_single_cv(
     on_progress: Callable,
     index: int,
     extra_fields: dict = None,
+    weights: dict = None,
 ) -> dict:
     """
     Screen one CV. Called concurrently for all CVs in the batch.
     Uses a semaphore to limit how many run at the same time.
+    `weights` is the per-job dimension-weight override (or None for defaults).
     """
     async with semaphore:
         # Notify frontend this CV is now being processed
@@ -54,7 +56,8 @@ async def screen_single_cv(
             result, error = await run_screening_pipeline(
                 cv_text=cv_text,
                 jd_text=jd_text,
-                api_key=api_key
+                api_key=api_key,
+                weights=weights,
             )
             if error:
                 await on_progress(index, "failed", filename, None, error=error)
@@ -102,6 +105,7 @@ async def run_batch_screening(
     on_progress: Callable,
     concurrency: int = CONCURRENCY_LIMIT,
     extra_fields: dict = None,
+    weights: dict = None,
 ) -> dict:
     """
     Screen a batch of CVs concurrently.
@@ -112,6 +116,7 @@ async def run_batch_screening(
         api_key: OpenAI API key
         on_progress: Async callback(index, status, filename, result, error=None)
         concurrency: Max parallel AI calls
+        weights: Per-job dimension weights (None → use scorer defaults)
 
     Returns:
         {
@@ -135,6 +140,7 @@ async def run_batch_screening(
             on_progress=on_progress,
             index=i,
             extra_fields=extra_fields or {},
+            weights=weights,
         )
         for i, (filename, file_bytes) in enumerate(files)
     ]
