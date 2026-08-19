@@ -17,7 +17,7 @@ from database import save_screening
 
 # Max parallel OpenAI calls at once — safe for most OpenAI plans
 # Increase to 10 if you're on a higher-tier plan
-CONCURRENCY_LIMIT = 5
+CONCURRENCY_LIMIT = 3  # dropped from 5 to keep memory under 512MB on Render Starter
 
 
 async def screen_single_cv(
