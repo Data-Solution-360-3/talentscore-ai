@@ -325,16 +325,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="card">
         <div class="card-title" style="margin-bottom:1rem">Stats strip (hero)</div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Stat 1 number</label><input class="form-input" id="lp-s1n" placeholder="3x"></div>
-          <div class="form-group"><label class="form-label">Stat 1 label</label><input class="form-input" id="lp-s1l" placeholder="Faster hiring"></div>
+          <div class="form-group"><label class="form-label">Stat 1 number</label><input class="form-input" id="lp-s1n" placeholder=""></div>
+          <div class="form-group"><label class="form-label">Stat 1 label</label><input class="form-input" id="lp-s1l" placeholder=""></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Stat 2 number</label><input class="form-input" id="lp-s2n" placeholder="100"></div>
           <div class="form-group"><label class="form-label">Stat 2 label</label><input class="form-input" id="lp-s2l" placeholder="CVs per batch"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Stat 3 number</label><input class="form-input" id="lp-s3n" placeholder="98%"></div>
-          <div class="form-group"><label class="form-label">Stat 3 label</label><input class="form-input" id="lp-s3l" placeholder="Accuracy rate"></div>
+          <div class="form-group"><label class="form-label">Stat 3 number</label><input class="form-input" id="lp-s3n" placeholder=""></div>
+          <div class="form-group"><label class="form-label">Stat 3 label</label><input class="form-input" id="lp-s3l" placeholder=""></div>
         </div>
       </div>
       <div class="card">
@@ -345,7 +345,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="card">
         <div class="card-title" style="margin-bottom:1rem">Trusted companies strip</div>
-        <div class="form-group"><label class="form-label">Company names (comma separated)</label><input class="form-input" id="lp-companies" placeholder="BRAC, Grameenphone, Pathao, ShopUp"></div>
+        <div class="form-group"><label class="form-label">Company names (comma separated)</label><input class="form-input" id="lp-companies" placeholder="DataSolution360, LinkX360"></div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-ghost btn-sm" onclick="loadLandingDefaults()">Reset to defaults</button>
@@ -693,11 +693,11 @@ const LANDING_DEFAULTS={
   h1:'Screen 100 CVs in',h2:'Minutes, Not Days',
   sub:'TopCandidate uses GPT-4o to structure, analyze, and rank candidates against your job description — with enterprise-grade accuracy and full transparency.',
   cta:'Start screening for free',cta2:'See how it works ↓',
-  s1n:'3x',s1l:'Faster hiring',s2n:'100',s2l:'CVs per batch',s3n:'98%',s3l:'Accuracy rate',
+  s1n:'',s1l:'',s2n:'100',s2l:'CVs per batch',s3n:'',s3l:'',
   bannerH:'Ready to transform your hiring?',
   bannerSub:'Join forward-thinking recruitment teams using TopCandidate to make faster, fairer hiring decisions. Start your free trial today — no credit card needed.',
   bannerBtn:'Start free trial — it\'s free →',
-  companies:'BRAC, Grameenphone, Pathao, ShopUp, DataSolution360, LinkX360'
+  companies:'DataSolution360, LinkX360'
 };
 
 function loadLandingContent(){
