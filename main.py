@@ -252,6 +252,21 @@ async def get_current_user(request: Request) -> dict:
     return payload
 
 
+async def require_admin(request: Request) -> dict:
+    """Authenticate the caller, then confirm they are an admin.
+
+    Role is read fresh from the DB rather than trusted from the JWT, so a
+    demoted account loses admin the moment it is demoted instead of when its
+    token expires. Every admin-only endpoint goes through here — the previous
+    per-endpoint copies are how three of them ended up with no check at all.
+    """
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or db_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only.")
+    return user
+
+
 # ─────────────────────────────────────────────────────────────
 # PAGES
 # ─────────────────────────────────────────────────────────────
@@ -780,21 +795,6 @@ async def list_screenings(request: Request, limit: int = 2000):
         "total": total,
         "truncated": len(screenings) < total,
     }
-
-
-@app.post("/api/admin/fix-user-role")
-async def fix_user_role(request: Request, email: str = Form(...), role: str = Form("admin")):
-    """Fix user role — accessible without auth for emergency use."""
-    from database import db
-    from bson import ObjectId
-    target = await get_user_by_email(email)
-    if not target:
-        raise HTTPException(status_code=404, detail=f"User {email} not found.")
-    await db.users.update_one(
-        {"_id": ObjectId(target["_id"])},
-        {"$set": {"role": role}}
-    )
-    return {"success": True, "email": email, "new_role": role}
 
 
 @app.get("/api/screenings/{screening_id}")
@@ -1620,8 +1620,9 @@ async def make_admin(request: Request, email: str):
 
 
 @app.get("/api/admin/check-users")
-async def check_users_screenings():
-    """Show all users and their actual screening counts in DB."""
+async def check_users_screenings(request: Request):
+    """Admin: show all users and their actual screening counts in DB."""
+    await require_admin(request)
     from database import db as mongodb
     users = []
     async for u in mongodb.users.find({}, {"password":0}):
@@ -1643,24 +1644,6 @@ async def check_users_screenings():
     return {"users": users, "unassigned_screenings": unassigned, "total_screenings": total}
 
 
-@app.post("/api/admin/assign-to-email/{email}")
-async def assign_screenings_to_email(email: str):
-    """Assign ALL unassigned screenings to a specific email."""
-    from database import db as mongodb
-    from bson import ObjectId
-    user = await get_user_by_email(email)
-    if not user:
-        return {"error": f"User {email} not found"}
-    uid = user["_id"]
-    result = await mongodb.screenings.update_many(
-        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
-        {"$set": {"user_id": uid}}
-    )
-    count = await mongodb.screenings.count_documents({"user_id": uid})
-    await mongodb.users.update_one({"_id": ObjectId(uid)}, {"$set": {"screening_count": count}})
-    return {"assigned": result.modified_count, "total_for_user": count, "user": email}
-
-
 @app.post("/api/admin/reset-my-count")
 async def reset_my_count(request: Request):
     """Reset current user screening count to 0 (for testing)."""
@@ -1678,8 +1661,9 @@ async def reset_my_count(request: Request):
 
 
 @app.get("/api/admin/fix-counts")
-async def fix_all_counts():
-    """Recalculate and fix screening_count for all users."""
+async def fix_all_counts(request: Request):
+    """Admin: recalculate and fix screening_count for all users."""
+    await require_admin(request)
     from database import db as mongodb
     from bson import ObjectId
     fixed = []
@@ -1694,58 +1678,13 @@ async def fix_all_counts():
     return {"fixed": fixed}
 
 
-@app.get("/api/fix-now")
-async def fix_now():
-    """One-time fix: assign all unowned screenings to tarafdersakib08@gmail.com"""
-    from database import db as mongodb
-    from bson import ObjectId
-    
-    # Find tarafdersakib
-    user = await get_user_by_email("tarafdersakib08@gmail.com")
-    if not user:
-        return {"error": "User not found"}
-    
-    uid = user["_id"]
-    
-    # Make admin
-    await mongodb.users.update_one(
-        {"_id": ObjectId(uid)},
-        {"$set": {"role": "admin"}}
-    )
-    
-    # Assign ALL unowned screenings
-    r1 = await mongodb.screenings.update_many(
-        {"$or": [
-            {"user_id": {"$exists": False}},
-            {"user_id": None},
-            {"user_id": ""}
-        ]},
-        {"$set": {"user_id": uid, "company": user.get("company_name","Data Solution 360")}}
-    )
-    
-    # Count total screenings for this user
-    total = await mongodb.screenings.count_documents({"user_id": uid})
-    
-    # Update screening count
-    await mongodb.users.update_one(
-        {"_id": ObjectId(uid)},
-        {"$set": {"screening_count": total, "role": "admin"}}
-    )
-    
-    return {
-        "success": True,
-        "user_id": uid,
-        "email": "tarafdersakib08@gmail.com",
-        "role": "admin",
-        "screenings_assigned": r1.modified_count,
-        "total_screenings": total,
-        "message": f"Done! Now sign out and sign back in at /login"
-    }
-
-
 @app.get("/api/debug/my-screenings")
 async def debug_screenings(request: Request):
-    """Debug: show what user_id is in token vs what screenings exist."""
+    """Admin debug: show what user_id is in token vs what screenings exist.
+
+    The sample below reads across all tenants, so this is admin-only.
+    """
+    await require_admin(request)
     user = await get_current_user(request)
     from database import db
     # Count screenings by this user_id
