@@ -220,6 +220,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .funnel-stage.act{border-color:var(--indigo);background:var(--ig)}
 .funnel-num{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:3px}
 .funnel-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
+.funnel-sub{font-size:9px;font-weight:600;color:var(--amber);margin-top:2px}
+.dedup-toggle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2);cursor:pointer;user-select:none}
+.dedup-toggle input{cursor:pointer;margin:0}
 .funnel-bar{height:3px;border-radius:2px;margin-top:8px}
 
 /* ── FILTERS ── */
@@ -443,17 +446,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="stat-val" id="ov-total">0</div>
       <div class="stat-sub">candidates evaluated</div>
     </div>
-    <div class="stat" onclick="filterByStage('strong')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--green)"></div>
-      <div class="stat-lbl">Shortlisted</div>
-      <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
-      <div class="stat-sub">strong matches</div>
-    </div>
-    <div class="stat" onclick="filterByStage('maybe')" style="cursor:pointer">
+    <div class="stat" onclick="filterByRec('hire')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--amber)"></div>
-      <div class="stat-lbl">Review needed</div>
-      <div class="stat-val" id="ov-maybe" style="color:var(--amber)">0</div>
-      <div class="stat-sub">manual decision</div>
+      <div class="stat-lbl">AI recommends hire</div>
+      <div class="stat-val" id="ov-airec" style="color:var(--amber)">0</div>
+      <div class="stat-sub">STRONG HIRE + HIRE</div>
+    </div>
+    <div class="stat" onclick="filterByStage('shortlisted')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--green)"></div>
+      <div class="stat-lbl">You shortlisted</div>
+      <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
+      <div class="stat-sub">your decision</div>
     </div>
     <div class="stat" onclick="showPage('jobs')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--orange)"></div>
@@ -463,14 +466,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- Pipeline funnel: 5 meaningful stages (was 8). Drop duplicates: "High Match"≈"Shortlisted", and Interview/Hired which are empty until used. -->
+  <!-- Pipeline funnel. Every cell is a STAGE count on the same (deduped) base, so the four
+       stage cells sum to Screened exactly. "Review needed" is a derived view of Screening
+       (never triaged by a human), shown as a sub-count rather than a cell of its own —
+       it is a subset of Screening, so giving it a cell would break the sum. -->
   <div class="card" style="margin-bottom:10px">
-    <div class="card-hd"><div class="card-title">Candidate pipeline</div><span class="card-sub">Click any stage to filter candidates</span></div>
+    <div class="card-hd">
+      <div class="card-title">Candidate pipeline</div>
+      <label class="dedup-toggle" title="One person applying to two roles counts as two candidacies. This merges repeat screenings of the same person for the same role.">
+        <input type="checkbox" id="dedup-toggle" onchange="setDedupe(this.checked)" checked>
+        <span>Merge duplicate candidacies</span>
+      </label>
+    </div>
     <div class="funnel" id="funnel-row">
       <div class="funnel-stage" onclick="filterByStage('all')"><div class="funnel-num" id="fn-all">0</div><div class="funnel-lbl">Screened</div><div class="funnel-bar" style="background:var(--navy)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('maybe')"><div class="funnel-num" id="fn-maybe">0</div><div class="funnel-lbl">Review needed</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:var(--green)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('screening')"><div class="funnel-num" id="fn-screening">0</div><div class="funnel-lbl">Screening</div><div class="funnel-sub" id="fn-review">0 need review</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
       <div class="funnel-stage" onclick="filterByStage('interview')"><div class="funnel-num" id="fn-interview">0</div><div class="funnel-lbl">Interview</div><div class="funnel-bar" style="background:var(--orange)"></div></div>
+      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:var(--green)"></div></div>
       <div class="funnel-stage" onclick="filterByStage('rejected')"><div class="funnel-num" id="fn-rejected">0</div><div class="funnel-lbl">Rejected</div><div class="funnel-bar" style="background:var(--red)"></div></div>
     </div>
   </div>
@@ -515,6 +527,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="filters-row">
       <input class="filter-input" id="f-search" placeholder="🔍 Search by name, skill..." oninput="applyFilters()" style="flex:1;min-width:180px">
       <select class="filter-select" id="f-job" onchange="applyFilters()"><option value="">All jobs</option></select>
+      <select class="filter-select" id="f-stage" onchange="applyFilters()">
+        <option value="">All stages</option>
+        <option value="screening">Screening</option>
+        <option value="review">— needs review</option>
+        <option value="interview">Interview</option>
+        <option value="shortlisted">Shortlisted</option>
+        <option value="rejected">Rejected</option>
+      </select>
       <select class="filter-select" id="f-result" onchange="applyFilters()">
         <option value="">All results</option>
         <option value="STRONG HIRE">Strong Hire</option>
@@ -563,7 +583,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
      4. PIPELINE
 ══════════════════════════════════════════ -->
 <div class="page" id="page-pipeline">
-  <div class="ph"><h1>Pipeline</h1><p>Auto-sorted by AI recommendation — unique candidates, duplicates hidden</p></div>
+  <div class="ph"><h1>Pipeline</h1><p>Sorted by the stage you put each candidate in. Duplicate merging follows the toggle on the Dashboard.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
     <span class="badge b-green">STRONG HIRE → Interview</span>
     <span class="badge b-indigo">HIRE + MAYBE → Screening</span>
@@ -573,7 +593,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="kb-grid">
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-0"></div></div>
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-1"></div></div>
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Offer</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Shortlisted</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Rejected</span><span class="badge b-red" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
   </div>
 </div>
@@ -624,9 +644,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
           <th>Screened</th>
           <th>Avg score</th>
           <th>Shortlisted</th>
-          <th>In interview</th>
+          <th>Interview</th>
           <th>Rejected</th>
-          <th>Pending review</th>
+          <th>Screening</th>
           <th>Conversion</th>
         </tr></thead>
         <tbody id="job-perf-tbl"><tr><td colspan="8" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="es-title">No analytics data yet</div><div class="es-body">Screen some CVs against a job posting and per-role performance will appear here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen CVs</a></div></div></td></tr></tbody>
@@ -777,7 +797,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('job-modal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveJob()">Save job posting</button>
+      <button class="btn btn-primary btn-sm" id="job-save-btn" onclick="saveJob()">Save job posting</button>
     </div>
   </div>
 </div>
@@ -1369,24 +1389,29 @@ function applyFilters(){
   const dateFrom=document.getElementById('f-date-from')?.value||'';
   const dateTo=document.getElementById('f-date-to')?.value||'';
   const result=document.getElementById('f-result')?.value||'';
+  const stageF=document.getElementById('f-stage')?.value||'';
   const scoreMin=parseInt(document.getElementById('f-score')?.value||'0')||0;
   const expMin=parseInt(document.getElementById('f-exp')?.value||'-1');
   const sort=document.getElementById('f-sort')?.value||'score';
   const scoreMax=document.getElementById('f-score')?.value===''?999:(scoreMin===0?39:scoreMin===80?100:scoreMin===60?79:59);
 
-  let filtered=allResults.filter(r=>{
+  // Dedup is all-or-nothing across pages — same rule the Dashboard funnel uses.
+  const base=CandidateStats.compute(allResults).rows;
+  let filtered=base.filter(r=>{
     const score=r.score||Math.round(r.overall_score||0);
     const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const exp=parseInt(r.years_experience)||0;
     const matchQ=!q||(r.candidate_name||'').toLowerCase().includes(q)||(r.current_title||'').toLowerCase().includes(q)||((r.critical_gaps||[]).join(' ')).toLowerCase().includes(q)||((r.dimensions||[]).flatMap(d=>d.matched_skills||[]).join(' ')).toLowerCase().includes(q);
-    const matchJ=!job||(r.job_id===job)||(r.job_title===job)||(r.company===job);
+    const matchJ=!job||r.job_id===job;
     const rDate=r.created_at?new Date(r.created_at):null;
     const matchDF=!dateFrom||!rDate||(rDate>=new Date(dateFrom));
     const matchDT=!dateTo||!rDate||(rDate<=new Date(dateTo+'T23:59:59'));
     const matchR=!result||rec===result;
+    const st=CandidateStats.stageOf(r);
+    const matchStage=!stageF||(stageF==='review'?CandidateStats.needsReview(r):st===stageF);
     const matchS=document.getElementById('f-score')?.value===''||score<=scoreMax;
     const matchE=expMin<0||(expMin===0?exp<=2:expMin===3?exp>=3&&exp<=5:exp>=6);
-    return matchQ&&matchJ&&matchR&&matchS&&matchE&&matchDF&&matchDT;
+    return matchQ&&matchJ&&matchR&&matchStage&&matchS&&matchE&&matchDF&&matchDT;
   });
 
   if(sort==='score')filtered.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0));
@@ -1395,21 +1420,49 @@ function applyFilters(){
   else if(sort==='name')filtered.sort((a,b)=>(a.candidate_name||'').localeCompare(b.candidate_name||''));
 
   filteredResults=filtered;
-  document.getElementById('filter-count').textContent=`Showing ${filtered.length} of ${allResults.length} candidates`;
+  document.getElementById('filter-count').textContent=`Showing ${filtered.length} of ${base.length} candidates`;
   renderCandidates(filtered);
 }
 
 function clearFilters(){
-  ['f-search','f-job','f-result','f-score','f-exp','f-date-from','f-date-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-search','f-job','f-stage','f-result','f-score','f-exp','f-date-from','f-date-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('f-sort').value='score';
   applyFilters();
 }
 
+// Funnel / stage-card click-through. Filters by STAGE — the same rule that produced
+// the number on the cell. An unknown key is a bug, not a reason to clear every filter
+// and show everything: the old else-branch did exactly that, so clicking "Interview 6"
+// silently displayed all 263 candidates.
 function filterByStage(stage){
   showPage('candidates');
-  const mapRec={strong:'STRONG HIRE',shortlisted:'HIRE',maybe:'MAYBE',rejected:'REJECT'};
-  if(mapRec[stage])document.getElementById('f-result').value=mapRec[stage];
-  else document.getElementById('f-result').value='';
+  const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
+  if(!fStage||!fResult) return;
+  const valid=['all','screening','review','interview','shortlisted','rejected'];
+  if(!valid.includes(stage)){
+    console.error('filterByStage: unknown stage',stage);
+    toast('Could not filter by "'+stage+'" — this is a bug, please report it',{type:'error'});
+    return;
+  }
+  fResult.value='';
+  fStage.value = stage==='all' ? '' : stage;
+  applyFilters();
+}
+
+// Stat-card click-through for the AI's recommendation. Deliberately separate from
+// stage: these are different questions and must never share a filter control.
+function filterByRec(kind){
+  showPage('candidates');
+  const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
+  if(!fStage||!fResult) return;
+  const map={hire:'HIRE',strong:'STRONG HIRE',maybe:'MAYBE',rejected:'REJECT'};
+  if(!(kind in map)){
+    console.error('filterByRec: unknown kind',kind);
+    toast('Could not filter by "'+kind+'" — this is a bug, please report it',{type:'error'});
+    return;
+  }
+  fStage.value='';
+  fResult.value=map[kind];
   applyFilters();
 }
 
@@ -1920,33 +1973,136 @@ function promptDialog(opts){
   });
 }
 
+// ─────────────────────────────────────────────────────────────
+// SHARED CANDIDATE STATS — single source of truth
+// ─────────────────────────────────────────────────────────────
+// Dashboard, Pipeline, Jobs and Analytics all count through this module.
+// Before it, five different rules each called themselves "shortlisted":
+// recommendation-based, stage-based, stage-with-a-recommendation-fallback,
+// the union of both, and a deduped variant. Nothing here falls back between
+// bases. A stage count is always a stage count; a recommendation count is
+// always a recommendation count; each is named for which one it is.
+let DEDUPE_ON = (localStorage.getItem('dedupe') || '1') === '1';
+
+const CandidateStats = (() => {
+  const rec = r => (r.rec || r.recommendation || '').toUpperCase();
+
+  // Stored stages are pending/shortlisted/interview/rejected (main.py:818).
+  // 'pending' is presented as 'screening'. There is no 'offer' stage and never was —
+  // the Pipeline's old "Offer" column was a caption over stage 'shortlisted'.
+  // Any value outside the four the backend accepts would otherwise index byStage as
+  // undefined and turn the funnel into NaN, silently breaking the sum invariant.
+  // Fall back to 'screening' and make noise instead.
+  const stageOf = r => {
+    const v = r.stage || 'pending';
+    if (v === 'pending') return 'screening';
+    if (v === 'interview' || v === 'shortlisted' || v === 'rejected') return v;
+    console.warn('CandidateStats: unrecognised stage', v, 'on', r._id);
+    return 'screening';
+  };
+
+  // A human has acted iff the stage endpoint stamped stage_updated_at (main.py:836).
+  const touched = r => !!r.stage_updated_at;
+
+  // "Review needed" is a DERIVED view, never a stored stage: still in Screening,
+  // and nobody has made a call on it yet. It is a SUBSET of Screening — giving it a
+  // peer cell in the funnel would double-count and break the sum.
+  const needsReview = r => stageOf(r) === 'screening' && !touched(r);
+
+  // Dedup key: email when the CV yielded one, else name + job.
+  // Returns null for records that must never merge — a missing or 'unknown' name
+  // carries no identity, so each such record stays distinct.
+  // Dedup is PER JOB: one person applying to two roles is two candidacies.
+  const dedupKey = r => {
+    const email = ((r.parsed_cv && r.parsed_cv.personal && r.parsed_cv.personal.email) || '').trim().toLowerCase();
+    const job   = r.job_id || '';
+    if (email) return 'e:' + email + '|' + job;
+    const name = (r.candidate_name || '').trim().toLowerCase();
+    if (!name || name === 'unknown') return null;
+    return 'n:' + name + '|' + job;
+  };
+
+  // Collapse duplicates, newest wins. Null-key records are all kept.
+  function dedupe(rows){
+    const seen = new Map(), unmergeable = [];
+    [...rows].sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0))
+      .forEach(r => {
+        const k = dedupKey(r);
+        if (k === null) { unmergeable.push(r); return; }
+        if (!seen.has(k)) seen.set(k, r);
+      });
+    return [...seen.values(), ...unmergeable];
+  }
+
+  // rows -> every count any page needs. opts.dedupe overrides the global toggle.
+  function compute(rows, opts){
+    const on  = (opts && 'dedupe' in opts) ? opts.dedupe : DEDUPE_ON;
+    const set = on ? dedupe(rows) : rows.slice();
+    const byStage = {screening:0, interview:0, shortlisted:0, rejected:0};
+    const byRec   = {'STRONG HIRE':0, 'HIRE':0, 'MAYBE':0, 'REJECT':0};
+    let reviewNeeded = 0, scoreSum = 0;
+
+    set.forEach(r => {
+      byStage[stageOf(r)]++;
+      const v = rec(r); if (v in byRec) byRec[v]++;
+      if (needsReview(r)) reviewNeeded++;
+      scoreSum += (r.score || r.overall_score || 0);
+    });
+
+    const total = set.length;
+    return {
+      rows: set,
+      total,
+      hidden: rows.length - total,
+      byStage,                                                 // sums to total
+      reviewNeeded,                                            // subset of byStage.screening
+      aiRecommendsHire: byRec['STRONG HIRE'] + byRec['HIRE'],   // the AI's opinion
+      youShortlisted:   byStage.shortlisted,                    // your decision
+      byRec,
+      avgScore: total ? Math.round(scoreSum / total) : 0,
+    };
+  }
+
+  // Candidates belonging to a job. job_id only — matching on title made every
+  // duplicate job document claim both jobs' candidates.
+  const forJob = (rows, jobId) => rows.filter(r => r.job_id === jobId);
+
+  return {compute, dedupe, dedupKey, stageOf, needsReview, rec, forJob};
+})();
+
+// Dedup is all-or-nothing across every page, driven by the Dashboard toggle.
+function setDedupe(on){
+  DEDUPE_ON = !!on;
+  localStorage.setItem('dedupe', DEDUPE_ON ? '1' : '0');
+  updateAll();
+}
+
 // ── OVERVIEW ──
 function renderOverview(){
-  const rec = r => (r.rec || r.recommendation || '').toUpperCase();
-  const total       = allResults.length;
-  const shortlisted = allResults.filter(r => rec(r)==='STRONG HIRE' || rec(r)==='HIRE').length;
-  const maybe       = allResults.filter(r => rec(r)==='MAYBE').length;
-  const rejected    = allResults.filter(r => rec(r)==='REJECT').length;
+  const s   = CandidateStats.compute(allResults);
+  const rec = CandidateStats.rec;
 
   // ── 4 stat cards ──
-  document.getElementById('ov-total').textContent       = total;
-  document.getElementById('ov-shortlisted').textContent = shortlisted;
-  document.getElementById('ov-maybe').textContent       = maybe;
+  // "AI recommends hire" and "You shortlisted" answer different questions and are
+  // expected to disagree. The gap between them is the signal, not a bug.
+  document.getElementById('ov-total').textContent       = s.total;
+  document.getElementById('ov-airec').textContent       = s.aiRecommendsHire;
+  document.getElementById('ov-shortlisted').textContent = s.youShortlisted;
   document.getElementById('ov-jobs').textContent        = allJobs.length;
 
-  // ── 5-stage pipeline funnel ──
-  // Stage counts use the user-set stage where available, fall back to AI rec for untouched candidates
-  const inStage = stage => allResults.filter(r => (r.stage||'pending') === stage).length;
-  const interviewCount  = inStage('interview');
-  const shortlistedStage = inStage('shortlisted') || shortlisted;   // fall back to AI-rec shortlists if user hasn't acted
-  document.getElementById('fn-all').textContent         = total;
-  document.getElementById('fn-maybe').textContent       = maybe;
-  document.getElementById('fn-shortlisted').textContent = shortlistedStage;
-  document.getElementById('fn-interview').textContent   = interviewCount;
-  document.getElementById('fn-rejected').textContent    = rejected;
+  // ── Funnel: every cell is a stage count on the same base ──
+  // No fallback. Zero renders as zero — a cell's meaning must not change with its value.
+  const dt = document.getElementById('dedup-toggle');
+  if(dt) dt.checked = DEDUPE_ON;
+  document.getElementById('fn-all').textContent         = s.total;
+  document.getElementById('fn-screening').textContent   = s.byStage.screening;
+  document.getElementById('fn-interview').textContent   = s.byStage.interview;
+  document.getElementById('fn-shortlisted').textContent = s.byStage.shortlisted;
+  document.getElementById('fn-rejected').textContent    = s.byStage.rejected;
+  document.getElementById('fn-review').textContent      = s.reviewNeeded + ' need review';
 
   // ── Recent applicants (now shows applied job) ──
-  const recent = allResults.slice(0, 8);
+  const recent = s.rows.slice(0, 8);
   document.getElementById('ov-recent-tbl').innerHTML = recent.length
     ? recent.map(r => {
         const score   = r.score || Math.round(r.overall_score || 0);
@@ -1972,33 +2128,17 @@ function renderOverview(){
 
 // ── PIPELINE ──
 function renderPipeline(){
-  // Dedupe by candidate name — keep the most recent screening
-  const seen=new Set();const unique=[];
-  [...allResults].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).forEach(r=>{
-    const key=(r.candidate_name||'unknown').toLowerCase().trim();
-    if(!seen.has(key)){seen.add(key);unique.push(r);}
-  });
+  // Same dedup rule as every other page, driven by the Dashboard toggle.
+  const unique=CandidateStats.compute(allResults).rows;
 
-  // Column routing: STAGE (what user decided) wins over AI recommendation.
-  // Candidates you haven't acted on fall back to rec-based placement.
-  //   col 0: Screening  — MAYBE + HIRE that you haven't triaged yet
-  //   col 1: Interview  — STRONG HIRE (default) + anything you moved to interview
-  //   col 2: Offer      — explicitly shortlisted by you (final stage before hire)
-  //   col 3: Rejected   — REJECT (AI) + anything you rejected
+  // Column routing is pure STAGE. The old version dropped untriaged STRONG HIRE into
+  // Interview and untriaged REJECT into Rejected, which put the AI's opinion inside
+  // columns that are meant to show your decisions. Untriaged candidates now sit in
+  // Screening, where they actually are.
+  //   col 0: Screening   col 1: Interview   col 2: Shortlisted   col 3: Rejected
+  const colOf={screening:0, interview:1, shortlisted:2, rejected:3};
   const cols=[[],[],[],[]];
-  unique.forEach(r=>{
-    const stage=r.stage;   // user-set
-    if(stage==='rejected')        cols[3].push(r);
-    else if(stage==='interview')  cols[1].push(r);
-    else if(stage==='shortlisted')cols[2].push(r);
-    else {
-      // No user decision yet — use AI recommendation as the default column
-      const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
-      if(rec==='STRONG HIRE')   cols[1].push(r);
-      else if(rec==='REJECT')   cols[3].push(r);
-      else                      cols[0].push(r);   // HIRE + MAYBE
-    }
-  });
+  unique.forEach(r=>{ cols[colOf[CandidateStats.stageOf(r)]].push(r); });
   cols.forEach(col=>col.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)));
 
   for(let i=0;i<4;i++){
@@ -2020,7 +2160,7 @@ function renderPipeline(){
           actions=`
             <button class="pb-act" title="Shortlist for offer" onclick="event.stopPropagation();pipelineMove('${r._id}','shortlisted')" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)">✓</button>
             <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:var(--red);border:1px solid var(--rb)">✕</button>`;
-        } else if(i===2){ // Offer → can reject or send back to interview
+        } else if(i===2){ // Shortlisted → can reject or send back to interview
           actions=`
             <button class="pb-act" title="Back to interview" onclick="event.stopPropagation();pipelineMove('${r._id}','interview')" style="background:var(--og);color:var(--orange);border:1px solid var(--ob)">←</button>
             <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:var(--red);border:1px solid var(--rb)">✕</button>`;
@@ -2048,8 +2188,10 @@ function renderPipeline(){
           body: ['Use the arrow buttons to move candidates here','Move candidates to interview from the Screening column','Shortlist top candidates from interviews','Reject candidates by clicking ✕'][i] || '',
         });
   }
+  // Reflects the Dashboard toggle: 0 when merging is off, so the notice never claims
+  // to be hiding rows that are actually on screen.
   const removed=allResults.length-unique.length;
-  document.getElementById('pipeline-notice').textContent=removed>0?(removed+' duplicate'+(removed>1?'s':'')+' hidden'):'';
+  document.getElementById('pipeline-notice').textContent=removed>0?(removed+' repeat screening'+(removed>1?'s':'')+' merged'):'';
 }
 
 // Move a candidate card directly from the pipeline board.
@@ -2119,10 +2261,10 @@ function renderJobs(){
 
   // Enrich jobs with computed fields so they can be sorted on those
   const enriched = allJobs.map(j => {
-    const related = allResults.filter(r => r.job_id===j._id || r.job_title===j.title || r.company===j.title);
-    const avgS = related.length ? Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length) : 0;
-    const shl = related.filter(r => (r.rec||r.recommendation||'').toUpperCase()==='STRONG HIRE' || (r.rec||r.recommendation||'').toUpperCase()==='HIRE').length;
-    return Object.assign({}, j, { _applicants: related.length, _avg: avgS, _shl: shl });
+    // job_id only. The old title/company fallbacks made every duplicate job document
+    // claim both jobs' candidates, so two "Data Analyst" rows each reported the union.
+    const st = CandidateStats.compute(CandidateStats.forJob(allResults, j._id));
+    return Object.assign({}, j, { _applicants: st.total, _avg: st.avgScore, _shl: st.youShortlisted });
   });
 
   const sorted = applySort(enriched, 'jobs-tbl');
@@ -2162,10 +2304,8 @@ async function viewJobDetails(jobId){
     const res = await fetch('/api/jobs/'+jobId+'/details',{credentials:'include'});
     if(res.ok) full = await res.json();
   }catch(_){}
-  const related = allResults.filter(r=>r.job_id===jobId||r.job_title===j.title||r.company===j.title);
-  const avgS = related.length ? Math.round(related.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/related.length) : 0;
-  const stages = {pending:0, shortlisted:0, interview:0, rejected:0};
-  related.forEach(r=>{ stages[r.stage||'pending'] = (stages[r.stage||'pending']||0)+1; });
+  const st = CandidateStats.compute(CandidateStats.forJob(allResults, jobId));
+  const related = st.rows;
   // Top 5 candidates by score for a quick "who's the best fit" snapshot
   const top = [...related].sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)).slice(0,5);
 
@@ -2187,19 +2327,19 @@ async function viewJobDetails(jobId){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Applicants</div>
-        <div style="font-size:22px;font-weight:800;color:var(--text)">${related.length}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--text)">${st.total}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg score</div>
-        <div style="font-size:22px;font-weight:800;color:${gc(avgS)}">${avgS||'—'}</div>
+        <div style="font-size:22px;font-weight:800;color:${gc(st.avgScore)}">${st.avgScore||'—'}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Shortlisted</div>
-        <div style="font-size:22px;font-weight:800;color:var(--green)">${stages.shortlisted}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green)">${st.byStage.shortlisted}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Rejected</div>
-        <div style="font-size:22px;font-weight:800;color:var(--red)">${stages.rejected}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--red)">${st.byStage.rejected}</div>
       </div>
     </div>
 
@@ -2457,9 +2597,23 @@ async function editJob(id){
   }catch(e){ toast('Failed to load job: '+e.message, {type:'error'}); }
 }
 
+let _savingJob=false;
 async function saveJob(){
+  // Double-submit guard. A second click while the first POST is in flight was one way
+  // two identical job documents got created; the server-side uniqueness check in
+  // save_job() is the other half.
+  if(_savingJob) return;
   const title=document.getElementById('j-title').value.trim();
   if(!title){ toast('Please enter a job title', {type:'warning'}); return; }
+
+  // Catch the duplicate before the round-trip so the user gets an instant answer.
+  if(!editingJobId){
+    const clash=allJobs.find(j=>(j.title||'').trim().toLowerCase()===title.toLowerCase());
+    if(clash){ toast('You already have a job titled "'+clash.title+'"', {type:'warning'}); return; }
+  }
+  _savingJob=true;
+  const saveBtn=document.getElementById('job-save-btn');
+  if(saveBtn) saveBtn.disabled=true;
   const desc=document.getElementById('j-desc').value;
   const fd=new FormData();
   fd.append('title',title);
@@ -2502,6 +2656,7 @@ async function saveJob(){
     ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>document.getElementById(id).value='');
     toast(editingJobId===null ? 'Job saved' : 'Job created: '+title, {type:'success'});
   }catch(e){ toast('Failed: '+e.message, {type:'error'}); }
+  finally{ _savingJob=false; const b=document.getElementById('job-save-btn'); if(b) b.disabled=false; }
 }
 async function deleteJob(id){
   const j = allJobs.find(x=>x._id===id);
@@ -2520,15 +2675,14 @@ async function deleteJob(id){
 // ── ANALYTICS ──
 function renderAnalytics(){
   // Headline stats
-  const total = allResults.length;
-  const avg   = total ? Math.round(allResults.reduce((a,r)=>a+(r.score||r.overall_score||0),0)/total) : 0;
-  const shl   = allResults.filter(r=>{
-    const rec=(r.rec||r.recommendation||'').toUpperCase();
-    return rec==='STRONG HIRE' || rec==='HIRE' || r.stage==='shortlisted' || r.stage==='interview';
-  }).length;
+  // Shortlist rate is now the STAGE count over total. It used to be the union of
+  // "AI said hire" and "you staged them shortlisted or interview", which is a fourth
+  // definition of shortlisted and inflated the rate against the Dashboard's number.
+  const s = CandidateStats.compute(allResults);
+  const total = s.total;
   document.getElementById('an-total').textContent = total;
-  document.getElementById('an-avg').textContent   = total ? avg : '—';
-  document.getElementById('an-rate').textContent  = total ? Math.round(shl/total*100)+'%' : '—';
+  document.getElementById('an-avg').textContent   = total ? s.avgScore : '—';
+  document.getElementById('an-rate').textContent  = total ? Math.round(s.youShortlisted/total*100)+'%' : '—';
   // ~8 minutes saved per CV is the figure we show across the app. 53 CVs → 7h, not 424h.
   // The previous code multiplied by 8 hours per CV which was nonsense.
   const minsSaved = total * 8;
@@ -2539,12 +2693,15 @@ function renderAnalytics(){
   // ── Job-wise table ──
   // Group screenings by job_id (falling back to job_title for older records that
   // were created before we started saving job_id). Compute stage counts + avg score.
+  // Group by job_id. Records with no job_id land in one "(no job linked)" bucket —
+  // see the batch job_id fix; new screenings can no longer land there.
   const byJob = {};
-  allResults.forEach(r=>{
-    const key = r.job_id || ('title:'+(r.job_title||'(no job linked)'));
+  s.rows.forEach(r=>{
+    const key = r.job_id || 'unlinked';
     if(!byJob[key]){
+      const j = allJobs.find(x=>x._id===r.job_id);
       byJob[key] = {
-        title: r.job_title || '(no job linked)',
+        title: (j && j.title) || r.job_title || '(no job linked)',
         screened: 0, sumScore: 0,
         shortlisted: 0, interview: 0, rejected: 0, pending: 0,
       };
@@ -2552,11 +2709,11 @@ function renderAnalytics(){
     const row = byJob[key];
     row.screened++;
     row.sumScore += (r.score || r.overall_score || 0);
-    const stage = r.stage || 'pending';
+    const stage = CandidateStats.stageOf(r);
     if(stage==='shortlisted')      row.shortlisted++;
     else if(stage==='interview')   row.interview++;
     else if(stage==='rejected')    row.rejected++;
-    else                           row.pending++;
+    else                           row.pending++;   // 'screening'
   });
 
   // Sortable headers
@@ -2567,9 +2724,9 @@ function renderAnalytics(){
       sortableHeader('job-perf-tbl', 'Screened', 'screened', 'desc') +
       sortableHeader('job-perf-tbl', 'Avg score', '_avgScore', 'desc') +
       sortableHeader('job-perf-tbl', 'Shortlisted', 'shortlisted', 'desc') +
-      sortableHeader('job-perf-tbl', 'In interview', 'interview', 'desc') +
+      sortableHeader('job-perf-tbl', 'Interview', 'interview', 'desc') +
       sortableHeader('job-perf-tbl', 'Rejected', 'rejected', 'desc') +
-      sortableHeader('job-perf-tbl', 'Pending review', 'pending', 'desc') +
+      sortableHeader('job-perf-tbl', 'Screening', 'pending', 'desc') +
       sortableHeader('job-perf-tbl', 'Conversion', '_conv', 'desc') +
       '</tr>';
   }
@@ -2670,10 +2827,12 @@ function exportAll(){exportCandidates();}
 async function logout(){await fetch('/api/auth/logout',{method:'POST',credentials:'include'});window.location.href='/login';}
 
 function updateAll(){
-  document.getElementById('sb-cand-cnt').textContent=allResults.length;
-  filteredResults=allResults;
+  // Everything downstream sees the same set — dedup is all-or-nothing across pages.
+  const view=CandidateStats.compute(allResults).rows;
+  document.getElementById('sb-cand-cnt').textContent=view.length;
+  filteredResults=view;
   renderOverview();
-  renderCandidates(allResults);
+  renderCandidates(view);
   renderJobs();
   applyFilters();
 }
@@ -2754,6 +2913,9 @@ async function loadFromDB(){
 
     // Populate job filter safely
     try{
+      if(screenData.truncated){
+        toast('Showing '+(screenData.count||0)+' of '+(screenData.total||0)+' screenings — counts on this page are incomplete.',{type:'warning'});
+      }
       const fJob=document.getElementById('f-job');
       if(fJob){
         fJob.innerHTML='<option value="">All jobs</option>';

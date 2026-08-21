@@ -22,7 +22,10 @@ from payment_service import (
     cancel_stripe_subscription, create_stripe_portal_session,
     STRIPE_PUBLISHABLE_KEY, PLANS
 )
-from email_service import generate_otp, send_verification_email, send_welcome_email
+from email_service import (
+    generate_otp, send_verification_email, send_welcome_email,
+    send_candidate_email, substitute_template, DEFAULT_TEMPLATES, TEMPLATE_VARIABLES,
+)
 from batch import run_batch_screening, CONCURRENCY_LIMIT
 from auth import (
     hash_password, verify_password, create_token,
@@ -40,6 +43,7 @@ from database import (
     update_user, increment_screening_count, sync_screening_count,
     store_otp, verify_otp, delete_pending,
     get_screenings_for_user, get_stats_for_user, get_jobs_for_user,
+    count_screenings_for_user, DuplicateJobError,
     get_skills_gaps_for_user, get_dimension_averages_for_user, db,
     save_payment, get_payments_for_user, update_user_subscription,
     invite_team_member, get_team_members, get_team_invites,
@@ -547,6 +551,15 @@ async def batch_screen_endpoint(
 ):
     user = await get_current_user(request)
 
+    # A batch with no job_id produces candidates that belong to no role — they drop out
+    # of every per-job view and pile up in Analytics as "(no job linked)". The batch UI
+    # has always labelled this field required; nothing enforced it until now.
+    if not job_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Select a job posting before screening. Candidates must be linked to a role."
+        )
+
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key not configured on server.")
     if len(job_description.strip()) < 50:
@@ -741,7 +754,7 @@ async def batch_screen_endpoint(
 # ─────────────────────────────────────────────────────────────
 
 @app.get("/api/screenings")
-async def list_screenings(request: Request, limit: int = 500):
+async def list_screenings(request: Request, limit: int = 2000):
     user = await get_current_user(request)
     try:
         db_user = await get_user_by_id(user["user_id"])
@@ -749,12 +762,24 @@ async def list_screenings(request: Request, limit: int = 500):
     except Exception:
         fresh_role = user.get("role", "client")
 
+    # The dashboard computes every stat client-side over this whole list, so a silent
+    # truncation shows up as wrong numbers rather than a missing page. Cap generously
+    # and tell the client when it hit the ceiling.
+    limit = max(1, min(limit, 10000))
+
     if fresh_role == "admin":
         screenings = await get_all_screenings(limit=limit)
+        total = len(screenings)
     else:
         screenings = await get_screenings_for_user(user["user_id"], limit=limit)
+        total = await count_screenings_for_user(user["user_id"])
 
-    return {"screenings": screenings, "count": len(screenings)}
+    return {
+        "screenings": screenings,
+        "count": len(screenings),
+        "total": total,
+        "truncated": len(screenings) < total,
+    }
 
 
 @app.post("/api/admin/fix-user-role")
@@ -836,6 +861,143 @@ async def update_screening_stage(
         }}
     )
     return {"success": True, "screening_id": screening_id, "stage": stage}
+
+
+# ─────────────────────────────────────────────────────────────
+# CANDIDATE EMAIL — send / templates / history
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/api/candidates/{screening_id}/email")
+async def send_email_to_candidate(
+    request: Request,
+    screening_id: str,
+    subject:  str = Form(...),
+    body:     str = Form(...),
+    template_type: str = Form(""),   # "interview"|"rejection"|"offer"|"custom" — for history label
+    to_email: str = Form(""),        # optional override (else pulled from CV)
+):
+    """Send an email to a candidate via the recruiter's connected Gmail.
+    Records the send in `email_history` so the UI can show 'Email sent on X' next to the candidate."""
+    from database import db as mongodb
+    from bson import ObjectId
+    from datetime import datetime as _dt
+    user = await get_current_user(request)
+
+    # Look up screening + tenant check
+    try:
+        oid = ObjectId(screening_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid screening ID.")
+    doc = await mongodb.screenings.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    if not is_admin and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    # Resolve target email: explicit override > parsed CV email
+    target = (to_email or "").strip() or (doc.get("parsed_cv", {}).get("personal", {}) or {}).get("email", "")
+    if not target or "@" not in target:
+        raise HTTPException(
+            status_code=400,
+            detail="No email address found in this candidate's CV. Provide one in the 'To' field."
+        )
+
+    # Recruiter's own email goes in Reply-To so the candidate can reply directly to them,
+    # not to the shared TopCandidate Gmail bot.
+    recruiter_email = (db_user.get("email") if db_user else "") or user.get("email", "")
+
+    ok, err = send_candidate_email(
+        to_email=target,
+        subject=subject,
+        body_text=body,
+        reply_to=recruiter_email,
+    )
+    if not ok:
+        raise HTTPException(status_code=502, detail=err)
+
+    # Record the send so the UI can show "Email sent" next to this candidate
+    await mongodb.email_history.insert_one({
+        "screening_id":   screening_id,
+        "user_id":        user["user_id"],
+        "company":        user.get("company", ""),
+        "candidate_name": doc.get("candidate_name", "Unknown"),
+        "to_email":       target,
+        "subject":        subject,
+        "body":           body,
+        "template_type":  template_type or "custom",
+        "sent_at":        _dt.utcnow(),
+        "sent_by_email":  recruiter_email,
+    })
+    return {"success": True, "to": target}
+
+
+@app.get("/api/user/email-templates")
+async def get_email_templates(request: Request):
+    """Return the user's saved candidate-email templates, falling back to defaults
+    for any templates they haven't customized."""
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"]) or {}
+    saved = db_user.get("email_templates") or {}
+    # Merge defaults so we always return all three templates
+    merged = {}
+    for kind, default_tpl in DEFAULT_TEMPLATES.items():
+        s = saved.get(kind) or {}
+        merged[kind] = {
+            "subject": s.get("subject") or default_tpl["subject"],
+            "body":    s.get("body")    or default_tpl["body"],
+            "is_custom": bool(s.get("subject") or s.get("body")),
+        }
+    return {"templates": merged, "variables": [{"name": n, "desc": d} for n, d in TEMPLATE_VARIABLES]}
+
+
+@app.put("/api/user/email-templates")
+async def update_email_templates(
+    request: Request,
+    templates: str = Form(...),    # JSON-encoded {kind: {subject, body}}
+):
+    """Save the user's customized email templates. Body is a JSON string so the form
+    layer doesn't have to know about nested structures."""
+    from database import db as mongodb
+    from bson import ObjectId
+    user = await get_current_user(request)
+    try:
+        parsed = json.loads(templates) if templates else {}
+    except Exception:
+        raise HTTPException(status_code=400, detail="Templates must be valid JSON.")
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail="Templates must be a dict keyed by template type.")
+    # Keep only the known template kinds — don't allow arbitrary keys to bloat the user doc
+    clean = {}
+    for kind in DEFAULT_TEMPLATES:
+        if kind in parsed and isinstance(parsed[kind], dict):
+            clean[kind] = {
+                "subject": str(parsed[kind].get("subject", ""))[:300],
+                "body":    str(parsed[kind].get("body", ""))[:8000],
+            }
+    await mongodb.users.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": {"email_templates": clean}}
+    )
+    return {"success": True, "saved": list(clean.keys())}
+
+
+@app.get("/api/candidates/{screening_id}/email-history")
+async def get_candidate_email_history(request: Request, screening_id: str):
+    """Return the email history for a single candidate so the UI can show
+    "✓ Interview email sent on May 18" or warn about double-sends."""
+    from database import db as mongodb
+    user = await get_current_user(request)
+    # Same tenant rule as the send endpoint
+    cursor = mongodb.email_history.find(
+        {"screening_id": screening_id, "user_id": user["user_id"]}
+    ).sort("sent_at", -1)
+    out = []
+    async for row in cursor:
+        row["_id"] = str(row["_id"])
+        out.append(row)
+    return {"history": out}
 
 
 @app.get("/api/screenings/{screening_id}/cv")
@@ -940,7 +1102,15 @@ async def create_job_endpoint(
     }
     if weights_dict is not None:
         job["weights"] = weights_dict
-    job_id = await save_job(job)
+    try:
+        job_id = await save_job(job)
+    except DuplicateJobError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=f"You already have a job titled '{e.title}'. Open the existing one instead of creating a second copy."
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"_id": job_id, **job}
 
 
