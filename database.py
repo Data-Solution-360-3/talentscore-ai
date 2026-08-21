@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 from bson import ObjectId
 import os
+import re
 import ssl
 from dotenv import load_dotenv
 
@@ -120,8 +121,40 @@ async def delete_screening(screening_id: str) -> bool:
     return result.deleted_count > 0
 
 
+class DuplicateJobError(Exception):
+    """Raised when a job with the same title already exists for this user."""
+    def __init__(self, existing_id: str, title: str):
+        self.existing_id = existing_id
+        self.title = title
+        super().__init__(f"A job titled '{title}' already exists.")
+
+
 async def save_job(job: dict) -> str:
-    doc = {**job, "created_at": datetime.utcnow(), "candidates_count": 0, "active": True}
+    """Insert a job, refusing a second active job with the same title for the same user.
+
+    Two "Data Analyst" documents is how the Jobs page ended up double-counting: each
+    duplicate claimed both jobs' candidates through the old title-matching filter.
+    Case-insensitive and whitespace-trimmed, since 'Data Analyst ' and 'data analyst'
+    are the same role to a recruiter.
+    NOTE: this is a read-then-write check, not a database constraint — two truly
+    simultaneous requests can still both pass it. A unique partial index on
+    (user_id, lowercased title, active) is the airtight fix; see the Stage 2 notes.
+    """
+    title = (job.get("title") or "").strip()
+    if not title:
+        raise ValueError("Job title is required.")
+    existing = await db.jobs.find_one(
+        {
+            "user_id": job.get("user_id"),
+            "active": True,
+            "title": {"$regex": f"^{re.escape(title)}$", "$options": "i"},
+        },
+        {"_id": 1},
+    )
+    if existing:
+        raise DuplicateJobError(str(existing["_id"]), title)
+
+    doc = {**job, "title": title, "created_at": datetime.utcnow(), "candidates_count": 0, "active": True}
     doc.pop("_id", None)
     inserted = await db.jobs.insert_one(doc)
     return str(inserted.inserted_id)
@@ -307,14 +340,25 @@ async def sync_screening_count(user_id: str):
 # TENANT-SCOPED QUERIES (filter by company/user)
 # ─────────────────────────────────────────────────────────────
 
+def user_match(user_id: str) -> dict:
+    """The single user_id matching rule for tenant-scoped screening queries.
+
+    get_screenings_for_user used this $or form while get_stats_for_user used a plain
+    equality match, so the two could disagree about how many screenings a user has —
+    the same class of bug as the four different "shortlisted" counts in the UI.
+    The $or form is the superset and is now used by both; equality would silently
+    drop records whose user_id was stored as a non-string.
+    """
+    return {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
+
+
+async def count_screenings_for_user(user_id: str) -> int:
+    """Unfiltered total, so callers can tell a full page from a truncated one."""
+    return await db.screenings.count_documents(user_match(user_id))
+
+
 async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
-    # Match by user_id (string match - handles both ObjectId string and plain string)
-    cursor = db.screenings.find({
-        "$or": [
-            {"user_id": user_id},
-            {"user_id": str(user_id)},
-        ]
-    }).sort("created_at", -1).limit(limit)
+    cursor = db.screenings.find(user_match(user_id)).sort("created_at", -1).limit(limit)
     results = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
@@ -324,7 +368,7 @@ async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
 
 async def get_stats_for_user(user_id: str) -> dict:
     pipeline = [
-        {"$match": {"user_id": user_id}},
+        {"$match": user_match(user_id)},
         {
             "$group": {
                 "_id": None,

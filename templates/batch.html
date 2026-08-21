@@ -422,15 +422,27 @@ async function runBatch(){
   const jd=document.getElementById('jd').value.trim();
   if(!selectedFiles.length)return;
 
-  const fd=new FormData();
-  fd.append('job_description',jd);
+  // The job selector is labelled required and now actually is. Without it every CV in
+  // the batch saves with no job_id and disappears from all per-job views.
   const batchJobSel=document.getElementById('batch-job-select');
   const jobVal=batchJobSel?.value||'';
-  if(jobVal){
-    const parts=jobVal.split('|');
-    fd.append('job_id',parts[0]||'');
-    fd.append('job_title',parts.slice(1).join('|')||'');
+  const parts=jobVal.split('|');
+  const jobId=parts[0]||'';
+  if(!jobId){
+    if(batchJobSel){
+      batchJobSel.style.borderColor='var(--red)';
+      batchJobSel.focus();
+      batchJobSel.scrollIntoView({behavior:'smooth',block:'center'});
+      batchJobSel.addEventListener('change',()=>{batchJobSel.style.borderColor='';},{once:true});
+    }
+    toast('Select the job you are screening for — candidates must be linked to a role.',{type:'error'});
+    return;
   }
+
+  const fd=new FormData();
+  fd.append('job_description',jd);
+  fd.append('job_id',jobId);
+  fd.append('job_title',parts.slice(1).join('|')||'');
   selectedFiles.forEach(f=>fd.append('cv_files',f));
 
   document.getElementById('input-section').style.display='none';

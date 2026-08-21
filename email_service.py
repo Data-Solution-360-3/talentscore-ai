@@ -211,3 +211,133 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
     except Exception as e:
         print(f"[EMAIL] Failed to send invite to {to_email}: {e}")
         return False
+
+
+# ─────────────────────────────────────────────────────────────
+# CANDIDATE COMMUNICATION (interview invite, rejection, offer)
+# ─────────────────────────────────────────────────────────────
+
+# Variables available in every candidate template. Templates use {curly} style.
+# We list these here so the UI can show the recruiter what placeholders exist.
+TEMPLATE_VARIABLES = [
+    ("{candidate_name}", "The candidate's full name"),
+    ("{job_title}",      "The job they applied for"),
+    ("{company_name}",   "Your company name"),
+    ("{recruiter_name}", "Your name (the sender)"),
+    ("{score}",          "Their AI match score (0-100)"),
+]
+
+DEFAULT_TEMPLATES = {
+    "interview": {
+        "subject": "Interview invitation — {job_title} at {company_name}",
+        "body": (
+            "Hi {candidate_name},\n\n"
+            "Thank you for applying for the {job_title} role at {company_name}. "
+            "We were impressed with your application and would like to invite you to "
+            "the next stage of our process.\n\n"
+            "Please reply with a few times that work for you next week for a 30-minute "
+            "conversation, and we'll get something on the calendar.\n\n"
+            "Looking forward to speaking with you.\n\n"
+            "Best regards,\n"
+            "{recruiter_name}\n"
+            "{company_name}"
+        ),
+    },
+    "rejection": {
+        "subject": "Update on your application — {job_title}",
+        "body": (
+            "Hi {candidate_name},\n\n"
+            "Thank you for your interest in the {job_title} role at {company_name} "
+            "and for taking the time to apply.\n\n"
+            "After careful review, we've decided to move forward with other candidates "
+            "whose background more closely matches what we're looking for in this position. "
+            "This was a difficult decision — we received many strong applications.\n\n"
+            "We genuinely appreciate your interest in {company_name} and wish you the best "
+            "in your job search.\n\n"
+            "Best regards,\n"
+            "{recruiter_name}\n"
+            "{company_name}"
+        ),
+    },
+    "offer": {
+        "subject": "Offer — {job_title} at {company_name}",
+        "body": (
+            "Hi {candidate_name},\n\n"
+            "We're delighted to offer you the {job_title} position at {company_name}!\n\n"
+            "We were very impressed throughout the interview process and believe you'd be "
+            "a great addition to our team. The formal offer document is attached / will be "
+            "sent separately with full details on compensation, benefits, and start date.\n\n"
+            "Please review and let us know if you have any questions. We'd love to have "
+            "your decision by [DATE].\n\n"
+            "Congratulations, and we hope to welcome you onboard soon.\n\n"
+            "Best regards,\n"
+            "{recruiter_name}\n"
+            "{company_name}"
+        ),
+    },
+}
+
+
+def substitute_template(template_str: str, variables: dict) -> str:
+    """Replace {placeholders} in a template. Unknown placeholders are left alone
+    so the recruiter notices and can correct them, rather than silently producing
+    'Hi ,' if candidate_name is missing."""
+    if not template_str:
+        return ""
+    result = template_str
+    for key, val in (variables or {}).items():
+        if val is None:
+            continue
+        result = result.replace("{" + key + "}", str(val))
+    return result
+
+
+def send_candidate_email(to_email: str, subject: str, body_text: str,
+                          reply_to: str = "") -> tuple[bool, str]:
+    """Send a candidate email through Gmail SMTP. Returns (success, error_message).
+
+    Plain text only — recruiter emails should feel personal, not marketing-y.
+    We wrap the body in a minimal HTML version too so it renders cleanly
+    in inboxes that prefer HTML."""
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        return False, ("Email service not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD "
+                       "in your Render environment variables to enable candidate emails.")
+    if not to_email or "@" not in to_email:
+        return False, "Invalid candidate email address."
+    if not subject or not subject.strip():
+        return False, "Email subject is required."
+    if not body_text or not body_text.strip():
+        return False, "Email body is required."
+
+    # Plain-text MIME part (preferred for personal email) + a simple HTML fallback
+    # so inboxes that auto-prefer HTML don't show monospace.
+    html_body = body_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    html_body = html_body.replace("\n", "<br>\n")
+    html_wrapper = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;max-width:600px">
+{html_body}
+</body></html>"""
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"{APP_NAME} <{GMAIL_USER}>"
+        msg["To"]      = to_email
+        if reply_to:
+            # Replies from the candidate go to the recruiter's real address, not the Gmail bot.
+            msg["Reply-To"] = reply_to
+        msg.attach(MIMEText(body_text, "plain"))
+        msg.attach(MIMEText(html_wrapper, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+        print(f"[EMAIL] Candidate email sent to {to_email} — subject: {subject[:60]}")
+        return True, ""
+    except smtplib.SMTPAuthenticationError:
+        return False, ("Gmail authentication failed. The app password may be wrong "
+                       "or expired. Regenerate it at https://myaccount.google.com/apppasswords")
+    except smtplib.SMTPRecipientsRefused:
+        return False, f"Email address {to_email} was rejected by the mail server."
+    except Exception as e:
+        return False, f"Send failed: {str(e)}"
