@@ -1644,6 +1644,140 @@ async def check_users_screenings(request: Request):
     return {"users": users, "unassigned_screenings": unassigned, "total_screenings": total}
 
 
+@app.get("/api/admin/diagnostics")
+async def admin_diagnostics(request: Request):
+    """Admin, read-only: the numbers needed before trusting the dedup key.
+
+    Writes nothing — no $set, no update, no insert anywhere in this handler.
+
+    The dedup classification below mirrors dedupKey() in index.html exactly:
+    email from parsed_cv.personal.email, else candidate_name + job_id, and no
+    key at all when the name is missing or 'unknown'. Keeping the two in sync
+    by hand is the weak point — if this endpoint and the dashboard ever
+    disagree on distinct_candidates, the definitions have drifted again.
+    """
+    await require_admin(request)
+    from datetime import datetime
+    from database import db as mongodb, user_match
+
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # ── Who holds admin, oldest account first ────────────────────────────
+    admins = []
+    async for u in mongodb.users.find({"role": "admin"}, {"password": 0}):
+        admins.append({
+            "id": str(u["_id"]),
+            "email": u.get("email"),
+            "company": u.get("company_name"),
+            "created_at": u.get("created_at"),
+            "active": u.get("active", True),
+            "plan": u.get("plan"),
+        })
+    admins.sort(key=lambda a: (a["created_at"] is None, a["created_at"]))
+
+    # ── Every account, with this-month and all-time counts kept apart ────
+    # check-users compares a monthly screening_count against an all-time
+    # total and labels the second one "actual", which reads as drift when
+    # the two are simply different questions. Both are shown here.
+    users = []
+    async for u in mongodb.users.find({}, {"password": 0}):
+        uid = str(u["_id"])
+        users.append({
+            "id": uid,
+            "email": u.get("email"),
+            "company": u.get("company_name"),
+            "role": u.get("role"),
+            "plan": u.get("plan"),
+            "created_at": u.get("created_at"),
+            "stored_screening_count": u.get("screening_count", 0),
+            "month_reset_at": u.get("month_reset_at"),
+            "screenings_this_month": await mongodb.screenings.count_documents(
+                {**user_match(uid), "created_at": {"$gte": month_start}}
+            ),
+            "screenings_all_time": await mongodb.screenings.count_documents(user_match(uid)),
+        })
+
+    # ── Pending/accepted team invites, so an account's provenance is visible ──
+    invites = []
+    async for i in mongodb.team_invites.find({}):
+        invites.append({
+            "email": i.get("email"),
+            "owner_user_id": i.get("owner_user_id"),
+            "company_name": i.get("company_name"),
+            "role": i.get("role"),
+            "status": i.get("status"),
+            "invited_at": i.get("invited_at"),
+        })
+
+    # ── Identity quality across every screening ──────────────────────────
+    total = 0
+    with_email = 0
+    with_usable_name = 0
+    name_missing = 0
+    name_unknown = 0
+    no_identity = 0
+    without_job = 0
+    keyed_by_email = 0
+    keyed_by_name = 0
+    keys = set()
+
+    async for s in mongodb.screenings.find(
+        {}, {"candidate_name": 1, "job_id": 1, "parsed_cv.personal.email": 1}
+    ):
+        total += 1
+        personal = ((s.get("parsed_cv") or {}).get("personal") or {})
+        email = (personal.get("email") or "").strip().lower()
+        raw_name = s.get("candidate_name")
+        name = (raw_name or "").strip().lower()
+        job = s.get("job_id") or ""
+
+        if not job:
+            without_job += 1
+        if email:
+            with_email += 1
+        if not name:
+            name_missing += 1
+        elif name == "unknown":
+            name_unknown += 1
+        else:
+            with_usable_name += 1
+
+        if email:
+            keyed_by_email += 1
+            keys.add("e:" + email + "|" + job)
+        elif name and name != "unknown":
+            keyed_by_name += 1
+            keys.add("n:" + name + "|" + job)
+        else:
+            # No identity at all — never merged, each stays its own candidacy.
+            no_identity += 1
+
+    distinct = len(keys) + no_identity
+
+    return {
+        "generated_at": now,
+        "read_only": True,
+        "admins": admins,
+        "admin_count": len(admins),
+        "users": users,
+        "team_invites": invites,
+        "screening_identity": {
+            "total": total,
+            "with_email": with_email,
+            "with_usable_name": with_usable_name,
+            "name_missing": name_missing,
+            "name_is_unknown": name_unknown,
+            "no_identity_never_merged": no_identity,
+            "without_job_id": without_job,
+            "keyed_by_email": keyed_by_email,
+            "keyed_by_name_and_job": keyed_by_name,
+            "distinct_candidates": distinct,
+            "duplicates_merged": total - distinct,
+        },
+    }
+
+
 @app.post("/api/admin/reset-my-count")
 async def reset_my_count(request: Request):
     """Reset current user screening count to 0 (for testing)."""
