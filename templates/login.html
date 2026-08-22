@@ -2,38 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5ef4'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F57C2E'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TopCandidate — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;--indigo-light:#eef0fe;
-  --orange:#fb923c;--orange2:#f97316;
-  --text:#0a0b1e;--t2:#4a5270;--t3:#8892aa;
-  --border:#e8eaf5;--surface:#f8f9ff;
-  --green:#10b981;--red:#f43f5e;
+  --navy:#142848;--indigo:#1E3A5F;--indigo2:#0F2540;--indigo-light:#EDF0F5;
+  --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;
+  --border:#E4E8F0;--border2:#D5DCE8;--surface:#FAFBFC;
+  --green:#16A34A;--red:#DC2626;
 }
 body{font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 .page{display:flex;flex:1;min-height:100vh}
 
 /* LEFT PANEL */
-.left{width:480px;flex-shrink:0;background:linear-gradient(160deg,#0f0d2e 0%,#1e1b4b 40%,#2d1a4a 100%);padding:3rem;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.left{width:480px;flex-shrink:0;background:linear-gradient(160deg,#0F2540 0%,#142848 45%,#1E3A5F 100%);padding:3rem;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .left::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")}
 .left-blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.3}
-.lb1{width:300px;height:300px;background:radial-gradient(circle,#5b5ef4,#fb923c);top:-50px;right:-50px}
+.lb1{width:300px;height:300px;background:radial-gradient(circle,#F57C2E,#1E3A5F);top:-50px;right:-50px}
 .lb2{width:200px;height:200px;background:var(--orange);bottom:50px;left:-50px}
 .left-logo{display:flex;align-items:center;gap:10px;margin-bottom:auto;position:relative;z-index:1}
 .left-icon{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
 .left-name{font-size:18px;font-weight:800;color:#fff}
 .left-content{position:relative;z-index:1;margin-top:auto;padding-bottom:2rem}
 .left-title{font-size:2.2rem;font-weight:800;color:#fff;line-height:1.2;margin-bottom:1rem;letter-spacing:-.5px}
-.left-title span{background:linear-gradient(135deg,#fb923c,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.left-title span{color:var(--orange)}
 .left-sub{font-size:14px;color:rgba(255,255,255,.6);line-height:1.7;margin-bottom:2rem}
 .left-stats{display:flex;flex-direction:column;gap:.75rem}
 .left-stat{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.7)}
-.left-stat-dot{width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#fb923c,#5b5ef4);flex-shrink:0}
+.left-stat-dot{width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0}
 
 /* RIGHT PANEL */
 .right{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;background:#fff}
@@ -52,12 +52,12 @@ body{font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);
 .fl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
 .fi-wrap{position:relative}
 input.fi{width:100%;padding:11px 14px;background:#fff;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:all .15s}
-input.fi:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(91,94,244,.1)}
+input.fi:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(245,124,46,.14)}
 input.fi::placeholder{color:var(--t3)}
 input.fi.error{border-color:var(--red)}
 .fi-hint{font-size:11px;color:var(--t3);margin-top:4px}
-.btn-main{width:100%;padding:13px;border-radius:10px;background:var(--indigo);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;box-shadow:0 4px 14px rgba(91,94,244,.3)}
-.btn-main:hover{background:var(--indigo2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(91,94,244,.4)}
+.btn-main{width:100%;padding:13px;border-radius:10px;background:var(--orange);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;box-shadow:0 4px 14px rgba(245,124,46,.30)}
+.btn-main:hover{background:var(--orange2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,124,46,.38)}
 .btn-main:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .err-box{background:#fff0f3;border:1.5px solid #fecdd3;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:14px;display:none;align-items:center;gap:8px}
 .ok-box{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:14px;display:none;align-items:center;gap:8px}
@@ -70,13 +70,13 @@ input.fi.error{border-color:var(--red)}
 /* OTP inputs */
 .otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:1.5rem}
 .otp-input{width:52px;height:60px;text-align:center;font-size:24px;font-weight:800;border:2px solid var(--border);border-radius:12px;outline:none;font-family:inherit;color:var(--text);transition:all .15s;background:#fff}
-.otp-input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(91,94,244,.1)}
+.otp-input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(245,124,46,.14)}
 .otp-input.filled{border-color:var(--indigo);background:var(--indigo-light)}
 .resend-row{text-align:center;font-size:13px;color:var(--t3);margin-bottom:1.25rem}
 .resend-btn{color:var(--indigo);font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit;font-size:13px}
 .resend-btn:disabled{color:var(--t3);cursor:not-allowed}
 .timer{font-weight:600;color:var(--orange)}
-.email-display{background:var(--indigo-light);border:1px solid rgba(91,94,244,.2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--indigo);text-align:center;margin-bottom:1.5rem}
+.email-display{background:var(--indigo-light);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--indigo);text-align:center;margin-bottom:1.5rem}
 
 @media(max-width:860px){.left{display:none}.right{padding:2rem 1rem}}
 </style>
@@ -89,17 +89,17 @@ input.fi.error{border-color:var(--red)}
     <div class="left-blob lb2"></div>
     <div class="left-logo">
       <div class="left-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <span class="left-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
+      <span class="left-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
     </div>
     <div class="left-content">
-      <h2 class="left-title">Find your<br><span>Top Candidates.</span></h2>
-      <p class="left-sub">Upload CVs, get instant AI scores, and shortlist your best candidates in minutes — not days. Now in early access, built for HR teams in Bangladesh.</p>
+      <h2 class="left-title">Score every CV<br><span>on the same rubric.</span></h2>
+      <p class="left-sub">Six weighted dimensions, two scoring passes, and a final score recomputed in code rather than taken from the model. Early access, built for HR teams in Bangladesh.</p>
       <div class="left-stats">
-        <div class="left-stat"><span class="left-stat-dot"></span>3-step AI pipeline: structure the CV, parse the JD, then score</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Every CV scored twice for consistent results</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Screen up to 100 CVs in one go</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Full report with CV viewer side-by-side</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>100% private — your data never shared</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Six weighted dimensions, set per role</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Every CV scored twice, from opposing angles</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Disagreement between passes lowers the recommendation</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Full report with the CV side-by-side</div>
+        <div class="left-stat"><span class="left-stat-dot"></span>Every score keeps the reasoning behind it</div>
       </div>
     </div>
   </div>
