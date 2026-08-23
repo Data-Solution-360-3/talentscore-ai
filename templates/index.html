@@ -2427,8 +2427,10 @@ async function viewJobDetails(jobId){
     document.body.appendChild(modal);
   }
   modal.querySelector('.modal').innerHTML = html;
-  openModal('job-detail-modal');
-  renderPublicLink(full);
+  openModal("job-detail-modal");
+  window._currentJob = full;
+  window._currentSpend = null;
+  renderPublicLink(full, null);
   loadPendingApplications(jobId);
 }
 
@@ -2436,52 +2438,104 @@ async function viewJobDetails(jobId){
 // PUBLIC APPLICATION LINK
 // ─────────────────────────────────────────────────────────────
 
-function renderPublicLink(job){
+// The link is ALWAYS shown — greyed when off — because the workflow is
+// create job → copy link → paste into a job board. A link that only appears
+// after you find a toggle is a link you post dead.
+// `spend` comes from /api/jobs/{id}/applications; null until that fetch lands.
+function renderPublicLink(job, spend){
   const box = document.getElementById('public-link-box');
   if(!box) return;
   const on  = !!job.is_public;
   const url = job.public_token ? `${location.origin}/apply/${job.public_token}` : '';
 
+  const capRow = (label, s) => {
+    if(!s) return '';
+    const pct  = s.cap ? Math.min(100, Math.round(s.used / s.cap * 100)) : 0;
+    const full = s.used >= s.cap;
+    const col  = full ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)';
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t2);margin-top:5px">
+      <span style="min-width:56px;font-weight:600">${label}</span>
+      <span style="flex:1;height:4px;background:var(--s3);border-radius:9999px;overflow:hidden">
+        <span style="display:block;height:100%;width:${pct}%;background:${col}"></span>
+      </span>
+      <span style="font-variant-numeric:tabular-nums;color:${full?'var(--red)':'var(--t2)'};font-weight:${full?'700':'600'}">
+        ${s.used}/${s.cap}${full?' — reached':''}
+      </span>
+    </div>`;
+  };
+
   box.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:10px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Public application link</div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer">
-        <input type="checkbox" id="pub-toggle" ${on?'checked':''} onchange="togglePublic('${job._id}',this.checked)" style="cursor:pointer">
-        ${on?'Accepting applications':'Paused'}
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
+        <input type="checkbox" id="pub-toggle" ${on?'checked':''}
+               onchange="togglePublic('${job._id}', this.checked)" style="cursor:pointer">
+        ${on ? 'On — accepting applications' : 'Off — turn on to accept applications'}
       </label>
     </div>
+
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
-      ${on && url ? `
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <input readonly value="${url}" id="pub-url" onclick="this.select()"
-                 style="flex:1;min-width:200px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--rs);color:var(--text)">
-          <button class="btn btn-xs btn-primary" onclick="copyPublicLink()">Copy link</button>
-          <button class="btn btn-xs btn-ghost" onclick="rotateToken('${job._id}')" title="Destroys the current URL permanently">Rotate</button>
-        </div>
-        <div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.55">
-          Paste this into a LinkedIn or BDJobs post. Turning the toggle off pauses the link and keeps the URL.
-          <strong>Rotate</strong> issues a new URL and kills this one for good — use it if the link gets abused.
-        </div>`
-      : `<div style="font-size:12px;color:var(--t2);line-height:1.6">
-          Turn this on to generate a public link candidates can apply through. Applications arrive
-          attached to this role and are scored automatically, up to the spend caps.
-        </div>`}
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;${on?'':'opacity:.55'}">
+        <input readonly value="${url}" id="pub-url" onclick="this.select()" ${on?'':'disabled'}
+               style="flex:1;min-width:200px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--rs);color:var(--text)">
+        <button class="btn btn-xs btn-primary" onclick="copyPublicLink()">Copy link</button>
+        <button class="btn btn-xs btn-ghost" onclick="rotateToken('${job._id}')" title="Issues a new URL and kills this one permanently">Rotate</button>
+      </div>
+
+      ${on
+        ? `<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.55">
+             Paste this into a LinkedIn or BDJobs post. Turning it off pauses the link and keeps this URL.
+             <strong>Rotate</strong> issues a new URL and kills this one for good — use it if the link gets abused.
+           </div>`
+        : `<div style="font-size:11px;color:var(--amber);margin-top:8px;line-height:1.55">
+             <strong>Not accepting applications yet</strong> — turn the switch on to activate this link.
+             Anyone opening it now sees a closed page.
+           </div>`}
+
+      ${spend ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
+            Spend caps — scoring stops here, uploads still stored
+          </div>
+          ${capRow('This job', spend.job)}
+          ${capRow('Today',    spend.day)}
+          ${capRow('This month', spend.month)}
+          <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
+            ~$0.054 per CV. Past a cap, applications are still received and stored — they just
+            wait for you to score them, and the candidate is never told anything is different.
+          </div>
+        </div>` : ''}
     </div>`;
 }
 
 async function togglePublic(jobId, isPublic){
+  const t = document.getElementById('pub-toggle');
+  if(t) t.disabled = true;
   try{
     const fd = new FormData(); fd.append('is_public', isPublic ? 'true' : 'false');
     const res = await fetch(`/api/jobs/${jobId}/public`,{method:'POST',body:fd,credentials:'include'});
-    const d = await res.json();
-    if(!res.ok) throw new Error(d.detail||'Could not update the link');
-    const job = allJobs.find(x=>x._id===jobId);
-    if(job){ job.is_public = d.is_public; job.public_token = d.public_token; renderPublicLink(job); }
-    toast(isPublic ? 'Public link is live' : 'Public link paused', {type:'success'});
+    let d = {};
+    try{ d = await res.json(); }catch(_){}
+    // A non-2xx here used to leave the checkbox flipped with no message, which
+    // reads as "the feature does nothing". Never fail quietly on this control.
+    if(!res.ok) throw new Error(d.detail || `Server returned ${res.status}`);
+
+    const cached = allJobs.find(x=>x._id===jobId);
+    if(cached){ cached.is_public = d.is_public; cached.public_token = d.public_token; }
+    if(window._currentJob && window._currentJob._id === jobId){
+      window._currentJob.is_public   = d.is_public;
+      window._currentJob.public_token = d.public_token;
+      renderPublicLink(window._currentJob, window._currentSpend);
+    }
+    toast(isPublic ? 'Public link is live — candidates can apply' : 'Public link paused — the URL is kept',
+          {type:'success'});
     renderJobs();
   }catch(e){
-    toast(e.message,{type:'error'});
-    const t=document.getElementById('pub-toggle'); if(t) t.checked = !isPublic;
+    toast('Could not change the link: ' + e.message, {type:'error'});
+    if(t){ t.checked = !isPublic; }   // put the switch back where it was
+  }finally{
+    const t2 = document.getElementById('pub-toggle');
+    if(t2) t2.disabled = false;
   }
 }
 
@@ -2513,9 +2567,13 @@ async function rotateToken(jobId){
     const res = await fetch(`/api/jobs/${jobId}/rotate-token`,{method:'POST',credentials:'include'});
     const d = await res.json();
     if(!res.ok) throw new Error(d.detail||'Could not rotate the link');
-    const job = allJobs.find(x=>x._id===jobId);
-    if(job){ job.public_token = d.public_token; renderPublicLink(job); }
-    toast('New link issued — the old one is dead',{type:'success'});
+    const cached = allJobs.find(x=>x._id===jobId);
+    if(cached) cached.public_token = d.public_token;
+    if(window._currentJob && window._currentJob._id === jobId){
+      window._currentJob.public_token = d.public_token;
+      renderPublicLink(window._currentJob, window._currentSpend);
+    }
+    toast("New link issued — the old URL is dead",{type:"success"});
   }catch(e){ toast(e.message,{type:'error'}); }
 }
 
@@ -2528,6 +2586,14 @@ async function loadPendingApplications(jobId){
     if(!res.ok){ box.innerHTML=''; return; }
     const d = await res.json();
     const c = d.counts || {pending:0,unscored:0,total:0};
+
+    // Caps belong on screen BEFORE the first application arrives — that is
+    // exactly when you're deciding whether to post the link. Feed them to the
+    // link box regardless of whether anyone has applied yet.
+    window._currentSpend = d.spend || null;
+    if(window._currentJob && window._currentJob._id === jobId){
+      renderPublicLink(window._currentJob, window._currentSpend);
+    }
     if(!c.total){ box.innerHTML=''; return; }
 
     const sp = d.spend || {};

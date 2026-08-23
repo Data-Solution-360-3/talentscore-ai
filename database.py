@@ -175,7 +175,11 @@ async def save_job(job: dict) -> str:
     if existing:
         raise DuplicateJobError(str(existing["_id"]), title)
 
-    doc = {**job, "title": title, "created_at": datetime.utcnow(), "candidates_count": 0, "active": True}
+    # Minted at creation, not on first toggle: the workflow is create job -> copy
+    # link -> paste into a job board, and making the link appear only after
+    # finding a toggle is how a dead link gets posted. Harmless until is_public.
+    doc = {**job, "title": title, "created_at": datetime.utcnow(), "candidates_count": 0,
+           "active": True, "is_public": False, "public_token": generate_public_token()}
     doc.pop("_id", None)
     inserted = await db.jobs.insert_one(doc)
     return str(inserted.inserted_id)
@@ -629,31 +633,67 @@ async def get_job_by_public_token(token: str) -> dict | None:
     return doc
 
 
-async def set_job_public(job_id: str, user_id: str, is_public: bool) -> dict | None:
-    """Pause or resume a public link. Keeps the existing token.
+async def ensure_job_token(job_id: str) -> str | None:
+    """Return the job's public token, minting one if it has none.
 
-    This is the reversible switch. Rotating the token is the irreversible one;
-    they are separate on purpose, so pausing a link doesn't cost you the URL
-    you already posted and revoking one doesn't require deleting the job.
+    Tokens are minted at job creation now, so this only fires for jobs that
+    predate the feature. A token existing is harmless — is_public is what
+    decides whether the URL resolves.
     """
-    job = await db.jobs.find_one({"_id": ObjectId(job_id), **user_match_field("user_id", user_id)})
+    try:
+        job = await db.jobs.find_one({"_id": ObjectId(job_id)}, {"public_token": 1})
+    except Exception:
+        return None
     if not job:
         return None
-    updates = {"is_public": is_public}
-    if is_public and not job.get("public_token"):
-        updates["public_token"] = generate_public_token()
-    await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": updates})
-    return {**job, **updates, "_id": str(job["_id"])}
+    if job.get("public_token"):
+        return job["public_token"]
+    token = generate_public_token()
+    await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": {"public_token": token}})
+    return token
 
 
-async def rotate_job_token(job_id: str, user_id: str) -> dict | None:
+# NOTE ON AUTHORISATION for the two functions below: they take an already
+# authorised job_id and do NOT re-check ownership. They used to, with a
+# user_id equality match that had no admin exemption — while the route
+# authorised through the admin-aware owned_job(). Two definitions of "may this
+# user act on this job" that disagreed, so an admin acting on a job owned by
+# another of their own accounts passed the route and was then refused here as
+# a 404. One check, in the route. Do not add a second one here.
+
+async def set_job_public(job_id: str, is_public: bool) -> dict | None:
+    """Pause or resume a public link. Keeps the existing token.
+
+    The reversible switch. Rotating the token is the irreversible one; they are
+    separate on purpose, so pausing doesn't cost you the URL you already posted
+    and revoking one doesn't require deleting the job.
+    """
+    try:
+        oid = ObjectId(job_id)
+    except Exception:
+        return None
+    job = await db.jobs.find_one({"_id": oid})
+    if not job:
+        return None
+    token = job.get("public_token") or generate_public_token()
+    await db.jobs.update_one(
+        {"_id": oid}, {"$set": {"is_public": is_public, "public_token": token}}
+    )
+    return {**job, "is_public": is_public, "public_token": token, "_id": str(job["_id"])}
+
+
+async def rotate_job_token(job_id: str) -> dict | None:
     """Kill a leaked link permanently. The old URL can never be revived."""
-    job = await db.jobs.find_one({"_id": ObjectId(job_id), **user_match_field("user_id", user_id)})
+    try:
+        oid = ObjectId(job_id)
+    except Exception:
+        return None
+    job = await db.jobs.find_one({"_id": oid})
     if not job:
         return None
     token = generate_public_token()
     await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
+        {"_id": oid},
         {"$set": {"public_token": token, "token_rotated_at": datetime.utcnow()}},
     )
     return {**job, "public_token": token, "_id": str(job["_id"])}

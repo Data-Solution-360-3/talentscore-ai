@@ -49,7 +49,7 @@ from database import (
     invite_team_member, get_team_members, get_team_invites,
     update_user_profile, update_user_notifications, get_full_user,
     generate_public_token, hash_ip, get_job_by_public_token, set_job_public,
-    rotate_job_token, user_match_field, reserve_screening_slot,
+    rotate_job_token, ensure_job_token, user_match_field, reserve_screening_slot,
     release_screening_slot, get_spend_state, rate_limit_allows,
     upsert_application, store_application_pdf, count_pending_applications,
     get_applications_for_job, user_match,
@@ -1349,7 +1349,7 @@ async def public_apply_submit(
 async def toggle_job_public(request: Request, job_id: str, is_public: bool = Form(...)):
     user = await get_current_user(request)
     await owned_job(job_id, user)
-    job = await set_job_public(job_id, user["user_id"], is_public)
+    job = await set_job_public(job_id, is_public)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
     return {
@@ -1366,7 +1366,7 @@ async def rotate_job_public_token(request: Request, job_id: str):
     URL you already posted, rotating destroys it permanently."""
     user = await get_current_user(request)
     await owned_job(job_id, user)
-    job = await rotate_job_token(job_id, user["user_id"])
+    job = await rotate_job_token(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
     return {"success": True, "public_token": job["public_token"],
@@ -2665,6 +2665,11 @@ async def get_job_details(request: Request, job_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Job not found.")
     doc["_id"] = str(doc["_id"])
+    # Jobs created before public links exist have no token. Mint one on first
+    # view so the link is visible immediately, rather than appearing only after
+    # the toggle is found. is_public still governs whether the URL resolves.
+    if not doc.get("public_token"):
+        doc["public_token"] = await ensure_job_token(doc["_id"])
     return doc
 
 
