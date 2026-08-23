@@ -8,7 +8,24 @@ import os
 import secrets
 import hashlib
 from datetime import datetime, timedelta
-from database import db
+import database as _database
+
+
+class _LiveDB:
+    """Resolve database.db at access time — see the same class in main.py.
+
+    `from database import db` captures None, because connect() rebinds the
+    module global after this module is imported. Every db. use below was dead.
+    """
+
+    def __getattr__(self, name):
+        live = _database.db
+        if live is None:
+            raise RuntimeError("Database handle requested before connect().")
+        return getattr(live, name)
+
+
+db = _LiveDB()
 from bson import ObjectId
 
 

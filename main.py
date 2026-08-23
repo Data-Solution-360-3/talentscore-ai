@@ -44,7 +44,7 @@ from database import (
     store_otp, verify_otp, delete_pending,
     get_screenings_for_user, get_stats_for_user, get_jobs_for_user,
     count_screenings_for_user, DuplicateJobError,
-    get_skills_gaps_for_user, get_dimension_averages_for_user, db,
+    get_skills_gaps_for_user, get_dimension_averages_for_user,
     save_payment, get_payments_for_user, update_user_subscription,
     invite_team_member, get_team_members, get_team_invites,
     update_user_profile, update_user_notifications, get_full_user,
@@ -56,6 +56,38 @@ from database import (
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
+
+import database as _database
+
+
+class _LiveDB:
+    """Resolves database.db at attribute access, not at import.
+
+    database.py starts with `db = None` and `connect()` rebinds that module
+    global at startup. `from database import db` therefore captures None
+    permanently — the importing module never sees the rebind. Every bare
+    `db.collection` in this file was silently dead, failing at call time with
+    `AttributeError: 'NoneType' object has no attribute 'jobs'`, and only when
+    somebody actually clicked the endpoint.
+
+    The endpoints that worked did `from database import db` INSIDE the function
+    body, which re-reads the module attribute per call. This does the same thing
+    once, for every call site, so a bare `db.` use can never be dead again.
+
+    If it is reached before connect(), it says so instead of surfacing as a
+    NoneType attribute error three frames away from the real cause.
+    """
+
+    def __getattr__(self, name):
+        live = _database.db
+        if live is None:
+            raise RuntimeError(
+                "Database handle requested before connect() — check the lifespan startup order."
+            )
+        return getattr(live, name)
+
+
+db = _LiveDB()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
