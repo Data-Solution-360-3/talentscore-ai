@@ -835,6 +835,61 @@ async def count_pending_applications(job_id: str) -> dict:
     return {"pending": pending, "unscored": unscored, "total": total}
 
 
+# ── Cached JD parse (one per job, not one per candidate) ────
+
+# Bump when the JD parse prompt or its output schema changes, so cached parses
+# from an older schema are re-parsed instead of silently scored against
+# missing fields.
+JD_PARSE_SCHEMA_VERSION = 1
+
+
+def jd_fingerprint(jd_text: str) -> str:
+    """Identity of a JD parse: the text itself, the schema, and the model.
+
+    Whitespace-normalised so that reformatting a description doesn't force a
+    re-parse, while any real edit does.
+    """
+    normalized = " ".join((jd_text or "").split())
+    return hashlib.sha256(
+        f"{JD_PARSE_SCHEMA_VERSION}:{normalized}".encode()
+    ).hexdigest()
+
+
+async def get_cached_jd_parse(job_id: str, jd_text: str, model: str) -> dict | None:
+    """Return the job's cached parsed JD, or None if absent or stale."""
+    try:
+        job = await db.jobs.find_one(
+            {"_id": ObjectId(job_id)},
+            {"parsed_jd": 1, "parsed_jd_hash": 1, "parsed_jd_model": 1},
+        )
+    except Exception:
+        return None
+    if not job or not job.get("parsed_jd"):
+        return None
+    if job.get("parsed_jd_hash") != jd_fingerprint(jd_text):
+        return None            # the description was edited
+    if job.get("parsed_jd_model") != model:
+        return None            # a different model would parse it differently
+    return job["parsed_jd"]
+
+
+async def save_jd_parse(job_id: str, jd_text: str, model: str, parsed: dict) -> None:
+    try:
+        await db.jobs.update_one(
+            {"_id": ObjectId(job_id)},
+            {"$set": {
+                "parsed_jd": parsed,
+                "parsed_jd_hash": jd_fingerprint(jd_text),
+                "parsed_jd_model": model,
+                "parsed_jd_at": datetime.utcnow(),
+            }},
+        )
+    except Exception as e:
+        # A cache write failing must never fail a screening — the next call
+        # simply parses inline again.
+        print(f"[JD-CACHE] could not store parse for job {job_id}: {e}")
+
+
 async def get_applications_for_job(job_id: str, user_id: str, status: str = "") -> list:
     q = {"job_id": job_id, **user_match_field("user_id", user_id)}
     if status:

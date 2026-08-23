@@ -683,11 +683,15 @@ async def batch_screen_endpoint(
             if job_id:    extra["job_id"]    = job_id
             if job_title: extra["job_title"] = job_title
 
+            # One JD parse for the whole batch instead of one per CV — so every
+            # candidate in this run is measured against an identical rubric.
+            jd_req = await resolve_jd_requirements(job_id, jd_text)
             results = await run_batch_screening(
                 files=files, jd_text=jd_text,
                 api_key=OPENAI_API_KEY, on_progress=on_progress,
                 extra_fields=extra,
                 weights=job_weights,
+                jd_requirements=jd_req,
             )
             # Also tag results in memory for the response
             for r in results.get("results", []):
@@ -1087,6 +1091,35 @@ this link, ask them for an up-to-date one.</p>
 </div></body></html>"""
 
 
+async def resolve_jd_requirements(job_id: str, jd_text: str):
+    """Parse a job's description once and reuse it for every candidate.
+
+    Cost is the smaller half of this. The larger half is fairness: the JD parse
+    is a GPT call, and parsing it per CV means two candidates for the same
+    posting can be scored against subtly different parsed requirements. One
+    parse per job means every candidate is measured against the same rubric.
+
+    Returns None on any failure, which makes the pipeline parse inline exactly
+    as it did before — the cache can never be the reason a screening fails.
+    """
+    from database import get_cached_jd_parse, save_jd_parse
+    from scorer import parse_jd_only, PIPELINE_MODEL
+
+    if not job_id or not (jd_text or "").strip():
+        return None
+    try:
+        cached = await get_cached_jd_parse(job_id, jd_text, PIPELINE_MODEL)
+        if cached:
+            return cached
+        parsed = await parse_jd_only(jd_text, OPENAI_API_KEY)
+        if parsed:
+            await save_jd_parse(job_id, jd_text, PIPELINE_MODEL, parsed)
+        return parsed
+    except Exception as e:
+        print(f"[JD-CACHE] falling back to inline parse for job {job_id}: {e}")
+        return None
+
+
 async def owned_job(job_id: str, user: dict) -> dict:
     """Fetch a job the caller owns, or raise. Tenant scoping for every dashboard route."""
     from bson import ObjectId as _OID
@@ -1175,11 +1208,17 @@ async def score_application(application_id: str):
             return
 
         weights = job.get("weights") if isinstance(job.get("weights"), dict) else None
+        jd_text = job.get("description") or ""
+        # Public applicants trickle in one at a time, so without this every
+        # single applicant would buy their own JD parse — and be scored against
+        # it rather than against the same one as everyone else on the posting.
+        jd_req = await resolve_jd_requirements(app_doc["job_id"], jd_text)
         result, err = await run_screening_pipeline(
             cv_text=cv_text,
-            jd_text=job.get("description") or "",
+            jd_text=jd_text,
             api_key=OPENAI_API_KEY,
             weights=weights,
+            jd_requirements=jd_req,
         )
         if err or not result:
             # Money may already be spent — the reservation is NOT released.

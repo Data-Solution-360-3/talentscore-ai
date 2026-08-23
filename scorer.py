@@ -800,7 +800,7 @@ Respond ONLY with this JSON:
 async def gpt_json_call(client: AsyncOpenAI, system: str, user: str,
                         temperature: float = 0.0, max_tokens: int = 2500) -> dict:
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model=PIPELINE_MODEL,
         max_tokens=max_tokens,
         temperature=temperature,
         response_format={"type": "json_object"},
@@ -1013,20 +1013,53 @@ def cv_is_self_consistent(cv: dict) -> tuple[bool, str]:
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
 
+# The model every call in this pipeline uses. Named rather than repeated inline
+# so a cached JD parse can be keyed on it — a cache keyed on a model string that
+# drifts from the model actually used is worse than no cache.
+PIPELINE_MODEL = "gpt-4o"
+
+
+async def parse_jd_only(jd_text: str, api_key: str) -> dict:
+    """Parse a job description into structured requirements, once.
+
+    Exposed so a caller can parse a JD a single time per job and reuse the
+    result across every candidate, instead of buying the same parse per CV.
+    Same prompt and same call the pipeline makes inline — no second code path.
+    """
+    client = AsyncOpenAI(api_key=api_key)
+    return await gpt_json_call(client, JD_PARSE_PROMPT, build_jd_parse_prompt(jd_text))
+
+
 async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
-                                  weights: dict | None = None) -> tuple[dict, str | None]:
+                                  weights: dict | None = None,
+                                  jd_requirements: dict | None = None) -> tuple[dict, str | None]:
     """Full screening pipeline. Returns (result_dict, error_str_or_None).
 
     `weights` is an optional per-job override of the dimension weights. If None,
-    DEFAULT_WEIGHTS is used (which matches the v1 behavior — backward compatible)."""
+    DEFAULT_WEIGHTS is used (which matches the v1 behavior — backward compatible).
+
+    `jd_requirements` is an optional pre-parsed JD from the job document's cache.
+    When None the JD is parsed inline exactly as before, so every existing caller
+    keeps working unchanged."""
     try:
         client = AsyncOpenAI(api_key=api_key)
 
         # ── STEP 1A + 1B in parallel ──
-        cv_profile, jd_requirements = await asyncio.gather(
-            gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text)),
-            gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text))
-        )
+        # jd_requirements may be supplied by the caller from the job document's
+        # cache. That is not only cheaper — it is FAIRER. This parse is a GPT
+        # call, and temperature 0.0 is not a determinism guarantee, so parsing
+        # per CV means two candidates for the same posting can be measured
+        # against subtly different parsed requirements. One parse per job means
+        # every candidate faces an identical rubric.
+        if jd_requirements is None:
+            cv_profile, jd_requirements = await asyncio.gather(
+                gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text)),
+                gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text))
+            )
+        else:
+            cv_profile = await gpt_json_call(
+                client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text)
+            )
 
         # ── Self-consistency: one retry if the model contradicted itself ──
         ok, reason = cv_is_self_consistent(cv_profile)

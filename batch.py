@@ -30,6 +30,7 @@ async def screen_single_cv(
     index: int,
     extra_fields: dict = None,
     weights: dict = None,
+    jd_requirements: dict = None,
 ) -> dict:
     """
     Screen one CV. Called concurrently for all CVs in the batch.
@@ -58,6 +59,7 @@ async def screen_single_cv(
                 jd_text=jd_text,
                 api_key=api_key,
                 weights=weights,
+                jd_requirements=jd_requirements,
             )
             if error:
                 await on_progress(index, "failed", filename, None, error=error)
@@ -106,6 +108,7 @@ async def run_batch_screening(
     concurrency: int = CONCURRENCY_LIMIT,
     extra_fields: dict = None,
     weights: dict = None,
+    jd_requirements: dict = None,
 ) -> dict:
     """
     Screen a batch of CVs concurrently.
@@ -141,6 +144,7 @@ async def run_batch_screening(
             index=i,
             extra_fields=extra_fields or {},
             weights=weights,
+            jd_requirements=jd_requirements,
         )
         for i, (filename, file_bytes) in enumerate(files)
     ]
