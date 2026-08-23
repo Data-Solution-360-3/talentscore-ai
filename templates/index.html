@@ -2273,7 +2273,11 @@ function renderJobs(){
   tbody.innerHTML = pg.slice.map(j=>{
     const statusCls={'active':'b-green','paused':'b-amber','closed':'b-red'}[j.status||'active']||'b-green';
     return`<tr class="job-row" onclick="viewJobDetails('${j._id}')" style="cursor:pointer">
-      <td style="font-weight:600;color:var(--text)"><span style="color:var(--orange)">${j.title}</span></td>
+      <td style="font-weight:600;color:var(--text)">
+        <span style="color:var(--orange)">${j.title}</span>
+        ${j.is_public ? `<span class="badge b-green" style="margin-left:6px;font-size:9px" title="Accepting public applications">LIVE</span>` : ''}
+        ${j._pending ? `<span class="badge b-amber" style="margin-left:4px;font-size:9px" title="${j._pending} application(s) not yet scored">${j._pending} pending</span>` : ''}
+      </td>
       <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
       <td style="font-weight:600;color:var(--orange)">${j._applicants}</td>
       <td style="font-weight:600;color:${gc(j._avg)}">${j._avg||'—'}</td>
@@ -2281,6 +2285,9 @@ function renderJobs(){
       <td><span class="badge ${statusCls}">${j.status||'active'}</span></td>
       <td>
         <div style="display:flex;gap:3px" onclick="event.stopPropagation()">
+          ${j.is_public && j.public_token
+            ? `<button class="btn btn-xs btn-ghost" onclick="copyJobLink('${j.public_token}')" title="Copy the public application link for this role">Copy link</button>`
+            : ''}
           <button class="btn btn-xs btn-ghost" onclick="viewCandidatesForJob('${j._id}')" title="See candidates screened for this role">View candidates</button>
           <button class="btn btn-xs btn-ghost" onclick="editJob('${j._id}')">Edit</button>
           <button class="btn btn-xs btn-red" onclick="deleteJob('${j._id}')">Delete</button>
@@ -2342,6 +2349,15 @@ async function viewJobDetails(jobId){
         <div style="font-size:22px;font-weight:800;color:var(--red)">${st.byStage.rejected}</div>
       </div>
     </div>
+
+    <!-- Public application link. Two separate controls on purpose: the toggle
+         pauses a link and keeps the URL you already posted; rotate destroys
+         that URL permanently. Conflating them means you cannot kill a leaked
+         link without losing the posting. -->
+    <div id="public-link-box" style="margin-bottom:14px"></div>
+
+    <!-- Pending applications from the public link -->
+    <div id="pending-box" style="margin-bottom:14px"></div>
 
     <!-- Job description -->
     <div style="margin-bottom:14px">
@@ -2412,6 +2428,177 @@ async function viewJobDetails(jobId){
   }
   modal.querySelector('.modal').innerHTML = html;
   openModal('job-detail-modal');
+  renderPublicLink(full);
+  loadPendingApplications(jobId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUBLIC APPLICATION LINK
+// ─────────────────────────────────────────────────────────────
+
+function renderPublicLink(job){
+  const box = document.getElementById('public-link-box');
+  if(!box) return;
+  const on  = !!job.is_public;
+  const url = job.public_token ? `${location.origin}/apply/${job.public_token}` : '';
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Public application link</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer">
+        <input type="checkbox" id="pub-toggle" ${on?'checked':''} onchange="togglePublic('${job._id}',this.checked)" style="cursor:pointer">
+        ${on?'Accepting applications':'Paused'}
+      </label>
+    </div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
+      ${on && url ? `
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input readonly value="${url}" id="pub-url" onclick="this.select()"
+                 style="flex:1;min-width:200px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--rs);color:var(--text)">
+          <button class="btn btn-xs btn-primary" onclick="copyPublicLink()">Copy link</button>
+          <button class="btn btn-xs btn-ghost" onclick="rotateToken('${job._id}')" title="Destroys the current URL permanently">Rotate</button>
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.55">
+          Paste this into a LinkedIn or BDJobs post. Turning the toggle off pauses the link and keeps the URL.
+          <strong>Rotate</strong> issues a new URL and kills this one for good — use it if the link gets abused.
+        </div>`
+      : `<div style="font-size:12px;color:var(--t2);line-height:1.6">
+          Turn this on to generate a public link candidates can apply through. Applications arrive
+          attached to this role and are scored automatically, up to the spend caps.
+        </div>`}
+    </div>`;
+}
+
+async function togglePublic(jobId, isPublic){
+  try{
+    const fd = new FormData(); fd.append('is_public', isPublic ? 'true' : 'false');
+    const res = await fetch(`/api/jobs/${jobId}/public`,{method:'POST',body:fd,credentials:'include'});
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.detail||'Could not update the link');
+    const job = allJobs.find(x=>x._id===jobId);
+    if(job){ job.is_public = d.is_public; job.public_token = d.public_token; renderPublicLink(job); }
+    toast(isPublic ? 'Public link is live' : 'Public link paused', {type:'success'});
+    renderJobs();
+  }catch(e){
+    toast(e.message,{type:'error'});
+    const t=document.getElementById('pub-toggle'); if(t) t.checked = !isPublic;
+  }
+}
+
+function copyJobLink(token){
+  const url = `${location.origin}/apply/${token}`;
+  navigator.clipboard.writeText(url)
+    .then(()=>toast('Application link copied',{type:'success'}))
+    .catch(()=>toast('Copy manually: '+url,{type:'info',duration:8000}));
+}
+
+function copyPublicLink(){
+  const el = document.getElementById('pub-url');
+  if(!el) return;
+  el.select();
+  navigator.clipboard.writeText(el.value)
+    .then(()=>toast('Link copied',{type:'success'}))
+    .catch(()=>toast('Press Ctrl+C to copy',{type:'info'}));
+}
+
+async function rotateToken(jobId){
+  const ok = await confirmDialog({
+    title: 'Rotate this link?',
+    body: 'The current URL stops working immediately and permanently. Anyone who already has it — including a candidate part-way through applying — will see a closed page. A new URL is issued that you will need to post again.',
+    confirmText: 'Rotate link',
+    danger: true
+  });
+  if(!ok) return;
+  try{
+    const res = await fetch(`/api/jobs/${jobId}/rotate-token`,{method:'POST',credentials:'include'});
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.detail||'Could not rotate the link');
+    const job = allJobs.find(x=>x._id===jobId);
+    if(job){ job.public_token = d.public_token; renderPublicLink(job); }
+    toast('New link issued — the old one is dead',{type:'success'});
+  }catch(e){ toast(e.message,{type:'error'}); }
+}
+
+async function loadPendingApplications(jobId){
+  const box = document.getElementById('pending-box');
+  if(!box) return;
+  box.innerHTML = `<div style="font-size:12px;color:var(--t3)">Loading applications…</div>`;
+  try{
+    const res = await fetch(`/api/jobs/${jobId}/applications`,{credentials:'include'});
+    if(!res.ok){ box.innerHTML=''; return; }
+    const d = await res.json();
+    const c = d.counts || {pending:0,unscored:0,total:0};
+    if(!c.total){ box.innerHTML=''; return; }
+
+    const sp = d.spend || {};
+    const capNote = [];
+    if(sp.job   && sp.job.used   >= sp.job.cap)   capNote.push('per-job cap reached');
+    if(sp.day   && sp.day.used   >= sp.day.cap)   capNote.push('daily cap reached');
+    if(sp.month && sp.month.used >= sp.month.cap) capNote.push('monthly cap reached');
+
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
+          Applications received
+        </div>
+        <span style="font-size:11px;color:var(--t3)">${c.total} total · ${c.pending} not yet scored</span>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:${c.pending?'12px':'0'}">
+          <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700">Scored</div>
+               <div style="font-size:18px;font-weight:800;color:var(--green)">${c.total - c.pending}</div></div>
+          <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700">Pending</div>
+               <div style="font-size:18px;font-weight:800;color:var(--amber)">${c.pending}</div></div>
+          <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700">Job spend</div>
+               <div style="font-size:18px;font-weight:800;color:var(--text)">${(sp.job&&sp.job.used)||0}<span style="font-size:12px;color:var(--t3)">/${(sp.job&&sp.job.cap)||0}</span></div></div>
+        </div>
+        ${c.pending ? `
+          <button class="btn btn-sm btn-primary" id="screen-pending-btn" onclick="screenPending('${jobId}')" style="width:100%">
+            Score ${c.pending} pending — approx. $${d.estimated_cost.toFixed(2)}
+          </button>
+          ${capNote.length ? `<div style="font-size:11px;color:var(--amber);margin-top:8px;line-height:1.5">
+            ⚠ ${capNote.join(', ')}. New applications are still being accepted and stored — they just aren't scored automatically. Scoring them here counts against the per-job and monthly caps.
+          </div>` : `<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">
+            Approximate cost at ~$0.054 per CV. Nothing is charged until you click.
+          </div>`}
+        ` : ''}
+      </div>`;
+  }catch(_){ box.innerHTML=''; }
+}
+
+async function screenPending(jobId){
+  const btn = document.getElementById('screen-pending-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Scoring…'; }
+  try{
+    const res = await fetch(`/api/jobs/${jobId}/screen-pending`,{method:'POST',credentials:'include'});
+    if(!res.ok){
+      let d={}; try{ d=await res.json(); }catch(_){}
+      throw new Error(d.detail||'Could not start scoring');
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf='', capped=0;
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value,{stream:true});
+      const parts = buf.split('\n\n'); buf = parts.pop();
+      for(const p of parts){
+        if(!p.startsWith('data: ')) continue;
+        let ev; try{ ev = JSON.parse(p.slice(6)); }catch(_){ continue; }
+        if(ev.type==='progress' && btn) btn.textContent = `Scoring ${ev.done+ev.failed} of ${ev.total}…`;
+        if(ev.type==='capped') capped++;
+        if(ev.type==='complete'){
+          toast(`Scored ${ev.done}${ev.failed?`, ${ev.failed} failed`:''}${capped?`, ${capped} blocked by a cap`:''}`,
+                {type: ev.failed||capped ? 'info' : 'success'});
+        }
+      }
+    }
+    await loadFromDB();
+    loadPendingApplications(jobId);
+  }catch(e){
+    toast(e.message,{type:'error'});
+    if(btn){ btn.disabled=false; btn.textContent='Retry scoring'; }
+  }
 }
 
 // Jump to Candidates page filtered by this job. Shared by Jobs page row clicks,

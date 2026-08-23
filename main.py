@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, Depends, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +47,14 @@ from database import (
     get_skills_gaps_for_user, get_dimension_averages_for_user, db,
     save_payment, get_payments_for_user, update_user_subscription,
     invite_team_member, get_team_members, get_team_invites,
-    update_user_profile, update_user_notifications, get_full_user
+    update_user_profile, update_user_notifications, get_full_user,
+    generate_public_token, hash_ip, get_job_by_public_token, set_job_public,
+    rotate_job_token, user_match_field, reserve_screening_slot,
+    release_screening_slot, get_spend_state, rate_limit_allows,
+    upsert_application, store_application_pdf, count_pending_applications,
+    get_applications_for_job, user_match,
+    MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
+    CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -1049,6 +1056,378 @@ async def get_cv_pdf(request: Request, screening_id: str):
 
 
 # ─────────────────────────────────────────────────────────────
+# PUBLIC APPLICATION LINKS
+#
+# The only unauthenticated write surface in the app. Everything here is built
+# around two facts: a public link spends OpenAI money, and a candidate must
+# never learn anything about how they were scored.
+# ─────────────────────────────────────────────────────────────
+
+import html as _html
+from datetime import datetime as _dt, timedelta as _td
+
+# Every failure mode of a public link — unknown token, paused job, rotated
+# token, deleted job — renders THIS page. No 404-vs-403 difference, no timing
+# hint, nothing to probe with.
+CLOSED_PAGE_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Position not available — TopCandidate.pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;
+background:#FAFBFC;color:#142848;min-height:100vh;display:grid;place-items:center;padding:1.5rem}
+.c{background:#fff;border:1px solid #E4E8F0;border-radius:16px;padding:2.5rem 2rem;max-width:440px;
+text-align:center;box-shadow:0 4px 12px rgba(20,40,72,.06)}
+h1{font-size:1.35rem;font-weight:800;margin-bottom:.75rem;letter-spacing:-.5px}
+p{color:#4A5970;line-height:1.65;font-size:.95rem}
+a{color:#E16A1F;font-weight:600;text-decoration:none}</style></head>
+<body><div class="c"><h1>This position isn't accepting applications</h1>
+<p>The link may have expired or the role may have closed. If someone sent you
+this link, ask them for an up-to-date one.</p>
+<p style="margin-top:1.25rem"><a href="https://topcandidate.pro">TopCandidate.pro</a></p>
+</div></body></html>"""
+
+
+async def owned_job(job_id: str, user: dict) -> dict:
+    """Fetch a job the caller owns, or raise. Tenant scoping for every dashboard route."""
+    from bson import ObjectId as _OID
+    try:
+        oid = _OID(job_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job = await db.jobs.find_one({"_id": oid})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    owner = job.get("user_id")
+    if not is_admin and owner and str(owner) != str(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    job["_id"] = str(job["_id"])
+    return job
+
+
+@app.get("/apply/{token}", response_class=HTMLResponse)
+async def public_apply_page(token: str):
+    job = await get_job_by_public_token(token)
+    if not job:
+        return HTMLResponse(CLOSED_PAGE_HTML, status_code=404)
+
+    owner = await get_user_by_id(str(job.get("user_id"))) if job.get("user_id") else None
+    company = (owner or {}).get("company_name") or "this company"
+
+    def esc(v, fallback=""):
+        return _html.escape(str(v if v not in (None, "") else fallback))
+
+    page = read_template("apply.html")
+    for key, val in {
+        "{{JOB_TITLE}}": esc(job.get("title"), "Open position"),
+        "{{COMPANY}}": esc(company),
+        "{{LOCATION}}": esc(job.get("loc") or job.get("location"), "Not specified"),
+        "{{JOB_TYPE}}": esc(job.get("type"), "Full-time"),
+        "{{DEPARTMENT}}": esc(job.get("dept") or job.get("department"), ""),
+        "{{JD_TEXT}}": esc(job.get("description"), "No description provided."),
+        "{{TOKEN}}": esc(token),
+        "{{RETENTION_DAYS}}": str(APPLICATION_PDF_RETENTION_DAYS),
+        "{{MAX_MB}}": str(MAX_APPLICATION_PDF_BYTES // (1024 * 1024)),
+    }.items():
+        page = page.replace(key, val)
+    return HTMLResponse(page)
+
+
+async def score_application(application_id: str):
+    """Score one public application. Runs AFTER the response is sent.
+
+    Nothing here talks to the candidate. If it fails, the application drops back
+    to stored_unscored and shows up in the recruiter's pending queue, which is
+    the same path a capped application takes — so the manual "Score all pending"
+    button doubles as the retry mechanism. No queue infrastructure needed.
+    """
+    from bson import ObjectId as _OID
+    try:
+        app_doc = await db.applications.find_one({"_id": _OID(application_id)})
+        if not app_doc:
+            return
+        job = await db.jobs.find_one({"_id": _OID(app_doc["job_id"])})
+        if not job:
+            return
+
+        f = await db.application_files.find_one({"application_id": application_id}, {"data": 1})
+        if not f or not f.get("data"):
+            await db.applications.update_one(
+                {"_id": _OID(application_id)},
+                {"$set": {"status": "stored_unscored", "error": "CV file missing"}},
+            )
+            await release_screening_slot(app_doc["job_id"])
+            return
+
+        await db.applications.update_one({"_id": _OID(application_id)}, {"$set": {"status": "scoring"}})
+
+        # pdfplumber is synchronous CPU work. On the event loop it would stall
+        # every other request in this worker for the duration of the parse.
+        cv_text, err = await asyncio.to_thread(extract_pdf_text, bytes(f["data"]))
+        if err or not (cv_text or "").strip():
+            await db.applications.update_one(
+                {"_id": _OID(application_id)},
+                {"$set": {"status": "stored_unscored", "error": err or "No text could be extracted"}},
+            )
+            # No API call happened, so the reservation is genuinely unused.
+            await release_screening_slot(app_doc["job_id"])
+            return
+
+        weights = job.get("weights") if isinstance(job.get("weights"), dict) else None
+        result, err = await run_screening_pipeline(
+            cv_text=cv_text,
+            jd_text=job.get("description") or "",
+            api_key=OPENAI_API_KEY,
+            weights=weights,
+        )
+        if err or not result:
+            # Money may already be spent — the reservation is NOT released.
+            await db.applications.update_one(
+                {"_id": _OID(application_id)},
+                {"$set": {"status": "stored_unscored", "error": err or "Scoring failed"}},
+            )
+            return
+
+        parsed_name = ((result.get("parsed_cv") or {}).get("personal") or {}).get("name")
+        if not parsed_name or str(parsed_name).strip().lower() in ("", "unknown"):
+            result["candidate_name"] = app_doc.get("name") or "Unknown"
+
+        result.update({
+            "job_id": app_doc["job_id"],
+            "job_title": job.get("title"),
+            "user_id": app_doc.get("user_id"),
+            "source": "public_apply",
+            "application_id": application_id,
+            "applicant_name": app_doc.get("name"),
+            "applicant_email": app_doc.get("email"),
+            "applicant_phone": app_doc.get("phone"),
+            "cv_filename": app_doc.get("cv_filename"),
+        })
+        screening_id = await save_screening(result)
+
+        # Point the stored PDF at the screening too, so the existing CV viewer
+        # resolves it exactly like a batch-uploaded one.
+        await db.application_files.update_one(
+            {"application_id": application_id},
+            {"$set": {"screening_id": _OID(screening_id)}},
+        )
+        await db.screenings.update_one(
+            {"_id": _OID(screening_id)}, {"$set": {"cv_file_id": f["_id"]}}
+        )
+        await db.applications.update_one(
+            {"_id": _OID(application_id)},
+            {"$set": {"status": "scored", "screening_id": screening_id, "scored_at": _dt.utcnow(),
+                      "error": None}},
+        )
+        await sync_screening_count(str(app_doc.get("user_id")))
+    except Exception as e:
+        print(f"[APPLY] scoring failed for {application_id}: {e}")
+        try:
+            await db.applications.update_one(
+                {"_id": _OID(application_id)}, {"$set": {"status": "stored_unscored", "error": str(e)[:300]}}
+            )
+        except Exception:
+            pass
+
+
+@app.post("/api/apply/{token}")
+async def public_apply_submit(
+    request: Request,
+    background: BackgroundTasks,
+    token: str,
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(""),
+    cv_file: UploadFile = File(...),
+):
+    job = await get_job_by_public_token(token)
+    if not job:
+        raise HTTPException(status_code=404, detail="This position isn't accepting applications.")
+
+    email_norm = (email or "").strip().lower()
+    if "@" not in email_norm or len(email_norm) < 5:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    if not (name or "").strip():
+        raise HTTPException(status_code=400, detail="Please enter your name.")
+
+    # Read one byte past the limit: enough to know it's oversized, not enough to
+    # let a 200MB upload sit in memory while we find out.
+    data = await cv_file.read(MAX_APPLICATION_PDF_BYTES + 1)
+    if len(data) > MAX_APPLICATION_PDF_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Your CV must be under {MAX_APPLICATION_PDF_BYTES // (1024*1024)}MB. Please upload a smaller PDF.",
+        )
+    if not data:
+        raise HTTPException(status_code=400, detail="The file appears to be empty.")
+    # Magic bytes, not Content-Type — the header is set by the client and the
+    # extension is decoration. This is the only check that reads the actual file.
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="Please upload a PDF file.")
+
+    client_ip = (request.headers.get("x-forwarded-for", "") or "").split(",")[0].strip() \
+        or (request.client.host if request.client else "unknown")
+    iph = hash_ip(client_ip)
+
+    # CGNAT means IP alone is useless in Bangladesh — thousands of subscribers
+    # share one address. Every bucket below is keyed on the email, with the IP
+    # only ever narrowing it further.
+    if not await rate_limit_allows(f"email-day:{email_norm}", 5, 86400):
+        raise HTTPException(status_code=429, detail="You've applied to several roles today. Please try again tomorrow.")
+    if not await rate_limit_allows(f"ipmail-hr:{iph}:{email_norm}", 3, 3600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please try again in an hour.")
+
+    job_id = str(job["_id"])
+    application_id, replaced = await upsert_application(
+        job, name, email_norm, phone, cv_file.filename or "cv.pdf", iph
+    )
+    await db.application_files.delete_many({"application_id": application_id})
+    await store_application_pdf(application_id, job_id, str(job.get("user_id") or ""),
+                                data, cv_file.filename or "cv.pdf")
+
+    # The reservation happens here, before anything is queued. If it fails the
+    # application is kept and simply isn't scored — the candidate is never told.
+    ok, blocked_by = await reserve_screening_slot(job_id)
+    if ok:
+        background.add_task(score_application, application_id)
+    else:
+        await db.applications.update_one(
+            {"_id": __import__("bson").ObjectId(application_id)},
+            {"$set": {"status": "stored_unscored", "capped_by": blocked_by}},
+        )
+        print(f"[APPLY] cap '{blocked_by}' reached — application {application_id} stored unscored")
+
+    # Byte-identical whether new, replaced, scored, or capped. A different
+    # response for a repeat submission would let anyone test whether a given
+    # address had already applied.
+    return {"success": True, "message": "Application received"}
+
+
+# ── Dashboard side ───────────────────────────────────────────
+
+@app.post("/api/jobs/{job_id}/public")
+async def toggle_job_public(request: Request, job_id: str, is_public: bool = Form(...)):
+    user = await get_current_user(request)
+    await owned_job(job_id, user)
+    job = await set_job_public(job_id, user["user_id"], is_public)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {
+        "success": True,
+        "is_public": is_public,
+        "public_token": job.get("public_token"),
+        "url": f"{APP_URL}/apply/{job.get('public_token')}" if job.get("public_token") else None,
+    }
+
+
+@app.post("/api/jobs/{job_id}/rotate-token")
+async def rotate_job_public_token(request: Request, job_id: str):
+    """Kill switch. Separate from the pause toggle on purpose: pausing keeps the
+    URL you already posted, rotating destroys it permanently."""
+    user = await get_current_user(request)
+    await owned_job(job_id, user)
+    job = await rotate_job_token(job_id, user["user_id"])
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"success": True, "public_token": job["public_token"],
+            "url": f"{APP_URL}/apply/{job['public_token']}"}
+
+
+@app.get("/api/jobs/{job_id}/applications")
+async def list_job_applications(request: Request, job_id: str):
+    user = await get_current_user(request)
+    await owned_job(job_id, user)
+    apps = await get_applications_for_job(job_id, user["user_id"])
+    counts = await count_pending_applications(job_id)
+    spend = await get_spend_state(job_id)
+    return {
+        "applications": apps,
+        "counts": counts,
+        "spend": spend,
+        "cost_per_screening": 0.054,
+        "estimated_cost": round(counts["pending"] * 0.054, 2),
+    }
+
+
+@app.delete("/api/applications/{application_id}")
+async def discard_application(request: Request, application_id: str):
+    """Throw away junk without paying to score it."""
+    from bson import ObjectId as _OID
+    user = await get_current_user(request)
+    try:
+        oid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    doc = await db.applications.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    await owned_job(doc["job_id"], user)
+    await db.application_files.delete_many({"application_id": application_id})
+    await db.applications.update_one({"_id": oid}, {"$set": {"status": "discarded"}})
+    return {"success": True}
+
+
+@app.post("/api/jobs/{job_id}/screen-pending")
+async def screen_pending_applications(request: Request, job_id: str):
+    """Score every pending application for a job, via the existing batch pipeline.
+
+    Deliberate authenticated action, so it bypasses the DAILY cap — but still
+    counts against the per-job and monthly ones, which are the caps that bound
+    what a single posting and a single month can cost.
+    """
+    from bson import ObjectId as _OID
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured on server.")
+
+    pending = await db.applications.find(
+        {"job_id": job_id, "status": {"$in": ["pending", "stored_unscored"]}}
+    ).sort("submitted_at", 1).to_list(200)
+    if not pending:
+        raise HTTPException(status_code=400, detail="No pending applications for this job.")
+
+    async def event_generator():
+        yield f"data: {json.dumps({'type':'start','total':len(pending)})}\n\n"
+        done = failed = 0
+        for i, app_doc in enumerate(pending):
+            aid = str(app_doc["_id"])
+            ok = await reserve_spend_for_manual(job_id)
+            if not ok:
+                yield f"data: {json.dumps({'type':'capped','index':i,'name':app_doc.get('name','')})}\n\n"
+                continue
+            await score_application(aid)
+            fresh = await db.applications.find_one({"_id": _OID(aid)}, {"status": 1})
+            if fresh and fresh.get("status") == "scored":
+                done += 1
+            else:
+                failed += 1
+            yield f"data: {json.dumps({'type':'progress','index':i,'done':done,'failed':failed,'total':len(pending),'name':app_doc.get('name','')})}\n\n"
+        counts = await count_pending_applications(job_id)
+        yield f"data: {json.dumps({'type':'complete','done':done,'failed':failed,'counts':counts})}\n\n"
+
+    return StreamingResponse(
+        event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def reserve_spend_for_manual(job_id: str) -> bool:
+    """Per-job and monthly only — the daily cap exists to bound what an unattended
+    public link can spend overnight, and this is neither unattended nor public."""
+    from database import reserve_spend, release_spend
+    now = _dt.utcnow()
+    if not await reserve_spend(f"job:{job_id}", CAP_PER_JOB):
+        return False
+    if not await reserve_spend(f"month:{now:%Y-%m}", CAP_PER_MONTH):
+        await release_spend(f"job:{job_id}")
+        return False
+    return True
+
+
+# ─────────────────────────────────────────────────────────────
 # STATS & ANALYTICS (tenant-scoped)
 # ─────────────────────────────────────────────────────────────
 
@@ -1097,6 +1476,22 @@ async def list_jobs(request: Request):
         jobs = await get_all_jobs()
     else:
         jobs = await get_jobs_for_user(user["user_id"])
+
+    # Pending counts for the Jobs table badge. One grouped aggregation rather
+    # than a count per job — the table renders every job at once.
+    pending_by_job = {}
+    try:
+        cursor = db.applications.aggregate([
+            {"$match": {"status": {"$in": ["pending", "stored_unscored"]}}},
+            {"$group": {"_id": "$job_id", "n": {"$sum": 1}}},
+        ])
+        async for row in cursor:
+            pending_by_job[row["_id"]] = row["n"]
+    except Exception:
+        pass
+    for j in jobs:
+        j["_pending"] = pending_by_job.get(str(j.get("_id")), 0)
+
     return {"jobs": jobs, "count": len(jobs)}
 
 
@@ -2226,7 +2621,7 @@ async def get_job_details(request: Request, job_id: str):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
     query = {"_id": oid}
     if not is_admin:
-        query["user_id"] = user["user_id"]   # tenant isolation
+        query.update(user_match_field("user_id", user["user_id"]))   # tenant isolation
     doc = await mongodb.jobs.find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail="Job not found.")

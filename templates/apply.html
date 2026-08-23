@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{JOB_TITLE}} — Apply via TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F57C2E'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--indigo:#1E3A5F;--orange:#F57C2E;--orange2:#E16A1F;
+  --og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);--ig:rgba(30,58,95,.08);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  --border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;
+  --r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-icon{width:28px;height:28px;border-radius:var(--r-md);background:var(--orange);display:grid;place-items:center;flex-shrink:0}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+.tb-tag{margin-left:auto;font-size:11.5px;color:var(--t3);font-weight:500}
+
+.wrap{max-width:720px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+
+.jobcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:1.25rem}
+.jc-head{padding:1.5rem 1.35rem 1.25rem;border-bottom:1px solid var(--border)}
+.jc-company{font-size:12.5px;font-weight:700;color:var(--orange2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:.5rem}
+.jc-title{font-size:clamp(1.4rem,5vw,1.9rem);font-weight:900;letter-spacing:-.8px;line-height:1.2;color:var(--navy)}
+.jc-meta{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-pill);padding:4px 11px;font-size:12px;font-weight:600;color:var(--t2)}
+.jc-body{padding:1.35rem}
+.jd-label{font-size:11.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:.75rem}
+.jd-text{font-size:.92rem;color:var(--t2);line-height:1.72;white-space:pre-wrap;word-wrap:break-word;max-height:340px;overflow-y:auto;padding-right:.35rem}
+.jd-text.open{max-height:none;overflow:visible}
+.jd-more{margin-top:.85rem;background:none;border:none;font-family:inherit;font-size:13px;font-weight:700;color:var(--orange2);cursor:pointer;padding:0}
+
+.formcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.5rem 1.35rem}
+.fc-title{font-size:1.15rem;font-weight:800;color:var(--navy);letter-spacing:-.4px;margin-bottom:.35rem}
+.fc-sub{font-size:.88rem;color:var(--t2);margin-bottom:1.5rem}
+.fw{display:flex;flex-direction:column;gap:6px;margin-bottom:1.05rem}
+.fl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
+.fl span{color:var(--orange2)}
+.fi{width:100%;padding:12px 14px;background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--r-lg);font-size:16px;font-family:inherit;color:var(--text);outline:none;transition:.15s}
+.fi:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--og)}
+.fi::placeholder{color:var(--t3)}
+.fi.bad{border-color:var(--red)}
+
+.drop{border:2px dashed var(--border2);border-radius:var(--r-lg);padding:1.6rem 1rem;text-align:center;cursor:pointer;transition:.15s;background:var(--s2)}
+.drop:hover,.drop.hot{border-color:var(--orange);background:var(--og)}
+.drop-ico{width:38px;height:38px;border-radius:var(--r-lg);background:var(--ig);display:grid;place-items:center;margin:0 auto .7rem}
+.drop-t{font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:.25rem}
+.drop-s{font-size:12px;color:var(--t3)}
+.drop.has{border-style:solid;border-color:var(--green);background:rgba(22,163,74,.06)}
+.file-row{display:flex;align-items:center;gap:.6rem;justify-content:center;font-size:.88rem;font-weight:600;color:var(--navy);word-break:break-all}
+
+.err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.75rem .9rem;font-size:.87rem;font-weight:500;margin-bottom:1rem;display:none;line-height:1.5}
+.retention{font-size:12px;color:var(--t3);line-height:1.6;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+
+.btn{width:100%;padding:14px;border-radius:var(--r-lg);background:var(--orange);color:#fff;font-size:16px;font-weight:700;font-family:inherit;border:none;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 4px 14px rgba(245,124,46,.28);margin-top:1.35rem}
+.btn:hover:not(:disabled){background:var(--orange2)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Success. Deliberately says nothing: no score, no stage, no timeline, no
+   internal identifier. The candidate learns that we received the file. */
+.done{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.75rem 1.5rem;text-align:center}
+.done-ico{width:60px;height:60px;border-radius:50%;background:rgba(22,163,74,.10);display:grid;place-items:center;margin:0 auto 1.25rem}
+.done-t{font-size:1.4rem;font-weight:900;color:var(--navy);letter-spacing:-.6px;margin-bottom:.65rem}
+.done-b{font-size:.95rem;color:var(--t2);line-height:1.7;max-width:400px;margin:0 auto}
+.done-f{margin-top:1.75rem;padding-top:1.35rem;border-top:1px solid var(--border);font-size:12px;color:var(--t3);line-height:1.6}
+#done-view{display:none}
+
+@media(min-width:768px){
+  .wrap{padding:2.25rem 1.5rem 5rem}
+  .jc-head{padding:1.85rem 1.75rem 1.5rem}
+  .jc-body,.formcard{padding:1.75rem}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Secure application</span>
+</div>
+
+<div class="wrap">
+
+  <div id="form-view">
+    <div class="jobcard">
+      <div class="jc-head">
+        <div class="jc-company">{{COMPANY}}</div>
+        <h1 class="jc-title">{{JOB_TITLE}}</h1>
+        <div class="jc-meta">
+          <span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>{{LOCATION}}</span>
+          <span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>{{JOB_TYPE}}</span>
+        </div>
+      </div>
+      <div class="jc-body">
+        <div class="jd-label">About this role</div>
+        <div class="jd-text" id="jd">{{JD_TEXT}}</div>
+        <button class="jd-more" id="jd-more" type="button" onclick="toggleJD()">Read full description ↓</button>
+      </div>
+    </div>
+
+    <div class="formcard">
+      <div class="fc-title">Apply for this role</div>
+      <div class="fc-sub">Takes about a minute. You'll need your CV as a PDF.</div>
+
+      <div class="err" id="err"></div>
+
+      <form id="f" onsubmit="return submitApp(event)">
+        <div class="fw">
+          <label class="fl" for="name">Full name <span>*</span></label>
+          <input class="fi" id="name" name="name" type="text" autocomplete="name" required placeholder="Your full name">
+        </div>
+        <div class="fw">
+          <label class="fl" for="email">Email <span>*</span></label>
+          <input class="fi" id="email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+        </div>
+        <div class="fw">
+          <label class="fl" for="phone">Phone</label>
+          <input class="fi" id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="01XXXXXXXXX">
+        </div>
+        <div class="fw">
+          <label class="fl">CV — PDF only, max {{MAX_MB}}MB <span>*</span></label>
+          <div class="drop" id="drop" onclick="document.getElementById('cv').click()">
+            <div id="drop-empty">
+              <div class="drop-ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+              <div class="drop-t">Tap to choose your CV</div>
+              <div class="drop-s">PDF, up to {{MAX_MB}}MB</div>
+            </div>
+            <div id="drop-full" style="display:none">
+              <div class="file-row">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span id="fname"></span>
+              </div>
+              <div class="drop-s" style="margin-top:.4rem">Tap to choose a different file</div>
+            </div>
+          </div>
+          <input type="file" id="cv" accept="application/pdf,.pdf" style="display:none" onchange="pickFile(this)">
+        </div>
+
+        <button class="btn" type="submit" id="btn">Submit application</button>
+      </form>
+
+      <p class="retention">Your CV is analysed to score your fit for this role. The file is deleted after {{RETENTION_DAYS}} days; the extracted profile is kept so we can consider you for future roles.</p>
+    </div>
+  </div>
+
+  <div id="done-view">
+    <div class="done">
+      <div class="done-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="done-t">Application received</div>
+      <p class="done-b">Thank you for applying for <strong>{{JOB_TITLE}}</strong> at {{COMPANY}}. Your CV is with the hiring team. If they'd like to take things further, they'll contact you at the email address you provided.</p>
+      <p class="done-f">You can close this page. There's nothing else you need to do.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = "{{TOKEN}}";
+const MAX_BYTES = {{MAX_MB}} * 1024 * 1024;
+let picked = null;
+
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.style.display='block';e.scrollIntoView({behavior:'smooth',block:'center'});}
+function hideErr(){document.getElementById('err').style.display='none';}
+
+function toggleJD(){
+  const jd=document.getElementById('jd'), b=document.getElementById('jd-more');
+  jd.classList.toggle('open');
+  b.textContent = jd.classList.contains('open') ? 'Show less ↑' : 'Read full description ↓';
+}
+// Only offer the toggle when there is actually more to read.
+window.addEventListener('load',()=>{
+  const jd=document.getElementById('jd');
+  if(jd.scrollHeight <= jd.clientHeight + 4) document.getElementById('jd-more').style.display='none';
+});
+
+function pickFile(input){
+  hideErr();
+  const f = input.files && input.files[0];
+  if(!f) return;
+  // Client-side checks are a courtesy so people aren't made to wait for an
+  // upload that will be refused. The server repeats both, and the server's
+  // answer is the one that counts.
+  if(f.size > MAX_BYTES){
+    showErr(`That file is ${(f.size/1048576).toFixed(1)}MB. Please upload a PDF under {{MAX_MB}}MB.`);
+    input.value=''; picked=null; return;
+  }
+  if(!/\.pdf$/i.test(f.name)){
+    showErr('Please choose a PDF file.');
+    input.value=''; picked=null; return;
+  }
+  picked = f;
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('drop-empty').style.display='none';
+  document.getElementById('drop-full').style.display='';
+  document.getElementById('drop').classList.add('has');
+}
+
+const drop = document.getElementById('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>{
+  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f){const dt=new DataTransfer();dt.items.add(f);const i=document.getElementById('cv');i.files=dt.files;pickFile(i);}
+});
+
+async function submitApp(e){
+  e.preventDefault();
+  hideErr();
+  const name=document.getElementById('name').value.trim();
+  const email=document.getElementById('email').value.trim();
+  const phone=document.getElementById('phone').value.trim();
+  if(!name){showErr('Please enter your name.');return false;}
+  if(!email||email.indexOf('@')<1){showErr('Please enter a valid email address.');return false;}
+  if(!picked){showErr('Please attach your CV as a PDF.');return false;}
+
+  const btn=document.getElementById('btn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spin"></div> Sending…';
+
+  const fd=new FormData();
+  fd.append('name',name); fd.append('email',email); fd.append('phone',phone); fd.append('cv_file',picked);
+
+  try{
+    const res=await fetch('/api/apply/'+TOKEN,{method:'POST',body:fd});
+    let data={};
+    try{ data=await res.json(); }catch(_){}
+    if(!res.ok) throw new Error(data.detail||'Something went wrong. Please try again.');
+    document.getElementById('form-view').style.display='none';
+    document.getElementById('done-view').style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(err){
+    showErr(err.message);
+    btn.disabled=false;
+    btn.textContent='Submit application';
+  }
+  return false;
+}
+</script>
+</body>
+</html>

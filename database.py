@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
-from bson import ObjectId
+from bson import ObjectId, Binary
 import os
 import re
 import ssl
@@ -31,6 +31,27 @@ async def connect():
     await db.screenings.create_index("recommendation")
     await db.screenings.create_index("overall_score")
     await db.jobs.create_index("created_at")
+
+    # ── Public application link ──
+    # Unique + sparse: jobs created before this feature have no public_token, and a
+    # plain unique index would treat every one of their missing values as the same
+    # null and reject all but the first.
+    await db.jobs.create_index("public_token", unique=True, sparse=True)
+    await db.applications.create_index("job_id")
+    await db.applications.create_index([("job_id", 1), ("email", 1)])
+    await db.applications.create_index("status")
+    await db.applications.create_index("submitted_at")
+
+    # TTL indexes. MongoDB only expires a document whose indexed field holds a BSON
+    # date — documents missing the field are ignored forever. That is exactly how
+    # the 243 CVs migrated by migration 001 stay exempt: their expires_at was
+    # unset, so this index can never touch them.
+    await db.application_files.create_index("expires_at", expireAfterSeconds=0)
+    await db.application_files.create_index("screening_id")
+    await db.application_files.create_index("application_id")
+    await db.rate_hits.create_index("expires_at", expireAfterSeconds=0)
+    await db.rate_hits.create_index([("bucket", 1), ("at", 1)])
+
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
 
@@ -558,3 +579,269 @@ async def get_full_user(user_id: str) -> dict | None:
         doc["_id"] = str(doc["_id"])
         doc.pop("password", None)
     return doc
+
+
+# ─────────────────────────────────────────────────────────────
+# PUBLIC APPLICATION LINKS
+# ─────────────────────────────────────────────────────────────
+
+import secrets
+import hashlib
+from datetime import timedelta
+
+# Retention for CVs uploaded through a public link. The apply page tells the
+# candidate 30 days; if this constant moves, that sentence has to move with it.
+APPLICATION_PDF_RETENTION_DAYS = 30
+
+# Spend caps. Each screening is ~4 GPT-4o calls, ~$0.054.
+CAP_PER_JOB = 200      # ~$10.80 per posting
+CAP_PER_DAY = 100      # ~$5.40/day
+CAP_PER_MONTH = 500    # ~$27/month — the one that bounds a card charge
+
+MAX_APPLICATION_PDF_BYTES = 2 * 1024 * 1024  # 2MB
+
+
+def generate_public_token() -> str:
+    """22 URL-safe characters, 128 bits. Not enumerable, carries no information."""
+    return secrets.token_urlsafe(16)
+
+
+def hash_ip(ip: str) -> str:
+    """Hash a client IP for rate-limit bucketing. Raw IPs are never stored.
+
+    Salted with SECRET_KEY so the digests aren't reversible via a rainbow table
+    of the whole IPv4 space, which is small enough to enumerate unsalted.
+    """
+    salt = os.getenv("SECRET_KEY", "topcandidate-fallback-salt")
+    return hashlib.sha256(f"{salt}:{ip}".encode()).hexdigest()[:32]
+
+
+async def get_job_by_public_token(token: str) -> dict | None:
+    """Resolve a public token to a live, publicly-listed job.
+
+    Paused (is_public False), rotated (token no longer matches), and deleted
+    (active False) jobs all resolve to None so the caller can return one
+    indistinguishable closed page for every case.
+    """
+    doc = await db.jobs.find_one({"public_token": token, "is_public": True, "active": True})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+async def set_job_public(job_id: str, user_id: str, is_public: bool) -> dict | None:
+    """Pause or resume a public link. Keeps the existing token.
+
+    This is the reversible switch. Rotating the token is the irreversible one;
+    they are separate on purpose, so pausing a link doesn't cost you the URL
+    you already posted and revoking one doesn't require deleting the job.
+    """
+    job = await db.jobs.find_one({"_id": ObjectId(job_id), **user_match_field("user_id", user_id)})
+    if not job:
+        return None
+    updates = {"is_public": is_public}
+    if is_public and not job.get("public_token"):
+        updates["public_token"] = generate_public_token()
+    await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": updates})
+    return {**job, **updates, "_id": str(job["_id"])}
+
+
+async def rotate_job_token(job_id: str, user_id: str) -> dict | None:
+    """Kill a leaked link permanently. The old URL can never be revived."""
+    job = await db.jobs.find_one({"_id": ObjectId(job_id), **user_match_field("user_id", user_id)})
+    if not job:
+        return None
+    token = generate_public_token()
+    await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": {"public_token": token, "token_rotated_at": datetime.utcnow()}},
+    )
+    return {**job, "public_token": token, "_id": str(job["_id"])}
+
+
+def user_match_field(field: str, user_id: str) -> dict:
+    """user_match, for collections whose owner field isn't called user_id.
+
+    Same reason as user_match: the id is not reliably stored as a string, so a
+    plain equality match silently drops rows.
+    """
+    return {"$or": [{field: user_id}, {field: str(user_id)}]}
+
+
+# ── Spend caps ───────────────────────────────────────────────
+
+async def reserve_spend(key: str, cap: int) -> bool:
+    """Claim one unit of spend under `cap`, atomically. True if claimed.
+
+    A read-then-write (`if count < cap: count += 1`) is a race: ten concurrent
+    uploads all read 199, all pass the check, and all spend. Here the check IS
+    the update — the filter requires count < cap and the increment happens in
+    the same round trip, so concurrency cannot overshoot the cap.
+
+    This is a reservation, not a tally: the slot is claimed BEFORE the money is
+    spent, never after.
+    """
+    await db.spend_counters.update_one(
+        {"_id": key},
+        {"$setOnInsert": {"count": 0, "created_at": datetime.utcnow()}},
+        upsert=True,
+    )
+    doc = await db.spend_counters.find_one_and_update(
+        {"_id": key, "count": {"$lt": cap}},
+        {"$inc": {"count": 1}, "$set": {"last_at": datetime.utcnow()}},
+    )
+    return doc is not None
+
+
+async def release_spend(key: str) -> None:
+    """Give a reservation back — only for failures BEFORE any API call.
+
+    If the pipeline died partway through, the money is already gone and the
+    counter should keep saying so.
+    """
+    await db.spend_counters.update_one({"_id": key, "count": {"$gt": 0}}, {"$inc": {"count": -1}})
+
+
+async def reserve_screening_slot(job_id: str) -> tuple[bool, str]:
+    """Reserve against all three caps. Returns (ok, which_cap_blocked).
+
+    Reserved in order job → day → month, releasing the earlier ones if a later
+    cap refuses, so a blocked application never leaves a phantom reservation
+    holding budget it didn't use.
+    """
+    now = datetime.utcnow()
+    k_job = f"job:{job_id}"
+    k_day = f"day:{now:%Y-%m-%d}"
+    k_month = f"month:{now:%Y-%m}"
+
+    if not await reserve_spend(k_job, CAP_PER_JOB):
+        return False, "job"
+    if not await reserve_spend(k_day, CAP_PER_DAY):
+        await release_spend(k_job)
+        return False, "day"
+    if not await reserve_spend(k_month, CAP_PER_MONTH):
+        await release_spend(k_day)
+        await release_spend(k_job)
+        return False, "month"
+    return True, ""
+
+
+async def release_screening_slot(job_id: str) -> None:
+    now = datetime.utcnow()
+    await release_spend(f"job:{job_id}")
+    await release_spend(f"day:{now:%Y-%m-%d}")
+    await release_spend(f"month:{now:%Y-%m}")
+
+
+async def get_spend_state(job_id: str) -> dict:
+    now = datetime.utcnow()
+    async def n(key):
+        d = await db.spend_counters.find_one({"_id": key}, {"count": 1})
+        return (d or {}).get("count", 0)
+    return {
+        "job": {"used": await n(f"job:{job_id}"), "cap": CAP_PER_JOB},
+        "day": {"used": await n(f"day:{now:%Y-%m-%d}"), "cap": CAP_PER_DAY},
+        "month": {"used": await n(f"month:{now:%Y-%m}"), "cap": CAP_PER_MONTH},
+    }
+
+
+# ── Rate limiting ────────────────────────────────────────────
+
+async def rate_limit_allows(bucket: str, limit: int, window_seconds: int) -> bool:
+    """Sliding-window counter. True if this hit is allowed.
+
+    Count-then-insert can let a couple of extra requests through under exact
+    simultaneity. That is acceptable here: this layer exists to blunt casual
+    spam, and the spend cap — which IS atomic — is what actually bounds cost.
+
+    Rows carry expires_at and are reaped by a TTL index, so there is no cleanup
+    job and the collection cannot grow without bound.
+    """
+    now = datetime.utcnow()
+    cutoff = now - timedelta(seconds=window_seconds)
+    used = await db.rate_hits.count_documents({"bucket": bucket, "at": {"$gte": cutoff}})
+    if used >= limit:
+        return False
+    await db.rate_hits.insert_one({
+        "bucket": bucket,
+        "at": now,
+        "expires_at": now + timedelta(seconds=window_seconds),
+    })
+    return True
+
+
+# ── Applications ─────────────────────────────────────────────
+
+async def upsert_application(job: dict, name: str, email: str, phone: str,
+                             filename: str, ip_hash: str) -> tuple[str, bool]:
+    """Create or replace a pending application. Returns (application_id, replaced).
+
+    job_id and user_id come off the job document, which was itself resolved from
+    the token — so an application that belongs to no job cannot be constructed.
+    This is what keeps public applicants out of the job-orphan problem.
+    """
+    email = (email or "").strip().lower()
+    now = datetime.utcnow()
+    existing = await db.applications.find_one(
+        {"job_id": str(job["_id"]), "email": email, "status": {"$in": ["pending", "stored_unscored", "scoring"]}}
+    )
+
+    doc = {
+        "job_id": str(job["_id"]),
+        "user_id": job.get("user_id"),
+        "name": (name or "").strip(),
+        "email": email,
+        "phone": (phone or "").strip(),
+        "cv_filename": filename,
+        "status": "pending",
+        "submitted_at": now,
+        "submitted_ip_hash": ip_hash,
+    }
+
+    if existing:
+        # Keep the latest. Candidates re-upload after fixing a typo, and refusing
+        # them reads as broken. The old PDF goes with the old record.
+        await db.application_files.delete_many({"application_id": str(existing["_id"])})
+        await db.applications.update_one({"_id": existing["_id"]}, {"$set": doc})
+        return str(existing["_id"]), True
+
+    res = await db.applications.insert_one(doc)
+    return str(res.inserted_id), False
+
+
+async def store_application_pdf(application_id: str, job_id: str, user_id: str,
+                                data: bytes, filename: str) -> str:
+    now = datetime.utcnow()
+    res = await db.application_files.insert_one({
+        "application_id": application_id,
+        "job_id": job_id,
+        "user_id": user_id,
+        "data": Binary(data),
+        "filename": filename,
+        "size": len(data),
+        "source": "public_apply",
+        "created_at": now,
+        "expires_at": now + timedelta(days=APPLICATION_PDF_RETENTION_DAYS),
+    })
+    return str(res.inserted_id)
+
+
+async def count_pending_applications(job_id: str) -> dict:
+    pending = await db.applications.count_documents(
+        {"job_id": job_id, "status": {"$in": ["pending", "stored_unscored"]}}
+    )
+    unscored = await db.applications.count_documents({"job_id": job_id, "status": "stored_unscored"})
+    total = await db.applications.count_documents({"job_id": job_id})
+    return {"pending": pending, "unscored": unscored, "total": total}
+
+
+async def get_applications_for_job(job_id: str, user_id: str, status: str = "") -> list:
+    q = {"job_id": job_id, **user_match_field("user_id", user_id)}
+    if status:
+        q["status"] = status
+    cursor = db.applications.find(q, {"cv_pdf_b64": 0}).sort("submitted_at", -1).limit(500)
+    out = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        out.append(doc)
+    return out
