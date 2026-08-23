@@ -324,9 +324,11 @@ async def sync_screening_count(user_id: str):
     from datetime import datetime
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # Count screenings from this month only
+    # user_match, not plain equality: a screening whose user_id was stored as a
+    # non-string is invisible to an equality match, so the month count runs low and
+    # the user is handed free quota. This is the number the batch limit enforces on.
     count = await db.screenings.count_documents({
-        "user_id": user_id,
+        **user_match(user_id),
         "created_at": {"$gte": month_start}
     })
     await db.users.update_one(
