@@ -1005,14 +1005,47 @@ async def get_cv_pdf(request: Request, screening_id: str):
     from bson import ObjectId
     from fastapi.responses import Response as FastResponse
     user = await get_current_user(request)
-    doc = await db.screenings.find_one({"_id": ObjectId(screening_id)}, {"cv_pdf_b64": 1, "cv_filename": 1, "user_id": 1})
-    if not doc or not doc.get("cv_pdf_b64"):
+    try:
+        oid = ObjectId(screening_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="CV file not found.")
+
+    doc = await db.screenings.find_one(
+        {"_id": oid},
+        {"cv_pdf_b64": 1, "cv_filename": 1, "user_id": 1, "cv_file_id": 1},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="CV file not found.")
+    # Ownership before content: the old order answered "does this screening have a
+    # CV?" for screenings the caller doesn't own.
     if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
-    pdf_bytes = base64.b64decode(doc["cv_pdf_b64"])
+
+    # application_files is the primary store; cv_pdf_b64 is the legacy copy that
+    # migration 001 leaves in place until it is unset. The new path is tried FIRST
+    # deliberately — while both exist, every read exercises the new one with the old
+    # one still there to fall back on, so a broken read surfaces now rather than
+    # after the retention window reaps the copies.
+    pdf_bytes = None
+    if doc.get("cv_file_id"):
+        f = await db.application_files.find_one({"screening_id": oid}, {"data": 1, "filename": 1})
+        if f and f.get("data"):
+            pdf_bytes = bytes(f["data"])
+
+    if pdf_bytes is None and doc.get("cv_pdf_b64"):
+        pdf_bytes = base64.b64decode(doc["cv_pdf_b64"])
+
+    if pdf_bytes is None:
+        # Expected state once a PDF has passed its retention window. The parsed
+        # profile on the screening is unaffected, so say that rather than "not found".
+        raise HTTPException(
+            status_code=404,
+            detail="The original CV is no longer stored. The parsed profile is retained.",
+        )
+
+    filename = doc.get("cv_filename") or "cv.pdf"
     return FastResponse(content=pdf_bytes, media_type="application/pdf",
-                        headers={"Content-Disposition": f"inline; filename={doc.get('cv_filename','cv.pdf')}"})
+                        headers={"Content-Disposition": f"inline; filename={filename}"})
 
 
 # ─────────────────────────────────────────────────────────────
