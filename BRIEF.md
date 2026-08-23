@@ -19,6 +19,23 @@ Anything marked ✅ was verified against live production or the code on the date
 - Never paste real secrets. If I paste one by accident, tell me to rotate immediately.
 - **Say "we can't tell" rather than guessing.** A confident wrong answer costs me more than an admitted gap.
 
+### ✅ Rule learned the hard way — 2026-08-22, migration 001
+
+**Ship the new read path BEFORE the destructive step that removes the old one.**
+
+During migration 001 I asked for `unset --commit` (delete `cv_pdf_b64`) and *then* wanted to confirm the CV viewer still worked against the new store. Claude refused and was right to: nothing read `application_files` yet, so `unset` would have 404'd the viewer for all 243 candidates, and the verification would have been testing a path that did not exist with the fallback already deleted.
+
+The correct order is always:
+
+1. Add the new read path, preferring the new store, **falling back** to the old one
+2. Deploy and confirm — the read is now exercised against the new store with the old one still underneath
+3. Only then run the destructive step
+4. Confirm again, this time with no fallback available to mask a silent failure
+
+Step 4 is the one that actually proves it. While a fallback exists, a broken new path looks identical to a working one.
+
+Generalises past this migration: **a verification is meaningless if the thing it would fall back to has already been deleted.** If I ask for these in the wrong order, say so.
+
 ## 2. What TopCandidate.pro is
 
 AI CV screening SaaS. Recruiter uploads a job description + batch of PDFs → GPT-4o scores each candidate on a 6-dimension weighted rubric → ranked, filterable list with detailed reports, pipeline stages, and candidate emails from inside the app.
@@ -214,9 +231,59 @@ count = await db.screenings.count_documents({
 
 No recount migration is needed — `sync_screening_count()` overwrites the stored value before every batch. **Not yet applied.**
 
+## 10b. ✅ Migration 001 — CV PDFs out of screening docs (2026-08-22, complete)
+
+`cv_pdf_b64` held the whole CV base64-encoded inside every screening. Moved to an `application_files` collection as raw BSON binData. Script: `migrations/001_pdfs_to_application_files.py` (`status` / `copy` / `verify` / `unset` / `rollback`, defaults to `--dry-run`, idempotent).
+
+Ran `copy --commit` → `verify` (243/243 byte-and-sha identical) → `unset --commit`. Read path shipped first as `e86499c`.
+
+**Result — logical data:**
+
+| | before | after |
+|---|---|---|
+| screenings, avg document | 260.1KB | **8.2KB** |
+| screenings, logical size | 66.8MB | **2.1MB** |
+| base64 overhead reclaimed | — | 16.2MB |
+
+8.2KB per screening beat the 13KB estimate. Capacity for new screenings is roughly **60,000**, not the ~2,000 the old shape allowed.
+
+### ⚠️ On-disk is NOT the same number — read this before assuming there's headroom
+
+`collStats.size` is logical data. `storageSize` is what is actually allocated on disk, and **WiredTiger does not return freed space** — it reuses it internally for new writes.
+
+Measured immediately after `unset`:
+
+```
+screenings         logical=2.1MB   onDisk=110.9MB
+application_files  logical=48.6MB  onDisk=93.0MB
+DB TOTAL           dataSize=50.8MB storageSize=204.1MB
+```
+
+So the database is holding **204MB on disk** while containing 51MB of data. Atlas M0's 512MB cap is measured against disk usage, so the honest figure is ~204/512MB, not ~51/512MB. **Check the Atlas Metrics tab, not the logical numbers, before assuming room.** The 110.9MB behind `screenings` is free for reuse and will absorb thousands of new screenings without growing — it just will not show as recovered. `compact` is not available on M0.
+
+When the TTL fires, `application_files` logical drops to ~0 and its 93MB on-disk stays allocated and reusable.
+
+### Retention state
+
+- 243 files carry `expires_at` = 2026-09-21 (30 days from migration). **All expire on the same day** — dating from `created_at` would have expired nearly all of them immediately, since most screenings are older than 30 days. New applications get proper rolling expiry.
+- **The TTL index does not exist yet.** Until it is created in `connect()`, nothing expires. Creating it starts the clock for real.
+- 20 of the 263 screenings never had a PDF (they predate PDF storage or came through the single-screen path). Their CV viewer was already empty.
+
+### Backup reality
+
+A **Droplet snapshot contains none of this** — the droplet runs the app, the data is in Atlas. **Atlas M0 has no automated backups**; continuous backup starts at M10. The only copy of the pre-migration state is the 46MB `mongodump` archive taken 2026-08-22, held in two locations off the droplet. Once the TTL fires, that archive is the only copy of the 243 PDFs that exists anywhere.
+
+```bash
+mongodump --uri="$MONGO_URI" --db=talentscore --gzip --archive=$HOME/talentscore-$(date +%F).gz
+```
+
+Worth doing on a schedule regardless of this feature.
+
 ## 11. Ops TODO
 
-- [ ] Take a Droplet snapshot (~$0.60/mo, one-click restore) — **do this before any backfill**
+- [x] Droplet snapshot taken, and a 46MB mongodump archived in two locations off-droplet (2026-08-22)
+- [ ] Put the mongodump on a schedule — Atlas M0 has no backups of its own
+- [ ] Watch Atlas storageSize (204MB/512MB), not dataSize — see §10b
 - [ ] Tighten Atlas IP whitelist to `178.128.58.53/32` if it's currently `0.0.0.0/0`
 - [ ] Grep nginx logs for the deleted endpoints (§8), then confirm the admin list
 - [ ] Confirm `admin@talentscore.ai` is an account you created
