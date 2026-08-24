@@ -102,12 +102,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
-.stat:hover{border-color:var(--border3);transform:translateY(-1px);box-shadow:0 4px 12px rgba(20,40,72,.06)}
-.stat:hover{border-color:var(--border3);transform:translateY(-1px)}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
+/* One hover rule — there used to be two, the second silently cancelling the
+   first's shadow. Gentle lift on the existing shadow token. */
+.stat:hover{border-color:var(--border3);transform:translateY(-2px);box-shadow:var(--shadow-md)}
 .stat-bar{position:absolute;top:0;left:0;right:0;height:2px}
-.stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px}
-.stat-val{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:2px}
+/* Soft, accent-tinted icon chip, top-right. Colour is set inline per card so
+   each KPI keeps its own accent; no new palette. */
+.stat-ico{position:absolute;top:.85rem;right:.85rem;width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center}
+.stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px;padding-right:34px}
+.stat-val{font-size:27px;font-weight:800;letter-spacing:-.6px;margin-bottom:3px;line-height:1}
 .stat-sub{font-size:10px;color:var(--t3)}
 .stat-trend{font-size:10px;font-weight:600;margin-top:3px}
 .stat-trend.up{color:var(--green)}.stat-trend.dn{color:var(--red)}
@@ -154,8 +158,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tbl th.sortable.sort-asc .sort-ind,.tbl th.sortable.sort-desc .sort-ind{color:var(--orange);opacity:1}
 .tbl td{padding:10px 12px;color:var(--t2);border-bottom:1px solid var(--border);vertical-align:middle;transition:background .12s}
 .tbl tr:last-child td{border-bottom:none}
-.tbl tbody tr{transition:background .12s}
+.tbl tbody tr{transition:background .12s,box-shadow .12s}
 .tbl tbody tr:hover td{background:var(--s2);cursor:pointer}
+/* Whole-row-clickable candidates: pointer + a subtle shadow lift on the
+   existing token. border-collapse is separate, so a row shadow renders. */
+.tbl tbody tr.row-click{cursor:pointer}
+.tbl tbody tr.row-click:hover{box-shadow:var(--shadow-sm);position:relative;z-index:1}
+/* Density: Compact roughly halves the vertical padding so more rows fit. */
+.tbl.dense td{padding:5px 12px}
+.tbl.dense .tag{padding:1px 5px;font-size:9px}
+/* Compact/comfortable segmented control */
+.density-seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r-sm);overflow:hidden}
+.density-seg button{border:none;background:var(--surface);color:var(--t2);font-size:11px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.density-seg button+button{border-left:1px solid var(--border2)}
+.density-seg button.active{background:var(--ig);color:var(--navy)}
+.density-seg button:hover:not(.active){background:var(--s2)}
 .tbl-empty{text-align:center;padding:2.5rem;color:var(--t3);font-size:12px}
 .tbl-link{color:var(--indigo);font-weight:600;text-decoration:none}
 .tbl-link:hover{text-decoration:underline}
@@ -216,7 +233,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── PIPELINE FUNNEL ── */
 .funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
 .funnel-stage{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:.75rem .6rem;text-align:center;transition:all .2s;cursor:pointer}
-.funnel-stage:hover{border-color:var(--indigo);transform:translateY(-2px)}
+.funnel-stage:hover{border-color:var(--indigo);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+/* Funnel shape: on a wide screen the five stages taper in width AND height,
+   left to right, so the row reads as an actual funnel. Pure presentation —
+   the numbers inside are untouched. Below 1100px the grid already reflows to
+   repeat(4,1fr), so the taper is scoped to the single-row desktop layout. */
+@media(min-width:1101px){
+  .funnel{grid-template-columns:1.35fr 1.15fr 1fr 0.88fr 0.78fr;align-items:center}
+  .funnel-stage{display:flex;flex-direction:column;justify-content:center}
+  .funnel-stage:nth-child(1){min-height:94px}
+  .funnel-stage:nth-child(2){min-height:85px}
+  .funnel-stage:nth-child(3){min-height:76px}
+  .funnel-stage:nth-child(4){min-height:67px}
+  .funnel-stage:nth-child(5){min-height:58px}
+}
 .funnel-stage.act{border-color:var(--indigo);background:var(--ig)}
 .funnel-num{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:3px}
 .funnel-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
@@ -442,24 +472,28 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="stats-grid">
     <div class="stat" onclick="showPage('candidates')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--navy)"></div>
+      <div class="stat-ico" style="background:var(--ig)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
       <div class="stat-lbl">Total screened</div>
       <div class="stat-val" id="ov-total">0</div>
       <div class="stat-sub">candidates evaluated</div>
     </div>
     <div class="stat" onclick="filterByRec('hire')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--amber)"></div>
+      <div class="stat-ico" style="background:var(--amg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></div>
       <div class="stat-lbl">AI recommends hire</div>
       <div class="stat-val" id="ov-airec" style="color:var(--amber)">0</div>
       <div class="stat-sub">STRONG HIRE + HIRE</div>
     </div>
     <div class="stat" onclick="filterByStage('shortlisted')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--green)"></div>
+      <div class="stat-ico" style="background:var(--gg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
       <div class="stat-lbl">You shortlisted</div>
       <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
       <div class="stat-sub">your decision</div>
     </div>
     <div class="stat" onclick="showPage('jobs')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--orange)"></div>
+      <div class="stat-ico" style="background:var(--og)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
       <div class="stat-lbl">Active jobs</div>
       <div class="stat-val" id="ov-jobs" style="color:var(--orange)">0</div>
       <div class="stat-sub">open roles</div>
@@ -519,7 +553,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="page" id="page-candidates">
   <div class="ph-row">
     <div class="ph"><h1>All Candidates</h1><p>Every screened candidate — filter, sort, and take action</p></div>
-    <button class="btn btn-ghost btn-sm" onclick="exportCandidates()">↓ Export CSV</button>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="density-seg" title="Row density">
+        <button id="dens-comfy" class="active" onclick="setDensity(false)">Comfortable</button>
+        <button id="dens-compact" onclick="setDensity(true)">Compact</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportCandidates()">↓ Export CSV</button>
+    </div>
   </div>
 
   <!-- Filters -->
@@ -1300,6 +1340,18 @@ function stageBadge(stage){
   if(stage==='interview')    return '<span class="badge b-amber" style="font-size:9px;margin-right:4px">→ Interview</span>';
   return '';
 }
+// Row density — JS state only. Deliberately NOT persisted: localStorage is
+// unavailable in this environment. Default comfortable. The .dense class sits
+// on the <table>, so it survives tbody re-renders and only needs setting here.
+let denseMode = false;
+function setDensity(dense){
+  denseMode = dense;
+  const table = document.getElementById('cands-tbl')?.closest('table');
+  if(table) table.classList.toggle('dense', dense);
+  document.getElementById('dens-comfy')?.classList.toggle('active', !dense);
+  document.getElementById('dens-compact')?.classList.toggle('active', dense);
+}
+
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
   // Render the sortable thead each time so the sort indicator stays in sync.
@@ -1355,8 +1407,11 @@ function renderCandidates(results){
     const stage=r.stage||'pending';
     const sl_active = stage==='shortlisted' ? 'box-shadow:0 0 0 2px var(--green);font-weight:700' : '';
     const rj_active = stage==='rejected'    ? 'box-shadow:0 0 0 2px var(--red);font-weight:700'   : '';
-    return`<tr>
-      <td><a class="tbl-link" href="/candidate?id=${r._id}">${r.candidate_name||'Unknown'}</a></td>
+    // Whole row opens the modal. The name link keeps its own navigation (full
+    // candidate page) and the ✓/✕ actions stop propagation so neither also
+    // triggers the row's modal.
+    return`<tr class="row-click" onclick="openCandModal('${r._id}')">
+      <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${r.candidate_name||'Unknown'}</a></td>
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
       <td>${scoreRing(score, 'sm')}</td>
       <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
@@ -1367,9 +1422,8 @@ function renderCandidates(results){
       <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
       <td>
         <div style="display:flex;gap:3px">
-          <button class="btn btn-xs btn-ghost" onclick="openCandModal('${r._id}')">View</button>
-          <button class="btn btn-xs" style="background:var(--gg);color:var(--green);border:1px solid var(--gb);${sl_active}" onclick="quickAction('${r._id}','shortlist')" title="Shortlist">✓</button>
-          <button class="btn btn-xs" style="background:var(--rg);color:var(--red);border:1px solid var(--rb);${rj_active}" onclick="quickAction('${r._id}','reject')" title="Reject">✕</button>
+          <button class="btn btn-xs" style="background:var(--gg);color:var(--green);border:1px solid var(--gb);${sl_active}" onclick="event.stopPropagation();quickAction('${r._id}','shortlist')" title="Shortlist">✓</button>
+          <button class="btn btn-xs" style="background:var(--rg);color:var(--red);border:1px solid var(--rb);${rj_active}" onclick="event.stopPropagation();quickAction('${r._id}','reject')" title="Reject">✕</button>
         </div>
       </td>
     </tr>`;
