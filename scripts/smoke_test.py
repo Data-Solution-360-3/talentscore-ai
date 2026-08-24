@@ -159,6 +159,64 @@ def main():
                 line(None, method, path, str(e)[:60])
                 failures.append((method, path, "exception"))
 
+        # ── Regression locks: two bugs the smoke test already caught once ──
+        # A 5xx is already fatal above, but these assert on the RESPONSE, not
+        # just the status, so a subtler break (200 with a garbled body) is
+        # caught too. Each appends to `failures` on its own terms.
+        print("\nRegression locks")
+
+        # /api/screenings 500'd on a raw ObjectId (cv_file_id) it failed to
+        # serialize. Assert it returns JSON with a screenings LIST — a
+        # serialization regression cannot pass this even if it somehow avoids a 5xx.
+        try:
+            r = c.get("/api/screenings?limit=5")
+            ok = r.status_code == 200
+            body = r.json() if ok else {}
+            ok = ok and isinstance(body.get("screenings"), list)
+            line(r.status_code, "GET", "/api/screenings",
+                 "screenings[] present" if ok else "MALFORMED — no screenings list")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/api/screenings", r.status_code if r.status_code >= 500 else "malformed"))
+        except Exception as e:
+            line(None, "GET", "/api/screenings", str(e)[:60])
+            failures.append(("GET", "/api/screenings", "exception"))
+
+        # /apply/{token}: an unknown token must return the unified closed page —
+        # never a 500, never a stack trace. This locks the probe-resistant
+        # response: unknown and paused are indistinguishable.
+        try:
+            r = c.get("/apply/smoke-test-definitely-not-real")
+            body = r.text or ""
+            ok = r.status_code < 500 and "accepting applications" in body.lower()
+            line(r.status_code, "GET", "/apply/{unknown}",
+                 "unified closed page" if ok else "NOT the closed page")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/apply/{unknown}", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/apply/{unknown}", str(e)[:60])
+            failures.append(("GET", "/apply/{unknown}", "exception"))
+
+        # If a real token exists, it must render EITHER the form (public) or the
+        # same closed page (paused) — but never a 500. This is the check that
+        # would have flagged the applicant-facing page being down.
+        if token:
+            try:
+                r = c.get(f"/apply/{token}")
+                body = r.text or ""
+                shows_form = "apply for this role" in body.lower()
+                shows_closed = "accepting applications" in body.lower()
+                ok = r.status_code < 500 and (shows_form or shows_closed)
+                state = "form (public)" if shows_form else "closed (paused)" if shows_closed else "UNRECOGNISED"
+                line(r.status_code, "GET", "/apply/{real}", state)
+                checked += 1
+                if not ok:
+                    failures.append(("GET", "/apply/{real}", r.status_code))
+            except Exception as e:
+                line(None, "GET", "/apply/{real}", str(e)[:60])
+                failures.append(("GET", "/apply/{real}", "exception"))
+
         # ── The write that was broken, exercised without changing state ──
         if job_id:
             print("\nMutating route (set to its current value — full path, no state change)")

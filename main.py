@@ -1171,11 +1171,23 @@ async def owned_job(job_id: str, user: dict) -> dict:
     return job
 
 
+def _closed_link_page() -> HTMLResponse:
+    """The single response for every non-resolving token.
+
+    get_job_by_public_token() returns None for all four closed states —
+    unknown, paused (is_public False), rotated (token no longer matches), and
+    deleted (active False) — so they all land here and are byte-for-byte
+    identical: same status, same body. A token cannot be probed for existence,
+    because "does not exist" and "exists but paused" are indistinguishable.
+    """
+    return HTMLResponse(CLOSED_PAGE_HTML, status_code=404)
+
+
 @app.get("/apply/{token}", response_class=HTMLResponse)
 async def public_apply_page(token: str):
     job = await get_job_by_public_token(token)
     if not job:
-        return HTMLResponse(CLOSED_PAGE_HTML, status_code=404)
+        return _closed_link_page()
 
     owner = await get_user_by_id(str(job.get("user_id"))) if job.get("user_id") else None
     company = (owner or {}).get("company_name") or "this company"

@@ -15,6 +15,28 @@ client = None
 db     = None
 
 
+def serialize_mongo(doc):
+    """Recursively stringify every ObjectId in a document so it is JSON-safe.
+
+    `_id` was always converted by hand. `cv_file_id` — added to 243 screenings
+    by migration 001 — was not, and it is a raw ObjectId. FastAPI cannot
+    serialize it, so every /api/screenings response 500'd with "ObjectId is not
+    iterable" the moment the migration ran. Converting only the field we know
+    about would leave the next raw-ObjectId field to break the same way, so this
+    walks the whole document at any depth. Note: job_id and user_id in
+    screenings are consistently strings — this is NOT the string-vs-ObjectId
+    typing behind user_match(); cv_file_id is a correctly-typed reference that
+    simply was never stringified on the way out.
+    """
+    if isinstance(doc, ObjectId):
+        return str(doc)
+    if isinstance(doc, list):
+        return [serialize_mongo(v) for v in doc]
+    if isinstance(doc, dict):
+        return {k: serialize_mongo(v) for k, v in doc.items()}
+    return doc
+
+
 async def connect():
     global client, db
     client = AsyncIOMotorClient(
@@ -73,15 +95,14 @@ async def get_all_screenings(limit: int = 200) -> list:
     cursor = db.screenings.find({}).sort("created_at", -1).limit(limit)
     results = []
     async for doc in cursor:
-        doc["_id"] = str(doc["_id"])
-        results.append(doc)
+        results.append(serialize_mongo(doc))
     return results
 
 
 async def get_screening_by_id(screening_id: str) -> dict | None:
     doc = await db.screenings.find_one({"_id": ObjectId(screening_id)})
     if doc:
-        doc["_id"] = str(doc["_id"])
+        return serialize_mongo(doc)
     return doc
 
 
@@ -388,8 +409,7 @@ async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
     cursor = db.screenings.find(user_match(user_id)).sort("created_at", -1).limit(limit)
     results = []
     async for doc in cursor:
-        doc["_id"] = str(doc["_id"])
-        results.append(doc)
+        results.append(serialize_mongo(doc))
     return results
 
 
