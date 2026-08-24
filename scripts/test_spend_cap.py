@@ -126,8 +126,9 @@ async def main():
                 print(f"  #{i}  HTTP {r.status_code}  {r.text[:60]}")
 
         # Background scoring is fire-and-forget; give the two allowed ones time.
+        # Two real CVs, ~3 GPT calls each (JD parse is cached), run concurrently.
         print("\nWaiting for background scoring…")
-        await asyncio.sleep(45)
+        await asyncio.sleep(75)
 
         apps = await db.applications.find(
             {"job_id": job_id, "email": {"$regex": "^captest[123]@example.com$"}}
