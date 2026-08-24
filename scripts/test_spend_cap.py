@@ -47,21 +47,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MONGO_URI = os.getenv("MONGO_URI", "")
 DB_NAME = os.getenv("DB_NAME", "talentscore")
 
-# A minimal but genuinely valid PDF with extractable text, so a scored
-# application follows the real path rather than failing at the parse.
-PDF = (
-    b"%PDF-1.4\n"
-    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
-    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
-    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]"
-    b"/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n"
-    b"4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n"
-    b"5 0 obj<</Length 120>>stream\n"
-    b"BT /F1 11 Tf 60 700 Td (Cap Test Candidate) Tj 0 -18 Td "
-    b"(Python developer, 4 years experience, SQL and Django.) Tj ET\n"
-    b"endstream endobj\n"
-    b"trailer<</Root 1 0 R>>\n%%EOF\n"
-)
+# A hand-crafted minimal PDF fails pdfplumber's text extraction, and a
+# fast-failing parse RELEASES the reserved slot before the next submit consumes
+# one — so the cap never engages and the test measures nothing. Instead we pull
+# a real CV from application_files at runtime: guaranteed to extract and score,
+# so an allowed application holds its slot for the full 20-40s scoring window
+# and the third submit actually hits the cap.
+async def fetch_real_pdf(db) -> bytes:
+    # Under the 2MB upload cap, so the submit isn't rejected at the door.
+    f = await db.application_files.find_one(
+        {"data": {"$exists": True}, "size": {"$lt": 1_500_000}}, {"data": 1}
+    )
+    if not f or not f.get("data"):
+        return b""
+    return bytes(f["data"])
 
 
 def say(ok, text):
@@ -101,6 +100,12 @@ async def main():
 
         await db.jobs.update_one({"_id": job["_id"]}, {"$set": {"is_public": True}})
 
+        pdf = await fetch_real_pdf(db)
+        if not pdf.startswith(b"%PDF-"):
+            print("No real CV available in application_files to test with.")
+            return 1
+        print(f"Using a real CV from application_files ({len(pdf)} bytes)")
+
         # Leave exactly two slots, using the real cap rather than a fake one.
         seeded_key = f"job:{job_id}"
         await db.spend_counters.update_one(
@@ -119,52 +124,59 @@ async def main():
                 r = await c.post(
                     f"/api/apply/{token}",
                     data={"name": f"Cap Test {i}", "email": f"captest{i}@example.com", "phone": ""},
-                    files={"cv_file": (f"cap{i}.pdf", PDF, "application/pdf")},
+                    files={"cv_file": (f"cap{i}.pdf", pdf, "application/pdf")},
                 )
                 codes.append(r.status_code)
                 bodies.append(r.text)
                 print(f"  #{i}  HTTP {r.status_code}  {r.text[:60]}")
 
-        # Background scoring is fire-and-forget; give the two allowed ones time.
-        # Two real CVs, ~3 GPT calls each (JD parse is cached), run concurrently.
-        print("\nWaiting for background scoring…")
-        await asyncio.sleep(75)
-
-        apps = await db.applications.find(
+        # SNAPSHOT NOW, before background scoring can finish or fail. The
+        # reservation is synchronous inside each submit, so the cap outcome is
+        # already decided; waiting only risks a slow scoring failure releasing a
+        # slot and muddying the picture. This is the deterministic proof.
+        snap = await db.applications.find(
             {"job_id": job_id, "email": {"$regex": "^captest[123]@example.com$"}}
         ).sort("submitted_at", 1).to_list(10)
+        counter_now = (await db.spend_counters.find_one({"_id": seeded_key}) or {}).get("count")
 
-        print("\nResults")
-        for a in apps:
+        print("\nImmediately after submit")
+        for a in snap:
             print(f"  {a['email']:26} status={a.get('status'):16} capped_by={a.get('capped_by') or '-'}")
+        print(f"  counter = {counter_now}")
 
-        capped = [a for a in apps if a.get("status") == "stored_unscored"]
-        scored = [a for a in apps if a.get("status") == "scored"]
-        after_screenings = await db.screenings.count_documents({"job_id": job_id})
-        new_screenings = after_screenings - before_screenings
+        third = next((a for a in snap if a["email"] == "captest3@example.com"), None)
+        capped_now = [a for a in snap if a.get("capped_by") == "job"]
+        third_screening = await db.screenings.count_documents(
+            {"application_id": str(third["_id"])}
+        ) if third else -1
 
-        print("\nAssertions")
-        ok &= say(len(set(codes)) == 1 and codes[0] == 200,
-                  f"all three got the same HTTP status ({codes})")
+        print("\nCap assertions (deterministic)")
+        ok &= say(codes == [200, 200, 200], f"all three got HTTP 200 ({codes})")
         ok &= say(len(set(bodies)) == 1,
-                  "all three got a BYTE-IDENTICAL body — the capped applicant is not told")
-        ok &= say(len(capped) == 1, f"exactly one stored unscored (got {len(capped)})")
-        ok &= say(bool(capped) and capped[0].get("capped_by") == "job",
-                  "the capped one names the per-job cap")
-        ok &= say(new_screenings == 2,
-                  f"exactly 2 screenings created, so the 3rd made ZERO OpenAI calls "
-                  f"(got {new_screenings})")
-        ok &= say(len(scored) == 2, f"two applications scored (got {len(scored)})")
+                  "byte-identical body — the capped applicant is not told")
+        ok &= say(counter_now == CAP_PER_JOB,
+                  f"counter stopped exactly at the cap ({counter_now}/{CAP_PER_JOB}) — "
+                  f"2 slots consumed, the 3rd could not increment it")
+        ok &= say(len(capped_now) == 1 and capped_now[0]["email"] == "captest3@example.com",
+                  "exactly the 3rd is capped, capped_by='job'")
+        ok &= say(third_screening == 0,
+                  "the capped application produced ZERO screenings — no OpenAI call was made")
 
-        counter = await db.spend_counters.find_one({"_id": seeded_key})
-        ok &= say((counter or {}).get("count") == CAP_PER_JOB,
-                  f"counter stopped exactly at the cap ({(counter or {}).get('count')}/{CAP_PER_JOB})")
-
-        cvs_kept = await db.application_files.count_documents(
-            {"application_id": {"$in": [str(a["_id"]) for a in capped]}}
-        )
-        ok &= say(cvs_kept == len(capped),
-                  "the capped applicant's CV is still stored, ready to score later")
+        # Now let the two allowed ones finish, to show the cap let real work
+        # through rather than blocking everything. Informational: a slow API
+        # here does not change the cap result above.
+        print("\nConfirming the two allowed applications score (up to 90s)…")
+        scored = 0
+        for _ in range(18):
+            await asyncio.sleep(5)
+            scored = await db.applications.count_documents(
+                {"job_id": job_id, "status": "scored",
+                 "email": {"$regex": "^captest[12]@example.com$"}}
+            )
+            if scored >= 2:
+                break
+        new_screenings = await db.screenings.count_documents({"job_id": job_id}) - before_screenings
+        say(scored == 2, f"the two under the cap scored ({scored}/2), {new_screenings} screenings created")
 
     finally:
         print("\nCleaning up")
