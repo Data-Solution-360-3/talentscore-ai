@@ -54,10 +54,54 @@ def line(status, method, path, note=""):
     print(f"  {colour}{mark}{reset} {code:>3}  {method:<6} {path}{('  — ' + note) if note else ''}")
 
 
+def mint_admin_token(admin_email: str):
+    """Mint a JWT for an existing admin directly from SECRET_KEY — no password.
+
+    The post-deploy smoke test runs on the server, where it has .env
+    (SECRET_KEY) and the database. So it authenticates the way the app itself
+    would, without depending on any standing known-password account. The old
+    seeded admin (admin@talentscore.ai / Admin@123) was removed precisely so no
+    such account exists; this is what replaces it.
+
+    Returns (token, resolved_email) or (None, reason). Never raises.
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from pymongo import MongoClient
+        from auth import create_token
+
+        uri = os.getenv("MONGO_URI")
+        dbname = os.getenv("DB_NAME", "talentscore")
+        if not uri:
+            return None, "MONGO_URI not set (remote run — use --password fallback)"
+        cli = MongoClient(uri, serverSelectionTimeoutMS=15000, tlsAllowInvalidCertificates=True)
+        user = cli[dbname].users.find_one({"email": admin_email.lower()})
+        cli.close()
+        if not user:
+            return None, f"admin {admin_email} not found"
+        if user.get("role") != "admin":
+            return None, f"{admin_email} is not an admin"
+        token = create_token({
+            "user_id": str(user["_id"]),
+            "email": user["email"],
+            "company": user.get("company_name", ""),
+            "role": "admin",
+        })
+        return token, user["email"]
+    except Exception as e:
+        return None, f"mint unavailable: {str(e)[:70]}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.getenv("SMOKE_BASE", DEFAULT_BASE))
-    ap.add_argument("--email", default=os.getenv("SMOKE_EMAIL", ""))
+    ap.add_argument("--admin-email",
+                    default=os.getenv("SMOKE_ADMIN_EMAIL", "tarafdersakib08@gmail.com"),
+                    help="Admin to mint a token for (server-side runs). No password needed.")
+    ap.add_argument("--email", default=os.getenv("SMOKE_EMAIL", ""),
+                    help="Fallback password login (remote runs only).")
     ap.add_argument("--password", default=os.getenv("SMOKE_PASSWORD", ""))
     args = ap.parse_args()
 
@@ -90,18 +134,30 @@ def main():
                 line(None, method, path, str(e)[:60])
                 failures.append((method, path, "exception"))
 
-        # ── Log in ───────────────────────────────────────────────────────
-        if not args.email or not args.password:
-            print("\nNo SMOKE_EMAIL / SMOKE_PASSWORD set — authenticated routes skipped.")
-            print("Those are where the dead-handle bug lived, so set them.\n")
-            return 1 if failures else 0
-
+        # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")
-        r = c.post("/api/auth/login", data={"email": args.email, "password": args.password})
-        line(r.status_code, "POST", "/api/auth/login")
-        if r.status_code != 200:
-            print("\nLogin failed — cannot test authenticated routes.\n")
-            return 1
+        # Primary: mint a token from SECRET_KEY (server-side, no password).
+        token_jwt, who = mint_admin_token(args.admin_email)
+        if token_jwt:
+            c.headers["Authorization"] = f"Bearer {token_jwt}"
+            # Prove the minted token is actually accepted before trusting it.
+            me = c.get("/api/auth/me")
+            line(me.status_code, "AUTH", f"minted token for {who}",
+                 "accepted" if me.status_code == 200 else "REJECTED")
+            if me.status_code != 200:
+                print("\nMinted token rejected — cannot test authenticated routes.\n")
+                return 1
+        elif args.email and args.password:
+            # Fallback for remote runs without DB/SECRET_KEY access.
+            r = c.post("/api/auth/login", data={"email": args.email, "password": args.password})
+            line(r.status_code, "POST", "/api/auth/login (password fallback)")
+            if r.status_code != 200:
+                print("\nLogin failed — cannot test authenticated routes.\n")
+                return 1
+        else:
+            print(f"\nNo auth available: {who}. Authenticated routes skipped.")
+            print("Run on the server (mints from SECRET_KEY) or set SMOKE_EMAIL/PASSWORD.\n")
+            return 1 if failures else 0
 
         # ── Resolve real ids, so path params aren't guesses ──────────────
         job_id = screening_id = token = None

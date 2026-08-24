@@ -223,18 +223,16 @@ async def lifespan(app: FastAPI):
     from database import db as mongodb
     from bson import ObjectId
 
-    # Create default admin account if none exists
-    admin = await get_user_by_email("admin@talentscore.ai")
-    if not admin:
-        await create_user(
-            email="admin@talentscore.ai",
-            hashed_password=hash_password("Admin@123"),
-            company_name="TopCandidate",
-            role="admin"
-        )
-        print("[AUTH] Default admin created: admin@talentscore.ai / Admin@123")
+    # The default-admin seed (admin@talentscore.ai / Admin@123) was removed.
+    # It stood up a live admin with a guessable, hardcoded password, and because
+    # it was `if not admin: create`, it would silently resurrect the account with
+    # the same password on the next restart if the account were ever deleted.
+    # The account has been removed from the database. Do NOT reintroduce any
+    # seeded credential here — an admin is made via the admin-only create-user
+    # endpoint or by promoting an existing (self-registered) account.
 
-    # Always make tarafdersakib08@gmail.com admin (role only, no data migration)
+    # Keep tarafdersakib08@gmail.com admin (role only, no credential) — the
+    # owner's lockout safety-net, so a role reset can never lock them out.
     sakib = await get_user_by_email("tarafdersakib08@gmail.com")
     if sakib:
         await mongodb.users.update_one(
