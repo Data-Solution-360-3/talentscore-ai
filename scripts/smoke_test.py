@@ -134,6 +134,35 @@ def main():
                 line(None, method, path, str(e)[:60])
                 failures.append((method, path, "exception"))
 
+        # ── SEO routes: assert 200 AND the expected content, not just no-5xx ──
+        print("\nSEO / crawlability")
+        seo_checks = [
+            ("/robots.txt", "Sitemap: https://topcandidate.pro/sitemap.xml", "sitemap pointer present"),
+            ("/sitemap.xml", "<loc>https://topcandidate.pro/</loc>", "landing url listed"),
+        ]
+        for path, needle, ok_note in seo_checks:
+            try:
+                r = c.get(path)
+                ok = r.status_code == 200 and needle in (r.text or "")
+                line(r.status_code, "GET", path, ok_note if ok else "MISSING EXPECTED CONTENT")
+                checked += 1
+                if not ok:
+                    failures.append(("GET", path, r.status_code if r.status_code >= 500 else "malformed"))
+            except Exception as e:
+                line(None, "GET", path, str(e)[:60])
+                failures.append(("GET", path, "exception"))
+        # favicon must be a real ICO (bytes), served 200
+        try:
+            r = c.get("/favicon.ico")
+            ok = r.status_code == 200 and len(r.content) > 100
+            line(r.status_code, "GET", "/favicon.ico", f"{len(r.content)} bytes" if ok else "EMPTY/MISSING")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/favicon.ico", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/favicon.ico", str(e)[:60])
+            failures.append(("GET", "/favicon.ico", "exception"))
+
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")
         # Primary: mint a token from SECRET_KEY (server-side, no password).

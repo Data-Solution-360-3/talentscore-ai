@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, Depends, BackgroundTasks
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse, PlainTextResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -273,6 +273,56 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# ─────────────────────────────────────────────────────────────
+# SEO — robots.txt, sitemap.xml, favicon. Static content only:
+# no database, no query, no auth. Serves the crawler, nothing else.
+# ─────────────────────────────────────────────────────────────
+
+# Public marketing pages are crawlable; every authenticated / applicant surface
+# is disallowed — /app, /api, /admin, /settings, /batch, /candidate, /apply and
+# /docs. /apply is deliberately excluded so individual job links are not indexed.
+_ROBOTS_TXT = """User-agent: *
+Disallow: /app
+Disallow: /api/
+Disallow: /admin
+Disallow: /settings
+Disallow: /batch
+Disallow: /candidate
+Disallow: /apply/
+Disallow: /docs
+Allow: /
+
+Sitemap: https://topcandidate.pro/sitemap.xml
+"""
+
+# Only the public marketing pages. Job /apply pages are intentionally omitted —
+# they are transient and disallowed above; say so to the owner before adding.
+_SITEMAP_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://topcandidate.pro/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://topcandidate.pro/login</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+</urlset>
+"""
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    return PlainTextResponse(_ROBOTS_TXT)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    return Response(content=_SITEMAP_XML, media_type="application/xml")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_ico():
+    path = Path(__file__).parent / "static" / "favicon.ico"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="favicon not found")
+    return FileResponse(path, media_type="image/x-icon")
 
 
 # ─────────────────────────────────────────────────────────────
