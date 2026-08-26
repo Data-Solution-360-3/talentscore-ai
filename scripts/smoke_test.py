@@ -162,6 +162,18 @@ def main():
         except Exception as e:
             line(None, "GET", "/favicon.ico", str(e)[:60])
             failures.append(("GET", "/favicon.ico", "exception"))
+        # The PNG favicon (Google) and the PWA icon must serve real bytes too.
+        for path in ("/static/favicon-48.png", "/static/icon-512.png"):
+            try:
+                r = c.get(path)
+                ok = r.status_code == 200 and len(r.content) > 100
+                line(r.status_code, "GET", path, f"{len(r.content)} bytes" if ok else "EMPTY/MISSING")
+                checked += 1
+                if not ok:
+                    failures.append(("GET", path, r.status_code))
+            except Exception as e:
+                line(None, "GET", path, str(e)[:60])
+                failures.append(("GET", path, "exception"))
 
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")

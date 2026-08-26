@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="TopCandidate">
   <rect width="64" height="64" rx="14" fill="#142848"/>
-  <!-- ascending bars (ranking) -->
+  <!-- ascending bars (ranking): white → orange → orange -->
   <rect x="14" y="40" width="9" height="12" rx="2" fill="#FFFFFF"/>
-  <rect x="27.5" y="33" width="9" height="19" rx="2" fill="#FFFFFF"/>
-  <rect x="41" y="26" width="9" height="26" rx="2" fill="#FFFFFF"/>
-  <!-- checkmark (selected / approved) -->
-  <path d="M15 19 L24 28 L49 8" fill="none" stroke="#F57C2E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/>
+  <rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/>
+  <!-- checkmark (selected / approved): white -->
+  <path d="M15 19 L24 28 L49 8" fill="none" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
