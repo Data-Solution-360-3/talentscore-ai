@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="TopCandidate">
+  <!-- Small-size variant: check only, for the 16px favicon slot where three
+       bars cannot resolve. The full ascending-bars mark is used at 32px and up. -->
+  <rect width="64" height="64" rx="14" fill="#142848"/>
+  <path d="M15 34 L27 46 L50 17" fill="none" stroke="#F57C2E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

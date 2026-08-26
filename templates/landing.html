@@ -20,8 +20,7 @@
 <meta name="twitter:title" content="TopCandidate.pro — AI CV screening on a rubric you control">
 <meta name="twitter:description" content="Six weighted dimensions, two scoring passes, and a final score recomputed in code. Early access, built for HR teams in Bangladesh.">
 <meta name="twitter:image" content="https://topcandidate.pro/static/og-image.png">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F57C2E'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -223,9 +222,18 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
 <body>
 
 <nav>
-  <a href="/" class="nav-logo">
-    <div class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-    <span class="nav-name">TopCandidate</span>
+  <a href="/" class="nav-logo" aria-label="TopCandidate.pro home">
+    <!-- Inlined (not <img>) so the wordmark uses the page's Inter — an SVG
+         loaded via <img> can't see webfonts. Mark: navy square + white
+         ascending bars + orange check. -->
+    <svg height="30" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+      <rect width="64" height="64" rx="14" fill="#142848"/>
+      <rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/>
+      <rect x="27.5" y="33" width="9" height="19" rx="2" fill="#fff"/>
+      <rect x="41" y="26" width="9" height="26" rx="2" fill="#fff"/>
+      <path d="M15 19 L24 28 L49 8" fill="none" stroke="#F57C2E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#142848">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
+    </svg>
   </a>
   <div class="nav-links">
     <a href="#how" class="nav-link">How it works</a>
@@ -644,8 +652,13 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
     <div class="foot-grid">
       <div class="foot-brand">
         <div class="foot-logo">
-          <div class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-          <span class="foot-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+          <svg height="28" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+            <rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/>
+            <rect x="27.5" y="33" width="9" height="19" rx="2" fill="#fff"/>
+            <rect x="41" y="26" width="9" height="26" rx="2" fill="#fff"/>
+            <path d="M15 19 L24 28 L49 8" fill="none" stroke="#F57C2E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#fff">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
+          </svg>
         </div>
         <p class="foot-tag">AI CV screening on a rubric you control. Built in Dhaka, for HR teams in Bangladesh.</p>
       </div>

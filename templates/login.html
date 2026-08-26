@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F57C2E'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign in — TopCandidate.pro</title>
 <meta name="description" content="Sign in to TopCandidate.pro, AI CV screening for HR teams in Bangladesh. Request early access if you don't have an account yet.">
@@ -16,7 +16,6 @@
 <meta property="og:image" content="https://topcandidate.pro/static/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://topcandidate.pro/static/og-image.png">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -101,8 +100,15 @@ input.fi.error{border-color:var(--red)}
     <div class="left-blob lb1"></div>
     <div class="left-blob lb2"></div>
     <div class="left-logo">
-      <div class="left-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <span class="left-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+      <!-- White wordmark + boxless mark for the dark login panel (a navy square
+           would vanish here). Inlined so the wordmark uses the page's Inter. -->
+      <svg height="34" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+        <rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/>
+        <rect x="27.5" y="33" width="9" height="19" rx="2" fill="#fff"/>
+        <rect x="41" y="26" width="9" height="26" rx="2" fill="#fff"/>
+        <path d="M15 19 L24 28 L49 8" fill="none" stroke="#F57C2E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#fff">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
+      </svg>
     </div>
     <div class="left-content">
       <h2 class="left-title">Score every CV<br><span>on the same rubric.</span></h2>
