@@ -74,6 +74,10 @@ async def connect():
     await db.rate_hits.create_index("expires_at", expireAfterSeconds=0)
     await db.rate_hits.create_index([("bucket", 1), ("at", 1)])
 
+    # ── Video interviews (Viva) — Phase 1 ──
+    await db.interviews.create_index("public_token", unique=True, sparse=True)
+    await db.interviews.create_index("user_id")
+
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
 
@@ -960,3 +964,50 @@ async def get_applications_for_job(job_id: str, user_id: str, status: str = "") 
         doc["_id"] = str(doc["_id"])
         out.append(doc)
     return out
+
+
+# ─────────────────────────────────────────────────────────────
+# VIDEO INTERVIEWS (Viva) — Phase 1 (English-only)
+# ─────────────────────────────────────────────────────────────
+
+# Interview status vocabulary is deliberately small in Phase 1: an interview is
+# a published question with a public recording link. Answers (a separate
+# collection) arrive in Phase 2 with the storage/transcription pipeline.
+async def create_interview(user_id: str, question: str, job_id: str = None,
+                           job_title: str = None) -> dict:
+    """Create an interview and its public recording token.
+
+    answer_language is hardcoded 'en' in Phase 1 and stored now so Phase 2's
+    Bangla path needs no migration over existing records. The Bangla option is
+    surfaced in the UI but inert — nothing can submit a non-'en' answer.
+    """
+    token = generate_public_token()
+    doc = {
+        "user_id": user_id,
+        "job_id": job_id,
+        "job_title": job_title,
+        "question": (question or "").strip(),
+        "answer_language": "en",   # Phase 1: English only. Do not infer.
+        "public_token": token,
+        "is_public": True,
+        "active": True,
+        "created_at": datetime.utcnow(),
+    }
+    res = await db.interviews.insert_one(doc)
+    doc["_id"] = str(res.inserted_id)
+    return doc
+
+
+async def get_interview_by_token(token: str) -> dict | None:
+    """Resolve a recording token to a live interview.
+
+    Same probe-resistant contract as the apply link: unknown, unpublished
+    (is_public False), and deleted (active False) all return None so the public
+    page renders one identical closed response for every case.
+    """
+    doc = await db.interviews.find_one(
+        {"public_token": token, "is_public": True, "active": True}
+    )
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc

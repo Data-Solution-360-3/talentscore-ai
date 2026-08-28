@@ -53,6 +53,7 @@ from database import (
     release_screening_slot, get_spend_state, rate_limit_allows,
     upsert_application, store_application_pdf, count_pending_applications,
     get_applications_for_job, user_match,
+    create_interview, get_interview_by_token,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1229,6 +1230,38 @@ def _closed_link_page() -> HTMLResponse:
     because "does not exist" and "exists but paused" are indistinguishable.
     """
     return HTMLResponse(CLOSED_PAGE_HTML, status_code=404)
+
+
+@app.get("/viva/{token}", response_class=HTMLResponse)
+async def viva_record_page(token: str):
+    """Public video-interview recording page (Phase 1, English-only).
+
+    Serves the recording UI. Unknown / unpublished / deleted tokens all return
+    the same closed page as the apply link — probe-resistant. The page records
+    and previews client-side only; nothing uploads to the server yet (Phase 1
+    Step 1 proves the camera/browser story before the storage pipeline exists).
+    """
+    interview = await get_interview_by_token(token)
+    if not interview:
+        return _closed_link_page()
+
+    owner = await get_user_by_id(str(interview.get("user_id"))) if interview.get("user_id") else None
+    company = (owner or {}).get("company_name") or "the hiring team"
+
+    def esc(v, fallback=""):
+        return _html.escape(str(v if v not in (None, "") else fallback))
+
+    page = read_template("viva.html")
+    for key, val in {
+        "{{QUESTION}}": esc(interview.get("question"), "Tell us about yourself."),
+        "{{JOB_TITLE}}": esc(interview.get("job_title"), "this role"),
+        "{{COMPANY}}": esc(company),
+        "{{TOKEN}}": esc(token),
+        "{{MAX_SECONDS}}": "120",
+        "{{ANSWER_LANGUAGE}}": esc(interview.get("answer_language"), "en"),
+    }.items():
+        page = page.replace(key, val)
+    return HTMLResponse(page)
 
 
 @app.get("/apply/{token}", response_class=HTMLResponse)

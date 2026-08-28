@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Video interview — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--indigo:#1E3A5F;--orange:#F57C2E;--orange2:#E16A1F;
+  --og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);--ig:rgba(30,58,95,.08);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  --border:#E4E8F0;--border2:#D5DCE8;--text:#142848;--t2:#4A5970;--t3:#8593AB;
+  --green:#16A34A;--red:#DC2626;
+  --r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-icon{width:28px;height:28px;border-radius:var(--r-md);background:var(--navy);display:grid;place-items:center;flex-shrink:0}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+.tb-tag{margin-left:auto;font-size:11.5px;color:var(--t3);font-weight:600}
+.wrap{max-width:560px;margin:0 auto;padding:1.25rem 1.15rem 4rem}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:1.1rem}
+.q-head{padding:1.35rem 1.35rem 1.1rem;border-bottom:1px solid var(--border)}
+.q-company{font-size:12px;font-weight:700;color:var(--orange2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:.5rem}
+.q-role{font-size:12.5px;color:var(--t3);margin-bottom:.75rem}
+.q-label{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem}
+.q-text{font-size:1.15rem;font-weight:700;color:var(--navy);line-height:1.4}
+
+.lang{padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)}
+.lang-label{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.6rem}
+.lang-opts{display:flex;gap:8px}
+.lang-btn{flex:1;padding:11px 10px;border-radius:var(--r-lg);border:1.5px solid var(--border2);background:var(--surface);font-family:inherit;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s}
+.lang-btn.active{border-color:var(--orange);background:var(--og);color:var(--navy)}
+.lang-btn[disabled]{cursor:not-allowed;opacity:.55;background:var(--s2)}
+.lang-btn small{font-size:10px;font-weight:600;color:var(--t3)}
+.lang-hint{font-size:12px;color:var(--t2);margin-top:.7rem;display:flex;gap:6px;align-items:flex-start;line-height:1.5}
+.lang-hint b{color:var(--navy)}
+
+.stage{padding:1.35rem}
+.viewport{position:relative;width:100%;aspect-ratio:3/4;max-height:60vh;background:#0b1a30;border-radius:var(--r-lg);overflow:hidden;display:grid;place-items:center}
+.viewport video{width:100%;height:100%;object-fit:cover;display:block}
+.viewport .idle{color:rgba(255,255,255,.7);text-align:center;padding:1.5rem;font-size:13px}
+.rec-dot{position:absolute;top:12px;left:12px;display:none;align-items:center;gap:7px;background:rgba(20,40,72,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3}
+.rec-dot i{width:9px;height:9px;border-radius:50%;background:#ff4d4d;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:.25}}
+.rec-dot.on{display:inline-flex}
+.countdown{position:absolute;top:12px;right:12px;background:rgba(20,40,72,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3;font-variant-numeric:tabular-nums;display:none}
+.countdown.on{display:block}
+
+.bar{height:6px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden;margin-top:.9rem;display:none}
+.bar.on{display:block}
+.bar i{display:block;height:100%;width:0;background:var(--orange);transition:width .2s linear}
+.bar i.warn{background:var(--red)}
+
+.controls{display:flex;gap:10px;margin-top:1.1rem}
+.btn{flex:1;padding:14px;border-radius:var(--r-lg);font-size:15px;font-weight:700;font-family:inherit;border:none;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn-rec{background:var(--orange);color:#fff;box-shadow:0 4px 14px rgba(245,124,46,.28)}
+.btn-rec:hover:not(:disabled){background:var(--orange2)}
+.btn-stop{background:var(--navy);color:#fff}
+.btn-ghost{background:var(--surface);color:var(--navy);border:1.5px solid var(--border2)}
+.btn-ghost:hover{background:var(--s2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hidden{display:none!important}
+
+.meta{font-size:12px;color:var(--t3);text-align:center;margin-top:.85rem}
+.err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.75rem .9rem;font-size:.87rem;margin-top:1rem;line-height:1.5;display:none}
+.err.on{display:block}
+
+/* Unsupported-browser screen (in-app WebViews) */
+.blocker{display:none;padding:2.5rem 1.5rem;text-align:center}
+.blocker.on{display:block}
+.blocker .ic{width:56px;height:56px;border-radius:50%;background:var(--og);display:grid;place-items:center;margin:0 auto 1.15rem}
+.blocker h2{font-size:1.25rem;font-weight:800;color:var(--navy);margin-bottom:.65rem}
+.blocker p{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto .5rem}
+.blocker .steps{text-align:left;max-width:340px;margin:1.25rem auto 0;font-size:.9rem;color:var(--t2);line-height:1.7}
+.blocker .url{margin-top:1.25rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;font-size:12px;font-family:ui-monospace,monospace;color:var(--navy);word-break:break-all}
+
+.done{display:none;padding:2.25rem 1.5rem;text-align:center}
+.done.on{display:block}
+.done .ic{width:56px;height:56px;border-radius:50%;background:rgba(22,163,74,.1);display:grid;place-items:center;margin:0 auto 1.1rem}
+.done h2{font-size:1.3rem;font-weight:900;color:var(--navy);margin-bottom:.55rem}
+.done p{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto}
+.done .phase-note{margin-top:1.25rem;font-size:11.5px;color:var(--t3);background:var(--s2);border:1px dashed var(--border2);border-radius:var(--r-md);padding:8px 10px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#142848"/><rect x="5" y="15" width="3.4" height="4.5" rx="1" fill="#fff"/><rect x="10.3" y="12.4" width="3.4" height="7.1" rx="1" fill="#F57C2E"/><rect x="15.6" y="9.7" width="3.4" height="9.8" rx="1" fill="#F57C2E"/><path d="M5.6 7.1 L9 10.5 L18.4 3" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Video interview</span>
+</div>
+
+<div class="wrap">
+
+  <!-- Unsupported browser (Facebook/Instagram/Messenger in-app browsers) -->
+  <div class="blocker" id="blocker">
+    <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E16A1F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+    <h2>Please open this in Chrome</h2>
+    <p>This in-app browser can't use your camera. Open the link in <b>Chrome</b> (Android) or <b>Safari</b> (iPhone) and it'll work.</p>
+    <div class="steps">
+      <div>1. Tap the <b>⋮</b> or <b>⋯</b> menu at the top corner.</div>
+      <div>2. Choose <b>“Open in browser”</b> or <b>“Open in Chrome”</b>.</div>
+      <div>3. Or copy this link and paste it into Chrome:</div>
+    </div>
+    <div class="url" id="blocker-url"></div>
+  </div>
+
+  <!-- Recording flow -->
+  <div id="flow">
+    <div class="card">
+      <div class="q-head">
+        <div class="q-company">{{COMPANY}}</div>
+        <div class="q-role">Interview for {{JOB_TITLE}}</div>
+        <div class="q-label">Your question</div>
+        <div class="q-text">{{QUESTION}}</div>
+      </div>
+
+      <div class="lang">
+        <div class="lang-label">Answer language</div>
+        <div class="lang-opts">
+          <button class="lang-btn active" id="lang-en" type="button">English<small>Available</small></button>
+          <button class="lang-btn" id="lang-bn" type="button" disabled aria-disabled="true">বাংলা / Bangla<small>Coming soon</small></button>
+        </div>
+        <div class="lang-hint">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4A5970" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><b>Please answer in English.</b> Speak clearly and take your time — we're listening for the substance of your answer, not perfect grammar.</span>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="viewport">
+          <div class="idle" id="idle">Tap <b>Start camera</b> below, allow access, then record your answer. You have up to 2 minutes.</div>
+          <video id="preview" playsinline muted class="hidden"></video>
+          <div class="rec-dot" id="recdot"><i></i> Recording</div>
+          <div class="countdown" id="countdown">2:00</div>
+        </div>
+        <div class="bar" id="bar"><i id="barfill"></i></div>
+
+        <div class="controls">
+          <button class="btn btn-rec" id="btn-start" type="button">Start camera</button>
+          <button class="btn btn-stop hidden" id="btn-record" type="button" disabled>● Record</button>
+          <button class="btn btn-stop hidden" id="btn-stop" type="button">■ Stop</button>
+        </div>
+        <div class="meta" id="meta"></div>
+        <div class="err" id="err"></div>
+      </div>
+    </div>
+
+    <!-- Review (after a recording exists) -->
+    <div class="card hidden" id="review-card">
+      <div class="stage">
+        <div class="q-label" style="margin-bottom:.7rem">Review your answer</div>
+        <div class="viewport"><video id="playback" playsinline controls></video></div>
+        <div class="meta" id="review-meta"></div>
+        <div class="controls">
+          <button class="btn btn-ghost" id="btn-redo" type="button">↺ Re-record</button>
+          <button class="btn btn-rec" id="btn-submit" type="button">Submit answer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done -->
+  <div class="done" id="done">
+    <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <h2>Answer recorded</h2>
+    <p>Thanks — your video answer is captured. The hiring team will review it.</p>
+    <div class="phase-note" id="phase-note"></div>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = "{{TOKEN}}";
+const MAX_SECONDS = parseInt("{{MAX_SECONDS}}") || 120;
+const MAX_MB_WARN = 30;
+
+const $ = id => document.getElementById(id);
+function showErr(m){ $('err').textContent = m; $('err').classList.add('on'); }
+function hideErr(){ $('err').classList.remove('on'); }
+
+// ── Browser support gate ─────────────────────────────────────────────
+// In-app WebViews (Facebook, Instagram, Messenger, etc.) frequently expose a
+// broken camera or none at all. Detect them by user-agent AND by missing APIs,
+// and show "open in Chrome" instead of a dead camera. The definitive check is
+// the getUserMedia call itself (below) — this is the early, friendly warning.
+function isInAppWebView(){
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|Twitter|WhatsApp|Snapchat|Pinterest|; wv\)|GSA\//i.test(ua);
+}
+function apisPresent(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+}
+function gate(){
+  if(!apisPresent() || isInAppWebView()){
+    $('blocker-url').textContent = location.href;
+    $('flow').style.display = 'none';
+    $('blocker').classList.add('on');
+    return false;
+  }
+  return true;
+}
+
+// ── Recording ────────────────────────────────────────────────────────
+let stream = null, recorder = null, chunks = [], blob = null, mime = '';
+let startedAt = 0, tickTimer = null, capTimer = null;
+
+function pickMime(){
+  const candidates = [
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9,opus',
+    'video/webm',
+    'video/mp4'  // Safari/iOS
+  ];
+  for(const c of candidates){
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return '';
+}
+
+async function startCamera(){
+  hideErr();
+  $('btn-start').disabled = true;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:{ideal:640}, height:{ideal:480}, frameRate:{ideal:24}, facingMode:'user' },
+      audio: true
+    });
+  }catch(e){
+    $('btn-start').disabled = false;
+    // Permission denied, or the in-app browser lied about support.
+    if(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')){
+      showErr('Camera and microphone access was blocked. Allow access in your browser settings and reload.');
+    }else if(e && e.name === 'NotFoundError'){
+      showErr('No camera was found on this device.');
+    }else{
+      // Most in-app WebView failures land here — send them to Chrome.
+      $('blocker-url').textContent = location.href;
+      $('flow').style.display = 'none';
+      $('blocker').classList.add('on');
+    }
+    return;
+  }
+  const v = $('preview');
+  v.classList.remove('hidden'); $('idle').classList.add('hidden');
+  v.srcObject = stream; v.muted = true; await v.play().catch(()=>{});
+  $('btn-start').classList.add('hidden');
+  $('btn-record').classList.remove('hidden'); $('btn-record').disabled = false;
+  $('meta').textContent = 'Camera ready. Tap Record when you want to begin.';
+}
+
+function fmt(s){ const m=Math.floor(s/60), r=s%60; return m+':'+String(r).padStart(2,'0'); }
+
+function startRecording(){
+  hideErr();
+  chunks = []; blob = null;
+  mime = pickMime();
+  const opts = { videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 96_000 };
+  if(mime) opts.mimeType = mime;
+  try{
+    recorder = new MediaRecorder(stream, opts);
+  }catch(e){
+    // Some devices reject the bitrate hints — retry with just the mime.
+    try{ recorder = new MediaRecorder(stream, mime ? {mimeType:mime} : undefined); }
+    catch(e2){ showErr('This browser can’t record video. Please open the link in Chrome.'); return; }
+  }
+  recorder.ondataavailable = ev => { if(ev.data && ev.data.size) chunks.push(ev.data); };
+  recorder.onstop = onRecorded;
+  recorder.start(1000); // gather data in 1s slices
+  startedAt = Date.now();
+
+  $('btn-record').classList.add('hidden');
+  $('btn-stop').classList.remove('hidden');
+  $('recdot').classList.add('on'); $('countdown').classList.add('on');
+  $('bar').classList.add('on');
+  $('meta').textContent = '';
+
+  tickTimer = setInterval(updateProgress, 200);
+  capTimer  = setTimeout(()=>{ stopRecording(true); }, MAX_SECONDS*1000);
+}
+
+function updateProgress(){
+  const elapsed = Math.min(MAX_SECONDS, (Date.now()-startedAt)/1000);
+  const remain = Math.max(0, MAX_SECONDS - elapsed);
+  $('countdown').textContent = fmt(Math.ceil(remain));
+  const pct = (elapsed/MAX_SECONDS)*100;
+  const fill = $('barfill'); fill.style.width = pct+'%';
+  if(remain <= 15) fill.classList.add('warn');
+}
+
+function stopRecording(hitCap){
+  if(capTimer){ clearTimeout(capTimer); capTimer=null; }
+  if(tickTimer){ clearInterval(tickTimer); tickTimer=null; }
+  if(recorder && recorder.state !== 'inactive') recorder.stop();
+  $('recdot').classList.remove('on'); $('countdown').classList.remove('on');
+  if(hitCap) $('meta').textContent = 'Reached the 2-minute limit — recording stopped automatically.';
+}
+
+function onRecorded(){
+  blob = new Blob(chunks, { type: mime || 'video/webm' });
+  const mb = blob.size/1048576;
+  // Free the live camera — we have the recording now.
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  $('preview').classList.add('hidden');
+  $('bar').classList.remove('on'); $('barfill').style.width='0'; $('barfill').classList.remove('warn');
+  $('btn-stop').classList.add('hidden');
+
+  const pb = $('playback');
+  pb.src = URL.createObjectURL(blob);
+  $('review-card').classList.remove('hidden');
+  $('review-meta').textContent = `${mb.toFixed(1)} MB · ${mime || 'video/webm'}`;
+  if(mb > MAX_MB_WARN){
+    showErr(`This recording is ${mb.toFixed(0)} MB — larger than expected. Try re-recording a shorter answer.`);
+  }
+  $('review-card').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function redo(){
+  blob = null; chunks = [];
+  $('review-card').classList.add('hidden');
+  hideErr();
+  $('idle').classList.remove('hidden');
+  $('btn-record').classList.add('hidden'); $('btn-stop').classList.add('hidden');
+  $('btn-start').classList.remove('hidden'); $('btn-start').disabled = false;
+  $('meta').textContent = '';
+}
+
+function submit(){
+  // PHASE 1, STEP 1: no upload. The server never touches the bytes, and the
+  // presigned direct-to-storage upload is the NEXT step (after the snapshot).
+  // For now we confirm the recording was captured so the recording flow can be
+  // demoed end to end on real devices before any storage/scoring exists.
+  if(!blob){ showErr('No recording to submit yet.'); return; }
+  const mb = (blob.size/1048576).toFixed(1);
+  $('flow').style.display = 'none';
+  $('done').classList.add('on');
+  $('phase-note').textContent =
+    `Demo build: recording captured in-browser (${mb} MB, ${mime||'video/webm'}). ` +
+    `Upload to storage is wired in the next step — the server never receives the video.`;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// wire up
+window.addEventListener('load', ()=>{
+  if(!gate()) return;
+  $('btn-start').addEventListener('click', startCamera);
+  $('btn-record').addEventListener('click', startRecording);
+  $('btn-stop').addEventListener('click', ()=>stopRecording(false));
+  $('btn-redo').addEventListener('click', redo);
+  $('btn-submit').addEventListener('click', submit);
+  // Bangla is inert in Phase 1 — visible, never selectable.
+  $('lang-bn').addEventListener('click', e=>e.preventDefault());
+});
+</script>
+</body>
+</html>

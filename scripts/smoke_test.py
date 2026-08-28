@@ -295,6 +295,21 @@ def main():
             line(None, "GET", "/apply/{unknown}", str(e)[:60])
             failures.append(("GET", "/apply/{unknown}", "exception"))
 
+        # /viva/{token}: an unknown recording token must return the same closed
+        # page — never a 500. (Phase 1 video interview.)
+        try:
+            r = c.get("/viva/smoke-test-definitely-not-real")
+            body = r.text or ""
+            ok = r.status_code < 500 and "accepting applications" in body.lower()
+            line(r.status_code, "GET", "/viva/{unknown}",
+                 "unified closed page" if ok else "NOT the closed page")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/viva/{unknown}", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/viva/{unknown}", str(e)[:60])
+            failures.append(("GET", "/viva/{unknown}", "exception"))
+
         # If a real token exists, it must render EITHER the form (public) or the
         # same closed page (paused) — but never a 500. This is the check that
         # would have flagged the applicant-facing page being down.
