@@ -3,22 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TopCandidate.pro — AI CV screening on a rubric you control</title>
-<meta name="description" content="Upload a job description and a batch of CVs. Every candidate is scored on six weighted dimensions, twice, and ranked — with the final score recomputed in code, not taken from the model. Early access, built for HR teams in Bangladesh.">
+<title>TopCandidate.pro — Every candidate, scored on your rubric</title>
+<meta name="description" content="Every candidate, scored on your rubric. Upload a job description and a batch of CVs — each scored on six weighted dimensions you control, with the final number recomputed in code, not taken from the model. Built for Bangladesh's HR teams.">
 <meta name="keywords" content="CV screening, AI recruitment, candidate ranking, HR technology, Bangladesh hiring, job screening">
 <link rel="canonical" href="https://topcandidate.pro/">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TopCandidate.pro">
-<meta property="og:title" content="TopCandidate.pro — AI CV screening on a rubric you control">
-<meta property="og:description" content="Six weighted dimensions, two scoring passes, and a final score recomputed in code. Early access, built for HR teams in Bangladesh.">
+<meta property="og:title" content="TopCandidate.pro — Every candidate, scored on your rubric">
+<meta property="og:description" content="Six weighted dimensions you control, two scoring passes, and a final score recomputed in code. Built for Bangladesh's HR teams.">
 <meta property="og:url" content="https://topcandidate.pro/">
 <meta property="og:image" content="https://topcandidate.pro/static/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TopCandidate.pro — AI CV screening on a rubric you control">
-<meta name="twitter:description" content="Six weighted dimensions, two scoring passes, and a final score recomputed in code. Early access, built for HR teams in Bangladesh.">
+<meta name="twitter:title" content="TopCandidate.pro — Every candidate, scored on your rubric">
+<meta name="twitter:description" content="Six weighted dimensions you control, two scoring passes, and a final score recomputed in code. Built for Bangladesh's HR teams.">
 <meta name="twitter:image" content="https://topcandidate.pro/static/og-image.png">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png">
@@ -220,6 +220,64 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   .use-stats{gap:1.35rem}
   .use-stat-num{font-size:1.7rem}
 }
+/* ══ REDESIGN: two-column hero + product frame + stepped how-it-works ══ */
+.hero{text-align:left}
+.hero-grid{position:relative;max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:3.5rem;align-items:center}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.3px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:6px 14px;margin-bottom:1.4rem}
+.hero-h1{font-size:clamp(2.4rem,5.2vw,3.9rem);font-weight:900;line-height:1.06;letter-spacing:-1.8px;color:var(--navy);margin-bottom:1.25rem}
+.hero-h1 .o{color:var(--orange2)}
+.hero-lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--t2);line-height:1.6;max-width:520px;margin:0 0 2rem}
+.hero-lead b{color:var(--navy);font-weight:700}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1.85rem}
+.hero-actions .btn-hero{box-shadow:0 8px 24px rgba(245,124,46,.32)}
+.hero-actions .btn-hero:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(245,124,46,.4)}
+.trust{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem}
+.trust span{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:var(--t2)}
+.trust svg{flex-shrink:0}
+.shot{position:relative}
+.frame{border-radius:22px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-xl);overflow:hidden}
+.frame img{display:block;width:100%;height:auto}
+.frame-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;background:var(--s2);border-bottom:1px solid var(--border)}
+.frame-bar .d{width:11px;height:11px;border-radius:50%}
+.frame-url{margin-left:10px;flex:1;background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);font-size:11px;color:var(--t3);padding:4px 12px}
+.ph{aspect-ratio:16/10.5;background:linear-gradient(160deg,#fff,var(--s2));display:grid;place-items:center;position:relative}
+.ph-note{position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:11px;color:var(--t3);font-weight:600}
+.sketch{width:86%;display:flex;flex-direction:column;gap:12px;opacity:.9}
+.sk-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.sk-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:11px;box-shadow:var(--shadow-sm)}
+.sk-card .n{height:16px;width:60%;border-radius:4px;background:var(--s3);margin-bottom:6px}
+.sk-card .l{height:7px;width:85%;border-radius:4px;background:var(--s2)}
+.sk-card:nth-child(2) .n{background:rgba(245,124,46,.22)}
+.sk-card:nth-child(3) .n{background:rgba(22,163,74,.22)}
+.sk-table{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-sm)}
+.sk-tr{display:grid;grid-template-columns:26px 1.4fr .8fr .6fr;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border)}
+.sk-tr:last-child{border-bottom:none}
+.ring{width:22px;height:22px;border-radius:50%;border:3px solid var(--green)}
+.ring.a{border-color:var(--orange)}.ring.r{border-color:#BE3144}
+.sk-tr .a1{height:8px;border-radius:4px;background:var(--s3)}
+.sk-tr .a2{height:8px;border-radius:4px;background:var(--s2)}
+.sk-pill{height:16px;border-radius:9px;background:rgba(22,163,74,.16)}
+.sk-pill.o{background:rgba(245,124,46,.16)}
+/* stepped how-it-works */
+.steps-3{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+.step3{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:2rem 1.7rem;box-shadow:var(--shadow-sm);transition:.2s}
+.step3:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--border3)}
+.step3-n{position:absolute;top:1.6rem;right:1.8rem;font-size:2.7rem;font-weight:900;color:var(--s3);line-height:1}
+.step3-ico{width:52px;height:52px;border-radius:var(--r-lg);background:var(--navy);display:grid;place-items:center;margin-bottom:1.2rem}
+.step3-t{font-size:1.12rem;font-weight:800;color:var(--navy);margin-bottom:.55rem;letter-spacing:-.3px}
+.step3-d{font-size:.94rem;color:var(--t2);line-height:1.62}
+.step3-conn{position:absolute;top:3.4rem;right:-1.05rem;color:var(--border3);z-index:2}
+.steps-3 .step3:last-child .step3-conn{display:none}
+@media(max-width:860px){
+  .hero-grid{grid-template-columns:1fr;gap:2.5rem}
+  .shot{order:2}
+  .steps-3{grid-template-columns:1fr;gap:1.15rem}
+  .step3-conn{display:none}
+}
+@media(max-width:400px){
+  .hero-actions{flex-direction:column}
+  .hero-actions .btn-hero,.hero-actions .btn-outline{justify-content:center;text-align:center}
+}
 </style>
 </head>
 <body>
@@ -252,20 +310,54 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
 
 <!-- ═══════════════ 1. HERO ═══════════════ -->
 <section class="hero">
-  <div class="hero-inner">
-    <h1 class="hero-title">Score every CV against the job,<br><em>on the same rubric.</em></h1>
-    <p class="hero-sub">Upload a job description and a batch of CVs. Each candidate is scored on six weighted dimensions, twice, and ranked — with the reasoning behind every number kept on the record.</p>
-    <div class="hero-cta">
-      <a href="#access" class="btn-hero">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Request access
-      </a>
-      <a href="#scoring" class="btn-outline">See how scoring works ↓</a>
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">🇧🇩 Built for Bangladesh's HR teams</div>
+      <h1 class="hero-h1">Every candidate,<br>scored on <span class="o">your rubric.</span></h1>
+      <p class="hero-lead">Upload a job description and a batch of CVs. Every candidate is scored on <b>six weighted dimensions you control</b> — then ranked, with the reasoning behind every number kept on the record.</p>
+      <div class="hero-actions">
+        <a class="btn-hero" href="#access">Start screening
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn-outline" href="#how">See how it works</a>
+      </div>
+      <div class="trust">
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>You set the weights</span>
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Scored in code, not guessed</span>
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Every number auditable</span>
+      </div>
     </div>
-    <div class="hero-stats">
-      <div class="hstat"><div class="hstat-num">6</div><div class="hstat-lbl">dimensions, you set the weights</div></div>
-      <div class="hstat"><div class="hstat-num">2<small>-pass</small></div><div class="hstat-lbl">scoring behind a confidence gate</div></div>
-      <div class="hstat"><div class="hstat-num">0</div><div class="hstat-lbl">scores taken on trust from the model</div></div>
+
+    <div class="shot">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span>
+          <span class="frame-url">topcandidate.pro/app</span>
+        </div>
+        <!-- Real dashboard screenshot. The placeholder sketch shows by default;
+             it's hidden the moment the real image loads, and if static/dashboard.png
+             is missing the image hides itself and the placeholder stays. -->
+        <img src="/static/dashboard.png" alt="TopCandidate dashboard — ranked candidates, pipeline, and the scoring funnel"
+             onload="var p=document.getElementById('shot-ph');if(p)p.style.display='none';"
+             onerror="this.style.display='none';">
+        <div class="ph" id="shot-ph">
+          <div class="sketch">
+            <div class="sk-row">
+              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
+              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
+              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
+              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
+            </div>
+            <div class="sk-table">
+              <div class="sk-tr"><div class="ring"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill"></div></div>
+              <div class="sk-tr"><div class="ring a"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill o"></div></div>
+              <div class="sk-tr"><div class="ring"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill"></div></div>
+              <div class="sk-tr"><div class="ring r"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill o"></div></div>
+            </div>
+          </div>
+          <div class="ph-note">Dashboard preview</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -278,24 +370,26 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
       <h2 class="sec-title">Three steps, one rubric</h2>
       <p class="sec-sub">The job description sets the standard once, and every candidate is measured against that same standard.</p>
     </div>
-    <div class="steps">
-      <div class="step">
-        <div class="step-n">1</div>
-        <div class="step-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-        <div class="step-title">Upload the JD and the CVs</div>
-        <div class="step-desc">Paste a job description, attach a batch of PDFs, and pick the weighting for the role — or start from one of eight presets.</div>
+    <div class="steps-3">
+      <div class="step3">
+        <div class="step3-n">1</div>
+        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <div class="step3-t">Upload the JD and the CVs</div>
+        <div class="step3-d">Paste a job description, attach a batch of PDFs, and set the weighting for the role — or start from one of eight presets.</div>
+        <svg class="step3-conn" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </div>
-      <div class="step">
-        <div class="step-n">2</div>
-        <div class="step-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 .5 1.65A3 3 0 0 0 5 13a3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0-1.5-2.35A3 3 0 0 0 18 9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
-        <div class="step-title">Each candidate is scored twice</div>
-        <div class="step-desc">A strict pass and an upside pass score the same CV independently, then get blended and checked by code that never sees a prompt.</div>
+      <div class="step3">
+        <div class="step3-n">2</div>
+        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 .5 1.65A3 3 0 0 0 5 13a3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0-1.5-2.35A3 3 0 0 0 18 9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
+        <div class="step3-t">Scored on your rubric, in code</div>
+        <div class="step3-d">Each CV is scored twice from opposing angles, blended, then the final number is recomputed deterministically — never taken on trust from the model.</div>
+        <svg class="step3-conn" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </div>
-      <div class="step">
-        <div class="step-n">3</div>
-        <div class="step-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="step-title">Rank, move, and write back</div>
-        <div class="step-desc">A sortable list with full reports per candidate, four pipeline stages, and interview or rejection emails sent from inside the app.</div>
+      <div class="step3">
+        <div class="step3-n">3</div>
+        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="step3-t">Rank, move, and email</div>
+        <div class="step3-d">A sortable list with a full report per candidate, four pipeline stages, and interview or rejection emails sent from inside the app.</div>
       </div>
     </div>
   </div>
@@ -500,37 +594,37 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
 <section class="sec sec-alt">
   <div class="wrap">
     <div class="sec-head">
-      <span class="sec-eyebrow">What makes it different</span>
-      <h2 class="sec-title">Built to be argued with</h2>
-      <p class="sec-sub">A screening tool you can't interrogate is a screening tool you shouldn't trust with someone's application.</p>
+      <span class="sec-eyebrow">Why it's different</span>
+      <h2 class="sec-title">Your edge over generic screeners</h2>
+      <p class="sec-sub">Not a black box that hands you a number. A rubric you control, maths you can check, and a record you can defend.</p>
     </div>
     <div class="diffs">
       <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-6M22 20H2"/></svg></div>
         <div>
-          <div class="diff-title">The final score is computed, not generated</div>
-          <div class="diff-desc">The model returns per-dimension scores. The overall number is then recalculated in code from those scores and your weights, minus any penalties. A model that returns a confident total gets that total thrown away.</div>
+          <div class="diff-title">You set the weights</div>
+          <div class="diff-desc">Six dimensions, and the emphasis is yours. A senior engineering role and a sales role shouldn't be graded the same way, so you tune the weighting per role — start from one of eight presets or set all six yourself.</div>
         </div>
       </div>
       <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
         <div>
-          <div class="diff-title">AI-written CV detection that never touches the score</div>
-          <div class="diff-desc">Cliché density, sentence-length variance, bullet parallelism and typography produce a likelihood signal on the report. It is shown to you and deliberately excluded from the scoring maths — a well-written CV is not a disqualification.</div>
-        </div>
-      </div>
-      <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-        <div>
-          <div class="diff-title">Tenure analysis with a floor</div>
-          <div class="diff-desc">Frequent job changes only register as a pattern once there are at least three roles across at least two years of career. Someone six months into their working life is read as early career, not as a flight risk.</div>
+          <div class="diff-title">Scored in code, not guessed</div>
+          <div class="diff-desc">The model returns per-dimension scores; the overall number is recomputed in code from those scores and your weights, minus penalties. A model that returns a confident total gets that total thrown away.</div>
         </div>
       </div>
       <div class="diff">
         <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
         <div>
-          <div class="diff-title">The reasoning stays on the record</div>
-          <div class="diff-desc">Every screening keeps its per-dimension scores, the gaps that triggered a penalty, the tenure read, and the job description it was measured against. When someone asks why a candidate ranked where they did, there's an answer.</div>
+          <div class="diff-title">Every number is auditable</div>
+          <div class="diff-desc">Two-pass scoring with a confidence gate, and every screening keeps its per-dimension scores, the gaps that triggered a penalty, and the job description it was measured against. When someone asks why a candidate ranked where they did, there's an answer.</div>
+        </div>
+      </div>
+      <div class="diff">
+        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div>
+          <div class="diff-title">Built for Bangladesh's HR teams</div>
+          <div class="diff-desc">Made in Dhaka for the way teams here hire — recruiter Gmail for candidate emails, batches of PDFs, and a workflow that runs on a phone. Not a Western tool bolted on sideways.</div>
         </div>
       </div>
     </div>
