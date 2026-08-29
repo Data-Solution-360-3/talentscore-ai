@@ -190,15 +190,17 @@ def main():
         except Exception as e:
             line(None, "GET", "/viva-live", str(e)[:60]); failures.append(("GET", "/viva-live", "exception"))
         try:
-            r = c.get("/api/viva-live/token")   # no auth header set yet
+            # POST since L1 (recovery context in the body). Still pre-auth: a
+            # non-401/403 here is an open spend hole.
+            r = c.post("/api/viva-live/token", json={"transcript": []})
             gated = r.status_code in (401, 403)
-            line(r.status_code, "GET", "/api/viva-live/token",
+            line(r.status_code, "POST", "/api/viva-live/token",
                  "gated (owner-only)" if gated else "NOT GATED — spend hole!")
             checked += 1
             if not gated:
-                failures.append(("GET", "/api/viva-live/token", r.status_code))
+                failures.append(("POST", "/api/viva-live/token", r.status_code))
         except Exception as e:
-            line(None, "GET", "/api/viva-live/token", str(e)[:60]); failures.append(("GET", "/api/viva-live/token", "exception"))
+            line(None, "POST", "/api/viva-live/token", str(e)[:60]); failures.append(("POST", "/api/viva-live/token", "exception"))
 
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")

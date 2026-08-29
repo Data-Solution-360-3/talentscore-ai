@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Live interview (L0 test) — TopCandidate.pro</title>
+<title>Live interview (L1 test) — TopCandidate.pro</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -15,7 +15,6 @@
   --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
   --r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
   --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
-  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
 }
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
@@ -26,15 +25,23 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:.4rem}
 .lede{font-size:.92rem;color:var(--t2);line-height:1.6}
 
-.orb{width:120px;height:120px;border-radius:50%;margin:1.5rem auto 1.1rem;display:grid;place-items:center;background:var(--s2);border:2px solid var(--border);transition:.25s;position:relative}
+.orb{width:120px;height:120px;border-radius:50%;margin:1.5rem auto 1.1rem;display:grid;place-items:center;background:var(--s2);border:2px solid var(--border);transition:.25s}
 .orb.you{border-color:var(--green);background:rgba(22,163,74,.08);box-shadow:0 0 0 8px rgba(22,163,74,.06)}
 .orb.ai{border-color:var(--orange);background:var(--og);box-shadow:0 0 0 8px rgba(245,124,46,.07)}
 .orb.think{border-color:var(--amber);background:rgba(217,119,6,.07)}
+.orb.drop{border-color:var(--red);background:rgba(220,38,38,.07);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(220,38,38,.06)}}
 .orb svg{width:46px;height:46px}
 .state{text-align:center;font-size:1.05rem;font-weight:800;color:var(--navy);min-height:1.4em}
 .substate{text-align:center;font-size:.82rem;color:var(--t3);margin-top:.25rem;min-height:1.2em}
 
-.latency{margin-top:1.25rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1rem}
+/* reconnect banner */
+.recon{display:none;align-items:center;gap:9px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-lg);padding:.7rem .9rem;margin-top:1rem;font-size:.86rem;color:#B91C1C;font-weight:600}
+.recon.on{display:flex}
+.recon .spin{width:14px;height:14px;border:2px solid rgba(220,38,38,.3);border-top-color:#DC2626;border-radius:50%;animation:sp .8s linear infinite;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.latency{margin-top:1.15rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1rem}
 .latency-label{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem}
 .latency-row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--t2);padding:2px 0}
 .latency-row b{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px}
@@ -48,11 +55,10 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .hidden{display:none!important}
 
-.log{margin-top:1rem;font-size:11px;color:var(--t3);font-family:ui-monospace,monospace;background:#0b1a30;color:#9fb3c8;border-radius:var(--r-md);padding:.7rem .8rem;max-height:130px;overflow-y:auto;line-height:1.5;display:none}
+.log{margin-top:1rem;font-size:11px;font-family:ui-monospace,monospace;background:#0b1a30;color:#9fb3c8;border-radius:var(--r-md);padding:.7rem .8rem;max-height:150px;overflow-y:auto;line-height:1.5;display:none}
 .log.on{display:block}
 .err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.8rem .95rem;font-size:.87rem;margin-top:1rem;line-height:1.5;display:none}
 .err.on{display:block}
-
 .blocker{display:none;text-align:center;padding:1.5rem .5rem}
 .blocker.on{display:block}
 .blocker h2{font-size:1.15rem;color:var(--navy);margin-bottom:.6rem}
@@ -63,7 +69,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 <body>
 <div class="topbar">
   <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
-  <span class="tb-tag">Live interview · L0 test</span>
+  <span class="tb-tag">Live interview · L1 drop-recovery</span>
 </div>
 
 <div class="wrap">
@@ -76,30 +82,33 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 
   <div id="flow">
     <div class="card">
-      <h1>Live AI interview — network test</h1>
-      <p class="lede">Tap start, allow the microphone, and have a short spoken conversation with the AI interviewer. This is a turn-taking test — the goal is to feel whether the back-and-forth is smooth on your real connection.</p>
+      <h1>Live AI interview — drop-recovery test</h1>
+      <p class="lede">Start the interview, then <b>kill your network mid-answer</b> (airplane mode). The session should reconnect on its own and the AI should apologize and ask you to repeat — not restart, not die.</p>
 
       <div class="orb" id="orb">
         <svg id="orb-ico" viewBox="0 0 24 24" fill="none" stroke="#8593AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
       </div>
       <div class="state" id="state">Ready</div>
-      <div class="substate" id="substate">Use mobile data, not wifi, to test your real network.</div>
+      <div class="substate" id="substate">Use mobile data — this test is about your real network.</div>
 
-      <div class="latency" id="latency">
-        <div class="latency-label">Per-turn latency (you stop → AI replies)</div>
+      <div class="recon" id="recon"><span class="spin"></span><span id="recon-msg">Connection dropped — reconnecting…</span></div>
+
+      <div class="latency">
+        <div class="latency-label">Per-turn latency · recovery stats</div>
         <div class="latency-row"><span>Last turn</span><b id="lat-last">—</b></div>
-        <div class="latency-row"><span>Best</span><b id="lat-best">—</b></div>
-        <div class="latency-row"><span>Worst</span><b id="lat-worst">—</b></div>
-        <div class="latency-row"><span>Turns measured</span><b id="lat-count">0</b></div>
+        <div class="latency-row"><span>Worst turn</span><b id="lat-worst">—</b></div>
+        <div class="latency-row"><span>Drops survived</span><b id="rec-count">0</b></div>
+        <div class="latency-row"><span>Last recovery took</span><b id="rec-time">—</b></div>
       </div>
 
       <div class="controls">
         <button class="btn btn-go" id="btn-start" type="button">Start interview</button>
+        <button class="btn btn-go hidden" id="btn-resume" type="button">Resume interview</button>
         <button class="btn btn-end hidden" id="btn-end" type="button">End</button>
       </div>
       <div class="err" id="err"></div>
       <div class="log" id="log"></div>
-      <p class="tip">Good: the AI replies within ~2s of you finishing, no talk-over.<br>Broken: long pauses, it cuts you off, or it talks while you talk.</p>
+      <p class="tip">Test: mid-answer, toggle airplane mode ON for ~5s, then OFF.<br>Pass: it reconnects and the AI asks you to repeat. Fail: silence, restart-from-scratch, or a dead page.</p>
     </div>
   </div>
 </div>
@@ -109,16 +118,25 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 <script>
 const $ = id => document.getElementById(id);
 const CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+
 let pc=null, dc=null, micStream=null;
-let turnStart=0, best=Infinity, worst=0, count=0;
+let manualStop=false, resuming=false, graceTimer=null;
+let turnStart=0, worst=0;
+let recoveries=0, recoveryStart=0;
+
+// Running conversation log — the recovery context. AI turns come from the
+// output transcript events; candidate turns from input transcription when the
+// API grants it. Recovery works from AI turns alone (the candidate repeats
+// their answer anyway — that IS the recovery UX).
+let transcript = [];   // {role:'ai'|'you', text}
+let aiBuf = '';
 
 function log(m){ const el=$('log'); el.classList.add('on'); el.innerHTML += m+'<br>'; el.scrollTop=el.scrollHeight; }
 function showErr(m){ $('err').textContent=m; $('err').classList.add('on'); }
+function hideErr(){ $('err').classList.remove('on'); }
 function setState(s, sub){ $('state').textContent=s; if(sub!==undefined) $('substate').textContent=sub; }
-function orb(cls, color, path){
-  const o=$('orb'); o.className='orb'+(cls?' '+cls:'');
-  if(color) $('orb-ico').setAttribute('stroke', color);
-}
+function orb(cls, color){ $('orb').className='orb'+(cls?' '+cls:''); if(color) $('orb-ico').setAttribute('stroke', color); }
+function recon(on, msg){ $('recon').classList.toggle('on', !!on); if(msg) $('recon-msg').textContent=msg; }
 
 function isInAppWebView(){
   const ua=navigator.userAgent||'';
@@ -129,89 +147,173 @@ function apisPresent(){ return !!(navigator.mediaDevices && navigator.mediaDevic
 function fmt(ms){ return (ms/1000).toFixed(2)+'s'; }
 function cls(ms){ return ms<=2000?'lat-good':ms<=3000?'lat-ok':'lat-bad'; }
 function recordTurn(ms){
-  count++; best=Math.min(best,ms); worst=Math.max(worst,ms);
+  worst=Math.max(worst,ms);
   const last=$('lat-last'); last.textContent=fmt(ms); last.className=cls(ms);
-  const b=$('lat-best'); b.textContent=fmt(best); b.className=cls(best);
   const w=$('lat-worst'); w.textContent=fmt(worst); w.className=cls(worst);
-  $('lat-count').textContent=count;
 }
 
-async function start(){
-  $('err').classList.remove('on');
-  $('btn-start').disabled=true;
-  setState('Connecting…','Minting a secure session');
+async function mintToken(){
+  const r = await fetch('/api/viva-live/token', {
+    method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({transcript: transcript.slice(-30)})
+  });
+  if(r.status===401 || r.status===403) throw {auth:true};
+  if(!r.ok) throw new Error('token '+r.status+' '+(await r.text()).slice(0,140));
+  return r.json();
+}
 
-  // 1) ephemeral token from OUR server (owner-gated). Server never sees audio.
-  let tok;
-  try{
-    const r = await fetch('/api/viva-live/token', {credentials:'include'});
-    if(r.status===401 || r.status===403){
-      $('btn-start').disabled=false;
-      showErr('Sign in as the owner first (open topcandidate.pro/login on this device), then reload this page. The live session costs money, so it is owner-only.');
-      setState('Ready'); return;
-    }
-    if(!r.ok){ throw new Error('token '+r.status+' '+(await r.text()).slice(0,140)); }
-    tok = await r.json();
-  }catch(e){ $('btn-start').disabled=false; showErr('Could not start session: '+e.message); setState('Ready'); return; }
-  log('token ok · model '+tok.model);
+async function ensureMic(){
+  if(micStream && micStream.getAudioTracks().some(t=>t.readyState==='live')) return;
+  micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+}
 
-  // 2) mic
-  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ $('btn-start').disabled=false; showErr('Microphone access is needed. Allow it and try again.'); setState('Ready'); return; }
+async function connect(){
+  const tok = await mintToken();
+  log((tok.recovered?'RECOVERY':'fresh')+' token ok');
 
-  // 3) peer connection — STUN helps NAT traversal on mobile
+  await ensureMic();
   pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
   pc.oniceconnectionstatechange = ()=> log('ice: '+pc.iceConnectionState);
-  pc.onconnectionstatechange = ()=>{
-    log('pc: '+pc.connectionState);
-    if(pc.connectionState==='connected'){ setState('Connected','The interviewer will speak first — listen'); }
-    if(pc.connectionState==='failed'){ showErr('Connection failed — likely a network/NAT issue on this connection.'); }
-    if(pc.connectionState==='disconnected'){ setState('Reconnecting…','Network dropped'); }
-  };
+  pc.onconnectionstatechange = onConnState;
   pc.ontrack = e => { $('ai-audio').srcObject = e.streams[0]; };
   micStream.getTracks().forEach(t=> pc.addTrack(t, micStream));
 
-  // 4) data channel for realtime events (drives the status + latency readout)
   dc = pc.createDataChannel('oai-events');
-  dc.onopen = ()=>{ log('dc open · asking AI to begin'); dc.send(JSON.stringify({type:'response.create'})); };
+  dc.onopen = ()=>{ log('dc open'); dc.send(JSON.stringify({type:'response.create'})); };
   dc.onmessage = onEvent;
 
-  // 5) SDP offer → OpenAI /calls → answer
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  setState('Connecting…','Handshaking with the interviewer');
-  let answer;
-  try{
-    const res = await fetch(CALLS_URL, { method:'POST', body: offer.sdp,
-      headers:{ Authorization:'Bearer '+tok.value, 'Content-Type':'application/sdp' } });
-    if(!res.ok){ throw new Error('calls '+res.status+' '+(await res.text()).slice(0,140)); }
-    answer = await res.text();
-  }catch(e){ showErr('Could not reach the interviewer: '+e.message); setState('Ready'); cleanup(); $('btn-start').disabled=false; return; }
-  await pc.setRemoteDescription({ type:'answer', sdp: answer });
+  const res = await fetch(CALLS_URL, { method:'POST', body: offer.sdp,
+    headers:{ Authorization:'Bearer '+tok.value, 'Content-Type':'application/sdp' } });
+  if(!res.ok) throw new Error('calls '+res.status+' '+(await res.text()).slice(0,140));
+  await pc.setRemoteDescription({ type:'answer', sdp: await res.text() });
+}
 
-  $('btn-start').classList.add('hidden');
-  $('btn-end').classList.remove('hidden');
+function onConnState(){
+  if(!pc) return;
+  const s = pc.connectionState;
+  log('pc: '+s);
+  if(s==='connected'){
+    clearTimeout(graceTimer); graceTimer=null;
+    recon(false);
+    if(recoveryStart){
+      const took = performance.now()-recoveryStart; recoveryStart=0;
+      recoveries++; $('rec-count').textContent=recoveries;
+      $('rec-time').textContent=fmt(took);
+      log('RECOVERED in '+fmt(took));
+    }
+    setState('Connected','Listen — the interviewer will speak');
+  }else if(s==='disconnected'){
+    // WebRTC often self-heals a short blip. Give it a 4s grace window before
+    // burning the session and re-minting.
+    orb('drop','#DC2626'); setState('Connection unstable…','Trying to ride it out');
+    recon(true,'Network hiccup — waiting for it to self-heal…');
+    if(!graceTimer) graceTimer = setTimeout(()=>{ resume('grace expired'); }, 4000);
+  }else if(s==='failed' || s==='closed'){
+    if(!manualStop) resume('pc '+s);
+  }
+}
+
+async function resume(reason){
+  if(resuming || manualStop) return;
+  resuming = true;
+  clearTimeout(graceTimer); graceTimer=null;
+  if(!recoveryStart) recoveryStart = performance.now();
+  log('resume: '+reason);
+  orb('drop','#DC2626');
+  try{ if(dc) dc.close(); }catch(_){}
+  try{ if(pc) pc.close(); }catch(_){}
+  pc=null; dc=null;
+
+  const MAX_ATTEMPTS = 6;
+  for(let i=1; i<=MAX_ATTEMPTS && !manualStop; i++){
+    recon(true, `Connection dropped — reconnecting (attempt ${i} of ${MAX_ATTEMPTS})…`);
+    setState('Reconnecting…', 'Keep the page open');
+    try{
+      await connect();
+      resuming = false;
+      return;                      // onConnState('connected') finishes the UI
+    }catch(e){
+      if(e && e.auth){ resuming=false; recon(false); showErr('Session expired — sign in again and restart.'); endUI(); return; }
+      log('attempt '+i+' failed: '+(e.message||e).toString().slice(0,80));
+      await new Promise(r=>setTimeout(r, 2500));
+    }
+  }
+  resuming = false;
+  recon(false);
+  // Network is still down. Don't lose the interview — offer a manual resume
+  // that carries the same transcript context whenever connectivity returns.
+  setState('Connection lost', 'Your interview is saved — resume when your network is back');
+  $('btn-resume').classList.remove('hidden');
+  $('btn-end').classList.add('hidden');
 }
 
 function onEvent(ev){
   let msg; try{ msg = JSON.parse(ev.data); }catch(_){ return; }
   const t = msg.type || '';
-  // Robust to minor event-name changes across API versions: match on substrings.
+
+  // transcript capture — tolerant to event-name drift across API versions
+  if(t.includes('audio_transcript.delta') || t.includes('output_text.delta')){
+    aiBuf += (msg.delta || '');
+  }else if(t.includes('audio_transcript.done') || t.includes('output_text.done')){
+    const text = (msg.transcript || aiBuf || '').trim(); aiBuf='';
+    if(text) transcript.push({role:'ai', text});
+  }else if(t.includes('input_audio_transcription') && (t.includes('completed')||t.includes('done'))){
+    const text = (msg.transcript || '').trim();
+    if(text) transcript.push({role:'you', text});
+  }
+
   if(t.includes('speech_started')){
     orb('you','#16A34A'); setState('Listening to you…','Speak your answer');
   }else if(t.includes('speech_stopped')){
     turnStart = performance.now();
-    orb('think','#D97706'); setState('Thinking…','Waiting for the AI to reply');
-  }else if((t.includes('audio') && t.includes('delta')) || t==='output_audio_buffer.started'){
+    orb('think','#D97706'); setState('Thinking…','');
+  }else if((t.includes('audio') && t.includes('delta') && !t.includes('transcript')) || t==='output_audio_buffer.started'){
     if(turnStart){ recordTurn(performance.now()-turnStart); turnStart=0; }
     orb('ai','#F57C2E'); setState('Interviewer speaking…','');
   }else if(t.includes('response.done') || t==='output_audio_buffer.stopped'){
     orb('', '#8593AB'); setState('Your turn','Answer when ready');
   }else if(t==='error'){
-    showErr('Realtime error: '+(msg.error && msg.error.message ? msg.error.message : 'unknown'));
+    log('rt error: '+((msg.error&&msg.error.message)||'unknown'));
   }
 }
 
+async function start(){
+  hideErr(); manualStop=false;
+  $('btn-start').disabled=true;
+  setState('Connecting…','Minting a secure session');
+  try{
+    await connect();
+    $('btn-start').classList.add('hidden');
+    $('btn-resume').classList.add('hidden');
+    $('btn-end').classList.remove('hidden');
+  }catch(e){
+    $('btn-start').disabled=false;
+    if(e && e.auth){ showErr('Sign in as the owner first (topcandidate.pro/login on this device), then reload.'); }
+    else if(e && e.name==='NotAllowedError'){ showErr('Microphone access was blocked. Allow it and try again.'); }
+    else showErr('Could not start: '+(e.message||e));
+    setState('Ready');
+  }
+}
+
+async function manualResume(){
+  hideErr();
+  $('btn-resume').disabled=true;
+  await resume('manual');
+  $('btn-resume').disabled=false;
+  if(pc && pc.connectionState!=='failed'){
+    $('btn-resume').classList.add('hidden');
+    $('btn-end').classList.remove('hidden');
+  }
+}
+
+function endUI(){
+  $('btn-end').classList.add('hidden');
+  $('btn-resume').classList.add('hidden');
+  $('btn-start').classList.remove('hidden'); $('btn-start').disabled=false;
+}
 function cleanup(){
   try{ if(dc) dc.close(); }catch(_){}
   try{ if(pc) pc.close(); }catch(_){}
@@ -219,18 +321,21 @@ function cleanup(){
   pc=null; dc=null; micStream=null;
 }
 function end(){
-  cleanup();
+  manualStop=true;
+  cleanup(); recon(false);
   orb('', '#8593AB');
-  setState('Ended', count? `Measured ${count} turn(s). Best ${fmt(best)}, worst ${fmt(worst)}.` : 'No turns measured.');
-  $('btn-end').classList.add('hidden');
-  $('btn-start').classList.remove('hidden'); $('btn-start').disabled=false;
+  setState('Ended', recoveries? `Survived ${recoveries} drop(s). Worst turn ${fmt(worst)}.` : (worst?`Worst turn ${fmt(worst)}.`:''));
+  transcript = []; aiBuf='';
+  endUI();
 }
 
 window.addEventListener('load', ()=>{
   if(!apisPresent() || isInAppWebView()){ $('flow').style.display='none'; $('blocker').classList.add('on'); return; }
   $('btn-start').addEventListener('click', start);
+  $('btn-resume').addEventListener('click', manualResume);
   $('btn-end').addEventListener('click', end);
 });
+window.addEventListener('online', ()=>{ log('browser online event'); if(!manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online event'); });
 window.addEventListener('pagehide', cleanup);
 </script>
 </body>
