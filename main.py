@@ -2254,8 +2254,17 @@ async def public_apply_status(token: str, application_id: str):
     if not await reserve_viva_launch(str(job["_id"]), cap):
         # Qualified but the day's interview budget is spent. Invisible to the
         # candidate; flagged for the recruiter so nobody qualified is lost.
+        # Stamped on the screening too — that's the doc the Candidates page
+        # renders, so the badge needs no join.
         await db.applications.update_one(
             {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
+        try:
+            if app_doc.get("screening_id"):
+                await db.screenings.update_one(
+                    {"_id": _OID(str(app_doc["screening_id"]))},
+                    {"$set": {"viva_capped": True}})
+        except Exception:
+            pass
         print(f"[VIVA] daily launch cap reached — application {application_id} qualified, not launched")
         return RECEIVED
 

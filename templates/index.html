@@ -1418,7 +1418,7 @@ function renderCandidates(results){
       <td>${missing.map(s=>`<span class="tag missing">${s}</span>`).join('')||'<span class="badge b-green" style="font-size:9px">None</span>'}</td>
       <td style="font-size:11px">${r.years_experience||'?'} yrs</td>
       <td style="font-size:10px;color:var(--t3)">${edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—'}</td>
-      <td><span class="badge ${tbcls(rec)}">${rec}</span>${stageBadge(stage)}</td>
+      <td><span class="badge ${tbcls(rec)}">${rec}</span>${stageBadge(stage)}${r.viva_capped?`<span class="badge b-amber" style="font-size:9px;margin-left:4px" title="Qualified for the live interview, but the job's daily interview cap was reached — send them a candidate link from /viva-live">INTERVIEW CAPPED</span>`:''}</td>
       <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
       <td>
         <div style="display:flex;gap:3px">
@@ -1537,6 +1537,11 @@ function openCandModal(id){
   document.getElementById('cand-modal-name').textContent=(r.candidate_name||'Candidate')+' — AI Report';
   document.getElementById('open-full-report').onclick=()=>{window.location.href='/candidate?id='+id;};
   document.getElementById('cand-modal-body').innerHTML=`
+    ${r.viva_capped ? `
+    <div style="background:var(--amg);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
+      <span style="font-size:14px;flex-shrink:0">⚠</span>
+      <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Qualified for the live interview but not launched</strong> — the job's daily interview cap was reached when they applied. Create a candidate link on /viva-live and send it to them so they aren't lost.</div>
+    </div>` : ''}
     ${r.recommendation_note ? `
     <div style="background:var(--amg);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px;flex-shrink:0">⚠</span>
