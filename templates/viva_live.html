@@ -183,9 +183,36 @@ function sendControlNote(){
   turnHud();
 }
 
+let sessionSaved = false, startedAtMs = 0;
+
+async function saveSession(status){
+  // L4: persist the interview (transcript + config + events) and let the
+  // server score it in the background. Fire-and-forget — a failed save is
+  // logged, never blocks the goodbye.
+  if(sessionSaved || !transcript.length || questionsAsked===0) return;
+  sessionSaved = true;
+  try{
+    const r = await fetch('/api/viva-live/session', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        transcript, status,
+        config: {questions: cfgQuestions, max_turns: maxTurns, vad: cfgVad},
+        questions_asked: questionsAsked,
+        recoveries, barge_ins: bargeIns,
+        duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000) : 0
+      })
+    });
+    const d = await r.json().catch(()=>({}));
+    log(r.ok ? 'session saved ('+d.session_id+') — scoring queued' : 'session save failed: '+r.status);
+    if(r.ok) $('substate').textContent = 'Saved — results at /viva-live/sessions once scored.';
+  }catch(e){ log('session save error: '+(e.message||e)); }
+}
+
 function finishInterview(){
   if(manualStop) return;
   manualStop = true;           // no resume attempts on our own teardown
+  saveSession('completed');    // before any state is cleared
   cleanup(); recon(false);
   orb('', '#8593AB');
   setState('Interview complete', `Thanks — ${Math.min(questionsAsked,maxTurns)} question(s), `+
@@ -392,6 +419,7 @@ async function start(){
   cfgVad = $("cfg-vad").value || "patient";
   aiSpeaking = false; bargeIns = 0; $("barge-count").textContent = "0";
   questionsAsked = 0; skipNextCount = false; closing = false; closingDone = false;
+  sessionSaved = false; startedAtMs = Date.now();
   transcript = []; aiBuf = ''; worst = 0; recoveries = 0;
   turnHud();
   $('btn-start').disabled=true;
@@ -434,6 +462,7 @@ function cleanup(){
 }
 function end(){
   manualStop=true;
+  saveSession('abandoned');   // before the transcript is cleared
   cleanup(); recon(false);
   orb('', '#8593AB');
   setState('Ended', recoveries? `Survived ${recoveries} drop(s). Worst turn ${fmt(worst)}.` : (worst?`Worst turn ${fmt(worst)}.`:''));

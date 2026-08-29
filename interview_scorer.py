@@ -226,3 +226,153 @@ async def score_written_answers(qa_pairs: list, api_key: str,
         "segment_score": max(0, min(100, segment)),
         "blank_answers": sorted(blank_idx),
     }, None
+
+
+# ─────────────────────────────────────────────────────────────
+# SPOKEN interview scorer (L4) — whole-conversation, not per-answer.
+# A live follow-up answer ("yes, exactly — it was the cache") is legitimately
+# three words BECAUSE of context; per-exchange scoring would punish the very
+# conversational quality the live interview is built for. One set of four
+# dimension scores for the interview, every score anchored to a quoted piece
+# of transcript evidence so the recruiter can verify each claim.
+# ─────────────────────────────────────────────────────────────
+
+SPOKEN_SCORER_VERSION = "spoken-1.0"
+MAX_TRANSCRIPT_CHARS = 8000
+
+SPOKEN_SYSTEM_PROMPT = """You are assessing the transcript of a LIVE SPOKEN screening interview conducted by an AI interviewer. The candidate spoke English as their second or third language. The transcript was produced by machine speech recognition of accented English and may contain transcription errors — garbled phrases, wrong homophones, dropped words. Score only what is asked. Return per-dimension scores 0-20 with a one-sentence justification each, quoting a short piece of evidence from the transcript for every score. Do not compute an overall score — that is done in code from your dimension scores.
+
+Score these four dimensions (0-20) for the interview as a whole:
+
+1. Relevance — Did the answers address the questions actually asked? Dodging or generic redirection scores low.
+2. Depth & Specificity — Concrete examples, real events, specifics ("I did X, which caused Y") versus vague generalities that could apply to anyone.
+3. Clarity & Structure of Thought — Is the REASONING organized and followable as spoken conversation? This measures the structure of the thinking, never the polish of the English.
+4. Role Competency — Does the conversation show relevant knowledge, judgment, or skill for the role?
+
+---
+SPOKEN LANGUAGE — read before scoring:
+- Fillers ("um", "you know"), false starts, self-corrections, and repetition are normal speech, not disorganized thinking. Never penalize them.
+- Short conversational answers to follow-up questions are normal — judge them in the context of the question asked, not against essay length.
+- If a phrase reads as garbled or nonsensical, treat it charitably as likely transcription error, not candidate error. Never penalize what the machine may have misheard.
+---
+CRITICAL — FAIRNESS FOR SECOND-LANGUAGE CANDIDATES. Read before scoring:
+
+You are scoring the quality of the candidate's thinking, not their command of English.
+
+- Judge "Clarity & Structure" as the coherence and organization of the ideas — is the line of thinking easy to follow?
+- DO NOT lower any score for, and treat as completely irrelevant: grammar, tense, article, or preposition mistakes; limited vocabulary, awkward phrasing, or non-native idiom; short, simple sentences or plain word choice; accent-driven phrasing.
+- A candidate who makes a sharp, well-organized point in broken English must score HIGHER than one who speaks fluent, polished English that rambles or says nothing.
+- If you notice yourself lowering a score because the English "sounds off" rather than because the thinking is unclear — stop. That is bias, not assessment. Re-read the exchange for its substance and score that.
+---
+NON-ANSWERS — a separate rule from the fairness rule above:
+
+If the candidate's answers are consistently blank, single-word, evasive, off-topic filler, or otherwise non-answers: score near zero (0-2) on the affected dimensions and say so plainly in the reasoning — do NOT invent merit that is not in the transcript. A non-answer is a real signal the recruiter needs, not something to be generous about.
+
+These two rules do not conflict: rough English with real substance scores HIGH; emptiness — fluent or not — scores near ZERO.
+---
+Return strict JSON:
+{"dimensions": [{"name": "<one of the four>", "score": <0-20>, "reason": "<one sentence>", "evidence": "<short transcript quote>"}], "summary": "<one neutral sentence>"}"""
+
+
+def _render_transcript(transcript: list) -> str:
+    lines = []
+    for t in transcript:
+        role = "Interviewer" if (t or {}).get("role") == "ai" else "Candidate"
+        text = str((t or {}).get("text", "")).strip()
+        if text:
+            lines.append(f"{role}: {text[:600]}")
+    return "\n".join(lines)[-MAX_TRANSCRIPT_CHARS:]
+
+
+def _spoken_zero(reason: str) -> dict:
+    return {
+        "scorer_version": SPOKEN_SCORER_VERSION,
+        "model": SCORING_MODEL,
+        "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
+        "dimensions": [{"name": d, "score": 0.0, "strict": 0.0, "generous": 0.0,
+                        "reason": reason, "evidence": ""} for d in DIMENSIONS],
+        "overall": 0,
+        "summary": reason,
+        "audit": {"deterministic_zero": True},
+    }
+
+
+async def _spoken_pass(client: AsyncOpenAI, angle: str, temperature: float,
+                       job_title: str, convo: str) -> dict:
+    resp = await client.chat.completions.create(
+        model=SCORING_MODEL,
+        temperature=temperature,
+        max_tokens=1800,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": SPOKEN_SYSTEM_PROMPT},
+            {"role": "user", "content":
+                f"{angle}\n\nROLE BEING SCREENED FOR: {job_title or 'not specified'}\n\n"
+                f"INTERVIEW TRANSCRIPT:\n\"\"\"\n{convo}\n\"\"\"\n\n"
+                "Score the four dimensions for this interview as a whole."},
+        ],
+    )
+    return json.loads(resp.choices[0].message.content)
+
+
+def _spoken_dims(raw: dict) -> dict:
+    """dimension name -> (score, reason, evidence), defensively parsed."""
+    out = {}
+    for d in (raw or {}).get("dimensions", []):
+        name = str(d.get("name", "")).strip()
+        match = next((D for D in DIMENSIONS if D.lower().split()[0] == name.lower().split()[0]), None) if name else None
+        if match is None:
+            continue
+        try:
+            score = max(0.0, min(20.0, float(d.get("score", 0))))
+        except Exception:
+            score = 0.0
+        out[match] = (score, str(d.get("reason", ""))[:400], str(d.get("evidence", ""))[:300])
+    return out
+
+
+async def score_spoken_interview(transcript: list, api_key: str,
+                                 job_title: str = "") -> tuple[dict | None, str | None]:
+    """Score a live-interview transcript. Returns (result, error).
+
+    Same honest architecture as every scorer in this product: two passes from
+    opposing angles, blended 60/40, and the overall number RECOMPUTED IN CODE
+    from the blended dimension scores — never taken from the model.
+    """
+    candidate_text = " ".join(
+        str((t or {}).get("text", "")).strip()
+        for t in transcript if (t or {}).get("role") == "you")
+    if not candidate_text.strip():
+        # No candidate speech at all — deterministic zero, no model call.
+        return _spoken_zero("The candidate said nothing scorable in this interview."), None
+
+    convo = _render_transcript(transcript)
+    client = AsyncOpenAI(api_key=api_key)
+    try:
+        strict_raw, generous_raw = await asyncio.gather(
+            _spoken_pass(client, STRICT_ANGLE, 0.2, job_title, convo),
+            _spoken_pass(client, GENEROUS_ANGLE, 0.3, job_title, convo),
+        )
+    except Exception as e:
+        return None, f"Scoring call failed: {str(e)[:200]}"
+
+    s, g = _spoken_dims(strict_raw), _spoken_dims(generous_raw)
+    dims_out, blended = [], {}
+    for d in DIMENSIONS:
+        ss, sr, se = s.get(d, (0.0, "not scored", ""))
+        gs, gr, ge = g.get(d, (0.0, "not scored", ""))
+        bl = round(ss * BLEND_STRICT + gs * BLEND_GENEROUS, 1)
+        blended[d] = bl
+        dims_out.append({"name": d, "score": bl, "strict": ss, "generous": gs,
+                         "reason": sr or gr, "evidence": se or ge})
+    overall = max(0, min(100, round(sum(blended.values()) / 80 * 100)))
+    return {
+        "scorer_version": SPOKEN_SCORER_VERSION,
+        "model": SCORING_MODEL,
+        "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
+        "dimensions": dims_out,
+        "overall": overall,
+        "summary": str((strict_raw or {}).get("summary") or (generous_raw or {}).get("summary") or "")[:300],
+        "audit": {"strict": {d: s.get(d, (None,))[0] for d in DIMENSIONS},
+                  "generous": {d: g.get(d, (None,))[0] for d in DIMENSIONS}},
+    }, None

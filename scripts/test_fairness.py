@@ -106,12 +106,90 @@ async def main() -> int:
           f"→ {'PASS' if ok_c else 'FAIL — non-answer scored too generously'}")
     print("─" * 62)
 
-    if ok_ab and ok_c:
-        print("\n\033[32mFAIRNESS GATE PASSED\033[0m — substance beat polish; emptiness scored near zero.\n")
+    written_ok = ok_ab and ok_c
+    if written_ok:
+        print("\n\033[32mWRITTEN GATE PASSED\033[0m — substance beat polish; emptiness scored near zero.")
+    else:
+        print("\n\033[31mWRITTEN GATE FAILED\033[0m — do NOT put this scorer in front of a real candidate.")
+
+    spoken_ok = await spoken_gate(key)
+    if written_ok and spoken_ok:
+        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken)\033[0m\n")
         return 0
-    print("\n\033[31mFAIRNESS GATE FAILED\033[0m — do NOT put this scorer in front of a real candidate.")
-    print("The prompt's fairness or non-answer block is not holding; report this output.\n")
+    print("\n\033[31mFAIRNESS GATE FAILED\033[0m — the failing path must not touch a real candidate.\n")
     return 1
+
+
+# ── SPOKEN gate (L4) — the same A/B/C, as live-interview transcripts. ──
+# A is deliberately rough, accented, AND carries plausible ASR garbles
+# ("cash expiry" for cache expiry) — the transcription-error charity rule is
+# part of what's under test. B is a fluent conversation that says nothing.
+
+_Q1 = "Tell me about a difficult bug you solved, and what your role was."
+_Q2 = "How did you make sure it would not happen again?"
+
+SPOKEN_A = [
+    {"role": "ai", "text": "Hello! Thanks for joining. " + _Q1},
+    {"role": "you", "text": "Ok so, in last company the report page it show wrong total but only some days. Everyone say random but I am not agree, random is usually not random. I reproduce for many dates, write down which one wrong — all is month end date. Then I check the code, the query it use server time zone but data is save in UTC, so last day of month it take record from next month. This is the, how you say, cash expiry — no sorry, the boundary problem."},
+    {"role": "ai", "text": "That's a clear diagnosis. " + _Q2},
+    {"role": "you", "text": "I convert all compare to UTC before, and I add test with month end date special. Also I tell finance team to check three month. After fix, three month no wrong total come back."},
+    {"role": "ai", "text": "Thanks, that's all my questions. The team will be in touch."},
+]
+
+SPOKEN_B = [
+    {"role": "ai", "text": "Hello! Thanks for joining. " + _Q1},
+    {"role": "you", "text": "Absolutely, that's a great question. Throughout my career I've always been passionate about tackling challenging problems head-on. I really believe in leveraging best practices and maintaining a solutions-oriented mindset, and collaboration is essential — I always make sure all stakeholders are aligned at every stage of the process."},
+    {"role": "ai", "text": "Could you give me one specific example? " + _Q2},
+    {"role": "you", "text": "Of course. I'd say my approach is fundamentally about being proactive rather than reactive. Challenges are really just opportunities in disguise, and I embrace them wholeheartedly as catalysts for growth, both personally and professionally. Prevention is ultimately about mindset."},
+    {"role": "ai", "text": "Thanks, that's all my questions. The team will be in touch."},
+]
+
+SPOKEN_C = [
+    {"role": "ai", "text": "Hello! Thanks for joining. " + _Q1},
+    {"role": "you", "text": "Hmm. Yes."},
+    {"role": "ai", "text": "Could you tell me a bit more? " + _Q2},
+    {"role": "you", "text": "I don't know. Maybe."},
+    {"role": "ai", "text": "Thanks, that's all my questions."},
+]
+
+
+def show_spoken(label, res):
+    print(f"\n  {label}  overall {res['overall']:>3}/100  {bar(res['overall'])}")
+    for d in res["dimensions"]:
+        print(f"      {d['name']:<32} {d['score']:>4.1f}/20  (strict {d.get('strict')}, generous {d.get('generous')})")
+        print(f"        └ {d['reason'][:100]}")
+        if d.get("evidence"):
+            print(f"        “{d['evidence'][:90]}”")
+
+
+async def spoken_gate(key) -> bool:
+    from interview_scorer import score_spoken_interview
+    print("\n" + "═" * 62)
+    print("SPOKEN GATE — live-interview transcripts, same A/B/C")
+    print("A includes deliberate ASR garbles — transcription charity is under test.")
+
+    results = {}
+    for label, tr in (("A", SPOKEN_A), ("B", SPOKEN_B), ("C", SPOKEN_C)):
+        res, err = await score_spoken_interview(tr, key, job_title="Software Engineer")
+        if err or not res:
+            print(f"\n  {label}: scoring failed — {err}")
+            return False
+        results[label] = res
+
+    show_spoken("A · rough/garbled English, real substance", results["A"])
+    show_spoken("B · fluent English, says nothing         ", results["B"])
+    show_spoken("C · non-answers                          ", results["C"])
+
+    margin = results["A"]["overall"] - results["B"]["overall"]
+    ok_ab = results["A"]["overall"] > results["B"]["overall"]
+    ok_c = results["C"]["overall"] <= 15
+    print("\n" + "─" * 62)
+    print(f"  A vs B margin: {'+' if margin >= 0 else ''}{margin} points "
+          f"→ {'PASS' if ok_ab else 'FAIL — spoken fairness rule broken'}")
+    print(f"  C (non-answers) = {results['C']['overall']}/100 "
+          f"→ {'PASS' if ok_c else 'FAIL — non-answer floor broken'}")
+    print("─" * 62)
+    return ok_ab and ok_c
 
 
 if __name__ == "__main__":

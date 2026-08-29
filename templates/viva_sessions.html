@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live interview results — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.1);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;--border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy)}
+.tb-tag{margin-left:auto;font-size:11px;color:var(--t3);font-weight:700;background:var(--s2);padding:3px 9px;border-radius:var(--r-pill)}
+.wrap{max-width:760px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.35rem;margin-bottom:1rem}
+h1{font-size:1.25rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:.3rem}
+.honest{background:var(--og);border:1px solid rgba(245,124,46,.3);border-radius:var(--r-lg);padding:.75rem .95rem;font-size:.85rem;color:var(--t2);line-height:1.55;margin:.9rem 0 0}
+.honest b{color:var(--orange2)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:.8rem .5rem;border-bottom:1px solid var(--border);cursor:pointer}
+.row:hover{background:var(--s2)}
+.row:last-child{border-bottom:none}
+.row .meta{font-size:12px;color:var(--t3)}
+.badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:var(--r-pill)}
+.b-scored{background:rgba(22,163,74,.12);color:var(--green)}
+.b-pending{background:rgba(217,119,6,.12);color:var(--amber)}
+.b-failed{background:rgba(220,38,38,.1);color:var(--red)}
+.score-big{font-size:2rem;font-weight:900;color:var(--navy);letter-spacing:-1px}
+.dim{padding:.7rem 0;border-bottom:1px solid var(--border)}
+.dim:last-child{border-bottom:none}
+.dim-top{display:flex;justify-content:space-between;font-weight:700;font-size:.92rem;color:var(--navy)}
+.dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);margin:.4rem 0;overflow:hidden}
+.dim-bar i{display:block;height:100%;background:var(--orange)}
+.dim-reason{font-size:.84rem;color:var(--t2);line-height:1.5}
+.dim-ev{font-size:.8rem;color:var(--t3);font-style:italic;margin-top:.25rem;border-left:3px solid var(--border2);padding-left:.6rem}
+.turn{margin:.45rem 0;font-size:.88rem;line-height:1.55}
+.turn.ai{color:var(--t2)}
+.turn.you{color:var(--navy);font-weight:600}
+.turn .who{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);display:block}
+.notice{padding:1.2rem;text-align:center;color:var(--t2);font-size:.92rem}
+.back{font-size:13px;font-weight:700;color:var(--orange2);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;margin-bottom:.8rem}
+.evrow{display:flex;gap:1.2rem;font-size:12px;color:var(--t3);margin-top:.5rem;flex-wrap:wrap}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Live interview · results</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h1>Live interview results</h1>
+    <div class="honest"><b>AI assessment — a signal for your review, not a verdict.</b>
+    Scores are computed from the transcript on a fixed rubric; every dimension shows the
+    evidence it is based on. Read the transcript before acting on any number.</div>
+  </div>
+
+  <div class="card" id="list-card"><div class="notice" id="list-notice">Loading…</div><div id="list"></div></div>
+
+  <div class="card hidden" id="detail-card">
+    <button class="back" id="btn-back" type="button">← All sessions</button>
+    <div id="detail"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function loadList(){
+  try{
+    const r = await fetch('/api/viva-live/sessions', {credentials:'include'});
+    if(r.status===401 || r.status===403){
+      $('list-notice').textContent = 'Sign in as the owner to view interview results (topcandidate.pro/login), then reload.';
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    if(!d.sessions.length){ $('list-notice').textContent = 'No live interviews recorded yet.'; return; }
+    $('list-notice').textContent = '';
+    $('list').innerHTML = d.sessions.map(s => {
+      const sc = s.score_status==='scored' ? (s.score_result? s.score_result.overall : '—') : null;
+      const b = s.score_status==='scored' ? 'b-scored' : (s.score_status==='failed' ? 'b-failed' : 'b-pending');
+      return `<div class="row" onclick="loadDetail('${esc(s._id)}')">
+        <div>
+          <div style="font-weight:700;font-size:.92rem">${esc((s.config&&s.config.questions&&s.config.questions[0])||'Interview').slice(0,60)}</div>
+          <div class="meta">${esc((s.created_at||'').replace('T',' ').slice(0,16))} · ${s.questions_asked||0} questions · ${s.status}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${sc!==null?`<span style="font-weight:900;font-size:1.2rem">${sc}</span>`:''}
+          <span class="badge ${b}">${esc(s.score_status||'pending')}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ $('list-notice').textContent = 'Could not load: '+e.message; }
+}
+
+async function loadDetail(id){
+  const r = await fetch('/api/viva-live/sessions/'+id, {credentials:'include'});
+  if(!r.ok){ alert('Could not load session'); return; }
+  const s = await r.json();
+  const res = s.score_result;
+  let html = '';
+  if(res){
+    html += `<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:.2rem">
+      <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
+      <span style="font-size:.85rem;color:var(--t2)">${esc(res.summary||'')}</span></div>
+    <div class="evrow"><span>scorer ${esc(res.scorer_version)}</span><span>blend ${res.blend?res.blend.strict+'/'+res.blend.generous:''}</span></div>
+    <div style="margin:1rem 0">` + res.dimensions.map(d => `
+      <div class="dim">
+        <div class="dim-top"><span>${esc(d.name)}</span><span>${d.score}/20 <span style="font-weight:500;color:var(--t3);font-size:11px">(strict ${d.strict} · generous ${d.generous})</span></span></div>
+        <div class="dim-bar"><i style="width:${(d.score/20*100).toFixed(0)}%"></i></div>
+        <div class="dim-reason">${esc(d.reason)}</div>
+        ${d.evidence?`<div class="dim-ev">“${esc(d.evidence)}”</div>`:''}
+      </div>`).join('') + `</div>`;
+  }else{
+    html += `<div class="notice">Scoring: ${esc(s.score_status||'pending')}${s.score_error?' — '+esc(s.score_error):''}. Reload in a moment.</div>`;
+  }
+  html += `<div class="evrow" style="margin-bottom:.6rem">
+    <span>${s.questions_asked||0} of ${(s.config&&s.config.max_turns)||'?'} questions</span>
+    <span>${s.recoveries||0} network drop(s) survived</span>
+    <span>${s.barge_ins||0} barge-in(s)</span>
+    <span>patience: ${esc((s.config&&s.config.vad)||'—')}</span>
+    <span>${s.status}</span></div>
+  <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
+  html += (s.transcript||[]).map(t => `
+    <div class="turn ${t.role==='ai'?'ai':'you'}">
+      <span class="who">${t.role==='ai'?'Interviewer':'Candidate'}</span>${esc(t.text)}
+    </div>`).join('') || '<div class="notice">No transcript captured.</div>';
+
+  $('detail').innerHTML = html;
+  $('list-card').classList.add('hidden');
+  $('detail-card').classList.remove('hidden');
+  window.scrollTo({top:0});
+}
+
+$('btn-back').addEventListener('click', ()=>{
+  $('detail-card').classList.add('hidden');
+  $('list-card').classList.remove('hidden');
+  loadList();
+});
+window.addEventListener('load', loadList);
+</script>
+</body>
+</html>

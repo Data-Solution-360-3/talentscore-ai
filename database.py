@@ -79,6 +79,8 @@ async def connect():
     await db.interviews.create_index("user_id")
     await db.interview_written_answers.create_index([("interview_id", 1), ("email", 1)])
     await db.interview_written_answers.create_index("status")
+    await db.interview_sessions.create_index("created_at")
+    await db.interview_sessions.create_index("status")
 
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
@@ -1056,3 +1058,32 @@ async def get_written_submissions(interview_id: str) -> list:
     async for doc in cursor:
         out.append(serialize_mongo(doc))
     return out
+
+
+# ── Live interview sessions (L4) ─────────────────────────────
+
+async def save_interview_session(doc: dict) -> str:
+    """Persist one completed/abandoned live interview: full transcript (both
+    sides), config, turn count, drop/recovery/barge-in events. Metadata only —
+    no audio or video is stored here (that is L5's proctoring capture)."""
+    doc = {**doc, "created_at": datetime.utcnow()}
+    doc.pop("_id", None)
+    res = await db.interview_sessions.insert_one(doc)
+    return str(res.inserted_id)
+
+
+async def get_interview_sessions(limit: int = 100) -> list:
+    cursor = db.interview_sessions.find(
+        {}, {"transcript": {"$slice": 2}}).sort("created_at", -1).limit(limit)
+    out = []
+    async for doc in cursor:
+        out.append(serialize_mongo(doc))
+    return out
+
+
+async def get_interview_session(session_id: str) -> dict | None:
+    try:
+        doc = await db.interview_sessions.find_one({"_id": ObjectId(session_id)})
+    except Exception:
+        return None
+    return serialize_mongo(doc) if doc else None

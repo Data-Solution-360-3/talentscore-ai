@@ -55,6 +55,7 @@ from database import (
     get_applications_for_job, user_match,
     create_interview, get_interview_by_token,
     save_written_submission, get_written_submissions,
+    save_interview_session, get_interview_sessions, get_interview_session,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1592,6 +1593,120 @@ async def viva_live_token(request: Request):
     out["max_turns"] = max_turns   # server-clamped; the client HUD trusts this
     out["vad"] = vad
     return out
+
+
+# ── L4: session capture + scoring ────────────────────────────
+
+async def score_live_session(session_id: str):
+    """Background: score a saved live-interview transcript. Fire-and-forget —
+    a failure drops the record to score_status 'failed' and stays reviewable."""
+    from bson import ObjectId as _OID
+    from interview_scorer import score_spoken_interview
+    try:
+        sess = await db.interview_sessions.find_one({"_id": _OID(session_id)})
+        if not sess:
+            return
+        await db.interview_sessions.update_one(
+            {"_id": _OID(session_id)}, {"$set": {"score_status": "scoring"}})
+        result, err = await score_spoken_interview(
+            sess.get("transcript") or [], OPENAI_API_KEY,
+            job_title=(sess.get("config") or {}).get("job_title") or "")
+        if err or not result:
+            await db.interview_sessions.update_one(
+                {"_id": _OID(session_id)},
+                {"$set": {"score_status": "failed", "score_error": err or "unknown"}})
+            return
+        await db.interview_sessions.update_one(
+            {"_id": _OID(session_id)},
+            {"$set": {"score_status": "scored", "score_result": result,
+                      "scored_at": _dt.utcnow(), "score_error": None}})
+    except Exception as e:
+        print(f"[VIVA-LIVE] session scoring failed for {session_id}: {e}")
+        try:
+            await db.interview_sessions.update_one(
+                {"_id": _OID(session_id)},
+                {"$set": {"score_status": "failed", "score_error": str(e)[:300]}})
+        except Exception:
+            pass
+
+
+@app.post("/api/viva-live/session")
+async def viva_live_save_session(request: Request, background: BackgroundTasks):
+    """Owner-gated: persist a finished live interview and queue scoring.
+
+    Owner-gated like the mint — while the live product has no public links,
+    every write path stays behind auth. When links go public in L5 this moves
+    to a server-side session record keyed by token, same note as the mint.
+    """
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+
+    transcript = body.get("transcript")
+    if not isinstance(transcript, list) or not transcript:
+        raise HTTPException(status_code=400, detail="A transcript is required.")
+    transcript = [
+        {"role": "ai" if (t or {}).get("role") == "ai" else "you",
+         "text": str((t or {}).get("text", ""))[:600]}
+        for t in transcript[:120] if str((t or {}).get("text", "")).strip()
+    ]
+    cfg = body.get("config") if isinstance(body.get("config"), dict) else {}
+    status = body.get("status") if body.get("status") in ("completed", "abandoned") else "abandoned"
+
+    def _i(v, lo, hi):
+        try:
+            return max(lo, min(hi, int(v)))
+        except Exception:
+            return lo
+
+    doc = {
+        "user_id": user["user_id"],
+        "answer_language": "en",
+        "transcript": transcript,
+        "config": {
+            "questions": [str(q)[:300] for q in (cfg.get("questions") or [])][:3],
+            "max_turns": _i(cfg.get("max_turns"), 1, 8),
+            "vad": str(cfg.get("vad", ""))[:20],
+            "job_title": str(cfg.get("job_title", ""))[:120],
+        },
+        "questions_asked": _i(body.get("questions_asked"), 0, 20),
+        "recoveries": _i(body.get("recoveries"), 0, 50),
+        "barge_ins": _i(body.get("barge_ins"), 0, 200),
+        "duration_seconds": _i(body.get("duration_seconds"), 0, 7200),
+        "status": status,
+        "score_status": "pending",
+    }
+    session_id = await save_interview_session(doc)
+    background.add_task(score_live_session, session_id)
+    return {"success": True, "session_id": session_id}
+
+
+@app.get("/api/viva-live/sessions")
+async def viva_live_list_sessions(request: Request):
+    """Owner-only: recorded live-interview sessions, newest first."""
+    await require_admin(request)
+    sessions = await get_interview_sessions()
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@app.get("/api/viva-live/sessions/{session_id}")
+async def viva_live_session_detail(request: Request, session_id: str):
+    """Owner-only: one session — full transcript, scores, evidence, events."""
+    await require_admin(request)
+    sess = await get_interview_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return sess
+
+
+@app.get("/viva-live/sessions", response_class=HTMLResponse)
+async def viva_live_sessions_page():
+    """Recruiter results view. The page shell is public; every byte of data
+    comes from the owner-gated APIs above, so an unauthenticated visitor sees
+    only a sign-in notice."""
+    return HTMLResponse(read_template("viva_sessions.html"))
 
 
 @app.get("/apply/{token}", response_class=HTMLResponse)

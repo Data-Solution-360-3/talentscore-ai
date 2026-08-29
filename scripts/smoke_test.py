@@ -212,6 +212,31 @@ def main():
                 failures.append(("POST", "/api/viva-live/token", r.status_code))
         except Exception as e:
             line(None, "POST", "/api/viva-live/token", str(e)[:60]); failures.append(("POST", "/api/viva-live/token", "exception"))
+        # L4 gates — always on a FRESH credential-free client (the written-
+        # endpoint lesson: a gate check must never inherit auth from `c`).
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.get("/api/viva-live/sessions")
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/viva-live/sessions",
+                 "gated (owner-only)" if gated else "NOT GATED — interview data leak!")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/viva-live/sessions", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/viva-live/sessions", str(e)[:60]); failures.append(("GET", "/api/viva-live/sessions", "exception"))
+        try:
+            r = c.get("/viva-live/sessions")
+            body = r.text or ""
+            ok = (r.status_code == 200 and 'id="list-card"' in body
+                  and "AI assessment" in body and "</html>" in body and "{{" not in body)
+            line(r.status_code, "GET", "/viva-live/sessions",
+                 "results page well-formed" if ok else "MALFORMED")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/viva-live/sessions", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/viva-live/sessions", str(e)[:60]); failures.append(("GET", "/viva-live/sessions", "exception"))
 
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")
