@@ -82,8 +82,16 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 
   <div id="flow">
     <div class="card">
-      <h1>Live AI interview — drop-recovery test</h1>
-      <p class="lede">Start the interview, then <b>kill your network mid-answer</b> (airplane mode). The session should reconnect on its own and the AI should apologize and ask you to repeat — not restart, not die.</p>
+      <h1>Live AI interview — multi-turn</h1>
+      <p class="lede">A full adaptive interview: the AI asks your opening question(s), probes based on what you actually say, and closes gracefully at the turn limit. Drop-recovery from L1 still applies — kill your network mid-conversation and it should resume with the history intact.</p>
+
+      <div style="margin-top:1.1rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.95rem 1rem" id="cfg">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem">Interview setup (recruiter-side)</div>
+        <label style="font-size:12px;font-weight:600;color:var(--t2)">Opening question(s) — one per line, up to 3</label>
+        <textarea id="cfg-questions" rows="3" style="width:100%;margin:.35rem 0 .7rem;padding:9px 11px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;resize:vertical">Tell me about a project you're proud of, and what your specific role was.</textarea>
+        <label style="font-size:12px;font-weight:600;color:var(--t2)">Total questions (turns)</label>
+        <input id="cfg-turns" type="number" min="1" max="8" value="4" style="width:80px;margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:700">
+      </div>
 
       <div class="orb" id="orb">
         <svg id="orb-ico" viewBox="0 0 24 24" fill="none" stroke="#8593AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
@@ -94,7 +102,8 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
       <div class="recon" id="recon"><span class="spin"></span><span id="recon-msg">Connection dropped — reconnecting…</span></div>
 
       <div class="latency">
-        <div class="latency-label">Per-turn latency · recovery stats</div>
+        <div class="latency-label">Interview progress · latency · recovery</div>
+        <div class="latency-row"><span>Question</span><b id="turn-hud">—</b></div>
         <div class="latency-row"><span>Last turn</span><b id="lat-last">—</b></div>
         <div class="latency-row"><span>Worst turn</span><b id="lat-worst">—</b></div>
         <div class="latency-row"><span>Drops survived</span><b id="rec-count">0</b></div>
@@ -131,6 +140,51 @@ let recoveries=0, recoveryStart=0;
 let transcript = [];   // {role:'ai'|'you', text}
 let aiBuf = '';
 
+// L2 — turn budget. The MODEL decides what to ask (adaptive); the CLIENT
+// counts how many questions have been asked (deterministic) and injects
+// "[Interview control note: ...]" system messages so the model always knows
+// the remaining budget. Models miscount; this arithmetic never does.
+let cfgQuestions = [], maxTurns = 4;
+let questionsAsked = 0;      // completed AI question turns
+let skipNextCount = false;   // the first response after a recovery mint is the
+                             // apology, not a new question — don't count it
+let closing = false;         // final control note sent; next response is the goodbye
+let closingDone = false;
+
+function turnHud(){
+  $('turn-hud').textContent = closing || closingDone
+    ? 'closing' : (questionsAsked ? `${Math.min(questionsAsked, maxTurns)} of ${maxTurns}` : '—');
+}
+
+function sendControlNote(){
+  if(!dc || dc.readyState!=='open') return;
+  let text;
+  if(questionsAsked >= maxTurns){
+    text = `[Interview control note: You have now asked all ${maxTurns} questions. `+
+           `When the candidate finishes this answer, thank them warmly, tell them that's `+
+           `all your questions and the team will be in touch, and end the interview. `+
+           `Ask nothing further.]`;
+    closing = true;
+  }else{
+    text = `[Interview control note: You have asked ${questionsAsked} of ${maxTurns} `+
+           `questions. ${maxTurns-questionsAsked} remaining. Continue adaptively.]`;
+  }
+  dc.send(JSON.stringify({type:'conversation.item.create', item:{
+    type:'message', role:'system', content:[{type:'input_text', text}]}}));
+  log('note: '+(closing?'FINAL':'progress '+questionsAsked+'/'+maxTurns));
+  turnHud();
+}
+
+function finishInterview(){
+  if(manualStop) return;
+  manualStop = true;           // no resume attempts on our own teardown
+  cleanup(); recon(false);
+  orb('', '#8593AB');
+  setState('Interview complete', `Thanks — ${Math.min(questionsAsked,maxTurns)} question(s), `+
+    (recoveries? `${recoveries} drop(s) survived, `:'') + `worst turn ${worst?fmt(worst):'n/a'}.`);
+  endUI();
+}
+
 function log(m){ const el=$('log'); el.classList.add('on'); el.innerHTML += m+'<br>'; el.scrollTop=el.scrollHeight; }
 function showErr(m){ $('err').textContent=m; $('err').classList.add('on'); }
 function hideErr(){ $('err').classList.remove('on'); }
@@ -156,11 +210,17 @@ async function mintToken(){
   const r = await fetch('/api/viva-live/token', {
     method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({transcript: transcript.slice(-30)})
+    body: JSON.stringify({
+      transcript: transcript.slice(-30),
+      config: {questions: cfgQuestions, max_turns: maxTurns},
+      progress: {asked: questionsAsked}
+    })
   });
   if(r.status===401 || r.status===403) throw {auth:true};
   if(!r.ok) throw new Error('token '+r.status+' '+(await r.text()).slice(0,140));
-  return r.json();
+  const tok = await r.json();
+  if(tok.max_turns) maxTurns = tok.max_turns;   // trust the server's clamp
+  return tok;
 }
 
 async function ensureMic(){
@@ -170,7 +230,8 @@ async function ensureMic(){
 
 async function connect(){
   const tok = await mintToken();
-  log((tok.recovered?'RECOVERY':'fresh')+' token ok');
+  log((tok.recovered?'RECOVERY':'fresh')+' token ok · budget '+questionsAsked+'/'+maxTurns);
+  if(tok.recovered) skipNextCount = true;   // the apology turn is not a question
 
   await ensureMic();
   pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
@@ -272,9 +333,25 @@ function onEvent(ev){
     orb('think','#D97706'); setState('Thinking…','');
   }else if((t.includes('audio') && t.includes('delta') && !t.includes('transcript')) || t==='output_audio_buffer.started'){
     if(turnStart){ recordTurn(performance.now()-turnStart); turnStart=0; }
-    orb('ai','#F57C2E'); setState('Interviewer speaking…','');
-  }else if(t.includes('response.done') || t==='output_audio_buffer.stopped'){
-    orb('', '#8593AB'); setState('Your turn','Answer when ready');
+    orb('ai','#F57C2E'); setState(closing ? 'Interviewer wrapping up…' : 'Interviewer speaking…','');
+  }else if(t.includes('response.done')){
+    // One completed AI response = one question asked — unless it was the
+    // recovery apology (skipNextCount) or the goodbye (closing).
+    if(closing){
+      closingDone = true;
+      setState('Interview complete','Wrapping up…');
+      // Finish when the goodbye audio drains; fallback timer if the buffer
+      // event never arrives on this browser.
+      setTimeout(finishInterview, 8000);
+    }else{
+      if(skipNextCount){ skipNextCount = false; }
+      else { questionsAsked++; }
+      sendControlNote();
+      orb('', '#8593AB'); setState('Your turn','Answer when ready');
+    }
+  }else if(t==='output_audio_buffer.stopped'){
+    if(closingDone){ finishInterview(); }
+    else if(!closing){ orb('', '#8593AB'); setState('Your turn','Answer when ready'); }
   }else if(t==='error'){
     log('rt error: '+((msg.error&&msg.error.message)||'unknown'));
   }
@@ -282,6 +359,12 @@ function onEvent(ev){
 
 async function start(){
   hideErr(); manualStop=false;
+  // read the recruiter-side config and reset all interview state
+  cfgQuestions = $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+  maxTurns = Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4));
+  questionsAsked = 0; skipNextCount = false; closing = false; closingDone = false;
+  transcript = []; aiBuf = ''; worst = 0; recoveries = 0;
+  turnHud();
   $('btn-start').disabled=true;
   setState('Connecting…','Minting a secure session');
   try{
