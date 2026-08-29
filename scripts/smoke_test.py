@@ -179,11 +179,22 @@ def main():
         # The token-mint endpoint spends real money per call, so the check must
         # never hit it with valid auth. Unauthenticated it MUST be gated (401/403);
         # a 200 here would mean an open spend hole. And the public page must load.
-        print("\nViva Live (L0)")
+        print("\nViva Live")
         try:
             r = c.get("/viva-live")
-            ok = r.status_code == 200 and "network test" in (r.text or "").lower()
-            line(r.status_code, "GET", "/viva-live", "page loads" if ok else "MALFORMED")
+            body = r.text or ""
+            # STRUCTURAL needles, not copy text. The first version asserted the
+            # phrase "network test", which the L1 rewrite renamed — producing a
+            # false MALFORMED on a perfectly good page. Assert what the page
+            # needs to FUNCTION: its start button, the WebRTC API call, a
+            # closing </html>, and no unreplaced {{placeholders}}.
+            ok = (r.status_code == 200
+                  and 'id="btn-start"' in body
+                  and "RTCPeerConnection" in body
+                  and "</html>" in body
+                  and "{{" not in body)
+            line(r.status_code, "GET", "/viva-live",
+                 "well-formed page" if ok else "MALFORMED — missing structure or placeholder leak")
             checked += 1
             if not ok:
                 failures.append(("GET", "/viva-live", r.status_code))
@@ -352,7 +363,15 @@ def main():
             line(None, "POST", "/api/viva/{unknown}/written", str(e)[:60])
             failures.append(("POST", "/api/viva/{unknown}/written", "exception"))
         try:
-            r = c.get("/api/interviews/000000000000000000000000/written")
+            # GATE CHECK — must run WITHOUT credentials. The client `c` carries
+            # the admin token by this point in the run, and the first version of
+            # this check used it — testing whether the door was locked while
+            # holding the key. It reported a well-guarded endpoint as NOT GATED
+            # (the endpoint's first line is require_admin; raw unauth curl gives
+            # 401). Every gate assertion now uses a fresh, credential-free
+            # client, so placement in this file can never contaminate it again.
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.get("/api/interviews/000000000000000000000000/written")
             gated = r.status_code in (401, 403)
             line(r.status_code, "GET", "/api/interviews/{id}/written",
                  "gated (owner-only)" if gated else "NOT GATED")
