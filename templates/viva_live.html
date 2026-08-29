@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Live interview (L1 test) — TopCandidate.pro</title>
+<title>Live interview (L3 test) — TopCandidate.pro</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -69,7 +69,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 <body>
 <div class="topbar">
   <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
-  <span class="tb-tag">Live interview · L1 drop-recovery</span>
+  <span class="tb-tag">Live interview · L3 endpointing</span>
 </div>
 
 <div class="wrap">
@@ -91,6 +91,12 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
         <textarea id="cfg-questions" rows="3" style="width:100%;margin:.35rem 0 .7rem;padding:9px 11px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;resize:vertical">Tell me about a project you're proud of, and what your specific role was.</textarea>
         <label style="font-size:12px;font-weight:600;color:var(--t2)">Total questions (turns)</label>
         <input id="cfg-turns" type="number" min="1" max="8" value="4" style="width:80px;margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:700">
+        <label style="font-size:12px;font-weight:600;color:var(--t2);margin-left:1rem">Patience</label>
+        <select id="cfg-vad" style="margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:600">
+          <option value="patient" selected>Patient — waits for a finished thought</option>
+          <option value="balanced">Balanced — auto</option>
+          <option value="fast">Fast — 500ms silence (will cut off thinkers)</option>
+        </select>
       </div>
 
       <div class="orb" id="orb">
@@ -106,6 +112,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
         <div class="latency-row"><span>Question</span><b id="turn-hud">—</b></div>
         <div class="latency-row"><span>Last turn</span><b id="lat-last">—</b></div>
         <div class="latency-row"><span>Worst turn</span><b id="lat-worst">—</b></div>
+        <div class="latency-row"><span>Barge-ins (you interrupted)</span><b id="barge-count">0</b></div>
         <div class="latency-row"><span>Drops survived</span><b id="rec-count">0</b></div>
         <div class="latency-row"><span>Last recovery took</span><b id="rec-time">—</b></div>
       </div>
@@ -144,12 +151,13 @@ let aiBuf = '';
 // counts how many questions have been asked (deterministic) and injects
 // "[Interview control note: ...]" system messages so the model always knows
 // the remaining budget. Models miscount; this arithmetic never does.
-let cfgQuestions = [], maxTurns = 4;
+let cfgQuestions = [], maxTurns = 4, cfgVad = "patient";
 let questionsAsked = 0;      // completed AI question turns
 let skipNextCount = false;   // the first response after a recovery mint is the
                              // apology, not a new question — don't count it
 let closing = false;         // final control note sent; next response is the goodbye
 let closingDone = false;
+let aiSpeaking = false, bargeIns = 0;
 
 function turnHud(){
   $('turn-hud').textContent = closing || closingDone
@@ -212,7 +220,7 @@ async function mintToken(){
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       transcript: transcript.slice(-30),
-      config: {questions: cfgQuestions, max_turns: maxTurns},
+      config: {questions: cfgQuestions, max_turns: maxTurns, vad: cfgVad},
       progress: {asked: questionsAsked}
     })
   });
@@ -225,7 +233,7 @@ async function mintToken(){
 
 async function ensureMic(){
   if(micStream && micStream.getAudioTracks().some(t=>t.readyState==='live')) return;
-  micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
 }
 
 async function connect(){
@@ -327,29 +335,48 @@ function onEvent(ev){
   }
 
   if(t.includes('speech_started')){
+    // BARGE-IN: candidate started talking while the AI was mid-speech. The
+    // server cancels the AI's response (interrupt_response) — count it so the
+    // test produces a number, and hand the floor to the candidate.
+    if(aiSpeaking){
+      bargeIns++; $('barge-count').textContent = bargeIns;
+      aiSpeaking = false;
+      log('BARGE-IN #'+bargeIns);
+    }
     orb('you','#16A34A'); setState('Listening to you…','Speak your answer');
   }else if(t.includes('speech_stopped')){
     turnStart = performance.now();
     orb('think','#D97706'); setState('Thinking…','');
   }else if((t.includes('audio') && t.includes('delta') && !t.includes('transcript')) || t==='output_audio_buffer.started'){
     if(turnStart){ recordTurn(performance.now()-turnStart); turnStart=0; }
+    aiSpeaking = true;
     orb('ai','#F57C2E'); setState(closing ? 'Interviewer wrapping up…' : 'Interviewer speaking…','');
   }else if(t.includes('response.done')){
-    // One completed AI response = one question asked — unless it was the
-    // recovery apology (skipNextCount) or the goodbye (closing).
+    aiSpeaking = false;
+    // TURN GUARD (L3): a barged-in response arrives here with status
+    // "cancelled" — a half-delivered question is NOT an asked question, so it
+    // must not consume budget. Only status "completed" counts; when the field
+    // is absent (event-shape drift) we count, matching pre-L3 behaviour.
+    const status = (msg.response && msg.response.status) || 'completed';
+    if(status !== 'completed'){
+      log('response '+status+' — not counted (budget stays '+questionsAsked+'/'+maxTurns+')');
+      return;
+    }
     if(closing){
       closingDone = true;
       setState('Interview complete','Wrapping up…');
-      // Finish when the goodbye audio drains; fallback timer if the buffer
-      // event never arrives on this browser.
-      setTimeout(finishInterview, 8000);
+      setTimeout(finishInterview, 8000);   // fallback if buffer.stopped never fires
     }else{
       if(skipNextCount){ skipNextCount = false; }
       else { questionsAsked++; }
       sendControlNote();
       orb('', '#8593AB'); setState('Your turn','Answer when ready');
     }
+  }else if(t==='output_audio_buffer.cleared'){
+    // The AI's queued audio was flushed by a barge-in — floor is the candidate's.
+    aiSpeaking = false;
   }else if(t==='output_audio_buffer.stopped'){
+    aiSpeaking = false;
     if(closingDone){ finishInterview(); }
     else if(!closing){ orb('', '#8593AB'); setState('Your turn','Answer when ready'); }
   }else if(t==='error'){
@@ -361,7 +388,9 @@ async function start(){
   hideErr(); manualStop=false;
   // read the recruiter-side config and reset all interview state
   cfgQuestions = $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
-  maxTurns = Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4));
+  maxTurns = Math.max(1, Math.min(8, parseInt($("cfg-turns").value)||4));
+  cfgVad = $("cfg-vad").value || "patient";
+  aiSpeaking = false; bargeIns = 0; $("barge-count").textContent = "0";
   questionsAsked = 0; skipNextCount = false; closing = false; closingDone = false;
   transcript = []; aiBuf = ''; worst = 0; recoveries = 0;
   turnHud();

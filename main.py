@@ -1445,44 +1445,73 @@ _VIVA_RECOVERY_TEMPLATE = (
 _MAX_RECOVERY_CHARS = 3000
 
 
-async def _mint_realtime_secret(instructions: str) -> dict:
+# L3 — endpointing presets. semantic_vad decides end-of-turn from WHAT was
+# said (finished thought vs mid-thought pause); server_vad is a plain silence
+# timer. The client sends a preset NAME only — raw turn-detection JSON from the
+# browser is never accepted into session config. All presets interrupt the
+# AI's speech when the candidate starts talking (barge-in).
+_VIVA_VAD_PRESETS = {
+    # patient: waits for a genuinely finished thought. Best default for
+    # interviews — candidates think between clauses. Costs some dead air.
+    "patient":  {"type": "semantic_vad", "eagerness": "low",
+                 "create_response": True, "interrupt_response": True},
+    # balanced: the model picks its own eagerness per utterance.
+    "balanced": {"type": "semantic_vad", "eagerness": "auto",
+                 "create_response": True, "interrupt_response": True},
+    # fast: raw 500ms silence timer — snappiest, but will cut off a thinker.
+    # Kept so the tradeoff can be FELT, not just described.
+    "fast":     {"type": "server_vad", "silence_duration_ms": 500,
+                 "create_response": True, "interrupt_response": True},
+}
+_VIVA_DEFAULT_VAD = "patient"
+
+
+async def _mint_realtime_secret(instructions: str, vad: str) -> dict:
     """Create an ephemeral Realtime secret with the given instructions.
 
-    Requests candidate-side transcription too, so the browser can log both
-    halves of the conversation for recovery context. If the API rejects that
-    config shape (400), retry without it — recovery still works from the AI-side
-    transcript alone; the candidate repeats their answer anyway, which is the
-    whole recovery UX.
+    Degrading cascade: full config (semantic VAD + input transcription) →
+    without turn_detection → bare. Each fallback loses polish, never the
+    interview: default server VAD still endpoints and still interrupts; missing
+    transcription only thins recovery context. A 400 naming the offending key
+    picks the right rung.
     """
     import httpx
-    base_session = {
-        "type": "realtime",
-        "model": VIVA_LIVE_MODEL,
-        "instructions": instructions,
-        "audio": {
-            "input": {"transcription": {"model": "gpt-4o-mini-transcribe"}},
-            "output": {"voice": "marin"},
-        },
-    }
+    turn_detection = _VIVA_VAD_PRESETS.get(vad, _VIVA_VAD_PRESETS[_VIVA_DEFAULT_VAD])
+
+    def session(with_td: bool, with_tx: bool) -> dict:
+        audio_in = {}
+        if with_tx:
+            audio_in["transcription"] = {"model": "gpt-4o-mini-transcribe"}
+        if with_td:
+            audio_in["turn_detection"] = turn_detection
+        s = {"type": "realtime", "model": VIVA_LIVE_MODEL,
+             "instructions": instructions,
+             "audio": {"output": {"voice": "marin"}}}
+        if audio_in:
+            s["audio"]["input"] = audio_in
+        return s
+
+    attempts = [session(True, True), session(False, True), session(False, False)]
     async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.post(
-            "https://api.openai.com/v1/realtime/client_secrets",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}",
-                     "Content-Type": "application/json"},
-            json={"session": base_session},
-        )
-        if r.status_code == 400 and "transcription" in r.text.lower():
-            fallback = {**base_session,
-                        "audio": {"output": {"voice": "marin"}}}
+        r = None
+        for i, sess in enumerate(attempts):
             r = await client.post(
                 "https://api.openai.com/v1/realtime/client_secrets",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}",
                          "Content-Type": "application/json"},
-                json={"session": fallback},
+                json={"session": sess},
             )
-    if r.status_code >= 400:
+            if r.status_code < 400:
+                break
+            # Only degrade on config-shape rejections; real errors surface as-is.
+            if not (r.status_code == 400 and
+                    ("turn_detection" in r.text.lower() or "semantic" in r.text.lower()
+                     or "transcription" in r.text.lower() or "eagerness" in r.text.lower())):
+                break
+            print(f"[VIVA-LIVE] mint attempt {i+1} rejected config, degrading: {r.text[:120]}")
+    if r is None or r.status_code >= 400:
         raise HTTPException(status_code=502,
-                            detail=f"Realtime mint failed ({r.status_code}): {r.text[:300]}")
+                            detail=f"Realtime mint failed ({r.status_code if r else '—'}): {(r.text if r else '')[:300]}")
     data = r.json()
     value = data.get("value") or (data.get("client_secret") or {}).get("value")
     if not value:
@@ -1536,6 +1565,7 @@ async def viva_live_token(request: Request):
         asked = max(0, min(max_turns, int(progress.get("asked", 0))))
     except Exception:
         asked = 0
+    vad = config.get("vad") if config.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD
 
     instructions = _build_live_instructions(questions, max_turns)
     recovered = False
@@ -1553,13 +1583,14 @@ async def viva_live_token(request: Request):
             recovered = True
 
     try:
-        out = await _mint_realtime_secret(instructions)
+        out = await _mint_realtime_secret(instructions, vad)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not reach OpenAI Realtime: {e}")
     out["recovered"] = recovered
     out["max_turns"] = max_turns   # server-clamped; the client HUD trusts this
+    out["vad"] = vad
     return out
 
 
