@@ -223,30 +223,63 @@ async function run(){
   rafReset();
   let faceMsSum=0, faceN=0, faceTimer=null;
   if(metrics.face_loaded===false) await loadFace();   // first call
-  if(detector){
-    const v=$('preview');
-    faceTimer = setInterval(()=>{
+  const v=$('preview');
+  function startFaceTimer(intervalMs, counter){
+    if(!detector) return null;
+    return setInterval(()=>{
       if(!v.videoWidth) return;
       const t=performance.now();
-      try{ detector.detectForVideo(v,t); faceMsSum+=performance.now()-t; faceN++; }catch(_){}
-    },500);
+      try{ detector.detectForVideo(v,t); faceMsSum+=performance.now()-t; faceN++; counter&&counter(); }catch(_){}
+    }, intervalMs);
   }
-  for(let s=1;s<=4;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(s*12.5)+'%'; }
+  faceTimer = startFaceTimer(500, null);
+  for(let s=1;s<=4;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(s*10)+'%'; }
   metrics.baseline_long_pct = +rafPct().toFixed(1);
   metrics.face_ms = faceN? +(faceMsSum/faceN).toFixed(0) : null;
+  clearInterval(faceTimer);
 
-  // Phase B (4–8s): ADD both continuous encoders — briefly living the Tier-S
-  // workload. You cannot certify a machine for continuous recording without
-  // running continuous recording; 4 seconds of it, slices discarded.
+  // Phase B (4–10s): the GENUINE Tier-S workload for 6 seconds — both
+  // continuous encoders AND face detection at the full 5 FPS S-rate.
+  // The first version of this burst measured only main-thread long frames and
+  // wrongly certified a machine that choked in the 10-minute spike: encoders
+  // run on their OWN threads, so encoder starvation is invisible to rAF. The
+  // tell is the recorder's timeslice cadence — a healthy encoder delivers a
+  // slice every ~1s; a starving one stretches past 1.5s. That gap is now a
+  // hard requirement for Tier S, per pipeline, alongside face throughput at
+  // the real S rate.
   rafReset();
+  faceMsSum=0; faceN=0;
+  let burstFaceCount=0;
+  faceTimer = startFaceTimer(200, ()=>{ burstFaceCount++; });   // 5 FPS — the S rate
   let camRec=null, scrRec=null;
+  let camLastSlice=performance.now(), scrLastSlice=performance.now();
+  let camMaxGap=0, scrMaxGap=0, camSlices=0, scrSlices=0;
   const mime=pickMime();
-  try{ camRec=new MediaRecorder(camStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000}); camRec.ondataavailable=()=>{}; camRec.start(1000); }catch(_){}
+  try{
+    camRec=new MediaRecorder(camStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+    camRec.ondataavailable=()=>{ const n=performance.now(); camMaxGap=Math.max(camMaxGap,n-camLastSlice); camLastSlice=n; camSlices++; };
+    camRec.start(1000);
+  }catch(_){}
   if(screenStream){
-    try{ scrRec=new MediaRecorder(screenStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000}); scrRec.ondataavailable=()=>{}; scrRec.start(1000); }catch(_){}
+    try{
+      scrRec=new MediaRecorder(screenStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+      scrRec.ondataavailable=()=>{ const n=performance.now(); scrMaxGap=Math.max(scrMaxGap,n-scrLastSlice); scrLastSlice=n; scrSlices++; };
+      scrRec.start(1000);
+    }catch(_){}
   }
-  for(let s=5;s<=8;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(s*12.5)+'%'; }
+  const burstSecs=6;
+  for(let s=1;s<=burstSecs;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(40+s*10)+'%'; }
+  // A recorder that produced NO slice in the window is worse than a slow one.
+  const nowB=performance.now();
+  camMaxGap=Math.max(camMaxGap, nowB-camLastSlice);
+  if(screenStream) scrMaxGap=Math.max(scrMaxGap, nowB-scrLastSlice);
   metrics.burst_long_pct = +rafPct().toFixed(1);
+  metrics.burst_face_fps = +(burstFaceCount/burstSecs).toFixed(1);
+  metrics.burst_face_ms  = faceN? +(faceMsSum/faceN).toFixed(0) : null;
+  metrics.burst_cam_max_gap_ms = Math.round(camMaxGap);
+  metrics.burst_scr_max_gap_ms = screenStream? Math.round(scrMaxGap) : null;
+  metrics.burst_cam_slices = camSlices;
+  metrics.burst_scr_slices = screenStream? scrSlices : null;
 
   // teardown
   rafOn=false; clearInterval(faceTimer);
@@ -261,15 +294,26 @@ async function run(){
 
 function decide(){
   // Tier thresholds — measured behaviour only. Worst-of rule.
+  // Tier S must pass EVERY continuous-workload requirement; a single starving
+  // pipeline fails it. The encoder slice-gap is the primary signal: it is the
+  // only one that sees the encoder threads, which rAF cannot.
+  const GAP_MAX = 1500;   // ms — a healthy 1s-timeslice encoder never stretches this far
   let tier, why;
+  const sReasons = [];
+  if(!metrics.screen_granted) sReasons.push('screen not shared — continuous tier requires it');
+  if(metrics.burst_cam_max_gap_ms > GAP_MAX) sReasons.push('camera encoder starving (slice gap '+metrics.burst_cam_max_gap_ms+'ms)');
+  if(metrics.burst_scr_max_gap_ms !== null && metrics.burst_scr_max_gap_ms > GAP_MAX) sReasons.push('screen encoder starving (slice gap '+metrics.burst_scr_max_gap_ms+'ms)');
+  if(metrics.burst_face_fps !== undefined && metrics.burst_face_fps < 4) sReasons.push('face detection below 4 FPS under full load ('+metrics.burst_face_fps+')');
+  if(metrics.burst_long_pct >= 5) sReasons.push('main-thread strain under burst ('+metrics.burst_long_pct+'%)');
+  if(metrics.face_ms === null || metrics.face_ms >= 40) sReasons.push('face inference above the full-tier bar');
+
   if(!metrics.face_loaded || metrics.baseline_long_pct>15 || (metrics.face_ms!==null && metrics.face_ms>150)){
     tier='W'; why = !metrics.face_loaded ? 'face detection could not load'
         : metrics.baseline_long_pct>15 ? 'main thread strained at baseline' : 'face inference too slow';
-  }else if(metrics.screen_granted && metrics.burst_long_pct<5 && metrics.face_ms!==null && metrics.face_ms<40){
-    tier='S'; why='handled the full continuous-recording workload cleanly';
+  }else if(sReasons.length === 0){
+    tier='S'; why='passed every continuous-workload requirement (encoder gaps, face throughput, main thread)';
   }else{
-    tier='M'; why = !metrics.screen_granted ? 'screen not shared — continuous tier requires it'
-        : metrics.burst_long_pct>=5 ? 'strain under the continuous-recording burst' : 'face inference above the full-tier bar';
+    tier='M'; why = sReasons.join('; ');
   }
   metrics.tier = tier; metrics.tier_reason = why;
 
