@@ -131,7 +131,23 @@ async function loadDetail(id){
     <span>${s.recoveries||0} network drop(s) survived</span>
     <span>${s.barge_ins||0} barge-in(s)</span>
     <span>patience: ${esc((s.config&&s.config.vad)||'—')}</span>
-    <span>${s.status}</span></div>
+    <span>${s.status}</span></div>`;
+
+  // Proctoring coverage timeline — reduced coverage must never look clean.
+  const pr = s.proctoring;
+  if(pr && pr.enabled){
+    const mmss = t => Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
+    html += `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Proctoring coverage</div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.7rem .9rem;font-size:.83rem;color:var(--t2);line-height:1.7">`;
+    html += (pr.coverage_segments||[]).map(cs =>
+      `<div><b style="font-variant-numeric:tabular-nums">${mmss(cs.t)}</b> — ${esc(cs.change)}<span style="color:var(--t3)"> · ${esc(cs.reason)}</span></div>`).join('')
+      || '<div>No coverage events recorded.</div>';
+    html += `<div style="margin-top:.4rem;color:var(--t3)">ended: camera ${esc(pr.final_cam||'—')}, screen ${esc(pr.final_scr||'—')} · ${pr.snapshots||0} snapshot(s) · ${((pr.cam_bytes+pr.scr_bytes)/1048576).toFixed(1)} MB recorded</div>
+    </div>`;
+  }else if(pr){
+    html += `<div class="evrow" style="margin-bottom:.6rem"><span style="color:var(--t3)">Proctoring: off for this session</span></div>`;
+  }
+  html += `
   <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
   html += (s.transcript||[]).map(t => `
     <div class="turn ${t.role==='ai'?'ai':'you'}">

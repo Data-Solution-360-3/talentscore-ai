@@ -97,6 +97,31 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
           <option value="balanced">Balanced — auto</option>
           <option value="fast">Fast — 500ms silence (will cut off thinkers)</option>
         </select>
+        <div style="margin-top:.6rem">
+          <label style="font-size:12px;font-weight:600;color:var(--t2)">Proctoring</label>
+          <select id="cfg-proc" style="margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:600">
+            <option value="off" selected>Off</option>
+            <option value="S">Continuous (Tier S) — camera + screen recording</option>
+            <option value="M">Snapshot (Tier M) — periodic captures</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="proc-panel" class="hidden" style="margin-top:.8rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.8rem .9rem">
+        <div style="display:flex;align-items:center;gap:10px">
+          <video id="proc-cam" playsinline muted autoplay style="width:96px;aspect-ratio:4/3;border-radius:var(--r-md);background:#0b1a30;object-fit:cover"></video>
+          <div style="flex:1;font-size:12px;color:var(--t2);line-height:1.7">
+            <div>Camera: <b id="proc-cam-st">—</b></div>
+            <div>Screen: <b id="proc-scr-st">—</b></div>
+            <div>Audio concealment: <b id="proc-conceal">0.00%</b> <span style="color:var(--t3)">(must stay ~0 through any downgrade)</span></div>
+          </div>
+          <img id="proc-thumb" class="hidden" style="width:72px;border-radius:var(--r-md);border:1px solid var(--border2)" alt="last snapshot">
+        </div>
+        <button id="btn-sim" type="button" class="hidden"
+          style="margin-top:.6rem;width:100%;padding:9px;border-radius:var(--r-md);border:1.5px solid rgba(220,38,38,.4);background:rgba(220,38,38,.06);color:#B91C1C;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer">
+          🔥 Simulate thermal load (inject +2s encoder gaps)</button>
+        <video id="proc-scr-hidden" playsinline muted autoplay class="hidden"></video>
+        <canvas id="proc-canvas" class="hidden"></canvas>
       </div>
 
       <div class="orb" id="orb">
@@ -185,6 +210,205 @@ function sendControlNote(){
 
 let sessionSaved = false, startedAtMs = 0;
 
+// ═════════════════════════════════════════════════════════════
+// PROCTORING (phase 2) — recorders + the LIVE WATCHDOG.
+// Prediction is dead; observation governs. Recorders capture in-memory
+// (slices counted, DISCARDED — R2 storage is a later phase). The watchdog
+// samples every 2s and downgrades the STARVING pipeline mid-interview:
+//   - any slice gap >= 2500ms            -> immediate downgrade
+//   - two gaps >= 1500ms within 10s      -> downgrade (debounced: one long
+//     gap can be a GC pause; two is a trend)
+//   - audio concealment > 0.5%           -> shed the heaviest remaining rung
+// One-way ratchet — no upgrades mid-interview. AUDIO IS NEVER ON THE LADDER:
+// recorders bind to local streams on their own threads; the downgrade stops
+// a recorder and starts a snapshot timer, and cannot touch the voice path.
+// Every transition lands in coverage_segments with timestamp + measured
+// reason, so reduced coverage is never mistaken for a clean result.
+// ?sim=1 shows a button that injects +2000ms into measured gaps — the same
+// trip-the-breaker discipline as the spend-cap test.
+// ═════════════════════════════════════════════════════════════
+let proc = null;
+const SIM = new URLSearchParams(location.search).get('sim') === '1';
+
+function covPush(change, reason){
+  const t = Math.round((Date.now() - proc.startMs)/1000);
+  proc.coverage.push({t, change, reason});
+  log('COVERAGE @'+t+'s: '+change+' — '+reason);
+}
+
+function procStatus(){
+  $('proc-cam-st').textContent = !proc ? '—'
+    : proc.camMode==='continuous' ? 'continuous ('+(proc.camBytes/1048576).toFixed(1)+' MB)'
+    : proc.camMode==='snapshots' ? 'snapshots ('+proc.snapshots+' taken)' : 'off';
+  $('proc-scr-st').textContent = !proc ? '—'
+    : proc.scrMode==='continuous' ? 'continuous ('+(proc.scrBytes/1048576).toFixed(1)+' MB)'
+    : proc.scrMode==='snapshots' ? 'snapshots ('+proc.scrSnaps+' taken)'
+    : proc.scrMode==='unavailable' ? 'not shared' : 'off';
+}
+
+async function procStart(mode){
+  proc = {mode, camMode:'off', scrMode:'off', camStream:null, scrStream:null,
+    camRec:null, scrRec:null, camBytes:0, scrBytes:0, snapshots:0, scrSnaps:0,
+    camLastSlice:0, scrLastSlice:0, camMaxGap:0, scrMaxGap:0,
+    camBad:[], scrBad:[], camGrace:0, scrGrace:0,
+    snapTimer:null, scrSnapTimer:null, watchTimer:null,
+    coverage:[], startMs:Date.now(), simLoad:false,
+    concealPrev:0, samplesPrev:0, concealPct:0, pcRef:null};
+
+  $('proc-panel').classList.remove('hidden');
+  if(SIM){ $('btn-sim').classList.remove('hidden'); }
+
+  try{
+    proc.camStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:15}}});
+    $('proc-cam').srcObject = proc.camStream;
+  }catch(e){
+    covPush('camera unavailable', 'permission denied or no camera');
+    proc.camMode = 'unavailable'; procStatus(); return;
+  }
+
+  if(mode==='S'){
+    try{
+      proc.scrStream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:5}}});
+      $('proc-scr-hidden').srcObject = proc.scrStream;
+      proc.scrStream.getVideoTracks()[0].addEventListener('ended', ()=>{
+        if(proc && proc.scrMode!=='off'){ proc.scrMode='unavailable'; covPush('screen share stopped','stopped by candidate'); procStatus(); }
+      });
+    }catch(e){
+      covPush('screen declined', 'starting as Tier M for screen');
+    }
+  }
+
+  const mime = (function(){ for(const c of ['video/webm;codecs=vp8','video/webm','video/mp4'])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(c)) return c; return ''; })();
+
+  if(mode==='S'){
+    try{
+      proc.camRec = new MediaRecorder(proc.camStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+      proc.camLastSlice = performance.now(); proc.camGrace = performance.now()+5000;
+      proc.camRec.ondataavailable = ev=>{ const n=performance.now();
+        proc.camMaxGap=Math.max(proc.camMaxGap, n-proc.camLastSlice); proc.camLastSlice=n;
+        proc.camBytes += (ev.data&&ev.data.size)||0; };   // counted, discarded
+      proc.camRec.start(1000); proc.camMode='continuous';
+    }catch(e){ proc.camMode='snapshots'; startCamSnapshots(); }
+    if(proc.scrStream){
+      try{
+        proc.scrRec = new MediaRecorder(proc.scrStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+        proc.scrLastSlice = performance.now(); proc.scrGrace = performance.now()+5000;
+        proc.scrRec.ondataavailable = ev=>{ const n=performance.now();
+          proc.scrMaxGap=Math.max(proc.scrMaxGap, n-proc.scrLastSlice); proc.scrLastSlice=n;
+          proc.scrBytes += (ev.data&&ev.data.size)||0; };
+        proc.scrRec.start(1000); proc.scrMode='continuous';
+      }catch(e){ proc.scrMode='snapshots'; startScrSnapshots(); }
+    }else{ proc.scrMode='unavailable'; }
+    covPush('start', 'tier S — continuous camera'+(proc.scrMode==='continuous'?' + screen':' (screen '+proc.scrMode+')'));
+  }else{
+    proc.camMode='snapshots'; startCamSnapshots();
+    proc.scrMode='unavailable';
+    covPush('start', 'tier M — camera snapshots');
+  }
+  procStatus();
+  proc.watchTimer = setInterval(watchdog, 2000);
+}
+
+function grabFrame(videoEl){
+  const c=$('proc-canvas'); if(!videoEl.videoWidth) return null;
+  c.width=320; c.height=Math.round(320*videoEl.videoHeight/videoEl.videoWidth);
+  c.getContext('2d').drawImage(videoEl,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.6);   // captured, shown, DISCARDED (no R2 yet)
+}
+function startCamSnapshots(){
+  proc.snapTimer = setInterval(()=>{
+    const d=grabFrame($('proc-cam')); if(!d) return;
+    proc.snapshots++; $('proc-thumb').src=d; $('proc-thumb').classList.remove('hidden');
+    procStatus();
+  }, 15000);
+}
+function startScrSnapshots(){
+  proc.scrSnapTimer = setInterval(()=>{
+    const d=grabFrame($('proc-scr-hidden')); if(!d) return;
+    proc.scrSnaps++; procStatus();
+  }, 20000);
+}
+
+function downgradeScreen(reason){
+  if(proc.scrMode!=='continuous') return;
+  try{ proc.scrRec && proc.scrRec.state!=='inactive' && proc.scrRec.stop(); }catch(_){}
+  proc.scrRec=null; proc.scrMode='snapshots'; startScrSnapshots();
+  covPush('screen: continuous → snapshots', reason); procStatus();
+}
+function downgradeCam(reason){
+  if(proc.camMode!=='continuous') return;
+  try{ proc.camRec && proc.camRec.state!=='inactive' && proc.camRec.stop(); }catch(_){}
+  proc.camRec=null; proc.camMode='snapshots'; startCamSnapshots();
+  covPush('camera: continuous → snapshots', reason); procStatus();
+}
+
+function gapCheck(which){
+  // effective gap = worst recorded gap this window, or silence since the last
+  // slice (a recorder that stopped delivering entirely is the worst case).
+  const now=performance.now();
+  const last = which==='cam'? proc.camLastSlice : proc.scrLastSlice;
+  const rec  = which==='cam'? proc.camRec : proc.scrRec;
+  const grace= which==='cam'? proc.camGrace : proc.scrGrace;
+  if(!rec || now < grace) return;
+  let gap = Math.max(which==='cam'? proc.camMaxGap : proc.scrMaxGap, now-last);
+  if(proc.simLoad) gap += 2000;                    // the debug injection
+  if(which==='cam') proc.camMaxGap=0; else proc.scrMaxGap=0;
+  const gapS = (gap/1000).toFixed(1)+'s'+(proc.simLoad?' (simulated)':'');
+  const down = which==='cam'? downgradeCam : downgradeScreen;
+  if(gap >= 2500){ down((which==='cam'?'camera':'screen')+' encoder gap '+gapS); return; }
+  if(gap >= 1500){
+    const bad = which==='cam'? proc.camBad : proc.scrBad;
+    bad.push(now);
+    const recent = bad.filter(t => now-t <= 10000);
+    if(which==='cam') proc.camBad=recent; else proc.scrBad=recent;
+    if(recent.length >= 2) down((which==='cam'?'camera':'screen')+' encoder gaps '+gapS+' twice in 10s');
+  }
+}
+
+async function watchdog(){
+  if(!proc) return;
+  gapCheck('scr'); gapCheck('cam');
+  // audio concealment from the LIVE session pc — the veto signal. Re-baseline
+  // when L1 recovery swaps the peer connection.
+  if(pc && pc.connectionState==='connected'){
+    if(proc.pcRef !== pc){ proc.pcRef=pc; proc.concealPrev=0; proc.samplesPrev=0; }
+    try{
+      const stats = await pc.getStats();
+      stats.forEach(s=>{
+        if(s.type==='inbound-rtp' && s.kind==='audio'){
+          const dC=(s.concealedSamples||0)-proc.concealPrev, dT=(s.totalSamplesReceived||0)-proc.samplesPrev;
+          proc.concealPrev=s.concealedSamples||0; proc.samplesPrev=s.totalSamplesReceived||0;
+          proc.concealPct = dT? +(dC/dT*100).toFixed(2) : 0;
+          $('proc-conceal').textContent = proc.concealPct.toFixed(2)+'%';
+          $('proc-conceal').style.color = proc.concealPct>0.5? 'var(--red)' : 'var(--green)';
+        }
+      });
+      if(proc.concealPct > 0.5){
+        // audio is threatened — shed the heaviest remaining rung immediately
+        if(proc.scrMode==='continuous') downgradeScreen('audio concealment '+proc.concealPct+'% — shedding for the interview');
+        else if(proc.camMode==='continuous') downgradeCam('audio concealment '+proc.concealPct+'% — shedding for the interview');
+      }
+    }catch(_){}
+  }
+}
+
+function procStop(){
+  if(!proc) return null;
+  clearInterval(proc.watchTimer); clearInterval(proc.snapTimer); clearInterval(proc.scrSnapTimer);
+  try{ proc.camRec && proc.camRec.state!=='inactive' && proc.camRec.stop(); }catch(_){}
+  try{ proc.scrRec && proc.scrRec.state!=='inactive' && proc.scrRec.stop(); }catch(_){}
+  try{ proc.camStream && proc.camStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  try{ proc.scrStream && proc.scrStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  const summary = {enabled:true, start_tier:proc.mode,
+    coverage_segments:proc.coverage,
+    cam_bytes:proc.camBytes, scr_bytes:proc.scrBytes,
+    snapshots:proc.snapshots + proc.scrSnaps,
+    final_cam:proc.camMode, final_scr:proc.scrMode};
+  proc = null;
+  return summary;
+}
+
 async function saveSession(status){
   // L4: persist the interview (transcript + config + events) and let the
   // server score it in the background. Fire-and-forget — a failed save is
@@ -200,7 +424,8 @@ async function saveSession(status){
         config: {questions: cfgQuestions, max_turns: maxTurns, vad: cfgVad},
         questions_asked: questionsAsked,
         recoveries, barge_ins: bargeIns,
-        duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000) : 0
+        duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000) : 0,
+        proctoring: window._procSummary || {enabled:false}
       })
     });
     const d = await r.json().catch(()=>({}));
@@ -212,6 +437,7 @@ async function saveSession(status){
 function finishInterview(){
   if(manualStop) return;
   manualStop = true;           // no resume attempts on our own teardown
+  window._procSummary = procStop();
   saveSession('completed');    // before any state is cleared
   cleanup(); recon(false);
   orb('', '#8593AB');
@@ -423,6 +649,11 @@ async function start(){
   transcript = []; aiBuf = ''; worst = 0; recoveries = 0;
   turnHud();
   $('btn-start').disabled=true;
+  const procMode = $('cfg-proc').value;
+  if(procMode !== 'off'){
+    setState('Setting up monitoring…','Allow camera'+(procMode==='S'?' and screen':''));
+    await procStart(procMode);
+  }
   setState('Connecting…','Minting a secure session');
   try{
     await connect();
@@ -462,6 +693,7 @@ function cleanup(){
 }
 function end(){
   manualStop=true;
+  window._procSummary = procStop();
   saveSession('abandoned');   // before the transcript is cleared
   cleanup(); recon(false);
   orb('', '#8593AB');
@@ -477,7 +709,16 @@ window.addEventListener('load', ()=>{
   $('btn-end').addEventListener('click', end);
 });
 window.addEventListener('online', ()=>{ log('browser online event'); if(!manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online event'); });
-window.addEventListener('pagehide', cleanup);
+window.addEventListener('pagehide', ()=>{ procStop(); cleanup(); });
+document.addEventListener('DOMContentLoaded', ()=>{});
+window.addEventListener('load', ()=>{
+  $('btn-sim') && $('btn-sim').addEventListener('click', ()=>{
+    if(!proc){ log('sim: start an interview with proctoring on first'); return; }
+    proc.simLoad = !proc.simLoad;
+    $('btn-sim').textContent = proc.simLoad ? '🔥 Simulated load ON — watchdog should fire within ~4-10s' : '🔥 Simulate thermal load (inject +2s encoder gaps)';
+    log('SIM LOAD '+(proc.simLoad?'ON':'OFF'));
+  });
+});
 </script>
 </body>
 </html>

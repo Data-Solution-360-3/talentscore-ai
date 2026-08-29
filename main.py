@@ -1678,6 +1678,30 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
         "status": status,
         "score_status": "pending",
     }
+
+    # Proctoring summary (phase 2) — coverage segments are the honesty artifact:
+    # every mid-interview downgrade with timestamp + measured reason, so reduced
+    # coverage is never mistaken for a clean result. Validated and capped.
+    p = body.get("proctoring")
+    if isinstance(p, dict) and p.get("enabled"):
+        segs = []
+        for s in (p.get("coverage_segments") or [])[:50]:
+            if isinstance(s, dict):
+                segs.append({"t": _i(s.get("t"), 0, 86400),
+                             "change": str(s.get("change", ""))[:80],
+                             "reason": str(s.get("reason", ""))[:200]})
+        doc["proctoring"] = {
+            "enabled": True,
+            "start_tier": str(p.get("start_tier", ""))[:4],
+            "coverage_segments": segs,
+            "cam_bytes": _i(p.get("cam_bytes"), 0, 2_000_000_000),
+            "scr_bytes": _i(p.get("scr_bytes"), 0, 2_000_000_000),
+            "snapshots": _i(p.get("snapshots"), 0, 10000),
+            "final_cam": str(p.get("final_cam", ""))[:20],
+            "final_scr": str(p.get("final_scr", ""))[:20],
+        }
+    else:
+        doc["proctoring"] = {"enabled": False}
     session_id = await save_interview_session(doc)
     background.add_task(score_live_session, session_id)
     return {"success": True, "session_id": session_id}
