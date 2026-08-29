@@ -61,6 +61,7 @@ async def main():
             written_questions=[
                 "Describe a time you had to explain a technical problem to a non-technical person. How did you do it?",
                 "You are given a task with an unclear requirement and a tight deadline. What do you do first, and why?",
+                "Tell us about a mistake you made at work. What happened, and what did you change afterwards?",
             ])
         # Tag it so --list / --delete-tests can find only script-made records.
         await db.interviews.update_one({"_id": __import__("bson").ObjectId(iv["_id"])},
