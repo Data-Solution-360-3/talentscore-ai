@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P0 load spike — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--orange:#F57C2E;--orange2:#E16A1F;
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;--border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy)}
+.tb-tag{margin-left:auto;font-size:11px;color:var(--t3);font-weight:700;background:var(--s2);padding:3px 9px;border-radius:var(--r-pill)}
+.wrap{max-width:680px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.35rem;margin-bottom:1rem}
+h1{font-size:1.25rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:.35rem}
+.lede{font-size:.9rem;color:var(--t2);line-height:1.6}
+.note{font-size:.8rem;color:var(--t3);line-height:1.55;margin-top:.6rem}
+.pipes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:1rem 0}
+.pipe{display:flex;gap:8px;align-items:center;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.7rem .8rem;font-size:.85rem;font-weight:600;color:var(--t2)}
+.pipe input{width:16px;height:16px;cursor:pointer}
+.controls{display:flex;gap:10px;margin-top:.5rem}
+.btn{flex:1;padding:14px;border-radius:var(--r-lg);font-size:15px;font-weight:800;font-family:inherit;border:none;cursor:pointer}
+.btn-go{background:var(--orange);color:#fff;box-shadow:0 6px 18px rgba(245,124,46,.3)}
+.btn-go:hover:not(:disabled){background:var(--orange2)}
+.btn-end{background:var(--navy);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hidden{display:none!important}
+.verdict{border-radius:var(--r-lg);padding:.85rem 1rem;font-weight:800;font-size:.95rem;text-align:center;margin-bottom:.9rem;display:none}
+.verdict.on{display:block}
+.v-good{background:rgba(22,163,74,.1);color:var(--green);border:1px solid rgba(22,163,74,.3)}
+.v-warn{background:rgba(217,119,6,.1);color:var(--amber);border:1px solid rgba(217,119,6,.3)}
+.v-bad{background:rgba(220,38,38,.08);color:var(--red);border:1px solid rgba(220,38,38,.3)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);padding:.35rem .4rem;border-bottom:1px solid var(--border)}
+td{padding:.45rem .4rem;border-bottom:1px solid var(--border);color:var(--t2)}
+td b{font-variant-numeric:tabular-nums;font-size:.95rem}
+.g{color:var(--green)}.a{color:var(--amber)}.r{color:var(--red)}
+.vids{display:flex;gap:8px;margin-top:.9rem}
+.vids video{width:50%;border-radius:var(--r-md);background:#0b1a30;aspect-ratio:4/3;object-fit:cover}
+.log{margin-top:.9rem;font-size:11px;font-family:ui-monospace,monospace;background:#0b1a30;color:#9fb3c8;border-radius:var(--r-md);padding:.6rem .7rem;max-height:120px;overflow-y:auto;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Proctoring · P0 load spike</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h1>P0 — can this laptop run all four at once?</h1>
+    <p class="lede">Runs <b>WebRTC audio</b> (loopback — real Opus encode/decode), <b>camera recording</b>, <b>screen recording</b>, and <b>MediaPipe face detection</b> (throttled ~8 FPS) simultaneously, and measures whether the audio pipeline starves. Recordings are counted and <b>discarded</b> — nothing uploads, nothing is stored, nothing costs money.</p>
+    <p class="note">Audio here is loopback: the encode/decode CPU load is real, the network leg is not. The final protocol step pairs this page with a real live interview in a second tab.</p>
+
+    <div class="pipes">
+      <label class="pipe"><input type="checkbox" id="p-audio" checked> WebRTC audio (loopback)</label>
+      <label class="pipe"><input type="checkbox" id="p-cam" checked> Camera recording</label>
+      <label class="pipe"><input type="checkbox" id="p-screen" checked> Screen recording</label>
+      <label class="pipe"><input type="checkbox" id="p-face" checked> Face detection ~8 FPS</label>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-go" id="btn-start" type="button">Start spike</button>
+      <button class="btn btn-end hidden" id="btn-stop" type="button">Stop &amp; summarize</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="verdict" id="verdict"></div>
+    <table>
+      <tr><th>Metric</th><th>Now</th><th>Worst</th><th>Fine / Choking</th></tr>
+      <tr><td>Elapsed</td><td><b id="m-time">—</b></td><td></td><td>run 10 min</td></tr>
+      <tr><td><b>Audio concealment</b> (stutter)</td><td><b id="m-conceal">—</b></td><td><b id="w-conceal">—</b></td><td class="note">&lt;0.5% / &gt;2%</td></tr>
+      <tr><td>Concealment events /s</td><td><b id="m-cev">—</b></td><td><b id="w-cev">—</b></td><td class="note">≈0 / &gt;5</td></tr>
+      <tr><td>Main-thread long frames</td><td><b id="m-long">—</b></td><td><b id="w-long">—</b></td><td class="note">&lt;5% / &gt;20%</td></tr>
+      <tr><td>UI frame rate</td><td><b id="m-fps">—</b></td><td><b id="w-fps">—</b></td><td class="note">&gt;30 / &lt;15</td></tr>
+      <tr><td>Camera encoder</td><td><b id="m-cam">—</b></td><td><b id="w-cam">—</b></td><td class="note">steady ~1s slices / gaps &gt;2.5s</td></tr>
+      <tr><td>Screen encoder</td><td><b id="m-scr">—</b></td><td><b id="w-scr">—</b></td><td class="note">steady ~1s slices / gaps &gt;2.5s</td></tr>
+      <tr><td>Face detection</td><td><b id="m-face">—</b></td><td><b id="w-face">—</b></td><td class="note">≥6 FPS / &lt;3 FPS</td></tr>
+    </table>
+    <div class="vids">
+      <video id="cam-view" playsinline muted autoplay></video>
+      <video id="screen-view" playsinline muted autoplay></video>
+    </div>
+    <div class="log" id="log">ready.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = m => { const el=$('log'); el.innerHTML += '<br>'+m; el.scrollTop=el.scrollHeight; };
+const fmtT = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+
+let running=false, t0=0, tick=null;
+let pc1=null, pc2=null, micStream=null, camStream=null, screenStream=null;
+let camRec=null, scrRec=null, faceTimer=null, detector=null;
+let camBytes=0, scrBytes=0, camLast=0, scrLast=0, camMaxGap=0, scrMaxGap=0;
+let faceCount=0, faceWindow=0, faceMsSum=0, faceFps=0, faceMs=0;
+let concealPrev=0, samplesPrev=0, cevPrev=0;
+let worst={conceal:0, cev:0, longp:0, fps:999, camGap:0, scrGap:0, faceFps:999};
+let frames=0, longFrames=0, lastRaf=0;
+
+function cls(v, warn, bad, invert){
+  if(invert) return v<=bad?'r':v<=warn?'a':'g';
+  return v>=bad?'r':v>=warn?'a':'g';
+}
+function setM(id, txt, klass){ const el=$(id); el.textContent=txt; el.className=klass||''; }
+
+// ── pipeline 1: loopback WebRTC audio — real Opus encode/decode in-page.
+// inbound-rtp concealedSamples = the audio system admitting it starved.
+async function startAudio(){
+  micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});
+  pc1 = new RTCPeerConnection(); pc2 = new RTCPeerConnection();
+  pc1.onicecandidate = e => e.candidate && pc2.addIceCandidate(e.candidate);
+  pc2.onicecandidate = e => e.candidate && pc1.addIceCandidate(e.candidate);
+  const sink = new Promise(res => { pc2.ontrack = e => res(e.streams[0]); });
+  micStream.getTracks().forEach(t => pc1.addTrack(t, micStream));
+  const offer = await pc1.createOffer(); await pc1.setLocalDescription(offer);
+  await pc2.setRemoteDescription(offer);
+  const answer = await pc2.createAnswer(); await pc2.setLocalDescription(answer);
+  await pc1.setRemoteDescription(answer);
+  const remote = await sink;
+  // keep the decode path fully live, muted so there is no feedback loop
+  const a = new Audio(); a.srcObject = remote; a.muted = true; a.play().catch(()=>{});
+  log('audio loopback up (Opus encode+decode live)');
+}
+
+function pickMime(){
+  for(const c of ['video/webm;codecs=vp8','video/webm','video/mp4']){
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return '';
+}
+
+// ── pipeline 2: camera recording — encoded, counted, DISCARDED.
+async function startCam(){
+  camStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:24}}});
+  $('cam-view').srcObject = camStream;
+  const m = pickMime();
+  camRec = new MediaRecorder(camStream, m?{mimeType:m, videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+  camLast = performance.now();
+  camRec.ondataavailable = ev => {
+    const now = performance.now();
+    camMaxGap = Math.max(camMaxGap, now-camLast); camLast = now;
+    camBytes += (ev.data && ev.data.size) || 0;   // counted, then dropped
+  };
+  camRec.start(1000);
+  log('camera recorder up (1 Mbps, slices discarded)');
+}
+
+// ── pipeline 3: screen recording — encoded, counted, DISCARDED.
+async function startScreen(){
+  screenStream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:10}}});
+  $('screen-view').srcObject = screenStream;
+  const surf = screenStream.getVideoTracks()[0].getSettings().displaySurface || '?';
+  const m = pickMime();
+  scrRec = new MediaRecorder(screenStream, m?{mimeType:m, videoBitsPerSecond:1_500_000}:{videoBitsPerSecond:1_500_000});
+  scrLast = performance.now();
+  scrRec.ondataavailable = ev => {
+    const now = performance.now();
+    scrMaxGap = Math.max(scrMaxGap, now-scrLast); scrLast = now;
+    scrBytes += (ev.data && ev.data.size) || 0;
+  };
+  scrRec.start(1000);
+  screenStream.getVideoTracks()[0].addEventListener('ended', ()=> log('screen share stopped by user'));
+  log('screen recorder up (surface: '+surf+', 1.5 Mbps, slices discarded)');
+}
+
+// ── pipeline 4: MediaPipe face detection, throttled ~8 FPS.
+async function startFace(){
+  try{
+    const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
+    const vision = await mp.FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
+    detector = await mp.FaceDetector.createFromOptions(vision, {
+      baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'},
+      runningMode:'VIDEO'});
+    const v = $('cam-view');
+    faceTimer = setInterval(()=>{
+      if(!v.videoWidth) return;
+      const t = performance.now();
+      try{
+        const res = detector.detectForVideo(v, t);
+        faceMsSum += performance.now()-t; faceWindow++;
+        faceCount = (res.detections||[]).length;
+      }catch(e){ log('face detect err: '+(e.message||e).toString().slice(0,60)); }
+    }, 125);   // ~8 FPS target
+    log('face detection up (~8 FPS target, blaze_face short-range)');
+  }catch(e){
+    log('FACE PIPELINE FAILED TO LOAD: '+(e.message||e).toString().slice(0,90));
+    setM('m-face','load failed','r');
+  }
+}
+
+// ── metrics loop ─────────────────────────────────────────────
+function rafLoop(ts){
+  if(!running) return;
+  if(lastRaf){ frames++; if(ts-lastRaf > 50) longFrames++; }
+  lastRaf = ts;
+  requestAnimationFrame(rafLoop);
+}
+
+async function sample(){
+  const el = (performance.now()-t0)/1000;
+  setM('m-time', fmtT(el));
+
+  // audio health from the receiving peer's stats
+  if(pc2){
+    try{
+      const stats = await pc2.getStats();
+      stats.forEach(s => {
+        if(s.type==='inbound-rtp' && s.kind==='audio'){
+          const conceal = s.concealedSamples||0, total = s.totalSamplesReceived||0, cev = s.concealmentEvents||0;
+          const dC = conceal-concealPrev, dT = total-samplesPrev, dE = cev-cevPrev;
+          concealPrev=conceal; samplesPrev=total; cevPrev=cev;
+          const pct = dT? (dC/dT*100) : 0;
+          worst.conceal = Math.max(worst.conceal, pct);
+          worst.cev = Math.max(worst.cev, dE);
+          setM('m-conceal', pct.toFixed(2)+'%', cls(pct,0.5,2));
+          setM('w-conceal', worst.conceal.toFixed(2)+'%', cls(worst.conceal,0.5,2));
+          setM('m-cev', String(dE), cls(dE,1,5));
+          setM('w-cev', String(worst.cev), cls(worst.cev,1,5));
+        }
+      });
+    }catch(_){}
+  }
+
+  // main thread
+  const longp = frames? (longFrames/frames*100) : 0;
+  const fps = frames; frames=0; longFrames=0;
+  worst.longp = Math.max(worst.longp, longp);
+  worst.fps = Math.min(worst.fps, fps||worst.fps);
+  setM('m-long', longp.toFixed(0)+'%', cls(longp,5,20));
+  setM('w-long', worst.longp.toFixed(0)+'%', cls(worst.longp,5,20));
+  setM('m-fps', fps+' fps', cls(fps,30,15,true));
+  setM('w-fps', (worst.fps===999?'—':worst.fps+' fps'), cls(worst.fps,30,15,true));
+
+  // recorders
+  if(camRec){
+    const kbps = Math.round(camBytes*8/1000); camBytes=0;
+    worst.camGap = Math.max(worst.camGap, camMaxGap);
+    setM('m-cam', kbps+' kbps', cls(camMaxGap,1500,2500));
+    setM('w-cam', 'gap '+(worst.camGap/1000).toFixed(1)+'s', cls(worst.camGap,1500,2500));
+    camMaxGap=0;
+  }
+  if(scrRec){
+    const kbps = Math.round(scrBytes*8/1000); scrBytes=0;
+    worst.scrGap = Math.max(worst.scrGap, scrMaxGap);
+    setM('m-scr', kbps+' kbps', cls(scrMaxGap,1500,2500));
+    setM('w-scr', 'gap '+(worst.scrGap/1000).toFixed(1)+'s', cls(worst.scrGap,1500,2500));
+    scrMaxGap=0;
+  }
+
+  // face
+  if(detector){
+    faceFps = faceWindow; faceMs = faceWindow? (faceMsSum/faceWindow) : 0;
+    faceWindow=0; faceMsSum=0;
+    worst.faceFps = Math.min(worst.faceFps, faceFps||worst.faceFps);
+    setM('m-face', faceFps+' FPS · '+faceMs.toFixed(0)+'ms · '+faceCount+' face(s)', cls(faceFps,6,3,true));
+    setM('w-face', (worst.faceFps===999?'—':worst.faceFps+' FPS'), cls(worst.faceFps,6,3,true));
+  }
+
+  verdict();
+}
+
+function verdict(){
+  const v = $('verdict'); v.classList.add('on');
+  const bad = worst.conceal>2 || worst.cev>5 || worst.longp>20 || (worst.fps!==999&&worst.fps<15)
+              || worst.camGap>2500 || worst.scrGap>2500 || (worst.faceFps!==999&&worst.faceFps<3);
+  const warn = worst.conceal>0.5 || worst.cev>1 || worst.longp>5
+              || worst.camGap>1500 || worst.scrGap>1500 || (worst.faceFps!==999&&worst.faceFps<6);
+  if(bad){ v.className='verdict on v-bad'; v.textContent='CHOKING — this machine cannot run all four without degrading audio. Proctoring must shed load on hardware like this.'; }
+  else if(warn){ v.className='verdict on v-warn'; v.textContent='MARGINAL — running, but with visible strain. Expect trouble on anything weaker.'; }
+  else { v.className='verdict on v-good'; v.textContent='FINE — all four pipelines coexisting with no audio starvation.'; }
+}
+
+async function start(){
+  $('btn-start').disabled = true;
+  try{
+    if($('p-audio').checked) await startAudio();
+    if($('p-cam').checked)   await startCam();
+    if($('p-screen').checked)await startScreen();
+    if($('p-face').checked && $('p-cam').checked) await startFace();
+    else if($('p-face').checked) log('face detection needs the camera pipeline — enable both');
+  }catch(e){
+    log('START FAILED: '+(e.message||e));
+    $('btn-start').disabled=false; stop(); return;
+  }
+  running = true; t0 = performance.now();
+  requestAnimationFrame(rafLoop);
+  tick = setInterval(sample, 1000);
+  $('btn-start').classList.add('hidden');
+  $('btn-stop').classList.remove('hidden');
+  log('spike running — target 10 minutes. Watch OS Task Manager for true CPU%.');
+}
+
+function stop(){
+  running=false;
+  clearInterval(tick); clearInterval(faceTimer);
+  try{ camRec && camRec.state!=='inactive' && camRec.stop(); }catch(_){}
+  try{ scrRec && scrRec.state!=='inactive' && scrRec.stop(); }catch(_){}
+  [micStream,camStream,screenStream].forEach(s=>{ try{ s && s.getTracks().forEach(t=>t.stop()); }catch(_){}});
+  try{ pc1&&pc1.close(); pc2&&pc2.close(); }catch(_){}
+  try{ detector && detector.close(); }catch(_){}
+  pc1=pc2=micStream=camStream=screenStream=camRec=scrRec=detector=null;
+  const el=(performance.now()-t0)/1000;
+  log('STOPPED at '+fmtT(el)+' — worst: conceal '+worst.conceal.toFixed(2)+'%, cev '+worst.cev+
+      ', longframes '+worst.longp.toFixed(0)+'%, camGap '+(worst.camGap/1000).toFixed(1)+
+      's, scrGap '+(worst.scrGap/1000).toFixed(1)+'s, faceFPS '+(worst.faceFps===999?'n/a':worst.faceFps));
+  $('btn-stop').classList.add('hidden');
+  $('btn-start').classList.remove('hidden'); $('btn-start').disabled=false;
+}
+
+$('btn-start').addEventListener('click', start);
+$('btn-stop').addEventListener('click', stop);
+window.addEventListener('pagehide', stop);
+</script>
+</body>
+</html>

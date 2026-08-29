@@ -1701,6 +1701,16 @@ async def viva_live_session_detail(request: Request, session_id: str):
     return sess
 
 
+@app.get("/viva-live/loadspike", response_class=HTMLResponse)
+async def viva_load_spike_page():
+    """P0 proctoring load spike — a standalone coexistence test. Runs loopback
+    WebRTC audio + camera recording + screen recording + face detection on the
+    visitor's own machine and measures whether the audio pipeline starves.
+    Public: it stores nothing, uploads nothing, spends nothing — the only
+    resources used are the visitor's own camera and CPU."""
+    return HTMLResponse(read_template("load_spike.html"))
+
+
 @app.get("/viva-live/sessions", response_class=HTMLResponse)
 async def viva_live_sessions_page():
     """Recruiter results view. The page shell is public; every byte of data
