@@ -1118,6 +1118,36 @@ async def complete_live_interview(token: str) -> None:
         {"public_token": token}, {"$inc": {"completed_sessions": 1}})
 
 
+# ── One-link flow: viva-after-CV gating ──────────────────────
+
+# Threshold default sits where MAYBE begins: clearly-weak CVs are filtered,
+# anyone plausible gets the interview. Both are per-job overridable.
+VIVA_THRESHOLD_DEFAULT = 48
+VIVA_DAILY_LAUNCH_CAP_DEFAULT = 25
+
+
+async def set_job_viva(job_id: str, viva: dict | None) -> None:
+    """Attach (or clear) the viva-after-CV config on a job.
+
+    job_id arrives pre-authorized by the route's owned_job() — no ownership
+    re-check here. Re-checking with different rules is how the public-link
+    toggle silently 404'd for admins; helpers trust the route's authz.
+    """
+    if viva is None:
+        await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$unset": {"viva": ""}})
+    else:
+        await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": {"viva": viva}})
+
+
+async def reserve_viva_launch(job_id: str, cap: int) -> bool:
+    """Atomically reserve one auto-launched interview against the job's daily
+    cap. A realtime interview is the most expensive single action the public
+    can trigger, so this is a hard ceiling, not advisory — same check-IS-the-
+    update pattern as every other cap."""
+    now = datetime.utcnow()
+    return await reserve_spend(f"viva-launch:{job_id}:{now:%Y-%m-%d}", cap)
+
+
 # ── Live interview sessions (L4) ─────────────────────────────
 
 async def save_interview_session(doc: dict) -> str:

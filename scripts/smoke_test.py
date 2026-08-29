@@ -282,6 +282,36 @@ def main():
                 failures.append(("POST", "/api/viva-live/create", r.status_code))
         except Exception as e:
             line(None, "POST", "/api/viva-live/create", str(e)[:60]); failures.append(("POST", "/api/viva-live/create", "exception"))
+        # One-link flow (CV upload → conditional interview).
+        try:
+            # A probe with a fake token+id must get EXACTLY the flat received
+            # payload — no score, no state hints, indistinguishable from a real
+            # gated-out candidate.
+            r = c.get("/api/apply/smoke-not-a-real-token/status/000000000000000000000000")
+            payload = {}
+            try:
+                payload = r.json()
+            except Exception:
+                pass
+            ok = r.status_code == 200 and payload == {"state": "received"}
+            line(r.status_code, "GET", "/api/apply/{unknown}/status/{id}",
+                 "flat 'received', leaks nothing" if ok else f"LEAKY: {str(payload)[:60]}")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/api/apply/{unknown}/status/{id}", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/apply/{unknown}/status/{id}", str(e)[:60]); failures.append(("GET", "/api/apply/{unknown}/status/{id}", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.post("/api/jobs/000000000000000000000000/viva", json={"enabled": True})
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "POST", "/api/jobs/{id}/viva",
+                 "gated (owner-only)" if gated else "NOT GATED — anyone could attach gates!")
+            checked += 1
+            if not gated:
+                failures.append(("POST", "/api/jobs/{id}/viva", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/jobs/{id}/viva", str(e)[:60]); failures.append(("POST", "/api/jobs/{id}/viva", "exception"))
         try:
             r = c.get("/viva-live/check")
             body = r.text or ""

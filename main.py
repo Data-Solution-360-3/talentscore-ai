@@ -57,7 +57,8 @@ from database import (
     save_written_submission, get_written_submissions,
     save_interview_session, get_interview_sessions, get_interview_session,
     create_live_interview, get_live_interview_by_token, reserve_live_mint,
-    complete_live_interview,
+    complete_live_interview, set_job_viva, reserve_viva_launch,
+    VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1738,14 +1739,10 @@ async def viva_live_session_detail(request: Request, session_id: str):
 # aren't owners), so it is guarded by the per-token mint budget instead.
 # ─────────────────────────────────────────────────────────────
 
-@app.post("/api/viva-live/create")
-async def viva_live_create(request: Request):
-    """Owner-only: create a live interview and get its candidate link."""
-    user = await require_admin(request)
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body.")
+def _validated_viva_config(body: dict) -> dict:
+    """One validator for every path that stores an interview config — the
+    manual candidate link and the per-job attach both go through here, so a
+    config the apply flow launches is exactly as constrained as a manual one."""
     questions = [str(q).strip()[:300] for q in (body.get("questions") or []) if str(q).strip()][:3]
     if not questions:
         questions = [_VIVA_DEFAULT_QUESTION]
@@ -1754,7 +1751,7 @@ async def viva_live_create(request: Request):
     except Exception:
         max_turns = 4
     max_turns = max(max_turns, len(questions))
-    config = {
+    return {
         "questions": questions,
         "max_turns": max_turns,
         "vad": body.get("vad") if body.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD,
@@ -1762,6 +1759,17 @@ async def viva_live_create(request: Request):
         "interviewer_name": str(body.get("interviewer_name", "")).strip()[:60] or "AI Interviewer",
         "job_title": str(body.get("job_title", "")).strip()[:120],
     }
+
+
+@app.post("/api/viva-live/create")
+async def viva_live_create(request: Request):
+    """Owner-only: create a live interview and get its candidate link."""
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    config = _validated_viva_config(body)
     doc = await create_live_interview(user["user_id"], config)
     return {"success": True, "token": doc["public_token"],
             "url": f"{APP_URL}/interview/{doc['public_token']}"}
@@ -1901,6 +1909,11 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "status": body.get("status") if body.get("status") in ("completed", "abandoned") else "abandoned",
         "score_status": "pending",
     }
+    # One-link flow: carry the application binding through so the results view
+    # can show the CV score and the interview for the same person.
+    for k in ("application_id", "job_id"):
+        if live.get(k):
+            doc[k] = str(live[k])
     p = body.get("proctoring")
     if isinstance(p, dict) and p.get("enabled"):
         segs = []
@@ -2152,13 +2165,165 @@ async def public_apply_submit(
         )
         print(f"[APPLY] cap '{blocked_by}' reached — application {application_id} stored unscored")
 
-    # Byte-identical whether new, replaced, scored, or capped. A different
-    # response for a repeat submission would let anyone test whether a given
-    # address had already applied.
-    return {"success": True, "message": "Application received"}
+    # Byte-equal in SHAPE whether new, replaced, scored, or capped — every
+    # submitter gets an id (theirs to poll with), so a repeat submission still
+    # can't be distinguished from a first one.
+    return {"success": True, "message": "Application received",
+            "application_id": application_id}
+
+
+@app.get("/api/apply/{token}/status/{application_id}")
+async def public_apply_status(token: str, application_id: str):
+    """The one-link flow's polling endpoint. Three flat payloads and nothing
+    else: processing / received / interview+url. Never a score, never a
+    threshold, never a reason.
+
+    "received" is the same bytes whether the candidate was gated out, the job
+    has viva off, scoring failed, a cap was hit, or the id doesn't exist — a
+    gated-out candidate and a probe both learn exactly nothing. Every failure
+    fails closed to the polite page.
+    """
+    from bson import ObjectId as _OID
+    RECEIVED = {"state": "received"}
+    job = await get_job_by_public_token(token)
+    if not job:
+        return RECEIVED
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        return RECEIVED
+    app_doc = await db.applications.find_one({"_id": aid, "job_id": str(job["_id"])})
+    if not app_doc:
+        return RECEIVED
+
+    viva = job.get("viva") or {}
+    if not viva.get("enabled"):
+        return RECEIVED
+
+    # Idempotent re-poll: if this application already launched an interview
+    # (double poll, page refresh), hand the same URL back while it's alive.
+    tok = app_doc.get("interview_token")
+    if tok:
+        live = await get_live_interview_by_token(tok)
+        if live:
+            return {"state": "interview", "url": f"{APP_URL}/interview/{tok}"}
+        return RECEIVED
+
+    status = app_doc.get("status")
+    if status in ("pending", "scoring"):
+        return {"state": "processing"}
+    if status != "scored":
+        # stored_unscored (cap/parse failure) and anything unexpected: the
+        # candidate gets the received page; the recruiter's pending queue is
+        # where this surfaces, exactly as today.
+        return RECEIVED
+
+    score = None
+    if app_doc.get("screening_id"):
+        try:
+            s = await db.screenings.find_one(
+                {"_id": _OID(str(app_doc["screening_id"]))}, {"overall_score": 1})
+            if s is not None:
+                score = int(s.get("overall_score", 0))
+        except Exception:
+            score = None
+    if score is None:
+        return RECEIVED
+
+    try:
+        threshold = max(0, min(100, int(viva.get("threshold", VIVA_THRESHOLD_DEFAULT))))
+    except Exception:
+        threshold = VIVA_THRESHOLD_DEFAULT
+    if score < threshold:
+        return RECEIVED
+
+    # Passed. Claim the mint atomically so two concurrent polls can't launch
+    # two interviews — the loser sees "processing" and picks up the token on
+    # its next poll.
+    claimed = await db.applications.find_one_and_update(
+        {"_id": aid, "interview_token": {"$exists": False}, "viva_minting": {"$ne": True}},
+        {"$set": {"viva_minting": True}},
+    )
+    if claimed is None:
+        return {"state": "processing"}
+
+    try:
+        cap = max(1, min(200, int(viva.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
+    except Exception:
+        cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
+    if not await reserve_viva_launch(str(job["_id"]), cap):
+        # Qualified but the day's interview budget is spent. Invisible to the
+        # candidate; flagged for the recruiter so nobody qualified is lost.
+        await db.applications.update_one(
+            {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
+        print(f"[VIVA] daily launch cap reached — application {application_id} qualified, not launched")
+        return RECEIVED
+
+    try:
+        cfg = _validated_viva_config(dict(viva.get("config") or {}))
+        if not cfg.get("job_title"):
+            cfg["job_title"] = str(job.get("title") or "")[:120]
+        live_doc = await create_live_interview(str(job.get("user_id") or ""), cfg)
+        await db.live_interviews.update_one(
+            {"public_token": live_doc["public_token"]},
+            {"$set": {"application_id": application_id, "job_id": str(job["_id"]),
+                      "source": "apply_flow"}},
+        )
+        await db.applications.update_one(
+            {"_id": aid},
+            {"$set": {"interview_token": live_doc["public_token"],
+                      "viva_launched_at": _dt.utcnow()},
+             "$unset": {"viva_minting": ""}},
+        )
+        return {"state": "interview",
+                "url": f"{APP_URL}/interview/{live_doc['public_token']}"}
+    except Exception as e:
+        # Release the claim so a later poll can retry; fail closed meanwhile.
+        print(f"[VIVA] launch failed for {application_id}: {e}")
+        try:
+            await db.applications.update_one({"_id": aid}, {"$unset": {"viva_minting": ""}})
+        except Exception:
+            pass
+        return RECEIVED
 
 
 # ── Dashboard side ───────────────────────────────────────────
+
+@app.post("/api/jobs/{job_id}/viva")
+async def set_job_viva_config(request: Request, job_id: str):
+    """Owner attaches (or clears) the viva-after-CV gate on a job. Stores a
+    snapshot of the interview config — the flow launches with what was saved,
+    not with whatever the /viva-live console happens to show later."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+
+    if not body.get("enabled"):
+        await set_job_viva(job["_id"], None)
+        return {"success": True, "viva": None}
+
+    try:
+        threshold = max(0, min(100, int(body.get("threshold", VIVA_THRESHOLD_DEFAULT))))
+    except Exception:
+        threshold = VIVA_THRESHOLD_DEFAULT
+    try:
+        daily_cap = max(1, min(200, int(body.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
+    except Exception:
+        daily_cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
+
+    viva = {
+        "enabled": True,
+        "threshold": threshold,
+        "daily_cap": daily_cap,
+        "config": _validated_viva_config(body),
+        "updated_at": _dt.utcnow(),
+    }
+    await set_job_viva(job["_id"], viva)
+    return {"success": True, "viva": serialize_mongo(viva)}
+
 
 @app.post("/api/jobs/{job_id}/public")
 async def toggle_job_public(request: Request, job_id: str, is_public: bool = Form(...)):

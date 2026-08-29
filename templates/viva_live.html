@@ -117,6 +117,28 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
         </div>
       </div>
 
+      <div id="atj" style="margin-top:.8rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.95rem 1rem">
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem">One-link flow — attach to a job</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:.7rem">Applicants on the job's public apply link who score at or above the threshold flow straight into this interview setup — same sitting, no second link. Everyone else sees the normal &ldquo;Application received&rdquo; page, with no hint a gate exists.</div>
+        <div id="atj-empty" style="font-size:12px;color:var(--t3)">Loading your jobs…</div>
+        <div id="atj-form" class="hidden">
+          <select id="atj-job" style="width:100%;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:600;background:#fff"></select>
+          <div style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.9rem;align-items:center">
+            <label style="font-size:12.5px;font-weight:700;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="atj-enabled" style="width:15px;height:15px;accent-color:var(--orange)"> Require live interview after CV
+            </label>
+            <label style="font-size:12px;font-weight:600;color:var(--t2)">Threshold
+              <input id="atj-th" type="number" min="0" max="100" value="48" style="width:64px;margin-left:.4rem;padding:6px 8px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:700"></label>
+            <label style="font-size:12px;font-weight:600;color:var(--t2)">Daily interview cap
+              <input id="atj-cap" type="number" min="1" max="200" value="25" style="width:64px;margin-left:.4rem;padding:6px 8px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:700"></label>
+          </div>
+          <div style="margin-top:.7rem;display:flex;align-items:center;gap:.7rem">
+            <button id="btn-atj-save" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--navy);color:#fff;cursor:pointer">Save to job</button>
+            <span id="atj-status" style="font-size:12px;color:var(--t3)">Saving snapshots the interview setup above onto the job.</span>
+          </div>
+        </div>
+      </div>
+
       <div id="proc-panel" class="hidden" style="margin-top:.8rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.8rem .9rem">
         <div style="display:flex;align-items:center;gap:10px">
           <video id="proc-cam" playsinline muted autoplay style="width:96px;aspect-ratio:4/3;border-radius:var(--r-md);background:#0b1a30;object-fit:cover"></video>
@@ -747,6 +769,77 @@ window.addEventListener('load', ()=>{
   if(b) b.addEventListener('click', createCandidateLink);
   const c=$('btn-copy-link');
   if(c) c.addEventListener('click', ()=>{ $('linkurl').select(); navigator.clipboard.writeText($('linkurl').value).catch(()=>{}); c.textContent='Copied'; setTimeout(()=>c.textContent='Copy',1500); });
+});
+
+// ── One-link flow: attach the current interview setup to a job ──
+let _atjJobs = [];
+function _atjSelected(){ return _atjJobs.find(j=>String(j._id)===$('atj-job').value); }
+
+function atjPrefill(){
+  const j = _atjSelected();
+  const v = (j && j.viva) || null;
+  $('atj-enabled').checked = !!(v && v.enabled);
+  $('atj-th').value  = (v && v.threshold != null) ? v.threshold : 48;
+  $('atj-cap').value = (v && v.daily_cap != null) ? v.daily_cap : 25;
+  $('atj-status').textContent = v && v.enabled
+    ? `Currently ON for this job — threshold ${v.threshold}, cap ${v.daily_cap}/day.`
+    : 'Currently OFF for this job. Saving snapshots the interview setup above onto it.';
+}
+
+async function atjLoad(){
+  try{
+    const r = await fetch('/api/jobs', {credentials:'include'});
+    if(!r.ok){ $('atj-empty').textContent = 'Sign in to attach an interview to a job.'; return; }
+    const d = await r.json().catch(()=>({}));
+    _atjJobs = (d.jobs||[]).filter(j=>j.public_token);
+    if(!_atjJobs.length){ $('atj-empty').textContent = 'No jobs with a public apply link yet — turn one on from the dashboard first.'; return; }
+    const sel = $('atj-job');
+    sel.innerHTML = _atjJobs.map(j=>{
+      const on = j.viva && j.viva.enabled;
+      return `<option value="${String(j._id)}">${(j.title||'Untitled job').replace(/</g,'&lt;')}${on?' — interview ON':''}</option>`;
+    }).join('');
+    sel.addEventListener('change', atjPrefill);
+    $('atj-empty').classList.add('hidden');
+    $('atj-form').classList.remove('hidden');
+    atjPrefill();
+  }catch(_){ $('atj-empty').textContent = 'Could not load jobs.'; }
+}
+
+async function atjSave(){
+  const j = _atjSelected();
+  if(!j){ return; }
+  const btn = $('btn-atj-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    const r = await fetch(`/api/jobs/${j._id}/viva`, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        enabled: $('atj-enabled').checked,
+        threshold: Math.max(0, Math.min(100, parseInt($('atj-th').value)||48)),
+        daily_cap: Math.max(1, Math.min(200, parseInt($('atj-cap').value)||25)),
+        questions: $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3),
+        max_turns: Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4)),
+        vad: $('cfg-vad').value || 'patient',
+        proctoring: $('cfg-proc').value || 'off',
+        interviewer_name: $('cfg-ivname').value.trim() || 'AI Interviewer',
+        job_title: j.title || ''
+      })
+    });
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || 'HTTP '+r.status);
+    j.viva = d.viva;   // keep the local copy honest for re-prefill
+    $('atj-status').textContent = d.viva
+      ? `Saved — ON at threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day.`
+      : 'Saved — OFF. Applicants get today’s normal flow.';
+  }catch(e){ $('atj-status').textContent = 'Save failed: ' + (e.message||e); }
+  btn.disabled = false; btn.textContent = 'Save to job';
+}
+
+window.addEventListener('load', ()=>{
+  atjLoad();
+  const s=$('btn-atj-save');
+  if(s) s.addEventListener('click', atjSave);
 });
 
 window.addEventListener('online', ()=>{ log('browser online event'); if(!manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online event'); });

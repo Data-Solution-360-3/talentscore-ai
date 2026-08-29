@@ -80,6 +80,12 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 .done-f{margin-top:1.75rem;padding-top:1.35rem;border-top:1px solid var(--border);font-size:12px;color:var(--t3);line-height:1.6}
 #done-view{display:none}
 
+/* Processing. Deliberately reads like a file being saved — no "evaluating",
+   no "checking", no progress percentage. The page decides what comes next
+   only after the server answers. */
+#proc-view{display:none}
+.procspin{width:34px;height:34px;border:3px solid var(--s3);border-top-color:var(--orange);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 1.25rem}
+
 @media(min-width:768px){
   .wrap{padding:2.25rem 1.5rem 5rem}
   .jc-head{padding:1.85rem 1.75rem 1.5rem}
@@ -156,6 +162,14 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       </form>
 
       <p class="retention">Your CV is analysed to score your fit for this role. The file is deleted after {{RETENTION_DAYS}} days; the extracted profile is kept so we can consider you for future roles.</p>
+    </div>
+  </div>
+
+  <div id="proc-view">
+    <div class="done">
+      <div class="procspin"></div>
+      <div class="done-t">Processing your application…</div>
+      <p class="done-b">This can take up to a minute. Please keep this page open.</p>
     </div>
   </div>
 
@@ -241,9 +255,12 @@ async function submitApp(e){
     let data={};
     try{ data=await res.json(); }catch(_){}
     if(!res.ok) throw new Error(data.detail||'Something went wrong. Please try again.');
-    document.getElementById('form-view').style.display='none';
-    document.getElementById('done-view').style.display='block';
-    window.scrollTo({top:0,behavior:'smooth'});
+    if(data.application_id){
+      try{ sessionStorage.setItem(PENDING_KEY, data.application_id); }catch(_){}
+      startProcessing(data.application_id);
+    }else{
+      showDone();
+    }
   }catch(err){
     showErr(err.message);
     btn.disabled=false;
@@ -251,6 +268,54 @@ async function submitApp(e){
   }
   return false;
 }
+
+// ── After submit: poll until the server says what comes next ──
+// Every applicant polls. The server answers with one of three flat states;
+// this page just obeys. Anything unexpected — errors, timeout, a closed tab's
+// worth of waiting — lands on the received page.
+const PENDING_KEY = 'tc-pending-' + TOKEN;
+const POLL_MS = 3000, POLL_TIMEOUT_MS = 90000;
+
+function showView(id){
+  ['form-view','proc-view','done-view'].forEach(v=>{
+    document.getElementById(v).style.display = (v===id) ? 'block' : 'none';
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function showDone(){
+  try{ sessionStorage.removeItem(PENDING_KEY); }catch(_){}
+  showView('done-view');
+}
+
+async function startProcessing(appId){
+  showView('proc-view');
+  const started = Date.now();
+  while(Date.now() - started < POLL_TIMEOUT_MS){
+    try{
+      const r = await fetch('/api/apply/'+TOKEN+'/status/'+encodeURIComponent(appId));
+      if(r.ok){
+        let d={}; try{ d=await r.json(); }catch(_){}
+        if(d.state==='interview' && d.url){
+          try{ sessionStorage.removeItem(PENDING_KEY); }catch(_){}
+          location.href = d.url;
+          return;
+        }
+        if(d.state==='received'){ showDone(); return; }
+        // 'processing' (or anything else): keep waiting.
+      }
+    }catch(_){ /* transient network blip — keep polling */ }
+    await new Promise(res=>setTimeout(res, POLL_MS));
+  }
+  showDone();
+}
+
+// An accidental refresh mid-processing resumes the wait instead of showing
+// the blank form again.
+window.addEventListener('load', ()=>{
+  let pending=null;
+  try{ pending = sessionStorage.getItem(PENDING_KEY); }catch(_){}
+  if(pending) startProcessing(pending);
+});
 </script>
 </body>
 </html>
