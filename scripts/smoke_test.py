@@ -335,6 +335,32 @@ def main():
             line(None, "GET", "/viva/{unknown}", str(e)[:60])
             failures.append(("GET", "/viva/{unknown}", "exception"))
 
+        # Written segment: an unknown token must 404 (never 5xx, never a
+        # model call), and the results endpoint must be gated pre-auth.
+        try:
+            r = c.post("/api/viva/smoke-not-real/written",
+                       json={"name": "x", "email": "x@y.com", "answers": []})
+            ok = r.status_code == 404
+            line(r.status_code, "POST", "/api/viva/{unknown}/written",
+                 "rejected" if ok else "UNEXPECTED")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva/{unknown}/written", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva/{unknown}/written", str(e)[:60])
+            failures.append(("POST", "/api/viva/{unknown}/written", "exception"))
+        try:
+            r = c.get("/api/interviews/000000000000000000000000/written")
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/interviews/{id}/written",
+                 "gated (owner-only)" if gated else "NOT GATED")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/interviews/{id}/written", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/interviews/{id}/written", str(e)[:60])
+            failures.append(("GET", "/api/interviews/{id}/written", "exception"))
+
         # If a real token exists, it must render EITHER the form (public) or the
         # same closed page (paused) — but never a 500. This is the check that
         # would have flagged the applicant-facing page being down.

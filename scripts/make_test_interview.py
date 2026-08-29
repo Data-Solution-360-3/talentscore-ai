@@ -56,7 +56,12 @@ async def main():
         # to one the real create flow will produce.
         from database import connect, create_interview
         await connect()
-        iv = await create_interview(user_id="test", question=args.question, job_title=args.title)
+        iv = await create_interview(
+            user_id="test", question=args.question, job_title=args.title,
+            written_questions=[
+                "Describe a time you had to explain a technical problem to a non-technical person. How did you do it?",
+                "You are given a task with an unclear requirement and a tight deadline. What do you do first, and why?",
+            ])
         # Tag it so --list / --delete-tests can find only script-made records.
         await db.interviews.update_one({"_id": __import__("bson").ObjectId(iv["_id"])},
                                        {"$set": {"source": "make_test_interview"}})

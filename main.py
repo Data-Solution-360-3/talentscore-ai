@@ -54,6 +54,7 @@ from database import (
     upsert_application, store_application_pdf, count_pending_applications,
     get_applications_for_job, user_match,
     create_interview, get_interview_by_token,
+    save_written_submission, get_written_submissions,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1263,9 +1264,109 @@ async def viva_record_page(token: str):
         "{{TOKEN}}": esc(token),
         "{{MAX_SECONDS}}": "120",
         "{{ANSWER_LANGUAGE}}": esc(interview.get("answer_language"), "en"),
+        # JSON, not HTML-escaped — it lands inside a <script> block. <
+        # keeps a malicious "</script>" in a question from breaking out.
+        "{{WRITTEN_QUESTIONS_JSON}}": json.dumps(
+            interview.get("written_questions") or []).replace("<", "\\u003c"),
     }.items():
         page = page.replace(key, val)
     return HTMLResponse(page)
+
+
+MAX_WRITTEN_ANSWER_CHARS = 4000
+
+
+async def score_written_submission(submission_id: str):
+    """Background: score a stored written submission. Runs AFTER the response.
+
+    Same fire-and-forget shape as score_application: failure drops the record
+    to 'failed' and it stays reviewable; nothing here talks to the candidate.
+    """
+    from bson import ObjectId as _OID
+    from interview_scorer import score_written_answers
+    try:
+        sub = await db.interview_written_answers.find_one({"_id": _OID(submission_id)})
+        if not sub:
+            return
+        iv = await db.interviews.find_one({"_id": _OID(sub["interview_id"])}) or {}
+        await db.interview_written_answers.update_one(
+            {"_id": _OID(submission_id)}, {"$set": {"status": "scoring"}})
+        qa = [(a.get("question", ""), a.get("answer_text", "")) for a in sub.get("answers", [])]
+        result, err = await score_written_answers(qa, OPENAI_API_KEY,
+                                                  job_title=iv.get("job_title") or "")
+        if err or not result:
+            await db.interview_written_answers.update_one(
+                {"_id": _OID(submission_id)},
+                {"$set": {"status": "failed", "error": err or "unknown"}})
+            return
+        await db.interview_written_answers.update_one(
+            {"_id": _OID(submission_id)},
+            {"$set": {"status": "scored", "score_result": result,
+                      "scored_at": _dt.utcnow(), "error": None}})
+    except Exception as e:
+        print(f"[VIVA-WRITTEN] scoring failed for {submission_id}: {e}")
+        try:
+            await db.interview_written_answers.update_one(
+                {"_id": _OID(submission_id)},
+                {"$set": {"status": "failed", "error": str(e)[:300]}})
+        except Exception:
+            pass
+
+
+@app.post("/api/viva/{token}/written")
+async def viva_written_submit(request: Request, background: BackgroundTasks, token: str):
+    """Public: candidate submits typed answers for the written segment.
+
+    Cost is bounded without a new cap system: the token is owner-minted and
+    unguessable, answers are capped at 5 questions x 4000 chars, one scored
+    submission per (interview, email) is final, and the email-keyed rate limit
+    below blunts spraying. Worst case per token is 2 model calls per candidate
+    email per hour — not an open spend hole like an unauthenticated mint.
+    """
+    interview = await get_interview_by_token(token)
+    if not interview:
+        raise HTTPException(status_code=404, detail="This interview isn't accepting responses.")
+    questions = interview.get("written_questions") or []
+    if not questions:
+        raise HTTPException(status_code=400, detail="This interview has no written segment.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    name = str(body.get("name", "")).strip()
+    email = str(body.get("email", "")).strip().lower()
+    raw_answers = body.get("answers")
+    if not name:
+        raise HTTPException(status_code=400, detail="Please enter your name.")
+    if "@" not in email or len(email) < 5:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    if not isinstance(raw_answers, list) or len(raw_answers) != len(questions):
+        raise HTTPException(status_code=400, detail="Please answer every question.")
+
+    answers = [{"question": q, "answer_text": str(a or "")[:MAX_WRITTEN_ANSWER_CHARS]}
+               for q, a in zip(questions, raw_answers)]
+
+    if not await rate_limit_allows(f"viva-written:{email}", 3, 3600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please try again in an hour.")
+
+    submission_id, _replaced = await save_written_submission(
+        interview["_id"], name, email, answers)
+    sub = await db.interview_written_answers.find_one(
+        {"_id": __import__("bson").ObjectId(submission_id)}, {"status": 1})
+    if sub and sub.get("status") == "pending":
+        background.add_task(score_written_submission, submission_id)
+    # Byte-identical whether new, replaced, or already scored — same
+    # tell-nothing contract as the apply link.
+    return {"success": True, "message": "Answers received"}
+
+
+@app.get("/api/interviews/{interview_id}/written")
+async def interview_written_results(request: Request, interview_id: str):
+    """Owner-only: written submissions with scores for one interview."""
+    await require_admin(request)
+    subs = await get_written_submissions(interview_id)
+    return {"submissions": subs, "count": len(subs)}
 
 
 # ─────────────────────────────────────────────────────────────

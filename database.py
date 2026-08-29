@@ -77,6 +77,8 @@ async def connect():
     # ── Video interviews (Viva) — Phase 1 ──
     await db.interviews.create_index("public_token", unique=True, sparse=True)
     await db.interviews.create_index("user_id")
+    await db.interview_written_answers.create_index([("interview_id", 1), ("email", 1)])
+    await db.interview_written_answers.create_index("status")
 
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
@@ -974,7 +976,8 @@ async def get_applications_for_job(job_id: str, user_id: str, status: str = "") 
 # a published question with a public recording link. Answers (a separate
 # collection) arrive in Phase 2 with the storage/transcription pipeline.
 async def create_interview(user_id: str, question: str, job_id: str = None,
-                           job_title: str = None) -> dict:
+                           job_title: str = None,
+                           written_questions: list | None = None) -> dict:
     """Create an interview and its public recording token.
 
     answer_language is hardcoded 'en' in Phase 1 and stored now so Phase 2's
@@ -987,6 +990,8 @@ async def create_interview(user_id: str, question: str, job_id: str = None,
         "job_id": job_id,
         "job_title": job_title,
         "question": (question or "").strip(),
+        # Written segment (Step 1 of proctored-async). Empty list = no written phase.
+        "written_questions": [str(q).strip() for q in (written_questions or []) if str(q).strip()][:5],
         "answer_language": "en",   # Phase 1: English only. Do not infer.
         "public_token": token,
         "is_public": True,
@@ -1011,3 +1016,43 @@ async def get_interview_by_token(token: str) -> dict | None:
     if doc:
         doc["_id"] = str(doc["_id"])
     return doc
+
+
+async def save_written_submission(interview_id: str, name: str, email: str,
+                                  answers: list) -> tuple[str, bool]:
+    """Store a candidate's written answers, replacing any earlier unscored
+    submission from the same email (same keep-the-latest rule as the apply
+    link — a resubmit after fixing a typo should not read as broken).
+    A submission that has already been SCORED is never replaced: rescoring on
+    demand would let a candidate re-roll a paid scoring call.
+    Returns (submission_id, replaced)."""
+    email = (email or "").strip().lower()
+    now = datetime.utcnow()
+    doc = {
+        "interview_id": interview_id,
+        "name": (name or "").strip(),
+        "email": email,
+        "answers": answers,          # [{question, answer_text}]
+        "answer_language": "en",     # Phase 1: English only
+        "status": "pending",         # pending -> scoring -> scored | failed
+        "submitted_at": now,
+    }
+    existing = await db.interview_written_answers.find_one(
+        {"interview_id": interview_id, "email": email})
+    if existing and existing.get("status") == "scored":
+        return str(existing["_id"]), False
+    if existing:
+        await db.interview_written_answers.update_one(
+            {"_id": existing["_id"]}, {"$set": doc})
+        return str(existing["_id"]), True
+    res = await db.interview_written_answers.insert_one(doc)
+    return str(res.inserted_id), False
+
+
+async def get_written_submissions(interview_id: str) -> list:
+    cursor = db.interview_written_answers.find(
+        {"interview_id": interview_id}).sort("submitted_at", -1).limit(200)
+    out = []
+    async for doc in cursor:
+        out.append(serialize_mongo(doc))
+    return out

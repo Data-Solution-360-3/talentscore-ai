@@ -171,6 +171,44 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     </div>
   </div>
 
+  <!-- Written segment (shown after the video answer when questions exist) -->
+  <div class="card hidden" id="written-card">
+    <div class="q-head">
+      <div class="q-company">{{COMPANY}}</div>
+      <div class="q-label">Written question <span id="wq-pos">1</span> of <span id="wq-total">1</span></div>
+      <div class="q-text" id="wq-text"></div>
+    </div>
+    <div class="stage">
+      <div class="lang-hint" style="margin-bottom:.8rem">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4A5970" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><b>Answer in English, in your own words.</b> We read for the substance of your thinking — not perfect grammar.</span>
+      </div>
+      <textarea id="wq-answer" rows="7" maxlength="4000" placeholder="Type your answer here…"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--border2);border-radius:var(--r-lg);font-family:inherit;font-size:15px;color:var(--text);resize:vertical;outline:none"></textarea>
+      <div class="meta" style="text-align:right" id="wq-count">0 / 4000</div>
+      <div class="controls">
+        <button class="btn btn-ghost" id="wq-back" type="button">← Back</button>
+        <button class="btn btn-rec" id="wq-next" type="button">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Written: contact + final submit -->
+  <div class="card hidden" id="written-finish">
+    <div class="stage">
+      <div class="q-label" style="margin-bottom:.7rem">Almost done — who are you?</div>
+      <input id="w-name" type="text" autocomplete="name" placeholder="Your full name"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--border2);border-radius:var(--r-lg);font-family:inherit;font-size:15px;margin-bottom:.7rem;outline:none">
+      <input id="w-email" type="email" autocomplete="email" placeholder="you@example.com"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--border2);border-radius:var(--r-lg);font-family:inherit;font-size:15px;outline:none">
+      <div class="err" id="w-err"></div>
+      <div class="controls">
+        <button class="btn btn-ghost" id="w-back" type="button">← Back</button>
+        <button class="btn btn-rec" id="w-submit" type="button">Submit answers</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Done -->
   <div class="done" id="done">
     <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -337,18 +375,83 @@ function redo(){
 }
 
 function submit(){
-  // PHASE 1, STEP 1: no upload. The server never touches the bytes, and the
-  // presigned direct-to-storage upload is the NEXT step (after the snapshot).
-  // For now we confirm the recording was captured so the recording flow can be
-  // demoed end to end on real devices before any storage/scoring exists.
+  // Video phase: no upload yet. The server never touches the bytes; the
+  // presigned direct-to-storage upload is a later step. The recording is
+  // confirmed captured, then the candidate flows into the WRITTEN segment
+  // (when this interview has written questions).
   if(!blob){ showErr('No recording to submit yet.'); return; }
   const mb = (blob.size/1048576).toFixed(1);
+  videoNote = `Video answer captured in-browser (${mb} MB, ${mime||'video/webm'}). ` +
+              `Upload to storage is wired in a later step — the server never receives the video.`;
+  if(WRITTEN_QUESTIONS.length){
+    $('review-card').classList.add('hidden');
+    document.querySelector('#flow > .card').classList.add('hidden');
+    startWritten();
+  }else{
+    finishAll();
+  }
+}
+
+function finishAll(){
   $('flow').style.display = 'none';
+  $('written-card').classList.add('hidden');
+  $('written-finish').classList.add('hidden');
   $('done').classList.add('on');
-  $('phase-note').textContent =
-    `Demo build: recording captured in-browser (${mb} MB, ${mime||'video/webm'}). ` +
-    `Upload to storage is wired in the next step — the server never receives the video.`;
+  $('phase-note').textContent = videoNote;
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Written segment ──────────────────────────────────────────────────
+const WRITTEN_QUESTIONS = {{WRITTEN_QUESTIONS_JSON}};
+let videoNote = '';
+let wIdx = 0;
+const wAnswers = WRITTEN_QUESTIONS.map(()=> '');
+
+function renderWritten(){
+  $('wq-pos').textContent = wIdx+1;
+  $('wq-total').textContent = WRITTEN_QUESTIONS.length;
+  $('wq-text').textContent = WRITTEN_QUESTIONS[wIdx];
+  $('wq-answer').value = wAnswers[wIdx];
+  $('wq-count').textContent = wAnswers[wIdx].length + ' / 4000';
+  $('wq-back').disabled = wIdx===0;
+  $('wq-next').textContent = wIdx === WRITTEN_QUESTIONS.length-1 ? 'Continue →' : 'Next →';
+}
+function startWritten(){
+  $('written-card').classList.remove('hidden');
+  wIdx = 0; renderWritten();
+  $('written-card').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function wSave(){ wAnswers[wIdx] = $('wq-answer').value; }
+function wNext(){
+  wSave();
+  if(wIdx < WRITTEN_QUESTIONS.length-1){ wIdx++; renderWritten(); }
+  else { $('written-card').classList.add('hidden'); $('written-finish').classList.remove('hidden'); }
+}
+function wBack(){ wSave(); if(wIdx>0){ wIdx--; renderWritten(); } }
+function wFinishBack(){
+  $('written-finish').classList.add('hidden');
+  $('written-card').classList.remove('hidden');
+  renderWritten();
+}
+async function wSubmit(){
+  const err = $('w-err'); err.classList.remove('on');
+  const name = $('w-name').value.trim();
+  const email = $('w-email').value.trim();
+  if(!name){ err.textContent='Please enter your name.'; err.classList.add('on'); return; }
+  if(email.indexOf('@') < 1){ err.textContent='Please enter a valid email address.'; err.classList.add('on'); return; }
+  const btn = $('w-submit'); btn.disabled = true; btn.textContent = 'Submitting…';
+  try{
+    const res = await fetch('/api/viva/'+TOKEN+'/written', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, answers: wAnswers})
+    });
+    let d={}; try{ d = await res.json(); }catch(_){}
+    if(!res.ok) throw new Error(d.detail || 'Something went wrong. Please try again.');
+    finishAll();
+  }catch(e){
+    err.textContent = e.message; err.classList.add('on');
+    btn.disabled = false; btn.textContent = 'Submit answers';
+  }
 }
 
 // wire up
@@ -359,6 +462,11 @@ window.addEventListener('load', ()=>{
   $('btn-stop').addEventListener('click', ()=>stopRecording(false));
   $('btn-redo').addEventListener('click', redo);
   $('btn-submit').addEventListener('click', submit);
+  $('wq-answer').addEventListener('input', ()=>{ $('wq-count').textContent = $('wq-answer').value.length + ' / 4000'; });
+  $('wq-next').addEventListener('click', wNext);
+  $('wq-back').addEventListener('click', wBack);
+  $('w-back').addEventListener('click', wFinishBack);
+  $('w-submit').addEventListener('click', wSubmit);
   // Bangla is inert in Phase 1 — visible, never selectable.
   $('lang-bn').addEventListener('click', e=>e.preventDefault());
 });
