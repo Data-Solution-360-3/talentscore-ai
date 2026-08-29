@@ -1701,6 +1701,16 @@ async def viva_live_session_detail(request: Request, session_id: str):
     return sess
 
 
+@app.get("/viva-live/check", response_class=HTMLResponse)
+async def viva_device_check_page():
+    """L5 phase 1 — the pre-interview device check ("lobby"). Runs an 8-second
+    measured probe (4s baseline + 4s Tier-S stress burst with both encoders
+    live) and assigns the proctoring tier from measured behaviour — never from
+    user-agent. Public: stores nothing, uploads nothing, spends nothing; the
+    tier result is handed to the interview page via sessionStorage."""
+    return HTMLResponse(read_template("viva_check.html"))
+
+
 @app.get("/viva-live/loadspike", response_class=HTMLResponse)
 async def viva_load_spike_page():
     """P0 proctoring load spike — a standalone coexistence test. Runs loopback

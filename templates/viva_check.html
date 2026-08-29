@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Device check — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.1);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;--border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy)}
+.tb-tag{margin-left:auto;font-size:11px;color:var(--t3);font-weight:700;background:var(--s2);padding:3px 9px;border-radius:var(--r-pill)}
+.wrap{max-width:560px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.4rem 1.3rem;margin-bottom:1rem}
+h1{font-size:1.25rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:.35rem}
+.lede{font-size:.9rem;color:var(--t2);line-height:1.6}
+
+.step{display:flex;gap:12px;align-items:flex-start;padding:.85rem 0;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.step-ic{width:30px;height:30px;border-radius:50%;background:var(--s2);border:1.5px solid var(--border2);display:grid;place-items:center;flex-shrink:0;font-size:13px;font-weight:800;color:var(--t3)}
+.step.on .step-ic{border-color:var(--orange);color:var(--orange2);background:var(--og)}
+.step.ok .step-ic{border-color:var(--green);color:#fff;background:var(--green)}
+.step.skip .step-ic{border-color:var(--border2);color:var(--t3)}
+.step-t{font-size:.92rem;font-weight:700;color:var(--navy)}
+.step-d{font-size:.8rem;color:var(--t3);line-height:1.5}
+.step-x{margin-left:auto;font-size:11px;font-weight:700;color:var(--t3);white-space:nowrap;padding-top:.35rem}
+
+.preview{width:100%;aspect-ratio:4/3;max-height:240px;background:#0b1a30;border-radius:var(--r-lg);object-fit:cover;margin:.7rem 0;display:none}
+.preview.on{display:block}
+.miclevel{height:8px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden;margin:.5rem 0;display:none}
+.miclevel.on{display:block}
+.miclevel i{display:block;height:100%;width:0;background:var(--green);transition:width .1s}
+.probe-bar{height:8px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden;margin:.7rem 0;display:none}
+.probe-bar.on{display:block}
+.probe-bar i{display:block;height:100%;width:0;background:var(--orange);transition:width .3s linear}
+
+.controls{display:flex;gap:10px;margin-top:1rem}
+.btn{flex:1;padding:14px;border-radius:var(--r-lg);font-size:15px;font-weight:800;font-family:inherit;border:none;cursor:pointer}
+.btn-go{background:var(--orange);color:#fff;box-shadow:0 6px 18px rgba(245,124,46,.3)}
+.btn-go:hover:not(:disabled){background:var(--orange2)}
+.btn-ghost{background:var(--surface);color:var(--navy);border:1.5px solid var(--border2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hidden{display:none!important}
+.err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.75rem .9rem;font-size:.85rem;margin-top:.8rem;line-height:1.5;display:none}
+.err.on{display:block}
+
+.tier{display:none;text-align:center;padding:.5rem 0}
+.tier.on{display:block}
+.tier-badge{display:inline-block;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;padding:6px 16px;border-radius:var(--r-pill);margin-bottom:.7rem}
+.tb-s{background:rgba(22,163,74,.12);color:var(--green)}
+.tb-m{background:rgba(217,119,6,.12);color:var(--amber)}
+.tb-w{background:var(--s3);color:var(--t2)}
+.tier-h{font-size:1.2rem;font-weight:900;color:var(--navy);margin-bottom:.35rem}
+.tier-d{font-size:.88rem;color:var(--t2);line-height:1.6;max-width:420px;margin:0 auto}
+.tier-list{text-align:left;max-width:380px;margin:.9rem auto 0;font-size:.85rem;color:var(--t2);line-height:1.8}
+.tier-list b{color:var(--navy)}
+details{margin-top:1rem;font-size:.8rem;color:var(--t3)}
+details pre{background:#0b1a30;color:#9fb3c8;border-radius:var(--r-md);padding:.7rem;overflow-x:auto;font-size:11px;line-height:1.5;margin-top:.5rem}
+.honest{background:var(--og);border:1px solid rgba(245,124,46,.3);border-radius:var(--r-lg);padding:.7rem .9rem;font-size:.8rem;color:var(--t2);line-height:1.55;margin-top:1rem;text-align:left}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Interview device check</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h1>Let's check your device</h1>
+    <p class="lede">Before your interview we run a quick <b>8-second check</b> so monitoring never interferes with your conversation. Nothing is recorded or uploaded during this check.</p>
+
+    <div class="step" id="st-cam">
+      <div class="step-ic">1</div>
+      <div><div class="step-t">Camera</div><div class="step-d">Used for identity and presence monitoring during the interview.</div></div>
+      <div class="step-x" id="sx-cam">waiting</div>
+    </div>
+    <div class="step" id="st-mic">
+      <div class="step-ic">2</div>
+      <div><div class="step-t">Microphone</div><div class="step-d">The interview is a spoken conversation — say a word to see the meter move.</div></div>
+      <div class="step-x" id="sx-mic">waiting</div>
+    </div>
+    <div class="step" id="st-scr">
+      <div class="step-ic">3</div>
+      <div><div class="step-t">Screen sharing <span style="font-weight:500;color:var(--t3)">(choose “entire screen”)</span></div><div class="step-d">Lets the hiring team confirm no other tools were used. You can decline — the interview still runs, with reduced monitoring noted to the recruiter.</div></div>
+      <div class="step-x" id="sx-scr">waiting</div>
+    </div>
+    <div class="step" id="st-probe">
+      <div class="step-ic">4</div>
+      <div><div class="step-t">Performance check</div><div class="step-d">8 seconds measuring what your machine can run alongside the live conversation.</div></div>
+      <div class="step-x" id="sx-probe">waiting</div>
+    </div>
+
+    <video id="preview" class="preview" playsinline muted autoplay></video>
+    <div class="miclevel" id="miclevel"><i id="micfill"></i></div>
+    <div class="probe-bar" id="probe-bar"><i id="probe-fill"></i></div>
+
+    <div class="controls">
+      <button class="btn btn-go" id="btn-start" type="button">Start device check</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card tier" id="tier-card">
+    <span class="tier-badge" id="tier-badge"></span>
+    <div class="tier-h" id="tier-h"></div>
+    <div class="tier-d" id="tier-d"></div>
+    <div class="tier-list" id="tier-list"></div>
+    <div class="honest">Monitoring is a <b>signal for human review, never a verdict</b> — and it cannot see other devices. The level of monitoring your device can support is recorded and shown to the recruiter, so reduced coverage is never mistaken for a clean result.</div>
+    <details><summary>Technical details (owner view)</summary><pre id="tech"></pre></details>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function step(id, state, note){
+  const el = $('st-'+id);
+  el.classList.remove('on','ok','skip');
+  if(state) el.classList.add(state);
+  if(note !== undefined) $('sx-'+id).textContent = note;
+}
+function showErr(m){ $('err').textContent=m; $('err').classList.add('on'); }
+
+let camStream=null, micStream=null, screenStream=null, detector=null;
+let frames=0, longFrames=0, lastRaf=0, rafOn=false;
+const metrics = { screen_granted:false, screen_surface:null, face_loaded:false,
+  baseline_long_pct:null, burst_long_pct:null, face_ms:null,
+  hw_threads:navigator.hardwareConcurrency||null, device_memory:navigator.deviceMemory||null,
+  ua_note:'recorded as context only — tier decided by measurement, never by device identity' };
+
+function rafLoop(ts){
+  if(!rafOn) return;
+  if(lastRaf){ frames++; if(ts-lastRaf>50) longFrames++; }
+  lastRaf=ts; requestAnimationFrame(rafLoop);
+}
+function rafReset(){ frames=0; longFrames=0; lastRaf=0; }
+function rafPct(){ return frames? (longFrames/frames*100) : 0; }
+
+async function loadFace(){
+  try{
+    const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
+    const vision = await mp.FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
+    detector = await mp.FaceDetector.createFromOptions(vision, {
+      baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'},
+      runningMode:'VIDEO'});
+    metrics.face_loaded = true;
+  }catch(e){ metrics.face_loaded = false; }
+}
+
+function pickMime(){
+  for(const c of ['video/webm;codecs=vp8','video/webm','video/mp4'])
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+  return '';
+}
+
+async function run(){
+  $('btn-start').disabled = true; $('err').classList.remove('on');
+
+  // 1 — camera
+  step('cam','on','requesting…');
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480}}});
+    $('preview').classList.add('on'); $('preview').srcObject = camStream;
+    step('cam','ok','working');
+  }catch(e){
+    step('cam','','blocked');
+    showErr('Camera access is required for a monitored interview. Allow it and try again.');
+    $('btn-start').disabled=false; return;
+  }
+
+  // 2 — mic, with a visible level meter so "working" is seen, not asserted
+  step('mic','on','requesting…');
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true}});
+    const ac = new (window.AudioContext||window.webkitAudioContext)();
+    const src = ac.createMediaStreamSource(micStream);
+    const an = ac.createAnalyser(); an.fftSize=512; src.connect(an);
+    const buf = new Uint8Array(an.frequencyBinCount);
+    $('miclevel').classList.add('on');
+    let heard=false;
+    const meter = setInterval(()=>{
+      an.getByteFrequencyData(buf);
+      const level = Math.min(100, Math.round(buf.reduce((a,b)=>a+b,0)/buf.length*1.8));
+      $('micfill').style.width = level+'%';
+      if(level>12 && !heard){ heard=true; step('mic','ok','heard you'); }
+    },100);
+    setTimeout(()=>{ clearInterval(meter); if(!heard) step('mic','ok','granted (say something in the interview)'); }, 3500);
+  }catch(e){
+    step('mic','','blocked');
+    showErr('Microphone access is required — the interview is a spoken conversation.');
+    $('btn-start').disabled=false; return;
+  }
+
+  // 3 — screen (declinable; declining caps the tier and is recorded honestly)
+  step('scr','on','choose what to share…');
+  try{
+    screenStream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:5}}});
+    metrics.screen_granted = true;
+    metrics.screen_surface = screenStream.getVideoTracks()[0].getSettings().displaySurface || 'unknown';
+    step('scr','ok', metrics.screen_surface==='monitor' ? 'entire screen' : metrics.screen_surface+' (entire screen preferred)');
+  }catch(e){
+    metrics.screen_granted = false;
+    step('scr','skip','declined — reduced monitoring');
+  }
+
+  // 4 — the measured probe: 4s baseline, then 4s Tier-S stress burst
+  step('probe','on','measuring…');
+  $('probe-bar').classList.add('on');
+  rafOn=true; requestAnimationFrame(rafLoop);
+
+  // Phase A (0–4s): camera + face detection @2 FPS + main-thread watch
+  rafReset();
+  let faceMsSum=0, faceN=0, faceTimer=null;
+  if(metrics.face_loaded===false) await loadFace();   // first call
+  if(detector){
+    const v=$('preview');
+    faceTimer = setInterval(()=>{
+      if(!v.videoWidth) return;
+      const t=performance.now();
+      try{ detector.detectForVideo(v,t); faceMsSum+=performance.now()-t; faceN++; }catch(_){}
+    },500);
+  }
+  for(let s=1;s<=4;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(s*12.5)+'%'; }
+  metrics.baseline_long_pct = +rafPct().toFixed(1);
+  metrics.face_ms = faceN? +(faceMsSum/faceN).toFixed(0) : null;
+
+  // Phase B (4–8s): ADD both continuous encoders — briefly living the Tier-S
+  // workload. You cannot certify a machine for continuous recording without
+  // running continuous recording; 4 seconds of it, slices discarded.
+  rafReset();
+  let camRec=null, scrRec=null;
+  const mime=pickMime();
+  try{ camRec=new MediaRecorder(camStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000}); camRec.ondataavailable=()=>{}; camRec.start(1000); }catch(_){}
+  if(screenStream){
+    try{ scrRec=new MediaRecorder(screenStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000}); scrRec.ondataavailable=()=>{}; scrRec.start(1000); }catch(_){}
+  }
+  for(let s=5;s<=8;s++){ await new Promise(r=>setTimeout(r,1000)); $('probe-fill').style.width=(s*12.5)+'%'; }
+  metrics.burst_long_pct = +rafPct().toFixed(1);
+
+  // teardown
+  rafOn=false; clearInterval(faceTimer);
+  try{ camRec&&camRec.state!=='inactive'&&camRec.stop(); }catch(_){}
+  try{ scrRec&&scrRec.state!=='inactive'&&scrRec.stop(); }catch(_){}
+  try{ screenStream&&screenStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  try{ detector&&detector.close(); }catch(_){}
+  step('probe','ok','done');
+
+  decide();
+}
+
+function decide(){
+  // Tier thresholds — measured behaviour only. Worst-of rule.
+  let tier, why;
+  if(!metrics.face_loaded || metrics.baseline_long_pct>15 || (metrics.face_ms!==null && metrics.face_ms>150)){
+    tier='W'; why = !metrics.face_loaded ? 'face detection could not load'
+        : metrics.baseline_long_pct>15 ? 'main thread strained at baseline' : 'face inference too slow';
+  }else if(metrics.screen_granted && metrics.burst_long_pct<5 && metrics.face_ms!==null && metrics.face_ms<40){
+    tier='S'; why='handled the full continuous-recording workload cleanly';
+  }else{
+    tier='M'; why = !metrics.screen_granted ? 'screen not shared — continuous tier requires it'
+        : metrics.burst_long_pct>=5 ? 'strain under the continuous-recording burst' : 'face inference above the full-tier bar';
+  }
+  metrics.tier = tier; metrics.tier_reason = why;
+
+  const T = {
+    S:{badge:'tb-s', name:'Full monitoring', h:'You’re all set — full monitoring',
+       d:'Your device handled the complete workload cleanly.',
+       list:['<b>Camera:</b> continuous recording','<b>Screen:</b> continuous recording','<b>Face check:</b> 5× per second','<b>Interview audio:</b> always full quality']},
+    M:{badge:'tb-m', name:'Standard monitoring', h:'You’re all set — standard monitoring',
+       d:'Monitoring runs in snapshot mode so your interview stays perfectly smooth.',
+       list:['<b>Camera:</b> periodic snapshots + on any flag','<b>Screen:</b> periodic snapshots'+(metrics.screen_granted?'':' (not shared — noted to recruiter)'),'<b>Face check:</b> 2× per second','<b>Interview audio:</b> always full quality']},
+    W:{badge:'tb-w', name:'Light monitoring', h:'You’re all set — light monitoring',
+       d:'Your device gets the lightest monitoring so nothing interferes with your conversation.',
+       list:['<b>Camera:</b> presence checks + occasional snapshots','<b>Screen:</b> '+(metrics.screen_granted?'occasional snapshots':'not shared — noted to recruiter'),'<b>Face check:</b> about 1× per second','<b>Interview audio:</b> always full quality']}
+  }[tier];
+
+  $('tier-badge').textContent = T.name; $('tier-badge').className = 'tier-badge '+T.badge;
+  $('tier-h').textContent = T.h;
+  $('tier-d').textContent = T.d;
+  $('tier-list').innerHTML = T.list.map(x=>'• '+x).join('<br>');
+  $('tech').textContent = JSON.stringify(metrics, null, 2);
+  $('tier-card').classList.add('on');
+  // Handoff for the interview page (phase 2 wiring reads this).
+  try{ sessionStorage.setItem('viva_tier', JSON.stringify(metrics)); }catch(_){}
+  $('tier-card').scrollIntoView({behavior:'smooth'});
+  // camera + mic stay live in a real lobby; in this standalone check, release them
+  try{ camStream&&camStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  try{ micStream&&micStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  $('preview').classList.remove('on'); $('miclevel').classList.remove('on');
+}
+
+$('btn-start').addEventListener('click', run);
+</script>
+</body>
+</html>

@@ -249,6 +249,18 @@ def main():
                 failures.append(("GET", "/viva-live/loadspike", r.status_code))
         except Exception as e:
             line(None, "GET", "/viva-live/loadspike", str(e)[:60]); failures.append(("GET", "/viva-live/loadspike", "exception"))
+        try:
+            r = c.get("/viva-live/check")
+            body = r.text or ""
+            ok = (r.status_code == 200 and 'id="btn-start"' in body
+                  and "never a verdict" in body and "</html>" in body and "{{" not in body)
+            line(r.status_code, "GET", "/viva-live/check",
+                 "device-check page well-formed" if ok else "MALFORMED")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/viva-live/check", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/viva-live/check", str(e)[:60]); failures.append(("GET", "/viva-live/check", "exception"))
 
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")
