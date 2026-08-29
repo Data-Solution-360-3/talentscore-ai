@@ -249,6 +249,39 @@ def main():
                 failures.append(("GET", "/viva-live/loadspike", r.status_code))
         except Exception as e:
             line(None, "GET", "/viva-live/loadspike", str(e)[:60]); failures.append(("GET", "/viva-live/loadspike", "exception"))
+        # Candidate-link surfaces (the recruiter/candidate split).
+        try:
+            r = c.get("/interview/smoke-not-a-real-token")
+            body = r.text or ""
+            ok = r.status_code < 500 and "accepting applications" in body.lower()
+            line(r.status_code, "GET", "/interview/{unknown}",
+                 "unified closed page" if ok else "NOT the closed page")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/interview/{unknown}", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/interview/{unknown}", str(e)[:60]); failures.append(("GET", "/interview/{unknown}", "exception"))
+        try:
+            r = c.post("/api/interview/smoke-not-a-real-token/session-token", json={})
+            ok = r.status_code == 404   # dead token: neutral refusal, no mint, no spend
+            line(r.status_code, "POST", "/api/interview/{unknown}/session-token",
+                 "refused, no spend" if ok else "UNEXPECTED")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/interview/{unknown}/session-token", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/interview/{unknown}/session-token", str(e)[:60]); failures.append(("POST", "/api/interview/{unknown}/session-token", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.post("/api/viva-live/create", json={"questions": ["x"]})
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "POST", "/api/viva-live/create",
+                 "gated (owner-only)" if gated else "NOT GATED — anyone could mint links!")
+            checked += 1
+            if not gated:
+                failures.append(("POST", "/api/viva-live/create", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/create", str(e)[:60]); failures.append(("POST", "/api/viva-live/create", "exception"))
         try:
             r = c.get("/viva-live/check")
             body = r.text or ""

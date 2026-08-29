@@ -81,6 +81,8 @@ async def connect():
     await db.interview_written_answers.create_index("status")
     await db.interview_sessions.create_index("created_at")
     await db.interview_sessions.create_index("status")
+    await db.live_interviews.create_index("public_token", unique=True, sparse=True)
+    await db.live_interviews.create_index("user_id")
 
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
@@ -1058,6 +1060,62 @@ async def get_written_submissions(interview_id: str) -> list:
     async for doc in cursor:
         out.append(serialize_mongo(doc))
     return out
+
+
+# ── Candidate-facing live interviews (the recruiter/candidate split) ──
+
+# A leaked candidate link must not be able to drain OpenAI spend: every session
+# mint consumes one unit of this per-token budget, atomically. 15 covers a full
+# interview plus generous L1 drop-recovery re-mints; then the link is dead.
+LIVE_MINT_BUDGET = 15
+
+
+async def create_live_interview(user_id: str, config: dict) -> dict:
+    """Recruiter creates a live interview; returns the doc with its candidate token.
+
+    The config is stored SERVER-SIDE and drives the session from here on. The
+    candidate page receives only what it operationally needs (name, count,
+    proctoring mode) — it cannot leak settings it never gets.
+    """
+    token = generate_public_token()
+    doc = {
+        "user_id": user_id,
+        "public_token": token,
+        "config": config,
+        "answer_language": "en",
+        "mints": 0,
+        "completed_sessions": 0,
+        "active": True,
+        "created_at": datetime.utcnow(),
+    }
+    res = await db.live_interviews.insert_one(doc)
+    doc["_id"] = str(res.inserted_id)
+    return doc
+
+
+async def get_live_interview_by_token(token: str) -> dict | None:
+    """Probe-resistant resolve: unknown, deactivated, and already-completed
+    tokens all return None so the page renders one identical closed response."""
+    doc = await db.live_interviews.find_one(
+        {"public_token": token, "active": True, "completed_sessions": {"$lt": 1}})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+async def reserve_live_mint(token: str) -> bool:
+    """Atomically consume one unit of the token's mint budget. Same
+    check-IS-the-update pattern as the spend caps — concurrency can't overshoot."""
+    doc = await db.live_interviews.find_one_and_update(
+        {"public_token": token, "active": True, "mints": {"$lt": LIVE_MINT_BUDGET}},
+        {"$inc": {"mints": 1}, "$set": {"last_mint_at": datetime.utcnow()}},
+    )
+    return doc is not None
+
+
+async def complete_live_interview(token: str) -> None:
+    await db.live_interviews.update_one(
+        {"public_token": token}, {"$inc": {"completed_sessions": 1}})
 
 
 # ── Live interview sessions (L4) ─────────────────────────────

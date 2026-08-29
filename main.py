@@ -56,6 +56,8 @@ from database import (
     create_interview, get_interview_by_token,
     save_written_submission, get_written_submissions,
     save_interview_session, get_interview_sessions, get_interview_session,
+    create_live_interview, get_live_interview_by_token, reserve_live_mint,
+    complete_live_interview,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1388,11 +1390,14 @@ _VIVA_DEFAULT_QUESTION = "Tell me about a project you're proud of, and what your
 _VIVA_MAX_TURNS_CAP = 8
 
 
-def _build_live_instructions(questions: list, max_turns: int) -> str:
+def _build_live_instructions(questions: list, max_turns: int,
+                             interviewer_name: str = "") -> str:
     numbered = "\n".join(f"  {i+1}. {q}" for i, q in enumerate(questions))
+    name_line = (f"Your name is {interviewer_name}. Introduce yourself by that name "
+                 "in your one greeting sentence. " if interviewer_name else "")
     return (
         "You are conducting a live spoken screening interview, in ENGLISH only. "
-        "Professional, warm, efficient.\n\n"
+        f"Professional, warm, efficient. {name_line}\n\n"
         "STRUCTURE\n"
         f"- You will ask a TOTAL of {max_turns} questions across the interview, one at a time, then close.\n"
         "- Open with ONE short greeting sentence, then immediately ask the first opening question below. "
@@ -1723,6 +1728,202 @@ async def viva_live_session_detail(request: Request, session_id: str):
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found.")
     return sess
+
+
+# ─────────────────────────────────────────────────────────────
+# CANDIDATE-FACING LIVE INTERVIEW — the recruiter/candidate split.
+# Recruiter configures at /viva-live (owner-only) and generates a token;
+# the candidate opens /interview/{token} and sees ZERO configuration.
+# Config lives server-side; the mint here is NOT owner-gated (candidates
+# aren't owners), so it is guarded by the per-token mint budget instead.
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/api/viva-live/create")
+async def viva_live_create(request: Request):
+    """Owner-only: create a live interview and get its candidate link."""
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    questions = [str(q).strip()[:300] for q in (body.get("questions") or []) if str(q).strip()][:3]
+    if not questions:
+        questions = [_VIVA_DEFAULT_QUESTION]
+    try:
+        max_turns = max(1, min(_VIVA_MAX_TURNS_CAP, int(body.get("max_turns", 4))))
+    except Exception:
+        max_turns = 4
+    max_turns = max(max_turns, len(questions))
+    config = {
+        "questions": questions,
+        "max_turns": max_turns,
+        "vad": body.get("vad") if body.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD,
+        "proctoring": body.get("proctoring") if body.get("proctoring") in ("off", "S", "M") else "off",
+        "interviewer_name": str(body.get("interviewer_name", "")).strip()[:60] or "AI Interviewer",
+        "job_title": str(body.get("job_title", "")).strip()[:120],
+    }
+    doc = await create_live_interview(user["user_id"], config)
+    return {"success": True, "token": doc["public_token"],
+            "url": f"{APP_URL}/interview/{doc['public_token']}"}
+
+
+@app.get("/interview/{token}", response_class=HTMLResponse)
+async def candidate_interview_page(token: str):
+    """The candidate's page. No configuration is rendered or sent — only what
+    the page operationally needs: interviewer name, question count, and the
+    proctoring MODE (it must know whether to request camera/screen; that is
+    disclosure, not a control). Patience/questions/etc. never leave the server."""
+    live = await get_live_interview_by_token(token)
+    if not live:
+        return _closed_link_page()
+    cfg = live.get("config") or {}
+
+    def esc(v, fallback=""):
+        return _html.escape(str(v if v not in (None, "") else fallback))
+
+    page = read_template("interview.html")
+    for key, val in {
+        "{{TOKEN}}": esc(token),
+        "{{IV_NAME}}": esc(cfg.get("interviewer_name"), "AI Interviewer"),
+        "{{IV_INITIAL}}": esc((cfg.get("interviewer_name") or "A").strip()[:1].upper(), "A"),
+        "{{JOB_TITLE}}": esc(cfg.get("job_title"), ""),
+        "{{MAX_TURNS}}": str(int(cfg.get("max_turns", 4))),
+        "{{EST_MINUTES}}": str(max(4, int(cfg.get("max_turns", 4)) * 2 + 2)),
+        "{{PROCTORING}}": esc(cfg.get("proctoring"), "off"),
+    }.items():
+        page = page.replace(key, val)
+    return HTMLResponse(page)
+
+
+@app.post("/api/interview/{token}/session-token")
+async def candidate_session_token(request: Request, token: str):
+    """Mint a Realtime secret for a candidate session. NOT owner-gated —
+    guarded instead by the per-token mint budget (atomic, 15 covers a session
+    plus generous drop-recoveries) and a rate limit. Instructions are built
+    server-side from the STORED config; the client sends only its recovery
+    transcript, which is size-capped and framed as data-not-instructions."""
+    live = await get_live_interview_by_token(token)
+    if not live:
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="Interview service not configured.")
+    if not await rate_limit_allows(f"live-mint:{token}", 6, 600):
+        raise HTTPException(status_code=429, detail="Please wait a moment and try again.")
+    if not await reserve_live_mint(token):
+        # Budget exhausted — same neutral closed message as a dead token.
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+
+    transcript, asked = [], 0
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            if isinstance(body.get("transcript"), list):
+                transcript = body["transcript"][:40]
+            asked = max(0, min(20, int((body.get("progress") or {}).get("asked", 0))))
+    except Exception:
+        pass
+
+    cfg = live.get("config") or {}
+    questions = cfg.get("questions") or [_VIVA_DEFAULT_QUESTION]
+    max_turns = int(cfg.get("max_turns", 4))
+    asked = min(asked, max_turns)
+    instructions = _build_live_instructions(questions, max_turns,
+                                            interviewer_name=cfg.get("interviewer_name", ""))
+    recovered = False
+    if transcript:
+        lines = []
+        for t in transcript:
+            role = "Interviewer" if (t or {}).get("role") == "ai" else "Candidate"
+            text = str((t or {}).get("text", "")).strip()
+            if text:
+                lines.append(f"{role}: {text[:400]}")
+        joined = "\n".join(lines)[-_MAX_RECOVERY_CHARS:]
+        if joined:
+            instructions += _VIVA_RECOVERY_TEMPLATE.format(
+                lines=joined, asked=asked, max_turns=max_turns)
+            recovered = True
+
+    try:
+        out = await _mint_realtime_secret(instructions, cfg.get("vad", _VIVA_DEFAULT_VAD))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Could not start the interview. Please retry.")
+    out["recovered"] = recovered
+    out["max_turns"] = max_turns
+    return out
+
+
+@app.post("/api/interview/{token}/session")
+async def candidate_session_save(request: Request, background: BackgroundTasks, token: str):
+    """Candidate's finished session — saved against the RECRUITER's account
+    (sessions belong to whoever created the interview). Marks the token
+    completed, so the link is single-use. Not owner-gated: the candidate is the
+    one finishing; the token itself is the credential."""
+    live = await get_live_interview_by_token(token)
+    if not live:
+        # Already completed or dead — neutral OK, nothing stored twice.
+        return {"success": True}
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+
+    transcript = body.get("transcript")
+    if not isinstance(transcript, list) or not transcript:
+        raise HTTPException(status_code=400, detail="A transcript is required.")
+    transcript = [
+        {"role": "ai" if (t or {}).get("role") == "ai" else "you",
+         "text": str((t or {}).get("text", ""))[:600]}
+        for t in transcript[:120] if str((t or {}).get("text", "")).strip()
+    ]
+
+    def _i(v, lo, hi):
+        try:
+            return max(lo, min(hi, int(v)))
+        except Exception:
+            return lo
+
+    cfg = live.get("config") or {}
+    doc = {
+        "user_id": live.get("user_id"),
+        "interview_token": token,
+        "source": "candidate_link",
+        "answer_language": "en",
+        "transcript": transcript,
+        "config": {"questions": cfg.get("questions"), "max_turns": cfg.get("max_turns"),
+                   "vad": cfg.get("vad"), "job_title": cfg.get("job_title", ""),
+                   "interviewer_name": cfg.get("interviewer_name", "")},
+        "questions_asked": _i(body.get("questions_asked"), 0, 20),
+        "recoveries": _i(body.get("recoveries"), 0, 50),
+        "barge_ins": _i(body.get("barge_ins"), 0, 200),
+        "duration_seconds": _i(body.get("duration_seconds"), 0, 7200),
+        "status": body.get("status") if body.get("status") in ("completed", "abandoned") else "abandoned",
+        "score_status": "pending",
+    }
+    p = body.get("proctoring")
+    if isinstance(p, dict) and p.get("enabled"):
+        segs = []
+        for s in (p.get("coverage_segments") or [])[:50]:
+            if isinstance(s, dict):
+                segs.append({"t": _i(s.get("t"), 0, 86400),
+                             "change": str(s.get("change", ""))[:80],
+                             "reason": str(s.get("reason", ""))[:200]})
+        doc["proctoring"] = {"enabled": True, "start_tier": str(p.get("start_tier", ""))[:4],
+                             "coverage_segments": segs,
+                             "cam_bytes": _i(p.get("cam_bytes"), 0, 2_000_000_000),
+                             "scr_bytes": _i(p.get("scr_bytes"), 0, 2_000_000_000),
+                             "snapshots": _i(p.get("snapshots"), 0, 10000),
+                             "final_cam": str(p.get("final_cam", ""))[:20],
+                             "final_scr": str(p.get("final_scr", ""))[:20]}
+    else:
+        doc["proctoring"] = {"enabled": False}
+
+    session_id = await save_interview_session(doc)
+    if doc["status"] == "completed":
+        await complete_live_interview(token)   # single-use: the link dies here
+    background.add_task(score_live_session, session_id)
+    return {"success": True}
 
 
 @app.get("/viva-live/check", response_class=HTMLResponse)

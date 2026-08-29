@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--indigo:#1E3A5F;--orange:#F57C2E;--orange2:#E16A1F;
+  --og:rgba(245,124,46,.1);--ob:rgba(245,124,46,.3);--ig:rgba(30,58,95,.08);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  --border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
+.hidden{display:none!important}
+
+.top{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 1.6rem;gap:14px;background:rgba(250,251,252,.85);backdrop-filter:blur(14px);z-index:50}
+.wordmark{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--navy)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:1.1rem}
+.progress{font-size:13px;font-weight:600;color:var(--t2);font-variant-numeric:tabular-nums}
+.progress b{color:var(--navy)}
+.watch{display:none;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--t3);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);padding:5px 12px;box-shadow:var(--shadow-sm)}
+.watch.on{display:flex}
+.watch i{width:7px;height:7px;border-radius:50%;background:var(--border2)}
+.watch i.rec{background:var(--green)} .watch i.snap{background:var(--amber)}
+
+.stage{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:90px 2rem 120px}
+
+.ivcard{display:inline-flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:.9rem 1.4rem}
+.ivatar{width:46px;height:46px;border-radius:50%;background:var(--navy);display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0}
+.ivname{font-size:15px;font-weight:800;color:var(--navy);line-height:1.2}
+.ivrole{font-size:11.5px;color:var(--t3);font-weight:600}
+.voice{display:flex;align-items:flex-end;gap:3px;height:20px;margin-left:.6rem}
+.voice i{width:3.5px;background:var(--orange);border-radius:2px;height:6px}
+.ivcard.speaking .voice i{animation:eq 1s ease-in-out infinite}
+.ivcard.speaking .voice i:nth-child(2){animation-delay:.15s}
+.ivcard.speaking .voice i:nth-child(3){animation-delay:.3s}
+.ivcard.speaking .voice i:nth-child(4){animation-delay:.45s}
+@keyframes eq{0%,100%{height:6px}50%{height:18px}}
+@media (prefers-reduced-motion:reduce){.ivcard.speaking .voice i{animation:none;height:12px}}
+
+.q-label{font-size:11.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin:2.2rem 0 1rem}
+.question{max-width:760px;text-align:center;font-size:clamp(1.35rem,2.8vw,2.15rem);font-weight:750;letter-spacing:-.7px;line-height:1.32;color:var(--navy);min-height:2.6em}
+.question .caret{display:inline-block;width:3px;height:1em;background:var(--orange);border-radius:2px;vertical-align:-.15em;margin-left:3px;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:0}}
+
+.presence{margin-top:2.4rem;display:inline-flex;align-items:center;gap:10px;font-size:14.5px;font-weight:700;padding:11px 22px;border-radius:var(--r-pill);border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow-md);color:var(--t2);transition:all .3s}
+.presence i{width:10px;height:10px;border-radius:50%;background:var(--border2)}
+.presence.ai{border-color:var(--ob);background:var(--og);color:var(--orange2)}
+.presence.ai i{background:var(--orange);animation:soft 1.6s ease-in-out infinite}
+.presence.you{border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.07);color:var(--green)}
+.presence.you i{background:var(--green);animation:soft 1.6s ease-in-out infinite}
+.presence.think{color:var(--amber)} .presence.think i{background:var(--amber)}
+@keyframes soft{50%{box-shadow:0 0 0 6px rgba(0,0,0,.04);opacity:.75}}
+@media (prefers-reduced-motion:reduce){.presence i{animation:none}}
+
+.selfview{position:fixed;right:1.6rem;bottom:1.6rem;width:210px;aspect-ratio:4/3;border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-xl);border:1px solid var(--border);background:#0b1a30;z-index:40;display:none}
+.selfview.on{display:block}
+.selfview video{width:100%;height:100%;object-fit:cover;display:block}
+.selfview .tag{position:absolute;left:10px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(20,40,72,.55);padding:3px 9px;border-radius:var(--r-pill)}
+.end{position:fixed;left:1.6rem;bottom:1.6rem;z-index:40;display:none}
+.end.on{display:block}
+.end button{font-family:inherit;font-size:13px;font-weight:700;color:var(--t2);background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--r-pill);padding:10px 20px;cursor:pointer;box-shadow:var(--shadow-sm)}
+.end button:hover{color:var(--red);border-color:rgba(220,38,38,.4)}
+
+.recon{position:fixed;top:74px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:9px;background:var(--surface);border:1px solid rgba(220,38,38,.3);color:#B91C1C;border-radius:var(--r-pill);padding:9px 18px;font-size:13px;font-weight:700;box-shadow:var(--shadow-lg);z-index:60}
+.recon.on{display:inline-flex}
+.recon .spin{width:13px;height:13px;border:2px solid rgba(220,38,38,.25);border-top-color:#DC2626;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* landing + complete cards */
+.bigcard{max-width:520px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.4rem 2.2rem;text-align:center}
+.bigcard h1{font-size:1.55rem;font-weight:900;letter-spacing:-.7px;color:var(--navy);margin:.9rem 0 .6rem}
+.bigcard .sub{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto}
+.expect{margin:1.5rem auto 0;max-width:380px;text-align:left;font-size:.88rem;color:var(--t2);line-height:2}
+.expect b{color:var(--navy)}
+.expect svg{vertical-align:-3px;margin-right:8px}
+.notice{margin-top:1.2rem;background:var(--og);border:1px solid rgba(245,124,46,.25);border-radius:var(--r-lg);padding:.7rem .95rem;font-size:.78rem;color:var(--t2);line-height:1.55;text-align:left}
+.btn-begin{margin-top:1.5rem;width:100%;padding:16px;border-radius:var(--r-lg);border:none;font-family:inherit;font-size:16px;font-weight:800;color:#fff;background:var(--orange);cursor:pointer;box-shadow:0 6px 20px rgba(245,124,46,.32)}
+.btn-begin:hover:not(:disabled){background:var(--orange2)}
+.btn-begin:disabled{opacity:.6;cursor:not-allowed}
+.foot{margin-top:1rem;font-size:11.5px;color:var(--t3)}
+.err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.75rem .9rem;font-size:.85rem;margin-top:1rem;line-height:1.5;display:none;text-align:left}
+.err.on{display:block}
+.resume-wrap{margin-top:1.2rem;display:none}
+.resume-wrap.on{display:block}
+
+.blocker{max-width:440px;text-align:center}
+@media(max-width:860px){
+  .selfview{width:126px;right:1rem;bottom:1rem}
+  .end{left:1rem;bottom:1rem}
+  .top{padding:0 1rem}
+  .watch span{display:none}
+  .bigcard{padding:1.8rem 1.3rem}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="wordmark">
+    <svg height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#142848"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/><rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/><rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/><path d="M15 19 L24 28 L49 8" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    TopCandidate<span style="color:var(--orange)">.pro</span>
+  </div>
+  <div class="top-right">
+    <span class="progress hidden" id="progress"><b id="prog-n">Question 1</b> of {{MAX_TURNS}}</span>
+    <span class="watch" id="watch"><i id="w-cam"></i><span>Camera</span> <i id="w-scr"></i><span>Screen</span></span>
+  </div>
+</div>
+
+<div class="recon" id="recon"><span class="spin"></span><span id="recon-msg">Connection dropped — reconnecting…</span></div>
+
+<!-- unsupported browser -->
+<section class="stage hidden" id="v-blocked">
+  <div class="bigcard blocker">
+    <h1>Please open this in Chrome or Safari</h1>
+    <p class="sub">This browser can't hold a live audio call. Open your interview link in <b>Chrome</b> or <b>Safari</b> on a laptop and it will work.</p>
+  </div>
+</section>
+
+<!-- LANDING -->
+<section class="stage" id="v-landing">
+  <div class="bigcard">
+    <div class="ivcard">
+      <div class="ivatar">{{IV_INITIAL}}</div>
+      <div style="text-align:left">
+        <div class="ivname">{{IV_NAME}}</div>
+        <div class="ivrole">AI Interviewer{{JOB_TITLE}}</div>
+      </div>
+    </div>
+    <h1>Ready for your interview?</h1>
+    <p class="sub">A short spoken conversation — {{IV_NAME}} asks, you answer in your own words. Every question is also shown as text, so you can read as well as listen.</p>
+    <div class="expect">
+      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>{{MAX_TURNS}} questions</b>, around {{EST_MINUTES}} minutes</div>
+      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Answer in <b>English</b>, at your own pace</div>
+      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>A short pause to think is completely fine</div>
+    </div>
+    <div class="notice hidden" id="proc-notice"><b>Monitoring:</b> this interview records your camera<span id="proc-scr-note"> and screen</span> for the hiring team's review. It's a signal for human reviewers — never an automatic decision.</div>
+    <button class="btn-begin" id="btn-begin" type="button">I'm ready — begin interview</button>
+    <div class="foot">Your microphone<span id="perm-note"></span> will be requested next.</div>
+    <div class="err" id="err"></div>
+    <div class="resume-wrap" id="resume-wrap">
+      <button class="btn-begin" id="btn-resume" type="button" style="background:var(--navy)">Resume interview</button>
+    </div>
+  </div>
+</section>
+
+<!-- INTERVIEW -->
+<section class="stage hidden" id="v-live">
+  <div class="ivcard" id="ivcard">
+    <div class="ivatar">{{IV_INITIAL}}</div>
+    <div>
+      <div class="ivname">{{IV_NAME}}</div>
+      <div class="ivrole">AI Interviewer</div>
+    </div>
+    <div class="voice"><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="q-label" id="q-label">Getting ready…</div>
+  <div class="question" id="question"><span class="caret"></span></div>
+  <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
+</section>
+
+<!-- COMPLETE -->
+<section class="stage hidden" id="v-done">
+  <div class="bigcard">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(22,163,74,.1);display:grid;place-items:center;margin:0 auto .4rem">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1>Interview complete</h1>
+    <p class="sub">Thank you — your conversation with {{IV_NAME}} is finished and saved. The hiring team will review it and be in touch. You can close this page.</p>
+  </div>
+</section>
+
+<div class="selfview" id="selfview"><video id="proc-cam" playsinline muted autoplay></video><span class="tag">You</span></div>
+<div class="end" id="endwrap"><button id="btn-end" type="button">End interview</button></div>
+<video id="proc-scr-hidden" class="hidden" playsinline muted autoplay></video>
+<canvas id="proc-canvas" class="hidden"></canvas>
+<audio id="ai-audio" autoplay></audio>
+
+<script>
+// ═════════════════════════════════════════════════════════════
+// CANDIDATE LIVE INTERVIEW — same engine as the owner console
+// (L1 drop-recovery, L2 turn budget via control notes, L3 endpointing/
+// barge-in, L4 capture, proctoring watchdog). ZERO configuration here:
+// the server injected only what the page operationally needs.
+// ═════════════════════════════════════════════════════════════
+const TOKEN = "{{TOKEN}}";
+const MAX_TURNS = parseInt("{{MAX_TURNS}}") || 4;
+const PROCTORING = "{{PROCTORING}}";      // off | S | M — disclosure, not a control
+const IV_NAME = "{{IV_NAME}}";
+const CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+
+const $ = id => document.getElementById(id);
+const log = (...a) => console.log('[viva]', ...a);
+function showErr(m){ const e=$('err'); e.textContent=m; e.classList.add('on'); }
+function view(v){ for(const s of ['v-landing','v-live','v-done','v-blocked']) $(s).classList.add('hidden'); $(v).classList.remove('hidden'); }
+
+let pc=null, dc=null, micStream=null;
+let manualStop=false, resuming=false, graceTimer=null;
+let transcript=[], aiBuf='';
+let questionsAsked=0, skipNextCount=false, closing=false, closingDone=false;
+let aiSpeaking=false, bargeIns=0, recoveries=0, recoveryStart=0;
+let sessionSaved=false, startedAtMs=0;
+let started=false;
+
+// ── presence / question UI ───────────────────────────────────
+function setPresence(k, txt){
+  $('presence').className='presence '+k;
+  $('presence-t').textContent=txt;
+  $('ivcard').classList.toggle('speaking', k==='ai');
+}
+function renderQuestionStream(){
+  $('question').innerHTML = escapeHtml(aiBuf)+'<span class="caret"></span>';
+}
+function renderQuestionFinal(text){
+  $('question').textContent = text;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function updateProgress(){
+  $('progress').classList.remove('hidden');
+  const n = Math.min(Math.max(questionsAsked,1), MAX_TURNS);
+  $('prog-n').textContent = 'Question '+n;
+  $('q-label').textContent = closing||closingDone ? 'Wrapping up' : 'Question '+n;
+}
+
+// ── engine: mint / connect / recovery (candidate endpoints) ──
+async function mintToken(){
+  const r = await fetch('/api/interview/'+TOKEN+'/session-token', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({transcript: transcript.slice(-30), progress:{asked: questionsAsked}})
+  });
+  if(r.status===404) throw {dead:true};
+  if(r.status===429) throw new Error('busy');
+  if(!r.ok) throw new Error('token '+r.status);
+  return r.json();
+}
+async function ensureMic(){
+  if(micStream && micStream.getAudioTracks().some(t=>t.readyState==='live')) return;
+  micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+}
+async function connect(){
+  const tok = await mintToken();
+  if(tok.recovered) skipNextCount = true;
+  await ensureMic();
+  pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
+  pc.onconnectionstatechange = onConnState;
+  pc.ontrack = e => { $('ai-audio').srcObject = e.streams[0]; };
+  micStream.getTracks().forEach(t=> pc.addTrack(t, micStream));
+  dc = pc.createDataChannel('oai-events');
+  dc.onopen = ()=> dc.send(JSON.stringify({type:'response.create'}));
+  dc.onmessage = onEvent;
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const res = await fetch(CALLS_URL, { method:'POST', body: offer.sdp,
+    headers:{ Authorization:'Bearer '+tok.value, 'Content-Type':'application/sdp' } });
+  if(!res.ok) throw new Error('calls '+res.status);
+  await pc.setRemoteDescription({ type:'answer', sdp: await res.text() });
+}
+function recon(on,msg){ $('recon').classList.toggle('on',!!on); if(msg) $('recon-msg').textContent=msg; }
+function onConnState(){
+  if(!pc) return;
+  const s = pc.connectionState;
+  log('pc:', s);
+  if(s==='connected'){
+    clearTimeout(graceTimer); graceTimer=null; recon(false);
+    if(recoveryStart){ recoveries++; recoveryStart=0; }
+  }else if(s==='disconnected'){
+    recon(true,'Connection hiccup — holding on…');
+    if(!graceTimer) graceTimer = setTimeout(()=>{ resume('grace'); }, 4000);
+  }else if(s==='failed' || s==='closed'){
+    if(!manualStop) resume('pc '+s);
+  }
+}
+async function resume(reason){
+  if(resuming || manualStop) return;
+  resuming = true;
+  clearTimeout(graceTimer); graceTimer=null;
+  if(!recoveryStart) recoveryStart = performance.now();
+  log('resume:', reason);
+  try{ if(dc) dc.close(); }catch(_){}
+  try{ if(pc) pc.close(); }catch(_){}
+  pc=null; dc=null;
+  for(let i=1;i<=6 && !manualStop;i++){
+    recon(true, 'Connection dropped — reconnecting (attempt '+i+' of 6)…');
+    try{ await connect(); resuming=false; return; }
+    catch(e){
+      if(e && e.dead){ resuming=false; recon(false); interviewDead(); return; }
+      await new Promise(r=>setTimeout(r,2500));
+    }
+  }
+  resuming=false;
+  recon(false);
+  setPresence('think','Connection lost — your progress is saved');
+  view('v-landing');
+  $('btn-begin').classList.add('hidden');
+  $('resume-wrap').classList.add('on');
+  showErr('Your network dropped. When it comes back, tap Resume — the interview continues where it left off.');
+}
+function interviewDead(){
+  showErr('This interview link is no longer available.');
+  view('v-landing'); $('btn-begin').disabled=true;
+}
+
+// ── engine: events (transcript, turns, closing) ──────────────
+function sendControlNote(){
+  if(!dc || dc.readyState!=='open') return;
+  let text;
+  if(questionsAsked >= MAX_TURNS){
+    text = '[Interview control note: You have now asked all '+MAX_TURNS+' questions. '+
+      'When the candidate finishes this answer, thank them warmly, tell them that\'s all your questions and the team will be in touch, and end the interview. Ask nothing further.]';
+    closing = true;
+  }else{
+    text = '[Interview control note: You have asked '+questionsAsked+' of '+MAX_TURNS+' questions. '+(MAX_TURNS-questionsAsked)+' remaining. Continue adaptively.]';
+  }
+  dc.send(JSON.stringify({type:'conversation.item.create', item:{type:'message', role:'system', content:[{type:'input_text', text}]}}));
+  updateProgress();
+}
+function onEvent(ev){
+  let msg; try{ msg = JSON.parse(ev.data); }catch(_){ return; }
+  const t = msg.type || '';
+
+  if(t.includes('audio_transcript.delta') || t.includes('output_text.delta')){
+    aiBuf += (msg.delta || '');
+    renderQuestionStream();                     // the question, as text, live
+  }else if(t.includes('audio_transcript.done') || t.includes('output_text.done')){
+    const text = (msg.transcript || aiBuf || '').trim(); aiBuf='';
+    if(text){ transcript.push({role:'ai', text}); renderQuestionFinal(text); }
+  }else if(t.includes('input_audio_transcription') && (t.includes('completed')||t.includes('done'))){
+    const text = (msg.transcript || '').trim();
+    if(text) transcript.push({role:'you', text});
+  }
+
+  if(t.includes('speech_started')){
+    if(aiSpeaking){ bargeIns++; aiSpeaking=false; }
+    setPresence('you','Listening to you — take your time');
+  }else if(t.includes('speech_stopped')){
+    setPresence('think','One moment…');
+  }else if((t.includes('audio') && t.includes('delta') && !t.includes('transcript')) || t==='output_audio_buffer.started'){
+    aiSpeaking = true;
+    setPresence('ai', IV_NAME+' is speaking');
+  }else if(t.includes('response.done')){
+    aiSpeaking = false;
+    const status = (msg.response && msg.response.status) || 'completed';
+    if(status !== 'completed') return;          // barge-in: not an asked question
+    if(closing){
+      closingDone = true;
+      setPresence('think','Wrapping up…'); updateProgress();
+      setTimeout(finishInterview, 8000);
+    }else{
+      if(skipNextCount){ skipNextCount = false; }
+      else { questionsAsked++; }
+      sendControlNote();
+      setPresence('you','Your turn — speak when ready');
+    }
+  }else if(t==='output_audio_buffer.cleared'){
+    aiSpeaking = false;
+  }else if(t==='output_audio_buffer.stopped'){
+    aiSpeaking = false;
+    if(closingDone){ finishInterview(); }
+    else if(!closing){ setPresence('you','Your turn — speak when ready'); }
+  }
+}
+
+// ── proctoring (recorders + watchdog) — same rules as approved ──
+let proc = null;
+function covPush(change, reason){
+  proc.coverage.push({t: Math.round((Date.now()-proc.startMs)/1000), change, reason});
+  log('coverage:', change, reason);
+  watchDots();
+}
+function watchDots(){
+  if(!proc){ $('watch').classList.remove('on'); return; }
+  $('watch').classList.add('on');
+  $('w-cam').className = proc.camMode==='continuous'?'rec':proc.camMode==='snapshots'?'snap':'';
+  $('w-scr').className = proc.scrMode==='continuous'?'rec':proc.scrMode==='snapshots'?'snap':'';
+}
+async function procStart(mode){
+  proc = {mode, camMode:'off', scrMode:'off', camStream:null, scrStream:null,
+    camRec:null, scrRec:null, camBytes:0, scrBytes:0, snapshots:0, scrSnaps:0,
+    camLastSlice:0, scrLastSlice:0, camMaxGap:0, scrMaxGap:0, camBad:[], scrBad:[],
+    camGrace:0, scrGrace:0, snapTimer:null, scrSnapTimer:null, watchTimer:null,
+    coverage:[], startMs:Date.now(), concealPrev:0, samplesPrev:0, concealPct:0, pcRef:null};
+  try{
+    proc.camStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:15}}});
+    $('proc-cam').srcObject = proc.camStream;
+    $('selfview').classList.add('on');
+  }catch(e){ covPush('camera unavailable','permission denied'); proc.camMode='unavailable'; return; }
+  if(mode==='S'){
+    try{
+      proc.scrStream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:5}}});
+      $('proc-scr-hidden').srcObject = proc.scrStream;
+      proc.scrStream.getVideoTracks()[0].addEventListener('ended', ()=>{
+        if(proc && proc.scrMode!=='off'){ proc.scrMode='unavailable'; covPush('screen share stopped','stopped by candidate'); }
+      });
+    }catch(e){ covPush('screen declined','continuing without screen'); }
+  }
+  const mime=(function(){for(const c of ['video/webm;codecs=vp8','video/webm','video/mp4']) if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(c)) return c; return '';})();
+  if(mode==='S'){
+    try{
+      proc.camRec=new MediaRecorder(proc.camStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+      proc.camLastSlice=performance.now(); proc.camGrace=performance.now()+5000;
+      proc.camRec.ondataavailable=ev=>{const n=performance.now(); proc.camMaxGap=Math.max(proc.camMaxGap,n-proc.camLastSlice); proc.camLastSlice=n; proc.camBytes+=(ev.data&&ev.data.size)||0;};
+      proc.camRec.start(1000); proc.camMode='continuous';
+    }catch(e){ proc.camMode='snapshots'; startCamSnaps(); }
+    if(proc.scrStream){
+      try{
+        proc.scrRec=new MediaRecorder(proc.scrStream, mime?{mimeType:mime,videoBitsPerSecond:1_000_000}:{videoBitsPerSecond:1_000_000});
+        proc.scrLastSlice=performance.now(); proc.scrGrace=performance.now()+5000;
+        proc.scrRec.ondataavailable=ev=>{const n=performance.now(); proc.scrMaxGap=Math.max(proc.scrMaxGap,n-proc.scrLastSlice); proc.scrLastSlice=n; proc.scrBytes+=(ev.data&&ev.data.size)||0;};
+        proc.scrRec.start(1000); proc.scrMode='continuous';
+      }catch(e){ proc.scrMode='snapshots'; startScrSnaps(); }
+    }else{ proc.scrMode='unavailable'; }
+    covPush('start','tier S — continuous camera'+(proc.scrMode==='continuous'?' + screen':''));
+  }else{
+    proc.camMode='snapshots'; startCamSnaps(); proc.scrMode='unavailable';
+    covPush('start','tier M — camera snapshots');
+  }
+  proc.watchTimer = setInterval(watchdog, 2000);
+}
+function grab(v){ const c=$('proc-canvas'); if(!v.videoWidth) return null;
+  c.width=320; c.height=Math.round(320*v.videoHeight/v.videoWidth);
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height); return c.toDataURL('image/jpeg',0.6); }
+function startCamSnaps(){ proc.snapTimer=setInterval(()=>{ if(grab($('proc-cam'))) proc.snapshots++; },15000); }
+function startScrSnaps(){ proc.scrSnapTimer=setInterval(()=>{ if(grab($('proc-scr-hidden'))) proc.scrSnaps++; },20000); }
+function downScr(reason){ if(proc.scrMode!=='continuous') return;
+  try{ proc.scrRec&&proc.scrRec.state!=='inactive'&&proc.scrRec.stop(); }catch(_){}
+  proc.scrRec=null; proc.scrMode='snapshots'; startScrSnaps(); covPush('screen: continuous → snapshots',reason); }
+function downCam(reason){ if(proc.camMode!=='continuous') return;
+  try{ proc.camRec&&proc.camRec.state!=='inactive'&&proc.camRec.stop(); }catch(_){}
+  proc.camRec=null; proc.camMode='snapshots'; startCamSnaps(); covPush('camera: continuous → snapshots',reason); }
+function gapCheck(which){
+  const now=performance.now();
+  const last=which==='cam'?proc.camLastSlice:proc.scrLastSlice;
+  const rec=which==='cam'?proc.camRec:proc.scrRec;
+  const grace=which==='cam'?proc.camGrace:proc.scrGrace;
+  if(!rec || now<grace) return;
+  let gap=Math.max(which==='cam'?proc.camMaxGap:proc.scrMaxGap, now-last);
+  if(which==='cam') proc.camMaxGap=0; else proc.scrMaxGap=0;
+  const gs=(gap/1000).toFixed(1)+'s';
+  const down=which==='cam'?downCam:downScr;
+  if(gap>=2500){ down((which==='cam'?'camera':'screen')+' encoder gap '+gs); return; }
+  if(gap>=1500){
+    const bad=which==='cam'?proc.camBad:proc.scrBad;
+    bad.push(now);
+    const recent=bad.filter(t=>now-t<=10000);
+    if(which==='cam') proc.camBad=recent; else proc.scrBad=recent;
+    if(recent.length>=2) down((which==='cam'?'camera':'screen')+' encoder gaps '+gs+' twice in 10s');
+  }
+}
+async function watchdog(){
+  if(!proc) return;
+  gapCheck('scr'); gapCheck('cam');
+  if(pc && pc.connectionState==='connected'){
+    if(proc.pcRef!==pc){ proc.pcRef=pc; proc.concealPrev=0; proc.samplesPrev=0; }
+    try{
+      const stats=await pc.getStats();
+      stats.forEach(s=>{ if(s.type==='inbound-rtp'&&s.kind==='audio'){
+        const dC=(s.concealedSamples||0)-proc.concealPrev, dT=(s.totalSamplesReceived||0)-proc.samplesPrev;
+        proc.concealPrev=s.concealedSamples||0; proc.samplesPrev=s.totalSamplesReceived||0;
+        proc.concealPct=dT?+(dC/dT*100).toFixed(2):0; }});
+      if(proc.concealPct>0.5){
+        if(proc.scrMode==='continuous') downScr('audio concealment '+proc.concealPct+'% — shedding for the interview');
+        else if(proc.camMode==='continuous') downCam('audio concealment '+proc.concealPct+'% — shedding for the interview');
+      }
+    }catch(_){}
+  }
+}
+function procStop(){
+  if(!proc) return null;
+  clearInterval(proc.watchTimer); clearInterval(proc.snapTimer); clearInterval(proc.scrSnapTimer);
+  try{ proc.camRec&&proc.camRec.state!=='inactive'&&proc.camRec.stop(); }catch(_){}
+  try{ proc.scrRec&&proc.scrRec.state!=='inactive'&&proc.scrRec.stop(); }catch(_){}
+  try{ proc.camStream&&proc.camStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  try{ proc.scrStream&&proc.scrStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  const s={enabled:true, start_tier:proc.mode, coverage_segments:proc.coverage,
+    cam_bytes:proc.camBytes, scr_bytes:proc.scrBytes, snapshots:proc.snapshots+proc.scrSnaps,
+    final_cam:proc.camMode, final_scr:proc.scrMode};
+  proc=null; $('selfview').classList.remove('on');
+  return s;
+}
+
+// ── lifecycle ────────────────────────────────────────────────
+async function saveSession(status){
+  if(sessionSaved || !transcript.length || questionsAsked===0) return;
+  sessionSaved = true;
+  try{
+    await fetch('/api/interview/'+TOKEN+'/session', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        transcript, status,
+        questions_asked: questionsAsked, recoveries, barge_ins: bargeIns,
+        duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000):0,
+        proctoring: window._procSummary || {enabled:false}
+      })});
+  }catch(e){ log('save failed', e); }
+}
+function finishInterview(){
+  if(manualStop) return;
+  manualStop = true;
+  window._procSummary = procStop();
+  saveSession('completed');
+  cleanup(); recon(false);
+  view('v-done');
+}
+function endInterview(){
+  manualStop = true;
+  window._procSummary = procStop();
+  saveSession('abandoned');
+  cleanup(); recon(false);
+  view('v-done');
+}
+function cleanup(){
+  try{ if(dc) dc.close(); }catch(_){}
+  try{ if(pc) pc.close(); }catch(_){}
+  try{ if(micStream) micStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  pc=null; dc=null; micStream=null;
+  $('endwrap').classList.remove('on');
+}
+
+async function begin(){
+  $('err').classList.remove('on');
+  $('btn-begin').disabled = true; $('btn-begin').textContent = 'Starting…';
+  try{
+    if(PROCTORING !== 'off') await procStart(PROCTORING);
+    await connect();
+    started = true; startedAtMs = Date.now();
+    view('v-live'); $('endwrap').classList.add('on');
+    setPresence('think', IV_NAME+' is joining…');
+    updateProgress();
+  }catch(e){
+    $('btn-begin').disabled=false; $('btn-begin').textContent="I'm ready — begin interview";
+    if(e && e.dead){ interviewDead(); return; }
+    if(e && e.name==='NotAllowedError'){ showErr('Microphone access is needed for a spoken interview. Allow it and try again.'); return; }
+    showErr('Could not start the interview. Check your connection and try again.');
+  }
+}
+async function manualResume(){
+  $('err').classList.remove('on');
+  $('btn-resume').disabled=true;
+  view('v-live');
+  await resume('manual');
+  $('btn-resume').disabled=false;
+  if(pc && pc.connectionState!=='failed'){ $('resume-wrap').classList.remove('on'); }
+}
+
+function isInAppWebView(){
+  const ua=navigator.userAgent||'';
+  return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|Twitter|WhatsApp|Snapchat|Pinterest|; wv\)|GSA\//i.test(ua);
+}
+window.addEventListener('load', ()=>{
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.RTCPeerConnection) || isInAppWebView()){
+    view('v-blocked'); return;
+  }
+  if(PROCTORING !== 'off'){
+    $('proc-notice').classList.remove('hidden');
+    $('perm-note').textContent = PROCTORING==='S' ? ', camera and screen' : ' and camera';
+    if(PROCTORING!=='S') $('proc-scr-note').textContent='';
+  }
+  $('btn-begin').addEventListener('click', begin);
+  $('btn-resume').addEventListener('click', manualResume);
+  $('btn-end').addEventListener('click', endInterview);
+});
+window.addEventListener('online', ()=>{ if(started && !manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online'); });
+window.addEventListener('pagehide', ()=>{ procStop(); cleanup(); });
+</script>
+</body>
+</html>

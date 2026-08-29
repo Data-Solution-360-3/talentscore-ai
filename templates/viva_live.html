@@ -104,6 +104,16 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
             <option value="S">Continuous (Tier S) — camera + screen recording</option>
             <option value="M">Snapshot (Tier M) — periodic captures</option>
           </select>
+          <label style="font-size:12px;font-weight:600;color:var(--t2);margin-left:1rem">Interviewer name</label>
+          <input id="cfg-ivname" value="AI Interviewer" style="margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:600;width:170px">
+        </div>
+        <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px dashed var(--border2)">
+          <button id="btn-create-link" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--navy);color:#fff;cursor:pointer">Create candidate link</button>
+          <span style="font-size:11.5px;color:var(--t3);margin-left:.6rem">Sends this exact setup to one candidate. They see zero settings.</span>
+          <div id="linkcard" class="hidden" style="margin-top:.7rem;display:flex;gap:8px;align-items:center">
+            <input id="linkurl" readonly style="flex:1;padding:9px 11px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);color:var(--text)">
+            <button id="btn-copy-link" type="button" style="padding:9px 14px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:12px;font-weight:800;background:var(--orange);color:#fff;cursor:pointer">Copy</button>
+          </div>
         </div>
       </div>
 
@@ -708,6 +718,37 @@ window.addEventListener('load', ()=>{
   $('btn-resume').addEventListener('click', manualResume);
   $('btn-end').addEventListener('click', end);
 });
+// Recruiter: create a candidate link from the current setup (owner-gated API).
+async function createCandidateLink(){
+  const btn = $('btn-create-link');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try{
+    const r = await fetch('/api/viva-live/create', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        questions: $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3),
+        max_turns: Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4)),
+        vad: $('cfg-vad').value || 'patient',
+        proctoring: $('cfg-proc').value || 'off',
+        interviewer_name: $('cfg-ivname').value.trim() || 'AI Interviewer'
+      })
+    });
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || 'HTTP '+r.status);
+    $('linkurl').value = d.url;
+    $('linkcard').classList.remove('hidden');
+  }catch(e){ showErr('Could not create link: '+(e.message||e)); }
+  btn.disabled = false; btn.textContent = 'Create candidate link';
+}
+
+window.addEventListener('load', ()=>{
+  const b=$('btn-create-link');
+  if(b) b.addEventListener('click', createCandidateLink);
+  const c=$('btn-copy-link');
+  if(c) c.addEventListener('click', ()=>{ $('linkurl').select(); navigator.clipboard.writeText($('linkurl').value).catch(()=>{}); c.textContent='Copied'; setTimeout(()=>c.textContent='Copy',1500); });
+});
+
 window.addEventListener('online', ()=>{ log('browser online event'); if(!manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online event'); });
 window.addEventListener('pagehide', ()=>{ procStop(); cleanup(); });
 document.addEventListener('DOMContentLoaded', ()=>{});
