@@ -93,6 +93,10 @@ db = _LiveDB()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 
+# Viva Live (L0) — OpenAI Realtime model for the turn-taking proving ground.
+# Stable alias is "gpt-realtime"; "gpt-realtime-2.1" is the current snapshot.
+VIVA_LIVE_MODEL = os.getenv("VIVA_LIVE_MODEL", "gpt-realtime-2.1")
+
 
 # ─────────────────────────────────────────────────────────────
 # Standalone admin UI for manual payment review.
@@ -1262,6 +1266,74 @@ async def viva_record_page(token: str):
     }.items():
         page = page.replace(key, val)
     return HTMLResponse(page)
+
+
+# ─────────────────────────────────────────────────────────────
+# VIVA LIVE — L0 proving ground (turn-taking on a real network)
+#
+# Bare minimum to FEEL whether OpenAI Realtime over WebRTC is usable on a Dhaka
+# mobile connection. One hardcoded question, one exchange. The browser connects
+# WebRTC DIRECTLY to OpenAI — this server only mints a short-lived ephemeral
+# secret and never touches audio bytes. No scoring, no DB, no recruiter UI.
+# ─────────────────────────────────────────────────────────────
+
+# The whole interview brief for L0. English-only, one question, respond once.
+_VIVA_L0_INSTRUCTIONS = (
+    "You are conducting a short spoken job interview, in ENGLISH only. "
+    "The moment the session starts, greet the candidate warmly in one short sentence, "
+    "then ask exactly this question and nothing else: "
+    "\"Tell me about a project you're proud of, and what your specific role was.\" "
+    "Then stop and listen. After the candidate finishes answering, respond ONCE: "
+    "briefly acknowledge what they said in one or two sentences and ask a single, natural "
+    "follow-up question. Then stop. Keep every spoken turn short and conversational — this is "
+    "a person on a mobile phone, not an essay. Speak only English; if the candidate speaks "
+    "another language, gently ask them to continue in English."
+)
+
+
+@app.get("/viva-live", response_class=HTMLResponse)
+async def viva_live_page():
+    """L0 test page. Harmless without a token — the mint endpoint is owner-gated."""
+    return HTMLResponse(read_template("viva_live.html"))
+
+
+@app.get("/api/viva-live/token")
+async def viva_live_token(request: Request):
+    """Mint a short-lived OpenAI Realtime ephemeral secret for the browser.
+
+    OWNER-ONLY. Each realtime session costs real money ($0.60-1.20 for a full
+    interview), so unlike the apply link this can never be an open endpoint — an
+    unauthenticated mint is a direct spend hole. Sign in as the owner on the
+    device you're testing from.
+    """
+    await require_admin(request)
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured on server.")
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                "https://api.openai.com/v1/realtime/client_secrets",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}",
+                         "Content-Type": "application/json"},
+                json={"session": {
+                    "type": "realtime",
+                    "model": VIVA_LIVE_MODEL,
+                    "instructions": _VIVA_L0_INSTRUCTIONS,
+                    "audio": {"output": {"voice": "marin"}},
+                }},
+            )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not reach OpenAI Realtime: {e}")
+    if r.status_code >= 400:
+        # Surface the real reason — usually no Realtime access or a bad model name.
+        raise HTTPException(status_code=502,
+                            detail=f"Realtime mint failed ({r.status_code}): {r.text[:300]}")
+    data = r.json()
+    value = data.get("value") or (data.get("client_secret") or {}).get("value")
+    if not value:
+        raise HTTPException(status_code=502, detail=f"No ephemeral secret in response: {str(data)[:200]}")
+    return {"value": value, "model": VIVA_LIVE_MODEL, "expires_at": data.get("expires_at")}
 
 
 @app.get("/apply/{token}", response_class=HTMLResponse)

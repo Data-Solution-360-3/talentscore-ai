@@ -175,6 +175,31 @@ def main():
                 line(None, "GET", path, str(e)[:60])
                 failures.append(("GET", path, "exception"))
 
+        # ── Viva Live (L0) — checked here, PRE-AUTH, on purpose ──
+        # The token-mint endpoint spends real money per call, so the check must
+        # never hit it with valid auth. Unauthenticated it MUST be gated (401/403);
+        # a 200 here would mean an open spend hole. And the public page must load.
+        print("\nViva Live (L0)")
+        try:
+            r = c.get("/viva-live")
+            ok = r.status_code == 200 and "network test" in (r.text or "").lower()
+            line(r.status_code, "GET", "/viva-live", "page loads" if ok else "MALFORMED")
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/viva-live", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/viva-live", str(e)[:60]); failures.append(("GET", "/viva-live", "exception"))
+        try:
+            r = c.get("/api/viva-live/token")   # no auth header set yet
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/viva-live/token",
+                 "gated (owner-only)" if gated else "NOT GATED — spend hole!")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/viva-live/token", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/viva-live/token", str(e)[:60]); failures.append(("GET", "/api/viva-live/token", "exception"))
+
         # ── Authenticate ─────────────────────────────────────────────────
         print("\nAuthenticating")
         # Primary: mint a token from SECRET_KEY (server-side, no password).

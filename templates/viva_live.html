@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Live interview (L0 test) — TopCandidate.pro</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#142848;--orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.1);--ob:rgba(245,124,46,.3);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;--border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
+  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
+  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.tb-name{font-size:14px;font-weight:800;color:var(--navy)}
+.tb-tag{margin-left:auto;font-size:11px;color:var(--t3);font-weight:700;background:var(--s2);padding:3px 9px;border-radius:var(--r-pill)}
+.wrap{max-width:520px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.5rem 1.35rem;margin-bottom:1.1rem}
+h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:.4rem}
+.lede{font-size:.92rem;color:var(--t2);line-height:1.6}
+
+.orb{width:120px;height:120px;border-radius:50%;margin:1.5rem auto 1.1rem;display:grid;place-items:center;background:var(--s2);border:2px solid var(--border);transition:.25s;position:relative}
+.orb.you{border-color:var(--green);background:rgba(22,163,74,.08);box-shadow:0 0 0 8px rgba(22,163,74,.06)}
+.orb.ai{border-color:var(--orange);background:var(--og);box-shadow:0 0 0 8px rgba(245,124,46,.07)}
+.orb.think{border-color:var(--amber);background:rgba(217,119,6,.07)}
+.orb svg{width:46px;height:46px}
+.state{text-align:center;font-size:1.05rem;font-weight:800;color:var(--navy);min-height:1.4em}
+.substate{text-align:center;font-size:.82rem;color:var(--t3);margin-top:.25rem;min-height:1.2em}
+
+.latency{margin-top:1.25rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1rem}
+.latency-label{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem}
+.latency-row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--t2);padding:2px 0}
+.latency-row b{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px}
+.lat-good{color:var(--green)}.lat-ok{color:var(--amber)}.lat-bad{color:var(--red)}
+
+.controls{display:flex;gap:10px;margin-top:1.35rem}
+.btn{flex:1;padding:15px;border-radius:var(--r-lg);font-size:15px;font-weight:800;font-family:inherit;border:none;cursor:pointer;transition:.15s}
+.btn-go{background:var(--orange);color:#fff;box-shadow:0 6px 18px rgba(245,124,46,.3)}
+.btn-go:hover:not(:disabled){background:var(--orange2)}
+.btn-end{background:var(--navy);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hidden{display:none!important}
+
+.log{margin-top:1rem;font-size:11px;color:var(--t3);font-family:ui-monospace,monospace;background:#0b1a30;color:#9fb3c8;border-radius:var(--r-md);padding:.7rem .8rem;max-height:130px;overflow-y:auto;line-height:1.5;display:none}
+.log.on{display:block}
+.err{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);color:#B91C1C;border-radius:var(--r-lg);padding:.8rem .95rem;font-size:.87rem;margin-top:1rem;line-height:1.5;display:none}
+.err.on{display:block}
+
+.blocker{display:none;text-align:center;padding:1.5rem .5rem}
+.blocker.on{display:block}
+.blocker h2{font-size:1.15rem;color:var(--navy);margin-bottom:.6rem}
+.blocker p{font-size:.92rem;color:var(--t2);line-height:1.6}
+.tip{font-size:12px;color:var(--t3);margin-top:1rem;line-height:1.55;text-align:center}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="tb-tag">Live interview · L0 test</span>
+</div>
+
+<div class="wrap">
+  <div class="blocker" id="blocker">
+    <div class="card">
+      <h2>Open this in Chrome or Safari</h2>
+      <p>This in-app browser can't hold a live audio call. Open the link in <b>Chrome</b> (Android) or <b>Safari</b> (iPhone) and try again.</p>
+    </div>
+  </div>
+
+  <div id="flow">
+    <div class="card">
+      <h1>Live AI interview — network test</h1>
+      <p class="lede">Tap start, allow the microphone, and have a short spoken conversation with the AI interviewer. This is a turn-taking test — the goal is to feel whether the back-and-forth is smooth on your real connection.</p>
+
+      <div class="orb" id="orb">
+        <svg id="orb-ico" viewBox="0 0 24 24" fill="none" stroke="#8593AB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      </div>
+      <div class="state" id="state">Ready</div>
+      <div class="substate" id="substate">Use mobile data, not wifi, to test your real network.</div>
+
+      <div class="latency" id="latency">
+        <div class="latency-label">Per-turn latency (you stop → AI replies)</div>
+        <div class="latency-row"><span>Last turn</span><b id="lat-last">—</b></div>
+        <div class="latency-row"><span>Best</span><b id="lat-best">—</b></div>
+        <div class="latency-row"><span>Worst</span><b id="lat-worst">—</b></div>
+        <div class="latency-row"><span>Turns measured</span><b id="lat-count">0</b></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-go" id="btn-start" type="button">Start interview</button>
+        <button class="btn btn-end hidden" id="btn-end" type="button">End</button>
+      </div>
+      <div class="err" id="err"></div>
+      <div class="log" id="log"></div>
+      <p class="tip">Good: the AI replies within ~2s of you finishing, no talk-over.<br>Broken: long pauses, it cuts you off, or it talks while you talk.</p>
+    </div>
+  </div>
+</div>
+
+<audio id="ai-audio" autoplay></audio>
+
+<script>
+const $ = id => document.getElementById(id);
+const CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+let pc=null, dc=null, micStream=null;
+let turnStart=0, best=Infinity, worst=0, count=0;
+
+function log(m){ const el=$('log'); el.classList.add('on'); el.innerHTML += m+'<br>'; el.scrollTop=el.scrollHeight; }
+function showErr(m){ $('err').textContent=m; $('err').classList.add('on'); }
+function setState(s, sub){ $('state').textContent=s; if(sub!==undefined) $('substate').textContent=sub; }
+function orb(cls, color, path){
+  const o=$('orb'); o.className='orb'+(cls?' '+cls:'');
+  if(color) $('orb-ico').setAttribute('stroke', color);
+}
+
+function isInAppWebView(){
+  const ua=navigator.userAgent||'';
+  return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|Twitter|WhatsApp|Snapchat|Pinterest|; wv\)|GSA\//i.test(ua);
+}
+function apisPresent(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection); }
+
+function fmt(ms){ return (ms/1000).toFixed(2)+'s'; }
+function cls(ms){ return ms<=2000?'lat-good':ms<=3000?'lat-ok':'lat-bad'; }
+function recordTurn(ms){
+  count++; best=Math.min(best,ms); worst=Math.max(worst,ms);
+  const last=$('lat-last'); last.textContent=fmt(ms); last.className=cls(ms);
+  const b=$('lat-best'); b.textContent=fmt(best); b.className=cls(best);
+  const w=$('lat-worst'); w.textContent=fmt(worst); w.className=cls(worst);
+  $('lat-count').textContent=count;
+}
+
+async function start(){
+  $('err').classList.remove('on');
+  $('btn-start').disabled=true;
+  setState('Connecting…','Minting a secure session');
+
+  // 1) ephemeral token from OUR server (owner-gated). Server never sees audio.
+  let tok;
+  try{
+    const r = await fetch('/api/viva-live/token', {credentials:'include'});
+    if(r.status===401 || r.status===403){
+      $('btn-start').disabled=false;
+      showErr('Sign in as the owner first (open topcandidate.pro/login on this device), then reload this page. The live session costs money, so it is owner-only.');
+      setState('Ready'); return;
+    }
+    if(!r.ok){ throw new Error('token '+r.status+' '+(await r.text()).slice(0,140)); }
+    tok = await r.json();
+  }catch(e){ $('btn-start').disabled=false; showErr('Could not start session: '+e.message); setState('Ready'); return; }
+  log('token ok · model '+tok.model);
+
+  // 2) mic
+  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ $('btn-start').disabled=false; showErr('Microphone access is needed. Allow it and try again.'); setState('Ready'); return; }
+
+  // 3) peer connection — STUN helps NAT traversal on mobile
+  pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
+  pc.oniceconnectionstatechange = ()=> log('ice: '+pc.iceConnectionState);
+  pc.onconnectionstatechange = ()=>{
+    log('pc: '+pc.connectionState);
+    if(pc.connectionState==='connected'){ setState('Connected','The interviewer will speak first — listen'); }
+    if(pc.connectionState==='failed'){ showErr('Connection failed — likely a network/NAT issue on this connection.'); }
+    if(pc.connectionState==='disconnected'){ setState('Reconnecting…','Network dropped'); }
+  };
+  pc.ontrack = e => { $('ai-audio').srcObject = e.streams[0]; };
+  micStream.getTracks().forEach(t=> pc.addTrack(t, micStream));
+
+  // 4) data channel for realtime events (drives the status + latency readout)
+  dc = pc.createDataChannel('oai-events');
+  dc.onopen = ()=>{ log('dc open · asking AI to begin'); dc.send(JSON.stringify({type:'response.create'})); };
+  dc.onmessage = onEvent;
+
+  // 5) SDP offer → OpenAI /calls → answer
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  setState('Connecting…','Handshaking with the interviewer');
+  let answer;
+  try{
+    const res = await fetch(CALLS_URL, { method:'POST', body: offer.sdp,
+      headers:{ Authorization:'Bearer '+tok.value, 'Content-Type':'application/sdp' } });
+    if(!res.ok){ throw new Error('calls '+res.status+' '+(await res.text()).slice(0,140)); }
+    answer = await res.text();
+  }catch(e){ showErr('Could not reach the interviewer: '+e.message); setState('Ready'); cleanup(); $('btn-start').disabled=false; return; }
+  await pc.setRemoteDescription({ type:'answer', sdp: answer });
+
+  $('btn-start').classList.add('hidden');
+  $('btn-end').classList.remove('hidden');
+}
+
+function onEvent(ev){
+  let msg; try{ msg = JSON.parse(ev.data); }catch(_){ return; }
+  const t = msg.type || '';
+  // Robust to minor event-name changes across API versions: match on substrings.
+  if(t.includes('speech_started')){
+    orb('you','#16A34A'); setState('Listening to you…','Speak your answer');
+  }else if(t.includes('speech_stopped')){
+    turnStart = performance.now();
+    orb('think','#D97706'); setState('Thinking…','Waiting for the AI to reply');
+  }else if((t.includes('audio') && t.includes('delta')) || t==='output_audio_buffer.started'){
+    if(turnStart){ recordTurn(performance.now()-turnStart); turnStart=0; }
+    orb('ai','#F57C2E'); setState('Interviewer speaking…','');
+  }else if(t.includes('response.done') || t==='output_audio_buffer.stopped'){
+    orb('', '#8593AB'); setState('Your turn','Answer when ready');
+  }else if(t==='error'){
+    showErr('Realtime error: '+(msg.error && msg.error.message ? msg.error.message : 'unknown'));
+  }
+}
+
+function cleanup(){
+  try{ if(dc) dc.close(); }catch(_){}
+  try{ if(pc) pc.close(); }catch(_){}
+  try{ if(micStream) micStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  pc=null; dc=null; micStream=null;
+}
+function end(){
+  cleanup();
+  orb('', '#8593AB');
+  setState('Ended', count? `Measured ${count} turn(s). Best ${fmt(best)}, worst ${fmt(worst)}.` : 'No turns measured.');
+  $('btn-end').classList.add('hidden');
+  $('btn-start').classList.remove('hidden'); $('btn-start').disabled=false;
+}
+
+window.addEventListener('load', ()=>{
+  if(!apisPresent() || isInAppWebView()){ $('flow').style.display='none'; $('blocker').classList.add('on'); return; }
+  $('btn-start').addEventListener('click', start);
+  $('btn-end').addEventListener('click', end);
+});
+window.addEventListener('pagehide', cleanup);
+</script>
+</body>
+</html>
