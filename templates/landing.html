@@ -34,7 +34,7 @@
   /* THREE colors, three roles — navy structures, orange acts, green confirms.
      Same tokens as index.html; green #16A34A is the product's success color
      everywhere, promoted here to a deliberate secondary accent. */
-  --navy:#142848;--indigo:#1E3A5F;--ig:rgba(30,58,95,.08);
+  --navy:#142848;   /* text + dark panels only — never an accent */
   --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
   --green:#16A34A;--green2:#128A40;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.28);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
@@ -127,13 +127,13 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 
 /* ── 2. HOW IT WORKS — Part A steps ── */
 .part-label{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:var(--sp-3)}
-.part-label b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r-md);background:var(--navy);color:#fff;font-size:12.5px;letter-spacing:0}
+.part-label b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r-md);background:var(--orange);color:#fff;font-size:12.5px;letter-spacing:0}
 .part-label.gn b{background:var(--green)}
 .steps-3{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3)}
 .step3{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4) 1.65rem;box-shadow:var(--shadow-sm);transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s,border-color .25s}
 .step3:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--border3)}
 .step3-n{position:absolute;top:1.7rem;right:1.8rem;font-size:2.6rem;font-weight:900;color:var(--s3);line-height:1}
-.step3-ico{width:52px;height:52px;border-radius:var(--r-lg);background:var(--navy);display:grid;place-items:center;margin-bottom:var(--sp-2)}
+.step3-ico{width:52px;height:52px;border-radius:var(--r-lg);background:var(--orange);display:grid;place-items:center;margin-bottom:var(--sp-2)}
 .step3-t{font-size:1.1rem;font-weight:800;color:var(--navy);margin-bottom:.55rem;letter-spacing:-.015em;line-height:1.3}
 .step3-d{font-size:.94rem;color:var(--t2);line-height:1.62}
 
@@ -151,7 +151,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .iv-mock{background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow-xl);padding:var(--sp-4) var(--sp-3);text-align:center;transition:transform .3s cubic-bezier(.2,.6,.2,1)}
 .iv-mock:hover{transform:translateY(-4px)}
 .ivcard{display:inline-flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:.85rem 1.3rem;text-align:left}
-.ivatar{width:44px;height:44px;border-radius:50%;background:var(--navy);display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;flex-shrink:0}
+.ivatar{width:44px;height:44px;border-radius:50%;background:var(--orange);display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;flex-shrink:0}
 .ivname{font-size:14.5px;font-weight:800;color:var(--navy);line-height:1.2}
 .ivrole{font-size:11px;color:var(--t3);font-weight:600}
 .voice{display:flex;align-items:flex-end;gap:3px;height:18px;margin-left:.5rem}
@@ -175,7 +175,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .caps{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3)}
 .cap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4) 1.65rem;box-shadow:var(--shadow-sm);transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s,border-color .25s;display:flex;flex-direction:column}
 .cap:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--border3)}
-.cap-ico{width:46px;height:46px;border-radius:var(--r-lg);background:var(--ig);display:grid;place-items:center;margin-bottom:var(--sp-2)}
+.cap-ico{width:46px;height:46px;border-radius:var(--r-lg);background:var(--og);display:grid;place-items:center;margin-bottom:var(--sp-2)}
 .cap-ico.gn{background:var(--gg)}
 .cap-t{font-size:1.06rem;font-weight:800;color:var(--navy);letter-spacing:-.015em;margin-bottom:.55rem;line-height:1.3}
 .cap-d{font-size:.925rem;color:var(--t2);line-height:1.62}
@@ -565,24 +565,24 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
         <circle cx="220" cy="200" r="4.5" fill="#F57C2E"/>
         <text class="n-flow" x="220" y="176" text-anchor="middle">in parallel</text>
         <g>
-          <rect x="16" y="54" width="176" height="72" rx="12" fill="#1E3A5F"/>
+          <rect x="16" y="54" width="176" height="72" rx="12" fill="#128A40"/>
           <text class="n-title" x="104" y="83" text-anchor="middle">Parse CV</text>
           <text class="n-sub" x="104" y="102" text-anchor="middle">roles, skills, dates, education</text>
         </g>
         <g>
-          <rect x="16" y="250" width="176" height="72" rx="12" fill="#1E3A5F"/>
+          <rect x="16" y="250" width="176" height="72" rx="12" fill="#128A40"/>
           <text class="n-title" x="104" y="279" text-anchor="middle">Parse JD</text>
           <text class="n-sub" x="104" y="298" text-anchor="middle">requirements, must-haves</text>
         </g>
         <rect x="248" y="30" width="232" height="340" rx="16" fill="#FAFBFC" stroke="#D5DCE8" stroke-width="1.5" stroke-dasharray="5 4"/>
         <text class="n-cap" x="364" y="52" text-anchor="middle">TWO-PASS SCORING</text>
         <g>
-          <rect x="266" y="86" width="196" height="56" rx="10" fill="#142848"/>
+          <rect x="266" y="86" width="196" height="56" rx="10" fill="#0E6E33"/>
           <text class="n-title" x="364" y="110" text-anchor="middle">Strict pass</text>
           <text class="n-sub" x="364" y="128" text-anchor="middle">gatekeeper · temp 0.2</text>
         </g>
         <g>
-          <rect x="266" y="258" width="196" height="56" rx="10" fill="#142848"/>
+          <rect x="266" y="258" width="196" height="56" rx="10" fill="#0E6E33"/>
           <text class="n-title" x="364" y="282" text-anchor="middle">Upside pass</text>
           <text class="n-sub" x="364" y="300" text-anchor="middle">hiring manager · temp 0.3</text>
         </g>
@@ -592,12 +592,12 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
           <text class="n-sub-d" x="364" y="211" text-anchor="middle">60 / 40 per dimension</text>
         </g>
         <g>
-          <rect x="526" y="164" width="180" height="72" rx="12" fill="#1E3A5F"/>
+          <rect x="526" y="164" width="180" height="72" rx="12" fill="#128A40"/>
           <text class="n-title" x="616" y="192" text-anchor="middle">Hard-gap check</text>
           <text class="n-sub" x="616" y="211" text-anchor="middle">−15 to −25 each, capped −35</text>
         </g>
         <g>
-          <rect x="750" y="164" width="180" height="72" rx="12" fill="#1E3A5F"/>
+          <rect x="750" y="164" width="180" height="72" rx="12" fill="#128A40"/>
           <text class="n-title" x="840" y="192" text-anchor="middle">Confidence gate</text>
           <text class="n-sub" x="840" y="211" text-anchor="middle">&gt;12 pts apart → downgrade</text>
         </g>
@@ -633,24 +633,24 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
         <circle cx="180" cy="118" r="4.5" fill="#F57C2E"/>
         <text class="n-flow" x="196" y="106" text-anchor="start">in parallel</text>
         <g>
-          <rect x="14" y="16" width="162" height="64" rx="11" fill="#1E3A5F"/>
+          <rect x="14" y="16" width="162" height="64" rx="11" fill="#128A40"/>
           <text class="n-title" x="95" y="42" text-anchor="middle">Parse CV</text>
           <text class="n-sub" x="95" y="60" text-anchor="middle">roles, skills, dates</text>
         </g>
         <g>
-          <rect x="184" y="16" width="162" height="64" rx="11" fill="#1E3A5F"/>
+          <rect x="184" y="16" width="162" height="64" rx="11" fill="#128A40"/>
           <text class="n-title" x="265" y="42" text-anchor="middle">Parse JD</text>
           <text class="n-sub" x="265" y="60" text-anchor="middle">requirements</text>
         </g>
         <rect x="14" y="150" width="332" height="280" rx="14" fill="#FAFBFC" stroke="#D5DCE8" stroke-width="1.5" stroke-dasharray="5 4"/>
         <text class="n-cap" x="180" y="172" text-anchor="middle">TWO-PASS SCORING</text>
         <g>
-          <rect x="32" y="186" width="296" height="60" rx="10" fill="#142848"/>
+          <rect x="32" y="186" width="296" height="60" rx="10" fill="#0E6E33"/>
           <text class="n-title" x="180" y="211" text-anchor="middle">Strict pass</text>
           <text class="n-sub" x="180" y="230" text-anchor="middle">gatekeeper · temp 0.2</text>
         </g>
         <g>
-          <rect x="32" y="262" width="296" height="60" rx="10" fill="#142848"/>
+          <rect x="32" y="262" width="296" height="60" rx="10" fill="#0E6E33"/>
           <text class="n-title" x="180" y="287" text-anchor="middle">Upside pass</text>
           <text class="n-sub" x="180" y="306" text-anchor="middle">hiring manager · temp 0.3</text>
         </g>
@@ -660,13 +660,13 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
           <text class="n-sub-d" x="180" y="399" text-anchor="middle">60 / 40 per dimension</text>
         </g>
         <g>
-          <rect x="32" y="462" width="296" height="76" rx="12" fill="#1E3A5F"/>
+          <rect x="32" y="462" width="296" height="76" rx="12" fill="#128A40"/>
           <text class="n-title" x="180" y="490" text-anchor="middle">Hard-gap check</text>
           <text class="n-sub" x="180" y="509" text-anchor="middle">−15 to −25 each,</text>
           <text class="n-sub" x="180" y="525" text-anchor="middle">capped at −35</text>
         </g>
         <g>
-          <rect x="32" y="570" width="296" height="76" rx="12" fill="#1E3A5F"/>
+          <rect x="32" y="570" width="296" height="76" rx="12" fill="#128A40"/>
           <text class="n-title" x="180" y="598" text-anchor="middle">Confidence gate</text>
           <text class="n-sub" x="180" y="617" text-anchor="middle">passes &gt;12 pts apart</text>
           <text class="n-sub" x="180" y="633" text-anchor="middle">→ downgrade to MAYBE</text>
