@@ -323,6 +323,19 @@ def main():
                 failures.append(("POST", "/api/jobs/{id}/viva", r.status_code))
         except Exception as e:
             line(None, "POST", "/api/jobs/{id}/viva", str(e)[:60]); failures.append(("POST", "/api/jobs/{id}/viva", "exception"))
+        for iq_path in ("/api/jobs/000000000000000000000000/interview-questions/generate",
+                        "/api/jobs/000000000000000000000000/interview-questions"):
+            try:
+                with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                    r = unauth.post(iq_path, json={})
+                gated = r.status_code in (401, 403)
+                line(r.status_code, "POST", iq_path.replace("000000000000000000000000", "{id}"),
+                     "gated (owner-only)" if gated else "NOT GATED")
+                checked += 1
+                if not gated:
+                    failures.append(("POST", iq_path, r.status_code))
+            except Exception as e:
+                line(None, "POST", iq_path, str(e)[:60]); failures.append(("POST", iq_path, "exception"))
         try:
             r = c.get("/viva-live/check")
             body = r.text or ""
@@ -447,6 +460,27 @@ def main():
         except Exception as e:
             line(None, "POST", "/api/viva-live/preview-session (typed)", str(e)[:60])
             failures.append(("POST", "/api/viva-live/preview-session (typed)", "exception"))
+        # Job-based sets: 10 questions must survive the pipeline intact — this
+        # exact check catches a cap regression (questions were [:3] before
+        # job-based sets raised the limits) and a mode-mangling one.
+        try:
+            ten = [{"text": f"Question {i+1}", "mode": "typed" if i < 3 else "spoken"}
+                   for i in range(10)]
+            r = c.post("/api/viva-live/preview-session", json={"questions": ten})
+            body = r.json() if r.status_code == 200 else {}
+            got = body.get("questions", [])
+            n_typed = sum(1 for q in got if q.get("mode") == "typed")
+            ok = (r.status_code == 200 and len(got) == 10 and n_typed == 3
+                  and body.get("has_typed") is True and body.get("tool_registered") is True)
+            line(r.status_code, "POST", "/api/viva-live/preview-session (10q)",
+                 "10-question set intact (7 spoken · 3 typed)" if ok
+                 else f"SET MANGLED: {len(got)} qs, {n_typed} typed")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva-live/preview-session (10q)", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session (10q)", str(e)[:60])
+            failures.append(("POST", "/api/viva-live/preview-session (10q)", "exception"))
         try:
             r = c.post("/api/viva-live/preview-session", json={
                 "questions": ["Plain legacy string question"]})

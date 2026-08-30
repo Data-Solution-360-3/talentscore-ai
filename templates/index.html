@@ -2569,9 +2569,12 @@ function renderPublicLink(job, spend){
         const v   = job.viva || null;
         const von = !!(v && v.enabled);
         const cfg = (v && v.config) || null;
-        const cfgLine = cfg
-          ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
-          : `Default setup — one general question, 4 turns, patient pace, proctoring off.`;
+        const iqa = (job.interview_questions||{}).approved || null;
+        const cfgLine = iqa
+          ? `this job's APPROVED question set (${iqa.count} questions, ~70/30 spoken/typed) · ${(cfg&&cfg.vad)||'patient'} pace · proctoring ${(cfg&&cfg.proctoring)||'off'}`
+          : (cfg
+            ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
+            : `Default setup — one general question, 4 turns, patient pace, proctoring off.`);
         return `
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${von?'8px':'0'}">
@@ -2602,7 +2605,197 @@ function renderPublicLink(job, spend){
             </div>
           </div>
         </div>`; })()}
+
+      ${(()=>{ // Job-based interview questions: none -> draft -> approved.
+        // Draft and approved are separate slots server-side; candidates only
+        // ever get the approved set. Rendering happens in iqRender() so edits
+        // can re-render without rebuilding the whole modal.
+        const iq = job.interview_questions || {};
+        window._iqState = { jobId: job._id, draft: iq.draft || null,
+                            approved: iq.approved || null, editing: false, work: null };
+        setTimeout(iqRender, 0);   // runs right after this string is inserted
+        return `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Interview questions</div>
+            <span id="iq-chip"></span>
+          </div>
+          <div id="iq-body"></div>
+        </div>`; })()}
     </div>`;
+}
+
+// ── Job-based interview questions (generate → review → approve) ──
+function iqList(){
+  const st = window._iqState;
+  if(st.editing) return st.work;
+  return st.draft ? st.draft.questions : [];
+}
+function iqCounts(list){
+  const t = list.filter(q=>q.mode==='typed').length;
+  return `${list.length - t} spoken 🎙 · ${t} typed ⌨`;
+}
+function iqChip(html){ const c=document.getElementById('iq-chip'); if(c) c.innerHTML = html; }
+function iqEditorRows(list){
+  return list.map((q,i)=>`
+    <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
+      <span style="font-size:11px;font-weight:700;color:var(--t3);width:18px;text-align:right;flex-shrink:0">${i+1}.</span>
+      <input value="${escapeHtml(q.text)}" maxlength="300" oninput="iqSetText(${i},this.value)"
+             style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+      <select onchange="iqSetMode(${i},this.value)"
+              style="width:104px;padding:7px 5px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
+        <option value="spoken" ${q.mode!=='typed'?'selected':''}>🎙 Spoken</option>
+        <option value="typed" ${q.mode==='typed'?'selected':''}>⌨ Typed</option>
+      </select>
+      <button onclick="iqDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
+    </div>`).join('');
+}
+function iqRender(){
+  const st = window._iqState;
+  const body = document.getElementById('iq-body');
+  if(!body || !st) return;
+  if(st.editing || st.draft){
+    const list = iqList();
+    iqChip(`<span class="badge b-amber">DRAFT — not used yet</span>`);
+    body.innerHTML = `
+      <div style="background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.3);border-radius:var(--rs);padding:7px 10px;font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:8px">
+        ${st.editing || st.approved
+          ? '<strong>Editing.</strong> The previously approved set stays live for candidates until you approve these changes.'
+          : '<strong>Draft</strong> — candidates never see these until you approve.'}
+      </div>
+      ${iqEditorRows(list)}
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">
+        <button class="btn btn-xs" onclick="iqAdd()">+ Add question</button>
+        <span id="iq-counter" style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(list)}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px">
+        <button class="btn btn-xs btn-primary" id="iq-approve" onclick="iqApprove()">Approve — use for this job</button>
+        ${st.editing ? '' : '<button class="btn btn-xs" onclick="iqSaveDraft()">Save draft</button>'}
+        <button class="btn btn-xs" onclick="iqRegenerate()">Regenerate</button>
+        <button class="btn btn-xs" onclick="iqDiscard()" style="color:var(--t3)">Discard</button>
+      </div>`;
+  }else if(st.approved){
+    iqChip(`<span class="badge b-green">APPROVED · used for all candidates</span>`);
+    body.innerHTML = `
+      ${st.approved.questions.map((q,i)=>`
+        <div style="display:flex;gap:7px;margin-bottom:4px;font-size:12px;line-height:1.5;color:var(--text)">
+          <span style="font-weight:700;color:var(--t3);width:18px;text-align:right;flex-shrink:0">${i+1}.</span>
+          <span style="flex:1">${escapeHtml(q.text)}</span>
+          <span style="font-size:10.5px;font-weight:700;color:${q.mode==='typed'?'var(--amber,#D97706)':'var(--t3)'};flex-shrink:0">${q.mode==='typed'?'⌨ typed':'🎙 spoken'}</span>
+        </div>`).join('')}
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <span style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(st.approved.questions)}</span>
+        <button class="btn btn-xs" onclick="iqEditApproved()">Edit questions</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
+        Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups.
+      </div>`;
+  }else{
+    iqChip(`<span class="badge" style="background:var(--s2);color:var(--t3)">NO QUESTIONS</span>`);
+    body.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:11px;font-weight:600;color:var(--t2)">How many
+          <input id="iq-count" type="number" min="4" max="15" value="10"
+                 style="width:52px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+        <button class="btn btn-xs btn-primary" id="iq-gen" onclick="iqGenerate()">Generate from job description</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
+        AI drafts role-relevant questions from this job's description — about 70% spoken, 30% typed.
+        You review and edit every question before any candidate sees them.
+      </div>`;
+  }
+}
+function iqSetText(i,v){ iqList()[i].text = v; }
+function iqSetMode(i,v){ iqList()[i].mode = v === 'typed' ? 'typed' : 'spoken';
+  const c=document.getElementById('iq-counter'); if(c) c.textContent = iqCounts(iqList()); }
+function iqDel(i){ iqList().splice(i,1); iqRender(); }
+function iqAdd(){ iqList().push({text:'', mode:'spoken'}); iqRender(); }
+function iqEditApproved(){
+  if(!confirm("Candidates interviewed after a change answer different questions than those before it — their scores aren't directly comparable. Edit anyway?")) return;
+  const st = window._iqState;
+  st.editing = true;
+  st.work = JSON.parse(JSON.stringify(st.approved.questions));
+  iqRender();
+}
+function iqSyncJobCache(){
+  const st = window._iqState;
+  const patch = {draft: st.draft, approved: st.approved};
+  const cached = allJobs.find(x=>x._id===st.jobId);
+  if(cached) cached.interview_questions = patch;
+  if(window._currentJob && window._currentJob._id===st.jobId)
+    window._currentJob.interview_questions = patch;
+}
+async function iqGenerate(){
+  const st = window._iqState;
+  const n = Math.max(4, Math.min(15, parseInt(document.getElementById('iq-count')?.value)||10));
+  const btn = document.getElementById('iq-gen');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
+  try{
+    const r = await fetch(`/api/jobs/${st.jobId}/interview-questions/generate`, {
+      method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({count:n})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
+    st.draft = d.draft; st.editing = false; st.work = null;
+    iqSyncJobCache(); iqRender();
+    toast(`${d.draft.count} questions drafted — review and approve below`, {type:'success'});
+  }catch(e){
+    toast('Could not generate questions: '+e.message, {type:'error'});
+    if(btn){ btn.disabled = false; btn.textContent = 'Generate from job description'; }
+  }
+}
+function iqRegenerate(){
+  if(!confirm('Replace this draft with a freshly generated set?')) return;
+  const st = window._iqState;
+  st.draft = null; st.editing = false; st.work = null;
+  iqRender();               // back to the generate view (approved set untouched)
+}
+async function iqSaveDraft(){
+  const st = window._iqState;
+  const list = iqList().filter(q=>q.text.trim());
+  try{
+    const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
+      method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'save_draft', questions:list})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
+    st.draft = d.draft; iqSyncJobCache();
+    toast('Draft saved', {type:'success'});
+  }catch(e){ toast('Could not save draft: '+e.message, {type:'error'}); }
+}
+async function iqApprove(){
+  const st = window._iqState;
+  const list = iqList().filter(q=>q.text.trim());
+  if(list.length < 4 || list.length > 15){
+    toast('An approved set needs 4–15 questions with text.', {type:'error'}); return;
+  }
+  const btn = document.getElementById('iq-approve');
+  if(btn){ btn.disabled = true; btn.textContent = 'Approving…'; }
+  try{
+    const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
+      method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'approve', questions:list})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
+    st.approved = d.approved; st.draft = null; st.editing = false; st.work = null;
+    iqSyncJobCache(); iqRender();
+    toast('Approved — every interview for this job now uses this set', {type:'success'});
+  }catch(e){
+    toast('Could not approve: '+e.message, {type:'error'});
+    if(btn){ btn.disabled = false; btn.textContent = 'Approve — use for this job'; }
+  }
+}
+async function iqDiscard(){
+  const st = window._iqState;
+  if(st.editing){ st.editing = false; st.work = null; iqRender(); return; }
+  if(!confirm('Discard this draft?')) return;
+  try{
+    const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
+      method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'discard_draft'})});
+    if(!r.ok) throw new Error(`Server returned ${r.status}`);
+    st.draft = null; iqSyncJobCache(); iqRender();
+  }catch(e){ toast('Could not discard: '+e.message, {type:'error'}); }
 }
 
 // The gate toggle and Save both write /api/jobs/{id}/viva WITHOUT a questions
@@ -2628,6 +2821,11 @@ async function saveJobViva(jobId, enabled){
   toast(enabled
     ? `Live interview ON — threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day`
     : 'Live interview off — applications are CV-only again', {type:'success'});
+  // The auto-prompt: enabling the gate on a job with no approved question set
+  // means candidates get the manual/default setup — point at the card below.
+  if(enabled && window._iqState && !window._iqState.approved){
+    toast('This job has no approved interview questions yet — generate and approve a set below, or it will use the manual /viva-live setup.', {type:'error'});
+  }
 }
 
 async function toggleJobViva(jobId, on){

@@ -58,6 +58,7 @@ from database import (
     save_interview_session, get_interview_sessions, get_interview_session,
     create_live_interview, get_live_interview_by_token, reserve_live_mint,
     complete_live_interview, set_job_viva, reserve_viva_launch,
+    update_job_interview_questions,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
@@ -1401,7 +1402,8 @@ async def interview_written_results(request: Request, interview_id: str):
 # ...]" system messages over the data channel. The model follows the notes;
 # the client owns the arithmetic.
 _VIVA_DEFAULT_QUESTION = "Tell me about a project you're proud of, and what your specific role was."
-_VIVA_MAX_TURNS_CAP = 8
+_VIVA_MAX_TURNS_CAP = 20   # raised from 8 for job-based 10-question sets
+_VIVA_MAX_QUESTIONS = 15
 
 
 def _normalize_questions(raw) -> list[dict]:
@@ -1418,7 +1420,7 @@ def _normalize_questions(raw) -> list[dict]:
             mode = "spoken"
         if text:
             out.append({"text": text, "mode": mode})
-    return out[:3]
+    return out[:_VIVA_MAX_QUESTIONS]
 
 
 # The mode-switch signal. The page never receives the question list and
@@ -1807,7 +1809,7 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
         "transcript": transcript,
         "config": {
             "questions": _normalize_questions(cfg.get("questions")),
-            "max_turns": _i(cfg.get("max_turns"), 1, 8),
+            "max_turns": _i(cfg.get("max_turns"), 1, _VIVA_MAX_TURNS_CAP),
             "vad": str(cfg.get("vad", ""))[:20],
             "job_title": str(cfg.get("job_title", ""))[:120],
         },
@@ -2464,6 +2466,16 @@ async def public_apply_status(token: str, application_id: str):
         cfg = _validated_viva_config(dict(viva.get("config") or {}))
         if not cfg.get("job_title"):
             cfg["job_title"] = str(job.get("title") or "")[:120]
+        # Job-based questions: the APPROVED set (and only the approved set —
+        # drafts never reach a candidate) replaces the manual config's
+        # questions. Turn budget: every main question plus 2 spoken adaptive
+        # follow-ups, unless the manual setting was already higher.
+        approved = ((job.get("interview_questions") or {}).get("approved") or {})
+        jqs = _normalize_questions(approved.get("questions"))
+        if jqs:
+            cfg["questions"] = jqs
+            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
+                                   max(int(cfg.get("max_turns", 4)), len(jqs) + 2))
         live_doc = await create_live_interview(str(job.get("user_id") or ""), cfg)
         await db.live_interviews.update_one(
             {"public_token": live_doc["public_token"]},
@@ -2532,6 +2544,72 @@ async def set_job_viva_config(request: Request, job_id: str):
         viva["config"]["job_title"] = str(job.get("title") or "")[:120]
     await set_job_viva(job["_id"], viva)
     return {"success": True, "viva": serialize_mongo(viva)}
+
+
+@app.post("/api/jobs/{job_id}/interview-questions/generate")
+async def job_interview_questions_generate(request: Request, job_id: str):
+    """Owner: generate the job's interview questions from its JD — ON DEMAND,
+    once, into the DRAFT slot. The approved slot (what candidates actually
+    get) is never touched by generation."""
+    from question_gen import generate_interview_questions, GEN_MODEL
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured on server.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    try:
+        count = max(4, min(15, int(body.get("count", 10))))
+    except Exception:
+        count = 10
+    if not await rate_limit_allows(f"iqgen:{job_id}", 10, 86400):
+        raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
+    questions, err = await generate_interview_questions(
+        job.get("description") or "", count, OPENAI_API_KEY,
+        job_title=job.get("title") or "")
+    if err or not questions:
+        raise HTTPException(status_code=502, detail=err or "Generation failed.")
+    draft = {"questions": questions, "count": len(questions),
+             "generated_at": _dt.utcnow(), "model": GEN_MODEL}
+    await update_job_interview_questions(job["_id"], {"draft": draft})
+    return {"success": True, "draft": serialize_mongo(draft)}
+
+
+@app.post("/api/jobs/{job_id}/interview-questions")
+async def job_interview_questions_save(request: Request, job_id: str):
+    """Owner: save the reviewed set. action 'save_draft' writes the draft slot;
+    'approve' validates and copies it into the approved slot (the ONLY write
+    the launch path reads) and clears the draft; 'discard_draft' drops the
+    draft, leaving whatever is approved untouched."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    action = body.get("action")
+    if action == "discard_draft":
+        await update_job_interview_questions(job["_id"], {"draft": None})
+        return {"success": True, "draft": None}
+    if action not in ("save_draft", "approve"):
+        raise HTTPException(status_code=400, detail="Unknown action.")
+
+    questions = _normalize_questions(body.get("questions"))
+    if action == "approve":
+        if not 4 <= len(questions) <= _VIVA_MAX_QUESTIONS:
+            raise HTTPException(status_code=400,
+                                detail=f"An approved set needs 4–{_VIVA_MAX_QUESTIONS} questions.")
+        approved = {"questions": questions, "count": len(questions),
+                    "approved_at": _dt.utcnow()}
+        await update_job_interview_questions(job["_id"], {"approved": approved, "draft": None})
+        return {"success": True, "approved": serialize_mongo(approved), "draft": None}
+    if not questions:
+        raise HTTPException(status_code=400, detail="At least one question is required.")
+    draft = {"questions": questions, "count": len(questions), "updated_at": _dt.utcnow()}
+    await update_job_interview_questions(job["_id"], {"draft": draft})
+    return {"success": True, "draft": serialize_mongo(draft)}
 
 
 @app.post("/api/jobs/{job_id}/public")

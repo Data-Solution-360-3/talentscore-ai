@@ -238,7 +238,9 @@ async def score_written_answers(qa_pairs: list, api_key: str,
 # ─────────────────────────────────────────────────────────────
 
 SPOKEN_SCORER_VERSION = "spoken-1.0"
-MAX_TRANSCRIPT_CHARS = 8000
+MAX_TRANSCRIPT_CHARS = 16000   # raised from 8k: a 10-question job-based
+# interview would otherwise be silently truncated before scoring — which would
+# quietly break the fairness story for long interviews.
 
 SPOKEN_SYSTEM_PROMPT = """You are assessing the transcript of a LIVE SPOKEN screening interview conducted by an AI interviewer. The candidate spoke English as their second or third language. The transcript was produced by machine speech recognition of accented English and may contain transcription errors — garbled phrases, wrong homophones, dropped words. Score only what is asked. Return per-dimension scores 0-20 with a one-sentence justification each, quoting a short piece of evidence from the transcript for every score. Do not compute an overall score — that is done in code from your dimension scores.
 

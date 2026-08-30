@@ -1139,6 +1139,18 @@ async def set_job_viva(job_id: str, viva: dict | None) -> None:
         await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": {"viva": viva}})
 
 
+async def update_job_interview_questions(job_id: str, patch: dict) -> None:
+    """Patch the job's interview_questions container ({draft, approved} slots).
+
+    Draft and approved live in SEPARATE slots so generating or editing can
+    never clobber the set candidates are actively getting: the launch path
+    reads only .approved, and approval is the single move that copies a draft
+    over it. job_id is pre-authorized by the route (owned_job).
+    """
+    sets = {f"interview_questions.{k}": v for k, v in patch.items()}
+    await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": sets})
+
+
 async def reserve_viva_launch(job_id: str, cap: int) -> bool:
     """Atomically reserve one auto-launched interview against the job's daily
     cap. A realtime interview is the most expensive single action the public
