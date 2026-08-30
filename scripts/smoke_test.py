@@ -293,6 +293,21 @@ def main():
                 failures.append(("POST", "/api/viva-live/preview-session", r.status_code))
         except Exception as e:
             line(None, "POST", "/api/viva-live/preview-session", str(e)[:60]); failures.append(("POST", "/api/viva-live/preview-session", "exception"))
+        # Employees (HRM module 1) — personal data: every route must refuse a
+        # credential-free client. Verified here from the first build.
+        for method, path in (("GET", "/api/employees"), ("POST", "/api/employees"),
+                             ("PUT", "/api/employees/000000000000000000000000")):
+            try:
+                with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                    r = unauth.request(method, path, json={} if method != "GET" else None)
+                gated = r.status_code in (401, 403)
+                line(r.status_code, method, path.replace("000000000000000000000000", "{id}"),
+                     "gated (owner-only)" if gated else "NOT GATED — employee data leak!")
+                checked += 1
+                if not gated:
+                    failures.append((method, path, r.status_code))
+            except Exception as e:
+                line(None, method, path, str(e)[:60]); failures.append((method, path, "exception"))
         # One-link flow (CV upload → conditional interview).
         try:
             # A probe with a fake token+id must get EXACTLY the flat received
@@ -404,6 +419,7 @@ def main():
             ("GET", "/api/admin/check-users", None),
             ("GET", "/api/admin/diagnostics", None),
             ("GET", "/api/keys", None),
+            ("GET", "/api/employees", None),
         ]
         if job_id:
             checks += [

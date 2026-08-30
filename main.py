@@ -59,6 +59,8 @@ from database import (
     create_live_interview, get_live_interview_by_token, reserve_live_mint,
     complete_live_interview, set_job_viva, reserve_viva_launch,
     update_job_interview_questions,
+    create_employee, get_employees_for_user, get_employee_for_user,
+    update_employee_for_user, find_employee_by_email, EMPLOYEE_STATUSES,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
@@ -2672,6 +2674,108 @@ async def discard_application(request: Request, application_id: str):
     await db.application_files.delete_many({"application_id": application_id})
     await db.applications.update_one({"_id": oid}, {"$set": {"status": "discarded"}})
     return {"success": True}
+
+
+# ─────────────────────────────────────────────────────────────
+# EMPLOYEES — HRM module 1. Tenant-scoped, admin-only this version.
+# Employee data is personal data: every route is gated from the first
+# build, same leak discipline as the interview/written endpoints.
+# ─────────────────────────────────────────────────────────────
+
+def _valid_ymd(s: str) -> bool:
+    try:
+        _dt.strptime(s, "%Y-%m-%d")
+        return True
+    except Exception:
+        return False
+
+
+def _validated_employee(body: dict) -> dict:
+    """Core fields only, all length-capped. Raises 400 with a plain message
+    the form can show verbatim."""
+    name = str(body.get("name", "")).strip()[:120]
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required.")
+    email = str(body.get("email", "")).strip().lower()[:200]
+    if "@" not in email or len(email) < 5:
+        raise HTTPException(status_code=400, detail="A valid email is required.")
+    role_title = str(body.get("role_title", "")).strip()[:120]
+    if not role_title:
+        raise HTTPException(status_code=400, detail="Role / job title is required.")
+    status = body.get("status") if body.get("status") in EMPLOYEE_STATUSES else "active"
+    start_date = str(body.get("start_date", "")).strip()[:10]
+    if not _valid_ymd(start_date):
+        raise HTTPException(status_code=400, detail="A start date (YYYY-MM-DD) is required.")
+    end_date = str(body.get("end_date", "")).strip()[:10]
+    if status == "terminated":
+        if not _valid_ymd(end_date):
+            raise HTTPException(status_code=400, detail="An end date is required when status is Terminated.")
+    else:
+        end_date = None   # end date only exists on terminated records
+    return {
+        "name": name, "email": email,
+        "phone": str(body.get("phone", "")).strip()[:40],
+        "role_title": role_title,
+        "department": str(body.get("department", "")).strip()[:80],
+        "status": status, "start_date": start_date, "end_date": end_date,
+    }
+
+
+@app.get("/api/employees")
+async def list_employees(request: Request):
+    user = await get_current_user(request)
+    employees = await get_employees_for_user(user["user_id"])
+    return {"employees": employees, "count": len(employees)}
+
+
+@app.post("/api/employees")
+async def create_employee_route(request: Request):
+    user = await get_current_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    fields = _validated_employee(body)
+
+    existing = await find_employee_by_email(user["user_id"], fields["email"])
+    if existing:
+        raise HTTPException(status_code=409,
+                            detail=f"{existing.get('name', 'Someone')} already has an employee record with this email.")
+
+    # source + hiring traceability. The screening link is only stored if the
+    # screening actually belongs to this tenant — a foreign id is dropped.
+    fields["source"] = "hired" if body.get("source") == "hired" else "manual"
+    if fields["source"] == "hired" and body.get("screening_id"):
+        from bson import ObjectId as _OID
+        try:
+            s = await db.screenings.find_one(
+                {"_id": _OID(str(body["screening_id"])),
+                 **user_match_field("user_id", user["user_id"])}, {"_id": 1})
+        except Exception:
+            s = None
+        if s:
+            fields["screening_id"] = str(body["screening_id"])
+
+    employee_id = await create_employee(user["user_id"], fields)
+    employee = await get_employee_for_user(employee_id, user["user_id"])
+    return {"success": True, "employee": employee}
+
+
+@app.put("/api/employees/{employee_id}")
+async def update_employee_route(request: Request, employee_id: str):
+    user = await get_current_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    # Core fields only — source, screening_id, and user_id can never be
+    # changed through an update.
+    fields = _validated_employee(body)
+    ok = await update_employee_for_user(employee_id, user["user_id"], fields)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    employee = await get_employee_for_user(employee_id, user["user_id"])
+    return {"success": True, "employee": employee}
 
 
 @app.post("/api/jobs/{job_id}/screen-pending")

@@ -83,6 +83,8 @@ async def connect():
     await db.interview_sessions.create_index("status")
     await db.live_interviews.create_index("public_token", unique=True, sparse=True)
     await db.live_interviews.create_index("user_id")
+    await db.employees.create_index("user_id")
+    await db.employees.create_index([("user_id", 1), ("email", 1)])
 
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
@@ -1149,6 +1151,53 @@ async def update_job_interview_questions(job_id: str, patch: dict) -> None:
     """
     sets = {f"interview_questions.{k}": v for k, v in patch.items()}
     await db.jobs.update_one({"_id": ObjectId(job_id)}, {"$set": sets})
+
+
+# ── Employees (HRM module 1) ─────────────────────────────────
+# The foundation record for every future HRM module: attendance, leave,
+# performance, and payroll will all reference the stable employee _id.
+# Tenant-scoped by user_id with the same user_match discipline as jobs
+# and screenings — an admin only ever sees their own company's staff.
+
+EMPLOYEE_STATUSES = ("active", "on_leave", "terminated")
+
+
+async def create_employee(user_id: str, fields: dict) -> str:
+    now = datetime.utcnow()
+    doc = {**fields, "user_id": user_id, "created_at": now, "updated_at": now}
+    res = await db.employees.insert_one(doc)
+    return str(res.inserted_id)
+
+
+async def get_employees_for_user(user_id: str) -> list:
+    cursor = db.employees.find(user_match_field("user_id", user_id)).sort("created_at", -1)
+    return [serialize_mongo(d) async for d in cursor]
+
+
+async def get_employee_for_user(employee_id: str, user_id: str) -> dict | None:
+    try:
+        oid = ObjectId(employee_id)
+    except Exception:
+        return None
+    doc = await db.employees.find_one({"_id": oid, **user_match_field("user_id", user_id)})
+    return serialize_mongo(doc) if doc else None
+
+
+async def update_employee_for_user(employee_id: str, user_id: str, fields: dict) -> bool:
+    try:
+        oid = ObjectId(employee_id)
+    except Exception:
+        return False
+    res = await db.employees.update_one(
+        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"$set": {**fields, "updated_at": datetime.utcnow()}})
+    return res.matched_count == 1
+
+
+async def find_employee_by_email(user_id: str, email: str) -> dict | None:
+    doc = await db.employees.find_one(
+        {**user_match_field("user_id", user_id), "email": (email or "").strip().lower()})
+    return serialize_mongo(doc) if doc else None
 
 
 async def reserve_viva_launch(job_id: str, cap: int) -> bool:

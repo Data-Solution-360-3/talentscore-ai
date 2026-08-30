@@ -436,6 +436,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     Job Postings
     <span class="sb-badge" id="sb-job-cnt">0</span>
   </button>
+  <div class="sb-sec">HR</div>
+  <button class="sb-item" id="sb-employees" onclick="showPage('employees')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Employees
+    <span class="sb-badge" id="sb-emp-cnt">0</span>
+  </button>
   <div class="sb-sec">Analytics</div>
   <button class="sb-item" id="sb-analytics" onclick="showPage('analytics')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -711,7 +717,71 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     EMPLOYEES (HRM module 1)
+══════════════════════════════════════════ -->
+<div class="page" id="page-employees">
+  <div class="ph-row">
+    <div class="ph"><h1>Employees</h1><p>Your company's staff records — hired through the funnel or added directly</p></div>
+    <button class="btn btn-primary btn-sm" onclick="openEmployeeModal()">＋ Add employee</button>
+  </div>
+  <div class="card" style="margin-bottom:10px;padding:.85rem">
+    <div class="filters-row">
+      <input class="filter-input" id="emp-search" placeholder="🔍 Search by name…" oninput="renderEmployees()" style="flex:1;min-width:170px">
+      <select class="filter-select" id="emp-dept" onchange="renderEmployees()"><option value="">All departments</option></select>
+      <select class="filter-select" id="emp-status" onchange="renderEmployees()">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="on_leave">On leave</option>
+        <option value="terminated">Terminated</option>
+      </select>
+      <button class="filter-clear" onclick="empClearFilters()">✕ Clear</button>
+    </div>
+    <div style="font-size:11px;color:var(--t3)" id="emp-count">—</div>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead id="emps-thead"><tr><th>Name</th><th>Role</th><th>Department</th><th>Status</th><th>Start date</th><th>Actions</th></tr></thead>
+        <tbody id="emps-tbl"></tbody>
+      </table>
+      <div id="emps-foot"></div>
+    </div>
+  </div>
+</div>
+
 </main>
+</div>
+
+<!-- EMPLOYEE ADD / DETAIL MODAL (one form serves both; the hire path opens it pre-filled) -->
+<div class="modal-overlay" id="emp-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hd"><h3 class="modal-title" id="emp-modal-title">Add employee</h3><button class="modal-close" onclick="closeModal('emp-modal')">✕</button></div>
+    <div id="emp-trace"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+      <div class="form-group"><label class="form-label">Full name *</label><input class="form-input" id="e-name"></div>
+      <div class="form-group"><label class="form-label">Email *</label><input class="form-input" id="e-email" type="email" placeholder="name@company.com"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="e-phone" placeholder="01XXXXXXXXX"></div>
+      <div class="form-group"><label class="form-label">Role / job title *</label><input class="form-input" id="e-role" placeholder="e.g. Data Analyst II"></div>
+      <div class="form-group"><label class="form-label">Department</label><input class="form-input" id="e-dept" placeholder="e.g. Engineering" list="emp-dept-list"></div>
+      <div class="form-group"><label class="form-label">Start date *</label><input class="form-input" id="e-start" type="date"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-input" id="e-status" onchange="empStatusUI()">
+          <option value="active">Active</option>
+          <option value="on_leave">On leave</option>
+          <option value="terminated">Terminated</option>
+        </select>
+      </div>
+      <div class="form-group" id="e-end-wrap" style="display:none"><label class="form-label">End date *</label><input class="form-input" id="e-end" type="date"></div>
+    </div>
+    <datalist id="emp-dept-list"></datalist>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('emp-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="emp-save" onclick="saveEmployee()">Save employee</button>
+    </div>
+  </div>
 </div>
 
 <!-- CANDIDATE DETAIL MODAL -->
@@ -723,6 +793,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="btn btn-red btn-sm" onclick="actionReject()">✕ Reject</button>
       <button class="btn btn-amber btn-sm" onclick="actionInterview()">→ Move to interview</button>
       <button class="btn btn-green btn-sm" onclick="actionShortlist()">✓ Shortlist</button>
+      <button class="btn btn-ghost btn-sm" onclick="actionAddEmployee()" title="Create an employee record pre-filled from this candidate">＋ Add as employee</button>
       <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>Send email</button>
       <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
@@ -859,6 +930,7 @@ function showPage(id){
   if(id==='analytics')renderAnalytics();
   if(id==='pipeline')renderPipeline();
   if(id==='audit')renderAudit();
+  if(id==='employees')loadEmployees();
 }
 
 // ── MODALS ──
@@ -1092,6 +1164,7 @@ function toggleSort(tableId, key, defaultDir){
   if(tableId === 'cands-tbl') applyFilters();
   else if(tableId === 'jobs-tbl') renderJobs();
   else if(tableId === 'job-perf-tbl') renderAnalytics();
+  else if(tableId === 'emps-tbl') renderEmployees();
 }
 
 /** Sort an array of rows according to the current state for a table. Mutates a COPY. */
@@ -1924,6 +1997,179 @@ function showToast(msg, colorOrType){
     else if(colorOrType && colorOrType.includes('amber')) type = 'warning';
     toast(msg, {type});
   }
+}
+
+// ── EMPLOYEES (HRM module 1) ──
+// Tenant-scoped records; the stable _id is what attendance/leave/payroll
+// will reference later. One modal serves add, edit, and the hire path.
+let allEmployees = [], _empEditing = null, _empPrefill = null;
+const EMP_STATUS_META = {active:['ACTIVE','b-green'], on_leave:['ON LEAVE','b-amber'], terminated:['TERMINATED','b-red']};
+
+async function loadEmployees(){
+  skeletonTableBody('emps-tbl', 6, 6);
+  try{
+    const r = await fetch('/api/employees', {credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    allEmployees = d.employees || [];
+    const cnt = document.getElementById('sb-emp-cnt');
+    if(cnt) cnt.textContent = allEmployees.length;
+    empFillDepts();
+    renderEmployees();
+  }catch(e){
+    document.getElementById('emps-tbl').innerHTML =
+      `<tr><td colspan="6" style="font-size:12px;color:var(--t3);padding:14px">Could not load employees: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+// Departments are free text (jobs use free text too) — suggestions come from
+// both existing employees and the jobs' departments, deduped.
+function empFillDepts(){
+  const sel = document.getElementById('emp-dept');
+  const cur = sel.value;
+  const depts = [...new Set(
+    [...allEmployees.map(e=>e.department), ...(window.allJobs||[]).map(j=>j.dept||j.department)]
+    .filter(Boolean).map(s=>String(s).trim()).filter(Boolean)
+  )].sort();
+  sel.innerHTML = '<option value="">All departments</option>' +
+    depts.map(d=>`<option value="${escapeHtml(d)}" ${d===cur?'selected':''}>${escapeHtml(d)}</option>`).join('');
+  document.getElementById('emp-dept-list').innerHTML = depts.map(d=>`<option value="${escapeHtml(d)}">`).join('');
+}
+
+function renderEmployees(){
+  const q    = (document.getElementById('emp-search').value||'').toLowerCase().trim();
+  const dept = document.getElementById('emp-dept').value;
+  const st   = document.getElementById('emp-status').value;
+  let rows = allEmployees.filter(e =>
+    (!q || (e.name||'').toLowerCase().includes(q)) &&
+    (!dept || e.department === dept) &&
+    (!st || e.status === st));
+  rows = applySort(rows, 'emps-tbl');
+  document.getElementById('emp-count').textContent = `${rows.length} of ${allEmployees.length} employee(s)`;
+  document.getElementById('emps-thead').innerHTML = '<tr>' +
+    sortableHeader('emps-tbl','Name','name','asc') +
+    sortableHeader('emps-tbl','Role','role_title','asc') +
+    sortableHeader('emps-tbl','Department','department','asc') +
+    sortableHeader('emps-tbl','Status','status','asc') +
+    sortableHeader('emps-tbl','Start date','start_date','desc') +
+    '<th>Actions</th></tr>';
+  const tbody = document.getElementById('emps-tbl');
+  if(!rows.length){
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:0;border:none"><div class="empty-state"><div class="es-title">${allEmployees.length ? 'No employees match these filters' : 'No employees yet'}</div><div class="es-body">${allEmployees.length ? 'Clear the filters to see everyone.' : 'Add existing staff directly, or hire a candidate and add them from their report.'}</div>${allEmployees.length ? '' : '<div class="es-actions"><button class="btn btn-primary btn-sm" onclick="openEmployeeModal()">＋ Add your first employee</button></div>'}</div></td></tr>`;
+    document.getElementById('emps-foot').innerHTML = '';
+    return;
+  }
+  const pg = applyPagination(rows, 'emps-tbl');
+  tbody.innerHTML = pg.slice.map(e=>{
+    const [lbl, cls] = EMP_STATUS_META[e.status] || ['—','b-amber'];
+    return `<tr class="row-click" onclick="openEmployeeModal('${e._id}')">
+      <td><div style="font-weight:700">${escapeHtml(e.name||'—')}${e.source==='hired' ? '<span class="badge" style="background:var(--og);color:var(--orange2);font-size:8.5px;margin-left:6px">HIRED</span>' : ''}</div><div style="font-size:11px;color:var(--t3)">${escapeHtml(e.email||'')}</div></td>
+      <td>${escapeHtml(e.role_title||'—')}</td>
+      <td>${escapeHtml(e.department||'—')}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td style="font-variant-numeric:tabular-nums">${escapeHtml(e.start_date||'—')}${e.status==='terminated'&&e.end_date ? `<span style="color:var(--t3)"> → ${escapeHtml(e.end_date)}</span>` : ''}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEmployeeModal('${e._id}')">Open</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('emps-foot').innerHTML =
+    paginationFooter('emps-tbl', pg.total, pg.page, pg.pageSize, pg.maxPage, 'renderEmployees');
+}
+
+function empClearFilters(){
+  document.getElementById('emp-search').value = '';
+  document.getElementById('emp-dept').value = '';
+  document.getElementById('emp-status').value = '';
+  renderEmployees();
+}
+
+function empStatusUI(){
+  document.getElementById('e-end-wrap').style.display =
+    document.getElementById('e-status').value === 'terminated' ? 'block' : 'none';
+}
+
+function openEmployeeModal(id, prefill){
+  _empEditing = id ? allEmployees.find(x=>x._id===id) || null : null;
+  _empPrefill = (!_empEditing && prefill) ? prefill : null;
+  const e = _empEditing || _empPrefill || {};
+  document.getElementById('emp-modal-title').textContent = _empEditing ? (e.name || 'Employee') : 'Add employee';
+  document.getElementById('emp-save').textContent = _empEditing ? 'Save changes' : 'Save employee';
+  document.getElementById('e-name').value  = e.name || '';
+  document.getElementById('e-email').value = e.email || '';
+  document.getElementById('e-phone').value = e.phone || '';
+  document.getElementById('e-role').value  = e.role_title || '';
+  document.getElementById('e-dept').value  = e.department || '';
+  document.getElementById('e-start').value = e.start_date || '';
+  document.getElementById('e-status').value = e.status || 'active';
+  document.getElementById('e-end').value   = e.end_date || '';
+  empStatusUI();
+  // Traceability — the link back to hiring is what connects HRM to the funnel.
+  const tr = document.getElementById('emp-trace');
+  const src = e.source || (_empPrefill ? 'hired' : null);
+  if(src === 'hired' && e.screening_id){
+    const s = (window.allResults||[]).find(x=>x._id===e.screening_id);
+    const scoreBit = s ? ` — CV score <strong>${s.score||Math.round(s.overall_score||0)}</strong> · ${escapeHtml((s.rec||s.recommendation||'').toUpperCase())}` : '';
+    tr.innerHTML = `<div style="background:var(--og);border:1px solid rgba(245,124,46,.3);border-radius:var(--rs);padding:.65rem .85rem;margin-bottom:10px;font-size:12px;line-height:1.55">Came through hiring${scoreBit} · <a href="/candidate?id=${e.screening_id}" target="_blank" rel="noopener" style="color:var(--orange2);font-weight:700;text-decoration:none">View original screening report →</a></div>`;
+  }else{
+    tr.innerHTML = '';
+  }
+  openModal('emp-modal');
+}
+
+async function saveEmployee(){
+  const body = {
+    name:  document.getElementById('e-name').value.trim(),
+    email: document.getElementById('e-email').value.trim(),
+    phone: document.getElementById('e-phone').value.trim(),
+    role_title: document.getElementById('e-role').value.trim(),
+    department: document.getElementById('e-dept').value.trim(),
+    status: document.getElementById('e-status').value,
+    start_date: document.getElementById('e-start').value,
+    end_date: document.getElementById('e-end').value,
+  };
+  if(_empEditing && body.status !== _empEditing.status){
+    const [lbl] = EMP_STATUS_META[body.status] || [body.status];
+    const ok = await confirmDialog({
+      title: `Change status to ${lbl.toLowerCase()}?`,
+      body: `${_empEditing.name} will be marked ${lbl.toLowerCase()}.`,
+      danger: body.status === 'terminated',
+      confirmText: 'Change status'});
+    if(!ok) return;
+  }
+  if(_empPrefill){ body.source = 'hired'; body.screening_id = _empPrefill.screening_id; }
+  const btn = document.getElementById('emp-save');
+  btn.disabled = true;
+  try{
+    const r = await fetch(_empEditing ? `/api/employees/${_empEditing._id}` : '/api/employees', {
+      method: _empEditing ? 'PUT' : 'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));
+    toast(_empEditing ? 'Employee updated' : `${body.name} added as an employee`, {type:'success'});
+    closeModal('emp-modal');
+    await loadEmployees();
+  }catch(e){ toast('Could not save: '+e.message, {type:'error'}); }
+  btn.disabled = false;
+}
+
+// The hire path: from a candidate's report to a pre-filled employee form.
+// Nothing saves until the recruiter presses Save — never silent.
+function actionAddEmployee(){
+  const r = (window.allResults||[]).find(x=>x._id===currentCandId);
+  if(!r){ toast('Open a candidate first.', {type:'error'}); return; }
+  const p = (r.parsed_cv && r.parsed_cv.personal) || {};
+  closeModal('cand-modal');
+  showPage('employees');
+  openEmployeeModal(null, {
+    name: r.candidate_name || r.applicant_name || '',
+    email: r.applicant_email || p.email || '',
+    phone: r.applicant_phone || p.phone || '',
+    role_title: r.job_title || '',
+    department: (function(){ const j=(window.allJobs||[]).find(x=>x._id===r.job_id)||{}; return j.dept||j.department||''; })(),
+    start_date: new Date().toISOString().slice(0,10),
+    status: 'active',
+    source: 'hired',
+    screening_id: r._id,
+  });
 }
 
 // ── CONFIRM DIALOG ──
