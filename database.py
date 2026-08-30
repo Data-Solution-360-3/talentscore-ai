@@ -85,6 +85,10 @@ async def connect():
     await db.live_interviews.create_index("user_id")
     await db.employees.create_index("user_id")
     await db.employees.create_index([("user_id", 1), ("email", 1)])
+    await db.leave_requests.create_index([("user_id", 1), ("status", 1)])
+    await db.leave_requests.create_index("employee_id")
+    await db.attendance.create_index(
+        [("user_id", 1), ("employee_id", 1), ("date", 1)], unique=True)
 
     print(f"[DB] Connected to MongoDB — database: {DB_NAME}")
 
@@ -1198,6 +1202,89 @@ async def find_employee_by_email(user_id: str, email: str) -> dict | None:
     doc = await db.employees.find_one(
         {**user_match_field("user_id", user_id), "email": (email or "").strip().lower()})
     return serialize_mongo(doc) if doc else None
+
+
+# ── Attendance & Leave (HRM module 2) ────────────────────────
+# Everything references the stable employee _id. Balances are COMPUTED
+# (allowance minus approved days this year), never stored as a counter —
+# a computed balance cannot drift, and approving a request IS the
+# deduction because the approval is an atomic pending->approved claim.
+
+LEAVE_TYPES = ("annual", "sick", "unpaid")
+DEFAULT_LEAVE_ALLOWANCES = {"annual": 20, "sick": 10}   # unpaid: tracked, not budgeted
+ATTENDANCE_STATUSES = ("present", "absent", "leave", "holiday")
+
+
+async def create_leave_request(user_id: str, doc: dict) -> str:
+    now = datetime.utcnow()
+    res = await db.leave_requests.insert_one(
+        {**doc, "user_id": user_id, "created_at": now})
+    return str(res.inserted_id)
+
+
+async def get_leave_requests_for_user(user_id: str, status: str = "",
+                                      employee_id: str = "") -> list:
+    q = dict(user_match_field("user_id", user_id))
+    if status:
+        q["status"] = status
+    if employee_id:
+        q["employee_id"] = employee_id
+    cursor = db.leave_requests.find(q).sort("created_at", -1).limit(500)
+    return [serialize_mongo(d) async for d in cursor]
+
+
+async def claim_leave_decision(request_id: str, user_id: str, status: str,
+                               approver: str) -> dict | None:
+    """Atomically move a PENDING request to approved/rejected. The pending
+    check is inside the update — two admins clicking at once can't decide
+    the same request twice. Returns the pre-update doc, or None."""
+    try:
+        oid = ObjectId(request_id)
+    except Exception:
+        return None
+    doc = await db.leave_requests.find_one_and_update(
+        {"_id": oid, **user_match_field("user_id", user_id), "status": "pending"},
+        {"$set": {"status": status, "approver": approver,
+                  "decided_at": datetime.utcnow()}})
+    return serialize_mongo(doc) if doc else None
+
+
+async def leave_taken_days(user_id: str, employee_id: str, year: int) -> dict:
+    """Approved days per type for one employee in one calendar year (by
+    start_date). Dates are stored as YYYY-MM-DD strings, so a string range
+    is an exact year filter."""
+    out = {t: 0 for t in LEAVE_TYPES}
+    cursor = db.leave_requests.aggregate([
+        {"$match": {**user_match_field("user_id", user_id),
+                    "employee_id": employee_id, "status": "approved",
+                    "start_date": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}}},
+        {"$group": {"_id": "$type", "days": {"$sum": "$days"}}},
+    ])
+    async for row in cursor:
+        if row["_id"] in out:
+            out[row["_id"]] = int(row["days"])
+    return out
+
+
+async def mark_attendance(user_id: str, employee_id: str, date: str,
+                          status: str, check_in: str = "", check_out: str = "") -> None:
+    """One record per employee per day — marking again overwrites (upsert)."""
+    await db.attendance.update_one(
+        {"user_id": user_id, "employee_id": employee_id, "date": date},
+        {"$set": {"status": status, "check_in": check_in, "check_out": check_out,
+                  "updated_at": datetime.utcnow()},
+         "$setOnInsert": {"created_at": datetime.utcnow()}},
+        upsert=True)
+
+
+async def get_attendance_for_month(user_id: str, month: str,
+                                   employee_id: str = "") -> list:
+    q = {**user_match_field("user_id", user_id),
+         "date": {"$gte": f"{month}-01", "$lte": f"{month}-31"}}
+    if employee_id:
+        q["employee_id"] = employee_id
+    cursor = db.attendance.find(q).sort("date", 1).limit(3000)
+    return [serialize_mongo(d) async for d in cursor]
 
 
 async def reserve_viva_launch(job_id: str, cap: int) -> bool:

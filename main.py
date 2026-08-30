@@ -61,6 +61,9 @@ from database import (
     update_job_interview_questions,
     create_employee, get_employees_for_user, get_employee_for_user,
     update_employee_for_user, find_employee_by_email, EMPLOYEE_STATUSES,
+    create_leave_request, get_leave_requests_for_user, claim_leave_decision,
+    leave_taken_days, mark_attendance, get_attendance_for_month,
+    LEAVE_TYPES, DEFAULT_LEAVE_ALLOWANCES, ATTENDANCE_STATUSES,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
@@ -2677,6 +2680,174 @@ async def discard_application(request: Request, application_id: str):
 
 
 # ─────────────────────────────────────────────────────────────
+# ATTENDANCE & LEAVE — HRM module 2, Part 1 (admin-only).
+# Balances are computed, approval is an atomic pending->approved claim,
+# and every record hangs off the stable employee _id.
+# ─────────────────────────────────────────────────────────────
+
+def _leave_days_between(start: str, end: str) -> int:
+    """Inclusive calendar days. Weekends/holidays count — v1 keeps the
+    arithmetic honest and visible rather than guessing each company's week."""
+    d1 = _dt.strptime(start, "%Y-%m-%d")
+    d2 = _dt.strptime(end, "%Y-%m-%d")
+    return (d2 - d1).days + 1
+
+
+async def _leave_balances_for(user_id: str, emp: dict) -> dict:
+    year = _dt.utcnow().year
+    taken = await leave_taken_days(user_id, emp["_id"], year)
+    allow = emp.get("leave_allowances") or {}
+    out = {}
+    for t in LEAVE_TYPES:
+        a = int(allow.get(t, DEFAULT_LEAVE_ALLOWANCES.get(t, 0)))
+        out[t] = {"allowance": a, "taken": taken.get(t, 0),
+                  "remaining": max(0, a - taken.get(t, 0)) if t != "unpaid" else None}
+    return out
+
+
+def _validated_leave(body: dict) -> dict:
+    ltype = body.get("type")
+    if ltype not in LEAVE_TYPES:
+        raise HTTPException(status_code=400, detail="Leave type must be annual, sick, or unpaid.")
+    start = str(body.get("start_date", "")).strip()[:10]
+    end = str(body.get("end_date", "")).strip()[:10] or start
+    if not (_valid_ymd(start) and _valid_ymd(end)):
+        raise HTTPException(status_code=400, detail="Valid start and end dates (YYYY-MM-DD) are required.")
+    days = _leave_days_between(start, end)
+    if days < 1:
+        raise HTTPException(status_code=400, detail="End date must not be before the start date.")
+    if days > 90:
+        raise HTTPException(status_code=400, detail="A single request can cover at most 90 days.")
+    return {"type": ltype, "start_date": start, "end_date": end, "days": days,
+            "reason": str(body.get("reason", "")).strip()[:500]}
+
+
+@app.get("/api/leave/requests")
+async def list_leave_requests(request: Request, status: str = "", employee_id: str = ""):
+    user = await get_current_user(request)
+    rows = await get_leave_requests_for_user(
+        user["user_id"], status=status if status in ("pending", "approved", "rejected") else "",
+        employee_id=employee_id[:40])
+    return {"requests": rows, "count": len(rows)}
+
+
+@app.post("/api/leave/requests")
+async def admin_log_leave(request: Request):
+    """Admin logs leave on an employee's behalf — created directly APPROVED
+    (it's the admin's own decision), with the same balance check an approval
+    gets."""
+    user = await get_current_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    emp = await get_employee_for_user(str(body.get("employee_id", "")), user["user_id"])
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    fields = _validated_leave(body)
+    if fields["type"] != "unpaid":
+        bal = await _leave_balances_for(user["user_id"], emp)
+        remaining = bal[fields["type"]]["remaining"]
+        if fields["days"] > remaining:
+            raise HTTPException(status_code=400,
+                                detail=f"{emp['name']} has {remaining} {fields['type']} day(s) left — this needs {fields['days']}.")
+    rid = await create_leave_request(user["user_id"], {
+        **fields, "employee_id": emp["_id"], "status": "approved",
+        "approver": user.get("email") or user["user_id"], "source": "admin",
+        "decided_at": _dt.utcnow()})
+    return {"success": True, "request_id": rid}
+
+
+@app.post("/api/leave/requests/{request_id}/decide")
+async def decide_leave_request(request: Request, request_id: str):
+    user = await get_current_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    action = body.get("action")
+    if action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="Action must be approve or reject.")
+
+    # Balance check BEFORE the claim (approve only). Two simultaneous
+    # approvals of different requests could in theory overdraw by one race —
+    # acceptable for a single-admin tool; the claim itself is atomic, so one
+    # request can never be decided twice.
+    if action == "approve":
+        req_rows = await get_leave_requests_for_user(user["user_id"])
+        req = next((r for r in req_rows if r["_id"] == request_id), None)
+        if not req:
+            raise HTTPException(status_code=404, detail="Request not found.")
+        if req["status"] != "pending":
+            raise HTTPException(status_code=409, detail="This request was already decided.")
+        if req["type"] != "unpaid":
+            emp = await get_employee_for_user(req["employee_id"], user["user_id"])
+            if not emp:
+                raise HTTPException(status_code=404, detail="Employee not found.")
+            remaining = (await _leave_balances_for(user["user_id"], emp))[req["type"]]["remaining"]
+            if req["days"] > remaining:
+                raise HTTPException(status_code=400,
+                                    detail=f"Only {remaining} {req['type']} day(s) left — this needs {req['days']}. Raise the allowance or reject.")
+
+    claimed = await claim_leave_decision(
+        request_id, user["user_id"],
+        "approved" if action == "approve" else "rejected",
+        user.get("email") or user["user_id"])
+    if not claimed:
+        raise HTTPException(status_code=409, detail="This request was already decided (or doesn't exist).")
+    return {"success": True}
+
+
+@app.get("/api/leave/balances")
+async def leave_balances(request: Request, employee_id: str = ""):
+    user = await get_current_user(request)
+    if employee_id:
+        emp = await get_employee_for_user(employee_id[:40], user["user_id"])
+        if not emp:
+            raise HTTPException(status_code=404, detail="Employee not found.")
+        return {"balances": {emp["_id"]: await _leave_balances_for(user["user_id"], emp)}}
+    out = {}
+    for emp in await get_employees_for_user(user["user_id"]):
+        out[emp["_id"]] = await _leave_balances_for(user["user_id"], emp)
+    return {"balances": out}
+
+
+@app.get("/api/attendance")
+async def attendance_month(request: Request, month: str = "", employee_id: str = ""):
+    user = await get_current_user(request)
+    month = (month or "").strip()[:7]
+    if not (len(month) == 7 and _valid_ymd(month + "-01")):
+        raise HTTPException(status_code=400, detail="month must be YYYY-MM.")
+    rows = await get_attendance_for_month(user["user_id"], month, employee_id[:40])
+    return {"attendance": rows, "count": len(rows)}
+
+
+@app.post("/api/attendance/mark")
+async def attendance_mark(request: Request):
+    user = await get_current_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    emp = await get_employee_for_user(str(body.get("employee_id", "")), user["user_id"])
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    date = str(body.get("date", "")).strip()[:10]
+    if not _valid_ymd(date):
+        raise HTTPException(status_code=400, detail="A valid date (YYYY-MM-DD) is required.")
+    status = body.get("status")
+    if status not in ATTENDANCE_STATUSES:
+        raise HTTPException(status_code=400, detail="Status must be present, absent, leave, or holiday.")
+
+    def _t(v):
+        v = str(v or "").strip()[:5]
+        return v if (len(v) == 5 and v[2] == ":" and v[:2].isdigit() and v[3:].isdigit()) else ""
+    await mark_attendance(user["user_id"], emp["_id"], date, status,
+                          check_in=_t(body.get("check_in")), check_out=_t(body.get("check_out")))
+    return {"success": True}
+
+
+# ─────────────────────────────────────────────────────────────
 # EMPLOYEES — HRM module 1. Tenant-scoped, admin-only this version.
 # Employee data is personal data: every route is gated from the first
 # build, same leak discipline as the interview/written endpoints.
@@ -2712,12 +2883,19 @@ def _validated_employee(body: dict) -> dict:
             raise HTTPException(status_code=400, detail="An end date is required when status is Terminated.")
     else:
         end_date = None   # end date only exists on terminated records
+    def _allow(key):
+        try:
+            return max(0, min(365, int(body.get(f"allow_{key}",
+                                                DEFAULT_LEAVE_ALLOWANCES.get(key, 0)))))
+        except Exception:
+            return DEFAULT_LEAVE_ALLOWANCES.get(key, 0)
     return {
         "name": name, "email": email,
         "phone": str(body.get("phone", "")).strip()[:40],
         "role_title": role_title,
         "department": str(body.get("department", "")).strip()[:80],
         "status": status, "start_date": start_date, "end_date": end_date,
+        "leave_allowances": {"annual": _allow("annual"), "sick": _allow("sick")},
     }
 
 

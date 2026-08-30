@@ -442,6 +442,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     Employees
     <span class="sb-badge" id="sb-emp-cnt">0</span>
   </button>
+  <button class="sb-item" id="sb-leave" onclick="showPage('leave')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+    Leave
+    <span class="sb-badge" id="sb-leave-cnt">0</span>
+  </button>
+  <button class="sb-item" id="sb-attendance" onclick="showPage('attendance')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Attendance
+  </button>
   <div class="sb-sec">Analytics</div>
   <button class="sb-item" id="sb-analytics" onclick="showPage('analytics')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -750,7 +759,76 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     LEAVE (HRM module 2 · admin)
+══════════════════════════════════════════ -->
+<div class="page" id="page-leave">
+  <div class="ph-row">
+    <div class="ph"><h1>Leave</h1><p>Requests, approvals, and balances across your team</p></div>
+    <button class="btn btn-primary btn-sm" onclick="openLogLeave()">＋ Log leave</button>
+  </div>
+  <div class="card" style="margin-bottom:10px;padding:.85rem">
+    <div class="filters-row">
+      <select class="filter-select" id="lv-status" onchange="renderLeave()">
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="">All statuses</option>
+      </select>
+      <select class="filter-select" id="lv-emp" onchange="renderLeave()"><option value="">All employees</option></select>
+      <div style="font-size:11px;color:var(--t3);margin-left:auto" id="lv-count">—</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead id="leave-thead"><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="leave-tbl"></tbody>
+      </table>
+      <div id="leave-foot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ATTENDANCE (HRM module 2 · admin)
+══════════════════════════════════════════ -->
+<div class="page" id="page-attendance">
+  <div class="ph-row">
+    <div class="ph"><h1>Attendance</h1><p>Mark daily presence — one row per employee, one column per day</p></div>
+    <input class="filter-input" id="att-month" type="month" onchange="loadAttendance()" style="width:160px">
+  </div>
+  <div class="card">
+    <div class="tbl-wrap" style="overflow-x:auto">
+      <table class="tbl" id="att-table" style="min-width:640px"><tbody id="att-body"></tbody></table>
+    </div>
+    <div style="font-size:11px;color:var(--t3);padding:.7rem .85rem;border-top:1px solid var(--border)">
+      Click a cell to cycle: — → <span style="color:var(--green);font-weight:700">P</span>resent → <span style="color:var(--red);font-weight:700">A</span>bsent → <span style="color:var(--orange2);font-weight:700">L</span>eave → <span style="color:var(--t2);font-weight:700">H</span>oliday → clear. Saved as you click.
+    </div>
+  </div>
+</div>
+
 </main>
+</div>
+
+<!-- LOG LEAVE MODAL (admin logs leave on an employee's behalf, created approved) -->
+<div class="modal-overlay" id="logleave-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hd"><h3 class="modal-title">Log leave</h3><button class="modal-close" onclick="closeModal('logleave-modal')">✕</button></div>
+    <div class="form-group"><label class="form-label">Employee *</label><select class="form-input" id="ll-emp"></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+      <div class="form-group"><label class="form-label">Type *</label><select class="form-input" id="ll-type"><option value="annual">Annual</option><option value="sick">Sick</option><option value="unpaid">Unpaid</option></select></div>
+      <div class="form-group"><label class="form-label">Days</label><input class="form-input" id="ll-days" readonly style="background:var(--s2)"></div>
+      <div class="form-group"><label class="form-label">Start date *</label><input class="form-input" id="ll-start" type="date" onchange="llDays()"></div>
+      <div class="form-group"><label class="form-label">End date *</label><input class="form-input" id="ll-end" type="date" onchange="llDays()"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Reason</label><input class="form-input" id="ll-reason" placeholder="optional"></div>
+    <div id="ll-bal" style="font-size:11px;color:var(--t3);margin-bottom:.4rem"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('logleave-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="ll-save" onclick="saveLogLeave()">Log &amp; approve</button>
+    </div>
+  </div>
 </div>
 
 <!-- EMPLOYEE ADD / DETAIL MODAL (one form serves both; the hire path opens it pre-filled) -->
@@ -775,6 +853,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </select>
       </div>
       <div class="form-group" id="e-end-wrap" style="display:none"><label class="form-label">End date *</label><input class="form-input" id="e-end" type="date"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.7rem">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-bottom:.5rem">Yearly leave allowance</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+        <div class="form-group"><label class="form-label">Annual (days)</label><input class="form-input" id="e-allow-annual" type="number" min="0" max="365" value="20"></div>
+        <div class="form-group"><label class="form-label">Sick (days)</label><input class="form-input" id="e-allow-sick" type="number" min="0" max="365" value="10"></div>
+      </div>
+      <div style="font-size:11px;color:var(--t3)">Unpaid leave is tracked but not budgeted. Balances = allowance − approved days this year.</div>
     </div>
     <datalist id="emp-dept-list"></datalist>
     <div class="modal-footer">
@@ -931,6 +1017,8 @@ function showPage(id){
   if(id==='pipeline')renderPipeline();
   if(id==='audit')renderAudit();
   if(id==='employees')loadEmployees();
+  if(id==='leave')loadLeave();
+  if(id==='attendance')loadAttendance();
 }
 
 // ── MODALS ──
@@ -1165,6 +1253,7 @@ function toggleSort(tableId, key, defaultDir){
   else if(tableId === 'jobs-tbl') renderJobs();
   else if(tableId === 'job-perf-tbl') renderAnalytics();
   else if(tableId === 'emps-tbl') renderEmployees();
+  else if(tableId === 'leave-tbl') drawLeave();
 }
 
 /** Sort an array of rows according to the current state for a table. Mutates a COPY. */
@@ -2101,6 +2190,9 @@ function openEmployeeModal(id, prefill){
   document.getElementById('e-start').value = e.start_date || '';
   document.getElementById('e-status').value = e.status || 'active';
   document.getElementById('e-end').value   = e.end_date || '';
+  const al = e.leave_allowances || {};
+  document.getElementById('e-allow-annual').value = al.annual != null ? al.annual : 20;
+  document.getElementById('e-allow-sick').value   = al.sick   != null ? al.sick   : 10;
   empStatusUI();
   // Traceability — the link back to hiring is what connects HRM to the funnel.
   const tr = document.getElementById('emp-trace');
@@ -2125,6 +2217,8 @@ async function saveEmployee(){
     status: document.getElementById('e-status').value,
     start_date: document.getElementById('e-start').value,
     end_date: document.getElementById('e-end').value,
+    allow_annual: document.getElementById('e-allow-annual').value,
+    allow_sick: document.getElementById('e-allow-sick').value,
   };
   if(_empEditing && body.status !== _empEditing.status){
     const [lbl] = EMP_STATUS_META[body.status] || [body.status];
@@ -2170,6 +2264,193 @@ function actionAddEmployee(){
     source: 'hired',
     screening_id: r._id,
   });
+}
+
+// ── LEAVE (HRM module 2 · admin) ──
+let allLeave = [], _empById = {};
+const LV_TYPE_LBL = {annual:'Annual', sick:'Sick', unpaid:'Unpaid'};
+const LV_STATUS_META = {pending:['PENDING','b-amber'], approved:['APPROVED','b-green'], rejected:['REJECTED','b-red']};
+
+async function loadLeave(){
+  skeletonTableBody('leave-tbl', 5, 7);
+  // Ensure we have employee names to resolve employee_id -> name.
+  if(!allEmployees.length){ try{ const r=await fetch('/api/employees',{credentials:'include'}); if(r.ok) allEmployees=(await r.json()).employees||[]; }catch(_){} }
+  _empById = {}; allEmployees.forEach(e=>_empById[e._id]=e);
+  const esel = document.getElementById('lv-emp');
+  esel.innerHTML = '<option value="">All employees</option>' +
+    allEmployees.map(e=>`<option value="${e._id}">${escapeHtml(e.name)}</option>`).join('');
+  await refreshLeave();
+}
+async function refreshLeave(){
+  const status = document.getElementById('lv-status').value;
+  const emp = document.getElementById('lv-emp').value;
+  const qs = new URLSearchParams();
+  if(status) qs.set('status', status);
+  if(emp) qs.set('employee_id', emp);
+  try{
+    const r = await fetch('/api/leave/requests?'+qs.toString(), {credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    allLeave = (await r.json()).requests || [];
+    // pending badge in the sidebar
+    const pend = (await (await fetch('/api/leave/requests?status=pending',{credentials:'include'})).json()).count || 0;
+    const b = document.getElementById('sb-leave-cnt'); if(b) b.textContent = pend;
+    renderLeave();
+  }catch(e){
+    document.getElementById('leave-tbl').innerHTML = `<tr><td colspan="7" style="font-size:12px;color:var(--t3);padding:14px">Could not load leave: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+// The status/employee filters are server params, so changing them re-queries.
+function renderLeave(){ refreshLeave(); }
+function drawLeave(){
+  let rows = applySort(allLeave.slice(), 'leave-tbl');
+  document.getElementById('lv-count').textContent = `${rows.length} request(s)`;
+  document.getElementById('leave-thead').innerHTML = '<tr>' +
+    '<th>Employee</th>' +
+    sortableHeader('leave-tbl','Type','type','asc') +
+    sortableHeader('leave-tbl','Dates','start_date','desc') +
+    sortableHeader('leave-tbl','Days','days','desc') +
+    '<th>Reason</th>' +
+    sortableHeader('leave-tbl','Status','status','asc') +
+    '<th>Actions</th></tr>';
+  const tb = document.getElementById('leave-tbl');
+  if(!rows.length){ tb.innerHTML = `<tr><td colspan="7" style="padding:0;border:none"><div class="empty-state"><div class="es-title">No leave requests</div><div class="es-body">Requests from employees land here. You can also log leave yourself.</div></div></td></tr>`; document.getElementById('leave-foot').innerHTML=''; return; }
+  const pg = applyPagination(rows, 'leave-tbl');
+  tb.innerHTML = pg.slice.map(l=>{
+    const [lbl,cls] = LV_STATUS_META[l.status]||['—','b-amber'];
+    const emp = _empById[l.employee_id];
+    return `<tr>
+      <td><div style="font-weight:700">${escapeHtml(emp?emp.name:'—')}</div><div style="font-size:11px;color:var(--t3)">${escapeHtml(emp?emp.role_title||'':'')}</div></td>
+      <td>${LV_TYPE_LBL[l.type]||l.type}${l.source==='admin'?'<span style="font-size:9px;color:var(--t3)"> · logged</span>':''}</td>
+      <td style="font-variant-numeric:tabular-nums">${escapeHtml(l.start_date)}${l.end_date&&l.end_date!==l.start_date?' → '+escapeHtml(l.end_date):''}</td>
+      <td>${l.days}</td>
+      <td style="max-width:180px;font-size:11px;color:var(--t2)">${escapeHtml(l.reason||'—')}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td>${l.status==='pending'
+        ? `<button class="btn btn-green btn-sm" style="padding:4px 9px" onclick="decideLeave('${l._id}','approve')">Approve</button> <button class="btn btn-red btn-sm" style="padding:4px 9px" onclick="decideLeave('${l._id}','reject')">Reject</button>`
+        : `<span style="font-size:10px;color:var(--t3)">${escapeHtml(l.approver||'')}</span>`}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('leave-foot').innerHTML =
+    paginationFooter('leave-tbl', pg.total, pg.page, pg.pageSize, pg.maxPage, 'drawLeave');
+}
+async function decideLeave(id, action){
+  const l = allLeave.find(x=>x._id===id);
+  const emp = l ? _empById[l.employee_id] : null;
+  const ok = await confirmDialog({
+    title: action==='approve' ? 'Approve leave?' : 'Reject leave?',
+    body: l ? `${emp?emp.name:'Employee'} · ${l.days} ${LV_TYPE_LBL[l.type]||l.type} day(s)${action==='approve'&&l.type!=='unpaid'?' — this deducts from their balance.':'.'}` : '',
+    danger: action==='reject', confirmText: action==='approve'?'Approve':'Reject'});
+  if(!ok) return;
+  try{
+    const r = await fetch(`/api/leave/requests/${id}/decide`, {method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast(action==='approve'?'Leave approved — balance updated':'Leave rejected', {type:'success'});
+    refreshLeave();
+  }catch(e){ toast('Could not '+action+': '+e.message, {type:'error'}); }
+}
+
+// Log leave (admin, on behalf) — created approved with a balance check.
+function openLogLeave(){
+  const sel = document.getElementById('ll-emp');
+  sel.innerHTML = allEmployees.filter(e=>e.status!=='terminated').map(e=>`<option value="${e._id}">${escapeHtml(e.name)}</option>`).join('');
+  ['ll-start','ll-end','ll-reason'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('ll-days').value='';
+  document.getElementById('ll-bal').textContent='';
+  document.getElementById('ll-type').onchange = llBal;
+  document.getElementById('ll-emp').onchange = llBal;
+  openModal('logleave-modal'); llBal();
+}
+function llDays(){
+  const s=document.getElementById('ll-start').value, e=document.getElementById('ll-end').value||s;
+  if(s && e){ const d=Math.round((new Date(e)-new Date(s))/86400000)+1; document.getElementById('ll-days').value = d>=1?d:''; }
+}
+async function llBal(){
+  const emp = document.getElementById('ll-emp').value, type=document.getElementById('ll-type').value;
+  if(!emp){ document.getElementById('ll-bal').textContent=''; return; }
+  try{
+    const r = await fetch('/api/leave/balances?employee_id='+emp, {credentials:'include'});
+    const d = await r.json(); const b=(d.balances||{})[emp];
+    if(b && type!=='unpaid'){ document.getElementById('ll-bal').textContent = `Balance: ${b[type].remaining} of ${b[type].allowance} ${type} day(s) remaining`; }
+    else document.getElementById('ll-bal').textContent = 'Unpaid leave is tracked, not budgeted.';
+  }catch(_){}
+}
+async function saveLogLeave(){
+  llDays();
+  const body = {
+    employee_id: document.getElementById('ll-emp').value,
+    type: document.getElementById('ll-type').value,
+    start_date: document.getElementById('ll-start').value,
+    end_date: document.getElementById('ll-end').value || document.getElementById('ll-start').value,
+    reason: document.getElementById('ll-reason').value.trim(),
+  };
+  if(!body.employee_id || !body.start_date){ toast('Pick an employee and a start date.', {type:'error'}); return; }
+  const btn=document.getElementById('ll-save'); btn.disabled=true;
+  try{
+    const r = await fetch('/api/leave/requests', {method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast('Leave logged and approved', {type:'success'});
+    closeModal('logleave-modal'); refreshLeave();
+  }catch(e){ toast('Could not log leave: '+e.message, {type:'error'}); }
+  btn.disabled=false;
+}
+
+// ── ATTENDANCE (HRM module 2 · admin) ──
+// Every click writes a real status (no blank write — the backend has no
+// "unset", and a computed grid should never store an empty marker).
+const ATT_CYCLE = ['present','absent','leave','holiday'];
+const ATT_CELL = {'':['·','var(--t3)'], present:['P','var(--green)'], absent:['A','var(--red)'], leave:['L','var(--orange2)'], holiday:['H','var(--t2)']};
+let _attMap = {};   // "empId|date" -> status
+
+async function loadAttendance(){
+  const mi = document.getElementById('att-month');
+  if(!mi.value) mi.value = new Date().toISOString().slice(0,7);
+  if(!allEmployees.length){ try{ const r=await fetch('/api/employees',{credentials:'include'}); if(r.ok) allEmployees=(await r.json()).employees||[]; }catch(_){} }
+  const month = mi.value;
+  try{
+    const r = await fetch('/api/attendance?month='+month, {credentials:'include'});
+    const d = await r.json();
+    _attMap = {};
+    (d.attendance||[]).forEach(a=>{ _attMap[a.employee_id+'|'+a.date]=a.status; });
+    renderAttendanceGrid(month);
+  }catch(e){
+    document.getElementById('att-body').innerHTML = `<tr><td style="font-size:12px;color:var(--t3);padding:14px">Could not load attendance: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+function renderAttendanceGrid(month){
+  const active = allEmployees.filter(e=>e.status!=='terminated');
+  const [y,m] = month.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  let head = '<tr><th style="position:sticky;left:0;background:var(--surface);min-width:150px">Employee</th>';
+  for(let d=1; d<=days; d++) head += `<th style="text-align:center;padding:6px 0;min-width:22px">${d}</th>`;
+  head += '</tr>';
+  let rows = '';
+  if(!active.length){ rows = `<tr><td colspan="${days+1}" style="font-size:12px;color:var(--t3);padding:14px">No active employees to mark.</td></tr>`; }
+  active.forEach(e=>{
+    let tds = `<td style="position:sticky;left:0;background:var(--surface);font-weight:700;font-size:12px">${escapeHtml(e.name)}</td>`;
+    for(let d=1; d<=days; d++){
+      const date = `${month}-${String(d).padStart(2,'0')}`;
+      const st = _attMap[e._id+'|'+date] || '';
+      const [ch,col] = ATT_CELL[st];
+      tds += `<td style="text-align:center;cursor:pointer;color:${col};font-weight:800;font-size:12px;user-select:none" onclick="cycleAtt('${e._id}','${date}',this)" data-st="${st}">${ch}</td>`;
+    }
+    rows += `<tr>${tds}</tr>`;
+  });
+  const t = document.getElementById('att-table');
+  t.innerHTML = `<thead>${head}</thead><tbody id="att-body">${rows}</tbody>`;
+}
+async function cycleAtt(empId, date, cell){
+  const cur = cell.getAttribute('data-st') || '';
+  const idx = ATT_CYCLE.indexOf(cur);   // -1 (blank) -> 0 = present
+  const next = ATT_CYCLE[(idx + 1) % ATT_CYCLE.length];
+  const [ch,col] = ATT_CELL[next];
+  cell.textContent = ch; cell.style.color = col; cell.setAttribute('data-st', next);
+  try{
+    const r = await fetch('/api/attendance/mark', {method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({employee_id:empId, date, status: next})});
+    if(!r.ok) throw new Error('save failed');
+  }catch(_){ toast('Could not save that mark — check connection.', {type:'error'}); }
 }
 
 // ── CONFIRM DIALOG ──
