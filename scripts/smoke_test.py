@@ -436,6 +436,28 @@ def main():
         # caught too. Each appends to `failures` on its own terms.
         print("\nRegression locks")
 
+        # Landing page: structural (renders whole, all sections) + honesty
+        # (the day-one rules — no accuracy %, no "trusted by", no testimonials
+        # — stay enforced by machine, not memory).
+        try:
+            r = c.get("/")
+            body = r.text or ""
+            structural = (r.status_code == 200 and 'id="what"' in body and 'id="how"' in body
+                          and 'id="scoring"' in body and 'id="access"' in body
+                          and "</html>" in body and "{{" not in body)
+            banned = [s for s in ("trusted by", "testimonial", "accuracy", "star rating")
+                      if s in body.lower()]
+            ok = structural and not banned
+            note = ("landing whole + honesty rules hold" if ok
+                    else (f"BANNED COPY: {banned}" if banned else "MALFORMED — section missing"))
+            line(r.status_code, "GET", "/ (landing lock)", note)
+            checked += 1
+            if not ok:
+                failures.append(("GET", "/ (landing lock)", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/ (landing lock)", str(e)[:60])
+            failures.append(("GET", "/ (landing lock)", "exception"))
+
         # Mixed spoken/typed: a typed question MUST produce a tool-registered
         # session, and a spoken-only config must not. preview-session runs the
         # exact validate->normalize->instructions pipeline of a candidate mint

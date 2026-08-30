@@ -4,21 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TopCandidate.pro — Every candidate, scored on your rubric</title>
-<meta name="description" content="Every candidate, scored on your rubric. Upload a job description and a batch of CVs — each scored on six weighted dimensions you control, with the final number recomputed in code, not taken from the model. Built for Bangladesh's HR teams.">
-<meta name="keywords" content="CV screening, AI recruitment, candidate ranking, HR technology, Bangladesh hiring, job screening">
+<meta name="description" content="One link takes a candidate from CV upload into a live AI interview. Six weighted dimensions you control, scores recomputed in code, fair to candidates who interview in their second language. Built for Bangladesh's HR teams.">
+<meta name="keywords" content="CV screening, AI recruitment, AI interview, candidate ranking, HR technology, Bangladesh hiring, job screening">
 <link rel="canonical" href="https://topcandidate.pro/">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TopCandidate.pro">
 <meta property="og:title" content="TopCandidate.pro — Every candidate, scored on your rubric">
-<meta property="og:description" content="Six weighted dimensions you control, two scoring passes, and a final score recomputed in code. Built for Bangladesh's HR teams.">
+<meta property="og:description" content="One link: CV screening plus a live AI interview, scored on six weighted dimensions you control — every number recomputed in code and kept on the record.">
 <meta property="og:url" content="https://topcandidate.pro/">
 <meta property="og:image" content="https://topcandidate.pro/static/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TopCandidate.pro — Every candidate, scored on your rubric">
-<meta name="twitter:description" content="Six weighted dimensions you control, two scoring passes, and a final score recomputed in code. Built for Bangladesh's HR teams.">
+<meta name="twitter:description" content="One link: CV screening plus a live AI interview, scored on six weighted dimensions you control — every number recomputed in code.">
 <meta name="twitter:image" content="https://topcandidate.pro/static/og-image.png">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png">
@@ -64,8 +64,6 @@ a{color:inherit}
 /* ── NAV ── */
 nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);height:64px;display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
 .nav-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
-.nav-icon{width:32px;height:32px;border-radius:var(--r-md);background:var(--orange);display:grid;place-items:center;flex-shrink:0;box-shadow:var(--shadow-sm)}
-.nav-name{font-size:16px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
 .nav-links{display:flex;align-items:center;gap:2px;margin-left:1.5rem}
 .nav-link{font-size:14px;font-weight:500;color:var(--t2);padding:6px 12px;border-radius:var(--r-sm);text-decoration:none;transition:.15s}
 .nav-link:hover{background:var(--s2);color:var(--navy)}
@@ -75,162 +73,20 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.88);backdrop-
 .btn-orange-sm{padding:8px 18px;border-radius:var(--r-md);font-size:14px;font-weight:700;color:#fff;background:var(--orange);border:none;text-decoration:none;transition:.15s;box-shadow:0 2px 8px rgba(245,124,46,.28)}
 .btn-orange-sm:hover{background:var(--orange2)}
 
-/* ── 1. HERO ── */
-.hero{position:relative;overflow:hidden;padding:5.5rem 1.5rem 4.5rem;text-align:center;background:var(--surface);border-bottom:1px solid var(--border)}
-.hero::before{content:'';position:absolute;top:-320px;left:50%;transform:translateX(-50%);width:1100px;height:620px;background:radial-gradient(ellipse at center,rgba(30,58,95,.07),transparent 68%);pointer-events:none}
-.hero-inner{position:relative;max-width:880px;margin:0 auto}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:7px 16px;font-size:13px;font-weight:600;color:var(--orange2);margin-bottom:1.75rem}
-.hero-badge i{width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0}
-.hero-title{font-size:clamp(2.1rem,5.4vw,3.9rem);font-weight:900;line-height:1.08;letter-spacing:-1.6px;color:var(--navy);margin-bottom:1.25rem}
-.hero-title em{font-style:normal;color:var(--orange2)}
-.hero-sub{font-size:clamp(1rem,1.6vw,1.16rem);color:var(--t2);line-height:1.65;max-width:620px;margin:0 auto 2.25rem}
-.hero-cta{display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap}
-.btn-hero{padding:14px 30px;border-radius:var(--r-lg);font-size:16px;font-weight:700;color:#fff;background:var(--orange);border:none;text-decoration:none;display:inline-flex;align-items:center;gap:9px;transition:.18s;box-shadow:0 6px 20px rgba(245,124,46,.30)}
-.btn-hero:hover{background:var(--orange2);transform:translateY(-1px);box-shadow:0 8px 26px rgba(245,124,46,.36)}
-.btn-outline{padding:14px 26px;border-radius:var(--r-lg);font-size:16px;font-weight:600;color:var(--navy);background:var(--surface);border:1.5px solid var(--border2);text-decoration:none;transition:.18s}
-.btn-outline:hover{border-color:var(--indigo);background:var(--s2)}
-/* Mechanism claims only. Every value here is a constant in the codebase —
-   6 dimensions, two scoring angles, and a final score recomputed in Python
-   rather than read off the model. No accuracy figures, no time-saved math. */
-.hero-stats{display:flex;justify-content:center;margin:3rem auto 0;border:1px solid var(--border);border-radius:var(--r-xl);background:var(--surface);box-shadow:var(--shadow-md);overflow:hidden;max-width:660px}
-.hstat{flex:1;padding:1.15rem .85rem;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
-.hstat+.hstat{border-left:1px solid var(--border)}
-.hstat-num{font-size:clamp(1.5rem,3.4vw,2rem);font-weight:900;color:var(--navy);letter-spacing:-1px;line-height:1;white-space:nowrap}
-.hstat-num small{font-size:.62em;font-weight:800;color:var(--orange2)}
-.hstat-lbl{font-size:11.5px;font-weight:600;color:var(--t2);line-height:1.35}
-
-/* ── 2. HOW IT WORKS ── */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
-.step{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:1.85rem 1.6rem;position:relative;box-shadow:var(--shadow-sm);transition:.18s}
-.step:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
-.step-n{position:absolute;top:1.6rem;right:1.6rem;font-size:2.6rem;font-weight:900;color:var(--s3);line-height:1;letter-spacing:-2px}
-.step-ico{width:44px;height:44px;border-radius:var(--r-lg);background:var(--ig);display:grid;place-items:center;margin-bottom:1.1rem}
-.step-title{font-size:1.05rem;font-weight:800;color:var(--navy);margin-bottom:.5rem;letter-spacing:-.3px}
-.step-desc{font-size:.925rem;color:var(--t2);line-height:1.6}
-
-/* ── 3. FLOWCHART ── */
-.flow-wrap{max-width:1140px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2rem 1.5rem}
-.flow-wrap svg{display:block;width:100%;height:auto}
-#flow-desktop{display:block}
-#flow-mobile{display:none}
-.flow-foot{max-width:1140px;margin:1.25rem auto 0;font-size:13px;color:var(--t3);text-align:center;line-height:1.6}
-.n-title{font:700 15px 'Inter',sans-serif;fill:#fff}
-.n-sub{font:500 11px 'Inter',sans-serif;fill:rgba(255,255,255,.72)}
-.n-title-d{font:700 15px 'Inter',sans-serif;fill:#142848}
-.n-sub-d{font:500 11px 'Inter',sans-serif;fill:#4A5970}
-.n-cap{font:700 10px 'Inter',sans-serif;fill:#8593AB;letter-spacing:.8px}
-.n-flow{font:600 11px 'Inter',sans-serif;fill:#E16A1F}
-
-/* ── 4. DIMENSIONS ── */
-.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
-.dim{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.4rem;transition:.18s}
-.dim:hover{border-color:var(--border3);box-shadow:var(--shadow-md)}
-.dim-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.6rem}
-.dim-name{font-size:.98rem;font-weight:800;color:var(--navy);letter-spacing:-.2px}
-.dim-w{font-size:.8rem;font-weight:800;color:var(--orange2);background:var(--og);border-radius:var(--r-pill);padding:3px 10px;white-space:nowrap}
-.dim-desc{font-size:.875rem;color:var(--t2);line-height:1.55;margin-bottom:.9rem}
-.dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden}
-.dim-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--orange)}
-.dims-note{text-align:center;font-size:.9rem;color:var(--t3);margin-top:1.75rem;line-height:1.6}
-
-/* ── 5. DIFFERENTIATORS ── */
-.diffs{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem}
-.diff{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:1.75rem;display:flex;gap:1.1rem;align-items:flex-start;box-shadow:var(--shadow-sm)}
-.diff-ico{width:42px;height:42px;border-radius:var(--r-lg);background:var(--navy);display:grid;place-items:center;flex-shrink:0}
-.diff-title{font-size:1.02rem;font-weight:800;color:var(--navy);margin-bottom:.45rem;letter-spacing:-.3px}
-.diff-desc{font-size:.92rem;color:var(--t2);line-height:1.62}
-
-/* ── 6. INTERNAL USE ── */
-.use{background:var(--navy);border-radius:var(--r-xl);padding:3rem 2.5rem;color:#fff;position:relative;overflow:hidden}
-.use::before{content:'';position:absolute;top:-160px;right:-120px;width:460px;height:460px;border-radius:50%;background:radial-gradient(circle,rgba(245,124,46,.16),transparent 66%);pointer-events:none}
-.use-inner{position:relative}
-.use-eyebrow{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--orange);margin-bottom:.85rem}
-.use-title{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:900;letter-spacing:-1px;line-height:1.2;margin-bottom:1rem}
-.use-body{font-size:1.02rem;color:rgba(255,255,255,.78);line-height:1.7;max-width:620px;margin-bottom:2.25rem}
-.use-body strong{color:#fff;font-weight:700}
-.use-stats{display:flex;gap:2.5rem;flex-wrap:wrap;padding-top:1.75rem;border-top:1px solid rgba(255,255,255,.14)}
-.use-stat-num{font-size:2rem;font-weight:900;letter-spacing:-1px;line-height:1;margin-bottom:.35rem}
-.use-stat-lbl{font-size:12.5px;font-weight:600;color:rgba(255,255,255,.62);line-height:1.4}
-.use-caveat{margin-top:1.75rem;font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;max-width:620px}
-
-/* ── 7. ACCESS ── */
-.access{max-width:620px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.75rem 2.25rem;text-align:center}
-.access-title{font-size:1.5rem;font-weight:900;color:var(--navy);letter-spacing:-.7px;margin-bottom:.85rem}
-.access-body{font-size:1rem;color:var(--t2);line-height:1.65;margin-bottom:1.75rem}
-.access-list{text-align:left;max-width:420px;margin:0 auto 2rem;display:flex;flex-direction:column;gap:.7rem}
-.access-item{display:flex;gap:.7rem;align-items:flex-start;font-size:.93rem;color:var(--t2);line-height:1.55}
-.access-item svg{flex-shrink:0;margin-top:2px}
-.access-note{font-size:13px;color:var(--t3);margin-top:1.25rem;line-height:1.6}
-
-/* ── 8. FAQ ── */
-.faq{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:.7rem}
-.faq-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;transition:.18s}
-.faq-item[open]{border-color:var(--border3);box-shadow:var(--shadow-md)}
-.faq-q{padding:1.1rem 1.35rem;font-size:.98rem;font-weight:700;color:var(--navy);cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.faq-q::-webkit-details-marker{display:none}
-.faq-q::after{content:'+';font-size:1.35rem;font-weight:400;color:var(--orange2);flex-shrink:0;line-height:1;transition:transform .2s}
-.faq-item[open] .faq-q::after{transform:rotate(45deg)}
-.faq-a{padding:0 1.35rem 1.25rem;font-size:.93rem;color:var(--t2);line-height:1.68}
-
-/* ── FOOTER ── */
-footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem;margin-top:0}
-.foot-grid{display:flex;justify-content:space-between;gap:2.5rem;flex-wrap:wrap;padding-bottom:2.25rem;border-bottom:1px solid rgba(255,255,255,.12)}
-.foot-brand{max-width:320px}
-.foot-logo{display:flex;align-items:center;gap:9px;margin-bottom:.9rem}
-.foot-name{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px}
-.foot-tag{font-size:.88rem;line-height:1.62}
-.foot-col-title{font-size:12px;font-weight:800;color:#fff;letter-spacing:.9px;text-transform:uppercase;margin-bottom:.9rem}
-.foot-link{display:block;font-size:.9rem;color:rgba(255,255,255,.62);text-decoration:none;margin-bottom:.6rem;transition:.15s}
-.foot-link:hover{color:var(--orange)}
-.foot-bot{padding-top:1.75rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:.83rem}
-
-/* ── RESPONSIVE — mobile-first checks at 380px ── */
-@media(max-width:960px){
-  .steps{grid-template-columns:1fr}
-  .dims{grid-template-columns:repeat(2,1fr)}
-  .diffs{grid-template-columns:1fr}
-}
-@media(max-width:768px){
-  .nav-links{display:none}
-  nav{padding:0 1rem}
-  .wrap{padding:0 1.15rem}
-  .sec{padding:3.5rem 0}
-  .sec-head{margin-bottom:2.25rem}
-  .hero{padding:3.5rem 1.15rem 3rem}
-  .hero-title{letter-spacing:-1px}
-  .hero-cta{flex-direction:column;align-items:stretch}
-  .btn-hero,.btn-outline{justify-content:center;text-align:center}
-  .hero-stats{margin-top:2.25rem;border-radius:var(--r-lg)}
-  .hstat{padding:.9rem .5rem}
-  .hstat-lbl{font-size:10.5px}
-  .flow-wrap{padding:1.25rem .85rem;border-radius:var(--r-lg)}
-  #flow-desktop{display:none}
-  #flow-mobile{display:block}
-  .n-title,.n-title-d{font-size:14px}
-  .n-sub,.n-sub-d{font-size:10.5px}
-  .dims{grid-template-columns:1fr}
-  .use{padding:2.25rem 1.5rem;border-radius:var(--r-lg)}
-  .use-stats{gap:1.75rem}
-  .access{padding:2rem 1.35rem;border-radius:var(--r-lg)}
-  .foot-grid{flex-direction:column;gap:1.75rem}
-}
-@media(max-width:400px){
-  .hstat-lbl{font-size:10px}
-  .hstat-num{font-size:1.35rem}
-  .use-stats{gap:1.35rem}
-  .use-stat-num{font-size:1.7rem}
-}
-/* ══ REDESIGN: two-column hero + product frame + stepped how-it-works ══ */
-.hero{text-align:left}
+/* ── 1. HERO — two-column, two-tone headline, product frame ── */
+.hero{position:relative;overflow:hidden;padding:5rem 1.5rem 4.5rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.hero::before{content:'';position:absolute;top:-320px;left:60%;width:1100px;height:640px;background:radial-gradient(ellipse at center,rgba(245,124,46,.06),transparent 66%);pointer-events:none}
 .hero-grid{position:relative;max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:3.5rem;align-items:center}
 .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.3px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:6px 14px;margin-bottom:1.4rem}
 .hero-h1{font-size:clamp(2.4rem,5.2vw,3.9rem);font-weight:900;line-height:1.06;letter-spacing:-1.8px;color:var(--navy);margin-bottom:1.25rem}
 .hero-h1 .o{color:var(--orange2)}
-.hero-lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--t2);line-height:1.6;max-width:520px;margin:0 0 2rem}
+.hero-lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--t2);line-height:1.62;max-width:530px;margin:0 0 2rem}
 .hero-lead b{color:var(--navy);font-weight:700}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1.85rem}
-.hero-actions .btn-hero{box-shadow:0 8px 24px rgba(245,124,46,.32)}
-.hero-actions .btn-hero:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(245,124,46,.4)}
+.btn-hero{padding:14px 30px;border-radius:var(--r-lg);font-size:16px;font-weight:700;color:#fff;background:var(--orange);border:none;text-decoration:none;display:inline-flex;align-items:center;gap:9px;transition:.18s;box-shadow:0 8px 24px rgba(245,124,46,.32)}
+.btn-hero:hover{background:var(--orange2);transform:translateY(-2px);box-shadow:0 12px 30px rgba(245,124,46,.4)}
+.btn-outline{padding:14px 26px;border-radius:var(--r-lg);font-size:16px;font-weight:600;color:var(--navy);background:var(--surface);border:1.5px solid var(--border2);text-decoration:none;transition:.18s}
+.btn-outline:hover{border-color:var(--indigo);background:var(--s2)}
 .trust{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem}
 .trust span{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:var(--t2)}
 .trust svg{flex-shrink:0}
@@ -258,7 +114,8 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
 .sk-tr .a2{height:8px;border-radius:4px;background:var(--s2)}
 .sk-pill{height:16px;border-radius:9px;background:rgba(22,163,74,.16)}
 .sk-pill.o{background:rgba(245,124,46,.16)}
-/* stepped how-it-works */
+
+/* ── 2. HOW IT WORKS — stepped cards ── */
 .steps-3{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
 .step3{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:2rem 1.7rem;box-shadow:var(--shadow-sm);transition:.2s}
 .step3:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--border3)}
@@ -268,15 +125,130 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
 .step3-d{font-size:.94rem;color:var(--t2);line-height:1.62}
 .step3-conn{position:absolute;top:3.4rem;right:-1.05rem;color:var(--border3);z-index:2}
 .steps-3 .step3:last-child .step3-conn{display:none}
+
+/* ── 3. CAPABILITY CARDS — what it does, honestly ── */
+.caps{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.cap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:1.75rem 1.6rem;box-shadow:var(--shadow-sm);transition:.2s}
+.cap:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--border3)}
+.cap-ico{width:46px;height:46px;border-radius:var(--r-lg);background:var(--ig);display:grid;place-items:center;margin-bottom:1.1rem}
+.cap-t{font-size:1.05rem;font-weight:800;color:var(--navy);letter-spacing:-.3px;margin-bottom:.5rem}
+.cap-d{font-size:.92rem;color:var(--t2);line-height:1.62}
+/* featured fairness card — the real differentiator gets the visual anchor */
+.cap-feat{grid-column:1/-1;background:var(--navy);border:none;display:grid;grid-template-columns:auto 1fr;gap:1.4rem;align-items:flex-start;padding:2.1rem 2rem;position:relative;overflow:hidden}
+.cap-feat::before{content:'';position:absolute;top:-140px;right:-100px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(245,124,46,.18),transparent 66%)}
+.cap-feat .cap-ico{background:var(--orange);margin:0;position:relative}
+.cap-feat .cap-t{color:#fff;font-size:1.25rem}
+.cap-feat .cap-d{color:rgba(255,255,255,.78);font-size:.98rem;max-width:760px}
+.cap-feat .cap-d b{color:#fff}
+.cap-feat:hover{transform:none;box-shadow:var(--shadow-sm)}
+
+/* ── 4. FLOWCHART ── */
+.flow-wrap{max-width:1140px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2rem 1.5rem}
+.flow-wrap svg{display:block;width:100%;height:auto}
+#flow-desktop{display:block}
+#flow-mobile{display:none}
+.flow-foot{max-width:1140px;margin:1.25rem auto 0;font-size:13px;color:var(--t3);text-align:center;line-height:1.6}
+.n-title{font:700 15px 'Inter',sans-serif;fill:#fff}
+.n-sub{font:500 11px 'Inter',sans-serif;fill:rgba(255,255,255,.72)}
+.n-title-d{font:700 15px 'Inter',sans-serif;fill:#142848}
+.n-sub-d{font:500 11px 'Inter',sans-serif;fill:#4A5970}
+.n-cap{font:700 10px 'Inter',sans-serif;fill:#8593AB;letter-spacing:.8px}
+.n-flow{font:600 11px 'Inter',sans-serif;fill:#E16A1F}
+
+/* ── 5. DIMENSIONS ── */
+.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.dim{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.4rem;transition:.18s}
+.dim:hover{border-color:var(--border3);box-shadow:var(--shadow-md)}
+.dim-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.6rem}
+.dim-name{font-size:.98rem;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+.dim-w{font-size:.8rem;font-weight:800;color:var(--orange2);background:var(--og);border-radius:var(--r-pill);padding:3px 10px;white-space:nowrap}
+.dim-desc{font-size:.875rem;color:var(--t2);line-height:1.55;margin-bottom:.9rem}
+.dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden}
+.dim-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--orange)}
+.dims-note{text-align:center;font-size:.9rem;color:var(--t3);margin-top:1.75rem;line-height:1.6}
+
+/* ── 6. INTERNAL USE — real numbers, our own hiring ── */
+.use{background:var(--navy);border-radius:var(--r-xl);padding:3rem 2.5rem;color:#fff;position:relative;overflow:hidden}
+.use::before{content:'';position:absolute;top:-160px;right:-120px;width:460px;height:460px;border-radius:50%;background:radial-gradient(circle,rgba(245,124,46,.16),transparent 66%);pointer-events:none}
+.use-inner{position:relative}
+.use-eyebrow{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--orange);margin-bottom:.85rem}
+.use-title{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:900;letter-spacing:-1px;line-height:1.2;margin-bottom:1rem}
+.use-body{font-size:1.02rem;color:rgba(255,255,255,.78);line-height:1.7;max-width:640px;margin-bottom:2.25rem}
+.use-body strong{color:#fff;font-weight:700}
+.use-stats{display:flex;gap:2.5rem;flex-wrap:wrap;padding-top:1.75rem;border-top:1px solid rgba(255,255,255,.14)}
+.use-stat-num{font-size:2rem;font-weight:900;letter-spacing:-1px;line-height:1;margin-bottom:.35rem}
+.use-stat-lbl{font-size:12.5px;font-weight:600;color:rgba(255,255,255,.62);line-height:1.4}
+.use-caveat{margin-top:1.75rem;font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;max-width:640px}
+
+/* ── 7. ACCESS ── */
+.access{max-width:620px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.75rem 2.25rem;text-align:center}
+.access-title{font-size:1.5rem;font-weight:900;color:var(--navy);letter-spacing:-.7px;margin-bottom:.85rem}
+.access-body{font-size:1rem;color:var(--t2);line-height:1.65;margin-bottom:1.75rem}
+.access-list{text-align:left;max-width:420px;margin:0 auto 2rem;display:flex;flex-direction:column;gap:.7rem}
+.access-item{display:flex;gap:.7rem;align-items:flex-start;font-size:.93rem;color:var(--t2);line-height:1.55}
+.access-item svg{flex-shrink:0;margin-top:2px}
+.access-note{font-size:13px;color:var(--t3);margin-top:1.25rem;line-height:1.6}
+
+/* ── 8. FAQ ── */
+.faq{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:.7rem}
+.faq-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;transition:.18s}
+.faq-item[open]{border-color:var(--border3);box-shadow:var(--shadow-md)}
+.faq-q{padding:1.1rem 1.35rem;font-size:.98rem;font-weight:700;color:var(--navy);cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.faq-q::-webkit-details-marker{display:none}
+.faq-q::after{content:'+';font-size:1.35rem;font-weight:400;color:var(--orange2);flex-shrink:0;line-height:1;transition:transform .2s}
+.faq-item[open] .faq-q::after{transform:rotate(45deg)}
+.faq-a{padding:0 1.35rem 1.25rem;font-size:.93rem;color:var(--t2);line-height:1.68}
+
+/* ── FOOTER ── */
+footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem;margin-top:0}
+.foot-grid{display:flex;justify-content:space-between;gap:2.5rem;flex-wrap:wrap;padding-bottom:2.25rem;border-bottom:1px solid rgba(255,255,255,.12)}
+.foot-brand{max-width:320px}
+.foot-logo{display:flex;align-items:center;gap:9px;margin-bottom:.9rem}
+.foot-col-title{font-size:12px;font-weight:800;color:#fff;letter-spacing:.9px;text-transform:uppercase;margin-bottom:.9rem}
+.foot-link{display:block;font-size:.9rem;color:rgba(255,255,255,.62);text-decoration:none;margin-bottom:.6rem;transition:.15s}
+.foot-link:hover{color:var(--orange)}
+.foot-tag{font-size:.88rem;line-height:1.62}
+.foot-bot{padding-top:1.75rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:.83rem}
+
+/* ── RESPONSIVE — sharp at 380px ── */
+@media(max-width:960px){
+  .caps{grid-template-columns:1fr 1fr}
+  .dims{grid-template-columns:repeat(2,1fr)}
+}
 @media(max-width:860px){
   .hero-grid{grid-template-columns:1fr;gap:2.5rem}
   .shot{order:2}
   .steps-3{grid-template-columns:1fr;gap:1.15rem}
   .step3-conn{display:none}
 }
+@media(max-width:768px){
+  .nav-links{display:none}
+  nav{padding:0 1rem}
+  .wrap{padding:0 1.15rem}
+  .sec{padding:3.5rem 0}
+  .sec-head{margin-bottom:2.25rem}
+  .hero{padding:3.5rem 1.15rem 3rem}
+  .hero-h1{letter-spacing:-1px}
+  .flow-wrap{padding:1.25rem .85rem;border-radius:var(--r-lg)}
+  #flow-desktop{display:none}
+  #flow-mobile{display:block}
+  .n-title,.n-title-d{font-size:14px}
+  .n-sub,.n-sub-d{font-size:10.5px}
+  .dims{grid-template-columns:1fr}
+  .use{padding:2.25rem 1.5rem;border-radius:var(--r-lg)}
+  .use-stats{gap:1.75rem}
+  .access{padding:2rem 1.35rem;border-radius:var(--r-lg)}
+  .foot-grid{flex-direction:column;gap:1.75rem}
+}
+@media(max-width:640px){
+  .caps{grid-template-columns:1fr}
+  .cap-feat{grid-template-columns:1fr;padding:1.6rem 1.35rem}
+}
 @media(max-width:400px){
   .hero-actions{flex-direction:column}
   .hero-actions .btn-hero,.hero-actions .btn-outline{justify-content:center;text-align:center}
+  .use-stats{gap:1.35rem}
+  .use-stat-num{font-size:1.7rem}
 }
 </style>
 </head>
@@ -298,6 +270,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   </a>
   <div class="nav-links">
     <a href="#how" class="nav-link">How it works</a>
+    <a href="#what" class="nav-link">What it does</a>
     <a href="#scoring" class="nav-link">Scoring</a>
     <a href="#dimensions" class="nav-link">Dimensions</a>
     <a href="#access" class="nav-link">Access</a>
@@ -313,18 +286,18 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   <div class="hero-grid">
     <div class="hero-copy">
       <div class="hero-eyebrow">🇧🇩 Built for Bangladesh's HR teams</div>
-      <h1 class="hero-h1">Every candidate,<br>scored on <span class="o">your rubric.</span></h1>
-      <p class="hero-lead">Upload a job description and a batch of CVs. Every candidate is scored on <b>six weighted dimensions you control</b> — then ranked, with the reasoning behind every number kept on the record.</p>
+      <h1 class="hero-h1">Every candidate,<br>scored on <span class="o">your&nbsp;rubric.</span></h1>
+      <p class="hero-lead">One link takes a candidate from <b>CV upload</b> into a <b>live AI interview</b> — scored on six weighted dimensions you control, with every number recomputed in code and kept on the record.</p>
       <div class="hero-actions">
-        <a class="btn-hero" href="#access">Start screening
+        <a class="btn-hero" href="#access">Request access
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
         <a class="btn-outline" href="#how">See how it works</a>
       </div>
       <div class="trust">
-        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>You set the weights</span>
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>One link, CV to interview</span>
         <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Scored in code, not guessed</span>
-        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Every number auditable</span>
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Fair to every accent</span>
       </div>
     </div>
 
@@ -367,36 +340,94 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   <div class="wrap">
     <div class="sec-head">
       <span class="sec-eyebrow">How it works</span>
-      <h2 class="sec-title">Three steps, one rubric</h2>
-      <p class="sec-sub">The job description sets the standard once, and every candidate is measured against that same standard.</p>
+      <h2 class="sec-title">One link, three steps</h2>
+      <p class="sec-sub">The job description sets the standard once, and every candidate is measured against that same standard — from the first CV to the last interview answer.</p>
     </div>
     <div class="steps-3">
       <div class="step3">
         <div class="step3-n">1</div>
-        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-        <div class="step3-t">Upload the JD and the CVs</div>
-        <div class="step3-d">Paste a job description, attach a batch of PDFs, and set the weighting for the role — or start from one of eight presets.</div>
+        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+        <div class="step3-t">Post the job, share one link</div>
+        <div class="step3-d">Set the role's weighting — or start from one of eight presets — and share the public apply link. Prefer batches? Upload a folder of PDFs yourself instead.</div>
         <svg class="step3-conn" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </div>
       <div class="step3">
         <div class="step3-n">2</div>
         <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 .5 1.65A3 3 0 0 0 5 13a3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0-1.5-2.35A3 3 0 0 0 18 9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
-        <div class="step3-t">Scored on your rubric, in code</div>
+        <div class="step3-t">Every CV scored on your rubric</div>
         <div class="step3-d">Each CV is scored twice from opposing angles, blended, then the final number is recomputed deterministically — never taken on trust from the model.</div>
         <svg class="step3-conn" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </div>
       <div class="step3">
         <div class="step3-n">3</div>
-        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="step3-t">Rank, move, and email</div>
-        <div class="step3-d">A sortable list with a full report per candidate, four pipeline stages, and interview or rejection emails sent from inside the app.</div>
+        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
+        <div class="step3-t">Qualifiers interview, same sitting</div>
+        <div class="step3-d">Candidates who clear your threshold flow straight into a live AI interview on that same link. Everything lands ranked in your dashboard, with emails sent from your own address.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ 3. SCORING FLOWCHART ═══════════════ -->
-<section class="sec sec-alt" id="scoring">
+<!-- ═══════════════ 3. CAPABILITY CARDS ═══════════════ -->
+<section class="sec sec-alt" id="what">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-eyebrow">What it does</span>
+      <h2 class="sec-title">The whole funnel, honestly built</h2>
+      <p class="sec-sub">No accuracy theatre, no logo wall. Seven things this product actually does — each one something we run our own hiring on.</p>
+    </div>
+    <div class="caps">
+
+      <div class="cap cap-feat">
+        <div class="cap-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div>
+          <div class="cap-t">Fair to every candidate — by rule, not by hope</div>
+          <div class="cap-d">Scoring measures the <b>substance</b> of an answer, never the polish of the English. A sharp answer in broken English <b>must outscore</b> a fluent answer that says nothing — that rule is written into every scorer, spoken and written, and tested against real transcripts before every release. Built for candidates who interview in their second language, because ours do.</div>
+        </div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+        <div class="cap-t">One link, full funnel</div>
+        <div class="cap-d">A candidate opens your apply link, uploads a CV, and — if they qualify — flows straight into a live interview. Same sitting, no second link, no login.</div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></div>
+        <div class="cap-t">AI CV screening</div>
+        <div class="cap-d">Six weighted dimensions you control, scored twice from opposing angles — and the final number recomputed in code, never taken on trust from the model.</div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
+        <div class="cap-t">Live AI interview</div>
+        <div class="cap-d">A real spoken conversation that adapts to what the candidate says, with typed questions where written answers reveal more — drawn from your job description, identical for every candidate.</div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+        <div class="cap-t">Proctoring, honestly framed</div>
+        <div class="cap-d">Presence monitoring and flagged snapshots, each labeled with when coverage changed and why. Signals for your reviewers — never an automatic verdict, and we won't call it cheat-proof.</div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+        <div class="cap-t">Full audit trail</div>
+        <div class="cap-d">Every score keeps its evidence — per-dimension reasoning, quoted answers, the exact job description it was measured against. When someone asks why a candidate ranked there, you have the answer.</div>
+      </div>
+
+      <div class="cap">
+        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div class="cap-t">Built for Bangladesh's HR teams</div>
+        <div class="cap-d">Made in Dhaka for how teams here hire — batches of PDFs, candidate emails from your own Gmail, and everything working on a phone over mobile data.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. SCORING FLOWCHART ═══════════════ -->
+<section class="sec" id="scoring">
   <div class="wrap">
     <div class="sec-head">
       <span class="sec-eyebrow">What actually runs</span>
@@ -546,8 +577,8 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   </div>
 </section>
 
-<!-- ═══════════════ 4. THE SIX DIMENSIONS ═══════════════ -->
-<section class="sec" id="dimensions">
+<!-- ═══════════════ 5. THE SIX DIMENSIONS ═══════════════ -->
+<section class="sec sec-alt" id="dimensions">
   <div class="wrap">
     <div class="sec-head">
       <span class="sec-eyebrow">The rubric</span>
@@ -590,52 +621,40 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   </div>
 </section>
 
-<!-- ═══════════════ 5. WHAT MAKES IT DIFFERENT ═══════════════ -->
-<section class="sec sec-alt">
+<!-- ═══════════════ 6. INTERNAL USE — real numbers ═══════════════ -->
+<section class="sec">
   <div class="wrap">
-    <div class="sec-head">
-      <span class="sec-eyebrow">Why it's different</span>
-      <h2 class="sec-title">Your edge over generic screeners</h2>
-      <p class="sec-sub">Not a black box that hands you a number. A rubric you control, maths you can check, and a record you can defend.</p>
-    </div>
-    <div class="diffs">
-      <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-6M22 20H2"/></svg></div>
-        <div>
-          <div class="diff-title">You set the weights</div>
-          <div class="diff-desc">Six dimensions, and the emphasis is yours. A senior engineering role and a sales role shouldn't be graded the same way, so you tune the weighting per role — start from one of eight presets or set all six yourself.</div>
+    <div class="use">
+      <div class="use-inner">
+        <span class="use-eyebrow">Who runs on it today</span>
+        <h2 class="use-title">We built it for our own hiring first</h2>
+        <p class="use-body">TopCandidate screens every application at <strong>LinkX360</strong> and <strong>Data Solution 360</strong> — the two companies behind it. Our own candidates go through the same apply link, the same rubric, and the same live interview we're offering you. When a scorer was unfair to candidates answering in their second language, we felt it in our own pipeline first — and fixed it there before anything shipped.</p>
+        <div class="use-stats">
+          <div>
+            <div class="use-stat-num">292</div>
+            <div class="use-stat-lbl">CVs screened<br>on the rubric</div>
+          </div>
+          <div>
+            <div class="use-stat-num">12</div>
+            <div class="use-stat-lbl">roles screened<br>across both companies</div>
+          </div>
+          <div>
+            <div class="use-stat-num">29</div>
+            <div class="use-stat-lbl">applications through<br>the public apply link</div>
+          </div>
+          <div>
+            <div class="use-stat-num">2</div>
+            <div class="use-stat-lbl">companies —<br>both of them ours</div>
+          </div>
         </div>
-      </div>
-      <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
-        <div>
-          <div class="diff-title">Scored in code, not guessed</div>
-          <div class="diff-desc">The model returns per-dimension scores; the overall number is recomputed in code from those scores and your weights, minus penalties. A model that returns a confident total gets that total thrown away.</div>
-        </div>
-      </div>
-      <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-        <div>
-          <div class="diff-title">Every number is auditable</div>
-          <div class="diff-desc">Two-pass scoring with a confidence gate, and every screening keeps its per-dimension scores, the gaps that triggered a penalty, and the job description it was measured against. When someone asks why a candidate ranked where they did, there's an answer.</div>
-        </div>
-      </div>
-      <div class="diff">
-        <div class="diff-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-        <div>
-          <div class="diff-title">Built for Bangladesh's HR teams</div>
-          <div class="diff-desc">Made in Dhaka for the way teams here hire — recruiter Gmail for candidate emails, batches of PDFs, and a workflow that runs on a phone. Not a Western tool bolted on sideways.</div>
-        </div>
+        <p class="use-caveat">These are our real internal numbers as of August 2026, from our own two companies. We don't have customer adoption figures to show you yet — and we'd rather show you honest small numbers than invented big ones.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ 6. ACCESS ═══════════════
-     (The "How we use it internally" section was removed — internal status, not
-     front-page sales content. Access flips to white so the white/grey section
-     rhythm stays intact now that the white internal-use section is gone.) -->
-<section class="sec" id="access">
+<!-- ═══════════════ 7. ACCESS ═══════════════ -->
+<section class="sec sec-alt" id="access">
   <div class="wrap">
     <div class="sec-head">
       <span class="sec-eyebrow">Access</span>
@@ -652,7 +671,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
         </div>
         <div class="access-item">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Weightings tuned to the roles you actually hire for</span>
+          <span>Weightings and interview questions tuned to the roles you actually hire for</span>
         </div>
         <div class="access-item">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -669,8 +688,8 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
   </div>
 </section>
 
-<!-- ═══════════════ 7. FAQ ═══════════════ -->
-<section class="sec sec-alt">
+<!-- ═══════════════ 8. FAQ ═══════════════ -->
+<section class="sec">
   <div class="wrap">
     <div class="sec-head">
       <span class="sec-eyebrow">Questions</span>
@@ -678,12 +697,20 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
     </div>
     <div class="faq">
       <details class="faq-item">
-        <summary class="faq-q">What file formats can I upload?</summary>
-        <div class="faq-a">PDF only. Anything else is rejected before it reaches the scorer, so a stray .docx in a batch fails fast rather than silently scoring as an empty CV.</div>
+        <summary class="faq-q">What is the live AI interview, exactly?</summary>
+        <div class="faq-a">A real-time spoken conversation with an AI interviewer, in the candidate's browser — no app to install. It asks your job's approved questions (the same set for every candidate, which fair comparison requires), adapts its follow-ups to what the candidate actually says, and shows every question as text on screen as well as speaking it. Some questions can be answered in writing instead, where a composed answer reveals more.</div>
       </details>
       <details class="faq-item">
-        <summary class="faq-q">How many CVs can I process at once?</summary>
-        <div class="faq-a">Batch size depends on the account we set up with you. Within a batch, CVs are processed three at a time and you watch each result land live rather than waiting for the whole batch to finish.</div>
+        <summary class="faq-q">Is the interview scoring fair to candidates whose English isn't fluent?</summary>
+        <div class="faq-a">This is the rule we test hardest. The scorers grade the substance of an answer — relevance, specifics, real events — and are explicitly instructed that clarity of thought is never the same thing as fluent English. A sharp answer in broken English must outscore a fluent answer that says nothing, and we verify that with test transcripts before every scoring change goes live. Garbled speech-recognition output is treated as a transcription error, never held against the candidate.</div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">Does the proctoring catch cheating?</summary>
+        <div class="faq-a">It produces signals, not verdicts — presence monitoring, flagged snapshots, and a timeline showing exactly when coverage changed and why. A human reviews them; nothing is auto-rejected. And we won't claim it's cheat-proof, because no browser-based system is: someone determined enough can always use a second device. What you get is honest evidence, honestly labeled.</div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">What file formats can I upload?</summary>
+        <div class="faq-a">PDF only. Anything else is rejected before it reaches the scorer, so a stray .docx in a batch fails fast rather than silently scoring as an empty CV.</div>
       </details>
       <details class="faq-item">
         <summary class="faq-q">Does a missing requirement automatically reject a candidate?</summary>
@@ -698,8 +725,8 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
         <div class="faq-a">No, and that's deliberate. It's computed from writing-style patterns and shown on the report as a signal for you to weigh. It's kept entirely out of the scoring maths, because a polished CV is evidence of effort, not of dishonesty.</div>
       </details>
       <details class="faq-item">
-        <summary class="faq-q">Where do candidate CVs go?</summary>
-        <div class="faq-a">CV text is sent to OpenAI's API for parsing and scoring — that's how the analysis works, and we'd rather say so plainly than claim your data never leaves the building. Results and the original PDF are stored in our database so you can reopen the report later, and you can delete any screening from the app.</div>
+        <summary class="faq-q">Where do candidate CVs and interview recordings go?</summary>
+        <div class="faq-a">CV text and interview transcripts are sent to OpenAI's API for parsing and scoring — that's how the analysis works, and we'd rather say so plainly than claim your data never leaves the building. Results are stored in our database so you can reopen reports later; candidate PDFs are deleted after 30 days; and you can delete any screening from the app.</div>
       </details>
       <details class="faq-item">
         <summary class="faq-q">Can I change how candidates are weighted?</summary>
@@ -727,11 +754,12 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:3.25rem 0 2rem
             <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#fff">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
           </svg>
         </div>
-        <p class="foot-tag">AI CV screening on a rubric you control. Built in Dhaka, for HR teams in Bangladesh.</p>
+        <p class="foot-tag">CV screening and live AI interviews on a rubric you control. Built in Dhaka, for HR teams in Bangladesh.</p>
       </div>
       <div>
         <div class="foot-col-title">Product</div>
         <a href="#how" class="foot-link">How it works</a>
+        <a href="#what" class="foot-link">What it does</a>
         <a href="#scoring" class="foot-link">Scoring pipeline</a>
         <a href="#dimensions" class="foot-link">The six dimensions</a>
         <a href="#access" class="foot-link">Request access</a>
