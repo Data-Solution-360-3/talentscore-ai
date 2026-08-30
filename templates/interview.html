@@ -279,6 +279,8 @@ async function ensureMic(){
 }
 async function connect(){
   const tok = await mintToken();
+  log('session minted — typed questions in config:', !!tok.has_typed,
+      tok.has_typed ? '(begin_typed_answer tool registered)' : '(all-spoken session)');
   if(tok.recovered) skipNextCount = true;
   await ensureMic();
   pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
@@ -427,10 +429,14 @@ function onEvent(ev){
   }
 
   // the mode switch: the model finished a begin_typed_answer tool call
-  if(t==='response.output_item.done' && msg.item && msg.item.type==='function_call'
-     && msg.item.name==='begin_typed_answer'){
-    let q=''; try{ q = String(JSON.parse(msg.item.arguments||'{}').question||''); }catch(_){}
-    enterTyped(msg.item.call_id, q);
+  if(t==='response.output_item.done' && msg.item && msg.item.type==='function_call'){
+    log('TOOL CALL from model:', msg.item.name, msg.item.arguments, 'call_id', msg.item.call_id);
+    if(msg.item.name==='begin_typed_answer'){
+      let q=''; try{ q = String(JSON.parse(msg.item.arguments||'{}').question||''); }catch(_){}
+      enterTyped(msg.item.call_id, q);
+    }else{
+      log('UNEXPECTED tool name — panel not opened');
+    }
     return;
   }
 

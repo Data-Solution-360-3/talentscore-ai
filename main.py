@@ -1897,6 +1897,32 @@ def _validated_viva_config(body: dict) -> dict:
     }
 
 
+@app.post("/api/viva-live/preview-session")
+async def viva_live_preview_session(request: Request):
+    """Owner-only, side-effect free: run a config through the EXACT pipeline a
+    candidate mint uses (validate → normalize → instructions) and report what
+    the session would get. No OpenAI call, no DB write. This is the smoke
+    test's regression lock: a typed question must produce a tool-registered
+    session, provably, on every deploy."""
+    await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    config = _validated_viva_config(body)
+    questions = _normalize_questions(config.get("questions"))
+    has_typed = any(q["mode"] == "typed" for q in questions)
+    instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
+                                            interviewer_name=config.get("interviewer_name", ""))
+    return {
+        "questions": questions,
+        "has_typed": has_typed,
+        "tool_registered": bool(has_typed),   # mirrors the mint's tools= branch
+        "tool_name": _TYPED_ANSWER_TOOL[0]["name"] if has_typed else None,
+        "typed_rules_in_instructions": "begin_typed_answer" in instructions and "(TYPED)" in instructions,
+    }
+
+
 @app.post("/api/viva-live/create")
 async def viva_live_create(request: Request):
     """Owner-only: create a live interview and get its candidate link."""

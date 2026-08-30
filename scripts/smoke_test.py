@@ -282,6 +282,17 @@ def main():
                 failures.append(("POST", "/api/viva-live/create", r.status_code))
         except Exception as e:
             line(None, "POST", "/api/viva-live/create", str(e)[:60]); failures.append(("POST", "/api/viva-live/create", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.post("/api/viva-live/preview-session", json={"questions": ["x"]})
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "POST", "/api/viva-live/preview-session",
+                 "gated (owner-only)" if gated else "NOT GATED")
+            checked += 1
+            if not gated:
+                failures.append(("POST", "/api/viva-live/preview-session", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session", str(e)[:60]); failures.append(("POST", "/api/viva-live/preview-session", "exception"))
         # One-link flow (CV upload → conditional interview).
         try:
             # A probe with a fake token+id must get EXACTLY the flat received
@@ -411,6 +422,47 @@ def main():
         # just the status, so a subtler break (200 with a garbled body) is
         # caught too. Each appends to `failures` on its own terms.
         print("\nRegression locks")
+
+        # Mixed spoken/typed: a typed question MUST produce a tool-registered
+        # session, and a spoken-only config must not. preview-session runs the
+        # exact validate->normalize->instructions pipeline of a candidate mint
+        # (no OpenAI call, no DB write), so a silent regression anywhere in
+        # that chain fails the deploy here instead of mid-interview.
+        try:
+            r = c.post("/api/viva-live/preview-session", json={
+                "questions": [{"text": "Spoken q", "mode": "spoken"},
+                              {"text": "Typed q", "mode": "typed"}]})
+            body = r.json() if r.status_code == 200 else {}
+            modes = [q.get("mode") for q in body.get("questions", [])]
+            ok = (r.status_code == 200 and modes == ["spoken", "typed"]
+                  and body.get("has_typed") is True and body.get("tool_registered") is True
+                  and body.get("tool_name") == "begin_typed_answer"
+                  and body.get("typed_rules_in_instructions") is True)
+            line(r.status_code, "POST", "/api/viva-live/preview-session (typed)",
+                 "typed q -> tool registered + rules in prompt" if ok
+                 else f"TYPED FLOW BROKEN: {str(body)[:80]}")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva-live/preview-session (typed)", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session (typed)", str(e)[:60])
+            failures.append(("POST", "/api/viva-live/preview-session (typed)", "exception"))
+        try:
+            r = c.post("/api/viva-live/preview-session", json={
+                "questions": ["Plain legacy string question"]})
+            body = r.json() if r.status_code == 200 else {}
+            ok = (r.status_code == 200 and body.get("has_typed") is False
+                  and body.get("tool_registered") is False
+                  and body.get("typed_rules_in_instructions") is False)
+            line(r.status_code, "POST", "/api/viva-live/preview-session (spoken)",
+                 "spoken-only -> no tool, no typed rules" if ok
+                 else f"SPOKEN PATH POLLUTED: {str(body)[:80]}")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva-live/preview-session (spoken)", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session (spoken)", str(e)[:60])
+            failures.append(("POST", "/api/viva-live/preview-session (spoken)", "exception"))
 
         # /api/screenings 500'd on a raw ObjectId (cv_file_id) it failed to
         # serialize. Assert it returns JSON with a screenings LIST — a
