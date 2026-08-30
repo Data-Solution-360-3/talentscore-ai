@@ -2323,13 +2323,21 @@ async def set_job_viva_config(request: Request, job_id: str):
     except Exception:
         daily_cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
 
+    # Two callers write here. The /viva-live attach card sends the full setup
+    # (questions and all). The job modal sends only the gate fields — no
+    # "questions" key — and must NOT clobber a setup saved from /viva-live
+    # with defaults. Config precedence: payload > previously stored > defaults.
+    existing_cfg = (job.get("viva") or {}).get("config")
+    cfg_source = body if "questions" in body else (existing_cfg or body)
     viva = {
         "enabled": True,
         "threshold": threshold,
         "daily_cap": daily_cap,
-        "config": _validated_viva_config(body),
+        "config": _validated_viva_config(dict(cfg_source)),
         "updated_at": _dt.utcnow(),
     }
+    if not viva["config"].get("job_title"):
+        viva["config"]["job_title"] = str(job.get("title") or "")[:120]
     await set_job_viva(job["_id"], viva)
     return {"success": True, "viva": serialize_mongo(viva)}
 

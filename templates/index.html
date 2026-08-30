@@ -2564,7 +2564,82 @@ function renderPublicLink(job, spend){
             wait for you to score them, and the candidate is never told anything is different.
           </div>
         </div>` : ''}
+
+      ${(()=>{ // Live-interview gate (the one-link flow). Reads/writes job.viva.
+        const v   = job.viva || null;
+        const von = !!(v && v.enabled);
+        const cfg = (v && v.config) || null;
+        const cfgLine = cfg
+          ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
+          : `Default setup — one general question, 4 turns, patient pace, proctoring off.`;
+        return `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${von?'8px':'0'}">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
+              Live interview after CV
+            </div>
+            <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${von?'var(--green)':'var(--t3)'}">
+              <input type="checkbox" id="viva-toggle" ${von?'checked':''}
+                     onchange="toggleJobViva('${job._id}', this.checked)" style="cursor:pointer">
+              ${von ? 'On — qualifying applicants flow into a live interview' : 'Off — applications are CV-only'}
+            </label>
+          </div>
+          <div id="viva-fields" style="display:${von?'block':'none'}">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;font-weight:600;color:var(--t2)">CV score threshold
+                <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}"
+                       style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+              <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
+                <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
+                       style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+              <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
+            </div>
+            <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
+              Applicants scoring at or above the threshold go straight into the interview, same sitting.
+              Everyone else sees the normal received page — no hint a gate exists.<br>
+              Interview setup: <strong>${cfgLine}</strong> — edit questions &amp; pace on
+              <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> and use its &ldquo;attach to a job&rdquo; card; this toggle keeps whatever setup is saved there.
+            </div>
+          </div>
+        </div>`; })()}
     </div>`;
+}
+
+// The gate toggle and Save both write /api/jobs/{id}/viva WITHOUT a questions
+// key — the server then keeps the interview setup already stored on the job
+// (or applies defaults if none was ever saved). Same never-fail-quietly
+// discipline as the public-link toggle.
+async function saveJobViva(jobId, enabled){
+  const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
+  const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));
+  const res = await fetch(`/api/jobs/${jobId}/viva`,{
+    method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(enabled ? {enabled:true, threshold:th, daily_cap:cap} : {enabled:false})
+  });
+  let d={}; try{ d=await res.json(); }catch(_){}
+  if(!res.ok) throw new Error(d.detail || `Server returned ${res.status}`);
+  const cached = allJobs.find(x=>x._id===jobId);
+  if(cached) cached.viva = d.viva;
+  if(window._currentJob && window._currentJob._id === jobId){
+    window._currentJob.viva = d.viva;
+    renderPublicLink(window._currentJob, window._currentSpend);
+  }
+  toast(enabled
+    ? `Live interview ON — threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day`
+    : 'Live interview off — applications are CV-only again', {type:'success'});
+}
+
+async function toggleJobViva(jobId, on){
+  const t = document.getElementById('viva-toggle');
+  if(t) t.disabled = true;
+  try{
+    await saveJobViva(jobId, on);
+  }catch(e){
+    toast('Could not change the interview gate: ' + e.message, {type:'error'});
+    const t2 = document.getElementById('viva-toggle');
+    if(t2){ t2.checked = !on; t2.disabled = false; }
+  }
 }
 
 async function togglePublic(jobId, isPublic){
