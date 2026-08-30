@@ -285,6 +285,19 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.middleware("http")
+async def no_html_cache(request: Request, call_next):
+    """HTML pages carry no validators, so without an explicit policy browsers
+    heuristically cache them — and a tab can silently run a PRE-DEPLOY page
+    against post-deploy APIs (root cause of the typed-toggle save that arrived
+    as the old string format). no-store keeps every page load current; static
+    assets are mounted separately and unaffected."""
+    resp = await call_next(request)
+    if resp.headers.get("content-type", "").startswith("text/html"):
+        resp.headers.setdefault("Cache-Control", "no-store")
+    return resp
+
+
 # ─────────────────────────────────────────────────────────────
 # SEO — robots.txt, sitemap.xml, favicon. Static content only:
 # no database, no query, no auth. Serves the crawler, nothing else.
@@ -1894,8 +1907,11 @@ async def viva_live_create(request: Request):
         raise HTTPException(status_code=400, detail="Invalid request body.")
     config = _validated_viva_config(body)
     doc = await create_live_interview(user["user_id"], config)
+    # Echo what was STORED (not what was sent) so a stale page or dropped
+    # field is visible at creation time, never discovered mid-interview.
     return {"success": True, "token": doc["public_token"],
-            "url": f"{APP_URL}/interview/{doc['public_token']}"}
+            "url": f"{APP_URL}/interview/{doc['public_token']}",
+            "questions": config["questions"]}
 
 
 @app.get("/interview/{token}", response_class=HTMLResponse)

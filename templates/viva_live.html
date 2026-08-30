@@ -128,6 +128,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
             <input id="linkurl" readonly style="flex:1;padding:9px 11px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);color:var(--text)">
             <button id="btn-copy-link" type="button" style="padding:9px 14px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:12px;font-weight:800;background:var(--orange);color:#fff;cursor:pointer">Copy</button>
           </div>
+          <div id="link-echo" class="hidden" style="margin-top:.4rem;font-size:11.5px;font-weight:700;color:var(--t2)"></div>
         </div>
       </div>
 
@@ -786,6 +787,13 @@ async function createCandidateLink(){
     if(!r.ok) throw new Error(d.detail || 'HTTP '+r.status);
     $('linkurl').value = d.url;
     $('linkcard').classList.remove('hidden');
+    // echo of what the SERVER stored — if this doesn't match what you set,
+    // the page that sent the request was stale
+    const qs = d.questions || [];
+    $('link-echo').textContent = qs.length
+      ? 'Stored: ' + qs.map((q,i)=>`${i+1} ${q.mode==='typed'?'⌨ typed':'🎙 spoken'}`).join(' · ')
+      : '';
+    $('link-echo').classList.remove('hidden');
   }catch(e){ showErr('Could not create link: '+(e.message||e)); }
   btn.disabled = false; btn.textContent = 'Create candidate link';
 }
@@ -855,8 +863,10 @@ async function atjSave(){
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || 'HTTP '+r.status);
     j.viva = d.viva;   // keep the local copy honest for re-prefill
+    const sq = (d.viva && d.viva.config && d.viva.config.questions) || [];
+    const echo = sq.length ? ' Stored: ' + sq.map((q,i)=>`${i+1} ${q.mode==='typed'?'⌨':'🎙'}`).join(' · ') + '.' : '';
     $('atj-status').textContent = d.viva
-      ? `Saved — ON at threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day.`
+      ? `Saved — ON at threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day.` + echo
       : 'Saved — OFF. Applicants get today’s normal flow.';
   }catch(e){ $('atj-status').textContent = 'Save failed: ' + (e.message||e); }
   btn.disabled = false; btn.textContent = 'Save to job';
