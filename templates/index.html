@@ -863,6 +863,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div style="font-size:11px;color:var(--t3)">Unpaid leave is tracked but not budgeted. Balances = allowance − approved days this year.</div>
     </div>
     <datalist id="emp-dept-list"></datalist>
+    <div id="emp-invite-box" style="display:none;border-top:1px solid var(--border);margin-top:.5rem;padding-top:.7rem">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-bottom:.4rem">Employee portal access</div>
+      <div id="emp-invite-status" style="font-size:12px;color:var(--t2);margin-bottom:.5rem"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" id="emp-invite-btn" onclick="inviteEmployee()">Generate invite link</button>
+        <input id="emp-invite-url" readonly class="form-input" style="flex:1;min-width:160px;font-size:11px;font-family:ui-monospace,monospace;display:none">
+        <button class="btn btn-ghost btn-sm" id="emp-invite-copy" onclick="copyInvite()" style="display:none">Copy</button>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('emp-modal')">Cancel</button>
       <button class="btn btn-primary btn-sm" id="emp-save" onclick="saveEmployee()">Save employee</button>
@@ -2204,7 +2213,40 @@ function openEmployeeModal(id, prefill){
   }else{
     tr.innerHTML = '';
   }
+  // Portal-access box: only when editing an existing employee.
+  const box = document.getElementById('emp-invite-box');
+  if(_empEditing){
+    box.style.display = 'block';
+    document.getElementById('emp-invite-status').textContent = _empEditing.has_login
+      ? 'This employee can sign in to their portal.'
+      : (_empEditing.invite_pending ? 'An invite link is pending — they haven’t set a password yet.' : 'No portal access yet. Generate an invite link to let them set a password.');
+    document.getElementById('emp-invite-url').style.display = 'none';
+    document.getElementById('emp-invite-copy').style.display = 'none';
+    document.getElementById('emp-invite-btn').textContent = _empEditing.has_login ? 'Re-send invite link' : 'Generate invite link';
+  }else{
+    box.style.display = 'none';
+  }
   openModal('emp-modal');
+}
+async function inviteEmployee(){
+  if(!_empEditing) return;
+  const btn = document.getElementById('emp-invite-btn'); btn.disabled = true;
+  try{
+    const r = await fetch(`/api/employees/${_empEditing._id}/invite`, {method:'POST',credentials:'include'});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    const u = document.getElementById('emp-invite-url');
+    u.value = d.invite_url; u.style.display = 'block';
+    document.getElementById('emp-invite-copy').style.display = 'inline-block';
+    document.getElementById('emp-invite-status').textContent = `Send this link to ${_empEditing.name} — it expires in ${d.expires_days} days.`;
+    toast('Invite link generated', {type:'success'});
+  }catch(e){ toast('Could not generate invite: '+e.message, {type:'error'}); }
+  btn.disabled = false;
+}
+function copyInvite(){
+  const u = document.getElementById('emp-invite-url');
+  u.select(); navigator.clipboard.writeText(u.value).catch(()=>{});
+  const c = document.getElementById('emp-invite-copy'); c.textContent='Copied'; setTimeout(()=>c.textContent='Copy',1500);
 }
 
 async function saveEmployee(){

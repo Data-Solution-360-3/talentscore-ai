@@ -1204,6 +1204,70 @@ async def find_employee_by_email(user_id: str, email: str) -> dict | None:
     return serialize_mongo(doc) if doc else None
 
 
+# ── Employee login (HRM module 2, Part 2) ────────────────────
+# A DISTINCT identity from the admin `users` collection: employee
+# credentials live on the employee record itself. The invite token is a
+# bearer credential (plaintext + expiry, same discipline as job tokens);
+# the password is bcrypt-hashed by the caller before it reaches here.
+
+async def set_employee_invite(employee_id: str, user_id: str, token: str,
+                              expires: datetime) -> bool:
+    try:
+        oid = ObjectId(employee_id)
+    except Exception:
+        return False
+    res = await db.employees.update_one(
+        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"$set": {"invite_token": token, "invite_expires": expires,
+                  "updated_at": datetime.utcnow()}})
+    return res.matched_count == 1
+
+
+async def get_employee_by_invite(token: str) -> dict | None:
+    if not token:
+        return None
+    doc = await db.employees.find_one(
+        {"invite_token": token, "invite_expires": {"$gt": datetime.utcnow()}})
+    return serialize_mongo(doc) if doc else None
+
+
+async def set_employee_password(employee_id: str, password_hash: str) -> bool:
+    try:
+        oid = ObjectId(employee_id)
+    except Exception:
+        return False
+    res = await db.employees.update_one(
+        {"_id": oid},
+        {"$set": {"password_hash": password_hash, "updated_at": datetime.utcnow()},
+         "$unset": {"invite_token": "", "invite_expires": ""}})
+    return res.matched_count == 1
+
+
+async def find_employee_logins(email: str) -> list:
+    """Every employee record (across tenants) with this email that has a
+    password set. Login verifies the password against each — the same email
+    could exist in two companies, so identity is (email + matching password)."""
+    email = (email or "").strip().lower()
+    if not email:
+        return []
+    cursor = db.employees.find(
+        {"email": email, "password_hash": {"$exists": True}})
+    return [serialize_mongo(d) async for d in cursor]
+
+
+async def update_employee_contact(employee_id: str, user_id: str, phone: str) -> bool:
+    """Employee self-service: phone ONLY. Never role, status, allowance, or
+    anything affecting their own leave entitlement — that stays admin-only."""
+    try:
+        oid = ObjectId(employee_id)
+    except Exception:
+        return False
+    res = await db.employees.update_one(
+        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"$set": {"phone": phone[:40], "updated_at": datetime.utcnow()}})
+    return res.matched_count == 1
+
+
 # ── Attendance & Leave (HRM module 2) ────────────────────────
 # Everything references the stable employee _id. Balances are COMPUTED
 # (allowance minus approved days this year), never stored as a counter —

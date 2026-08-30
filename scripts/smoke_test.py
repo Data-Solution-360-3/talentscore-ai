@@ -94,6 +94,25 @@ def mint_admin_token(admin_email: str):
         return None, f"mint unavailable: {str(e)[:70]}"
 
 
+def mint_employee_token():
+    """Mint a real role=employee JWT from SECRET_KEY — the same way the login
+    endpoint does. No DB needed: the boundary we test (admin/hiring endpoints
+    reject an employee token) is enforced on the role claim alone."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from auth import create_token
+        return create_token({
+            "role": "employee",
+            "employee_id": "000000000000000000000000",
+            "tenant": "000000000000000000000000",
+            "name": "Smoke Employee",
+        })
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.getenv("SMOKE_BASE", DEFAULT_BASE))
@@ -326,6 +345,61 @@ def main():
                     failures.append((method, path, r.status_code))
             except Exception as e:
                 line(None, method, path, str(e)[:60]); failures.append((method, path, "exception"))
+        # ── EMPLOYEE-TOKEN BOUNDARY (HRM Part 2, security point 6) ──
+        # A real role=employee token MUST be refused by every admin/hiring
+        # endpoint, and admitted only by the six /api/me/* routes. This is the
+        # deploy gate the user demanded: a regression that leaks an employee
+        # through an admin route fails the build here.
+        emp_tok = mint_employee_token()
+        if not emp_tok:
+            line(None, "AUTH", "employee-token boundary", "could not mint employee token (SECRET_KEY?)")
+            failures.append(("AUTH", "employee-token", "mint failed"))
+        else:
+            print("\nEmployee-token boundary — must be REJECTED by admin/hiring")
+            forbidden = [
+                ("GET", "/api/employees"), ("POST", "/api/employees"),
+                ("GET", "/api/screenings"), ("GET", "/api/jobs"),
+                ("GET", "/api/stats"), ("GET", "/api/analytics/skills-gaps"),
+                ("GET", "/api/leave/requests"), ("POST", "/api/leave/requests"),
+                ("GET", "/api/leave/balances"),
+                ("GET", "/api/attendance?month=2026-08"), ("POST", "/api/attendance/mark"),
+                ("GET", "/api/admin/diagnostics"), ("GET", "/api/keys"),
+            ]
+            for method, path in forbidden:
+                try:
+                    with httpx.Client(base_url=base, timeout=30.0) as ec:
+                        ec.headers["Authorization"] = f"Bearer {emp_tok}"
+                        r = ec.request(method, path, json={} if method == "POST" else None)
+                    ok = r.status_code == 403   # get_current_user refuses employee role
+                    line(r.status_code, method, path,
+                         "employee refused" if ok else "LEAK — employee reached admin route!")
+                    checked += 1
+                    if not ok:
+                        failures.append(("EMP-FORBIDDEN", path, r.status_code))
+                except Exception as e:
+                    line(None, method, path, str(e)[:60]); failures.append(("EMP-FORBIDDEN", path, "exception"))
+
+            print("\nEmployee-token boundary — must be ADMITTED by /api/me/* (guard passes)")
+            allowed = [("GET", "/api/me"), ("GET", "/api/me/leave"),
+                       ("GET", "/api/me/attendance"), ("PATCH", "/api/me"),
+                       ("POST", "/api/me/leave")]
+            for method, path in allowed:
+                try:
+                    with httpx.Client(base_url=base, timeout=30.0) as ec:
+                        ec.headers["Authorization"] = f"Bearer {emp_tok}"
+                        r = ec.request(method, path, json={} if method in ("POST", "PATCH") else None)
+                    # The guard admitting the employee is the point — 401/403 would
+                    # mean the boundary wrongly rejects its own role. (404 = guard
+                    # passed, synthetic employee_id simply has no record: correct.)
+                    ok = r.status_code not in (401, 403)
+                    line(r.status_code, method, path,
+                         "guard admits employee" if ok else "employee wrongly rejected")
+                    checked += 1
+                    if not ok:
+                        failures.append(("EMP-ALLOWED", path, r.status_code))
+                except Exception as e:
+                    line(None, method, path, str(e)[:60]); failures.append(("EMP-ALLOWED", path, "exception"))
+
         # One-link flow (CV upload → conditional interview).
         try:
             # A probe with a fake token+id must get EXACTLY the flat received

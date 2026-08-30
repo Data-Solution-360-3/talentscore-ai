@@ -64,6 +64,8 @@ from database import (
     create_leave_request, get_leave_requests_for_user, claim_leave_decision,
     leave_taken_days, mark_attendance, get_attendance_for_month,
     LEAVE_TYPES, DEFAULT_LEAVE_ALLOWANCES, ATTENDANCE_STATUSES,
+    set_employee_invite, get_employee_by_invite, set_employee_password,
+    find_employee_logins, update_employee_contact,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
@@ -365,6 +367,40 @@ async def get_current_user(request: Request) -> dict:
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
+    # THE BOUNDARY (Part 2, point 2): an employee token is refused by every
+    # endpoint that authenticates through here — which is every admin and
+    # hiring endpoint. Employees are a distinct role reaching a distinct set
+    # of routes (require_employee below); they can never authenticate as the
+    # tenant's admin, no matter which endpoint they aim a token at.
+    if payload.get("role") == "employee":
+        raise HTTPException(status_code=403, detail="Employees cannot access this area.")
+    return payload
+
+
+def _get_employee_token(request: Request) -> str | None:
+    """Employee sessions live on their OWN cookie, kept separate from the
+    admin access_token so the two never cross on one browser. A Bearer token
+    is also accepted (the smoke test drives the boundary this way)."""
+    tok = request.cookies.get("emp_token")
+    if tok:
+        return tok
+    auth = request.headers.get("Authorization", "")
+    return auth[7:] if auth.startswith("Bearer ") else None
+
+
+async def require_employee(request: Request) -> dict:
+    """Guard for the /api/me/* endpoints. Returns the scope taken FROM THE
+    SIGNED TOKEN — employee_id and tenant — never from the request. There is
+    no path by which an employee names another person's data: the query is
+    built from claims they cannot forge."""
+    token = _get_employee_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = decode_token(token)
+    if not payload or payload.get("role") != "employee":
+        raise HTTPException(status_code=403, detail="Employee session required.")
+    if not payload.get("employee_id") or not payload.get("tenant"):
+        raise HTTPException(status_code=403, detail="Malformed employee session.")
     return payload
 
 
@@ -2848,6 +2884,200 @@ async def attendance_mark(request: Request):
 
 
 # ─────────────────────────────────────────────────────────────
+# EMPLOYEE LOGIN — HRM module 2, Part 2. A distinct role.
+# Six /api/me/* endpoints, scoped ENTIRELY from the signed token.
+# Cross-employee access is unrepresentable: no endpoint accepts an
+# identity from the request.
+# ─────────────────────────────────────────────────────────────
+
+def _safe_employee(e: dict) -> dict:
+    """Strip credentials before an employee doc leaves the server, and expose
+    only whether login is set (never the hash or the live invite token)."""
+    if not e:
+        return e
+    e = dict(e)
+    e["has_login"] = bool(e.pop("password_hash", None))
+    e["invite_pending"] = bool(e.pop("invite_token", None))
+    e.pop("invite_expires", None)
+    return e
+
+
+@app.post("/api/employees/{employee_id}/invite")
+async def employee_invite(request: Request, employee_id: str):
+    """Admin generates an invite link that lets this employee set a password.
+    Owner-gated; the employee must belong to this tenant."""
+    user = await get_current_user(request)
+    emp = await get_employee_for_user(employee_id, user["user_id"])
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    token = generate_public_token()
+    ok = await set_employee_invite(employee_id, user["user_id"], token,
+                                   _dt.utcnow() + _td(days=7))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    return {"success": True,
+            "invite_url": f"{APP_URL}/employee/invite/{token}",
+            "expires_days": 7}
+
+
+@app.get("/employee/invite/{token}", response_class=HTMLResponse)
+async def employee_invite_page(token: str):
+    """Public set-password page. The token is the credential; unknown/expired
+    tokens render the same neutral closed page as every other dead link."""
+    emp = await get_employee_by_invite(token)
+    if not emp:
+        return _closed_link_page()
+    page = read_template("employee_setpw.html")
+    page = page.replace("{{TOKEN}}", _html.escape(token))
+    page = page.replace("{{NAME}}", _html.escape(emp.get("name", "")))
+    return HTMLResponse(page)
+
+
+@app.post("/api/auth/employee/set-password")
+async def employee_set_password(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    emp = await get_employee_by_invite(str(body.get("token", "")))
+    if not emp:
+        raise HTTPException(status_code=404, detail="This invite link is no longer valid.")
+    password = str(body.get("password", ""))
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    await set_employee_password(emp["_id"], hash_password(password))
+    return _employee_session_response(emp)
+
+
+@app.post("/api/auth/employee/login")
+async def employee_login(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    email = str(body.get("email", "")).strip().lower()
+    password = str(body.get("password", ""))
+    # The same email may exist in two tenants — identity is (email + matching
+    # password). Verify against each candidate; first match wins.
+    for emp in await find_employee_logins(email):
+        if emp.get("password_hash") and verify_password(password, emp["password_hash"]):
+            if emp.get("status") == "terminated":
+                raise HTTPException(status_code=403, detail="This account is no longer active.")
+            return _employee_session_response(emp)
+    raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+
+def _employee_session_response(emp: dict) -> JSONResponse:
+    """Mint an employee token carrying the two claims that define scope —
+    employee_id and tenant — and set it on the SEPARATE emp_token cookie."""
+    token = create_token({
+        "role": "employee",
+        "employee_id": emp["_id"],
+        "tenant": str(emp.get("user_id")),
+        "name": emp.get("name", ""),
+    })
+    resp = JSONResponse({"success": True, "name": emp.get("name", "")})
+    resp.set_cookie("emp_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
+    return resp
+
+
+@app.post("/api/auth/employee/logout")
+async def employee_logout():
+    resp = JSONResponse({"success": True})
+    resp.delete_cookie("emp_token")
+    return resp
+
+
+@app.get("/employee/login", response_class=HTMLResponse)
+async def employee_login_page():
+    return HTMLResponse(read_template("employee_login.html"))
+
+
+@app.get("/employee", response_class=HTMLResponse)
+async def employee_portal_page(request: Request):
+    token = _get_employee_token(request)
+    payload = decode_token(token) if token else None
+    if not payload or payload.get("role") != "employee":
+        return RedirectResponse("/employee/login")
+    return HTMLResponse(read_template("employee_portal.html"))
+
+
+# ── The six employee-scoped endpoints. Scope is token-derived, always. ──
+
+async def _me_employee(request: Request) -> tuple[dict, dict]:
+    """Resolve (payload, employee_doc) for the signed-in employee. The doc is
+    fetched by (employee_id, tenant) FROM THE TOKEN — a foreign id cannot be
+    supplied, so this only ever returns the caller's own record."""
+    payload = await require_employee(request)
+    emp = await get_employee_for_user(payload["employee_id"], payload["tenant"])
+    if not emp:
+        raise HTTPException(status_code=404, detail="Your employee record was not found.")
+    return payload, emp
+
+
+@app.get("/api/me")
+async def me_profile(request: Request):
+    _, emp = await _me_employee(request)
+    return {"employee": _safe_employee(emp)}
+
+
+@app.patch("/api/me")
+async def me_update_contact(request: Request):
+    """Contact info ONLY — phone. Role, status, allowance and every leave-
+    affecting field are admin-only; an employee editing their own allowance
+    would be the obvious exploit, so those keys are simply not honored here."""
+    payload, _ = await _me_employee(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    await update_employee_contact(payload["employee_id"], payload["tenant"],
+                                  str(body.get("phone", "")).strip())
+    emp = await get_employee_for_user(payload["employee_id"], payload["tenant"])
+    return {"success": True, "employee": _safe_employee(emp)}
+
+
+@app.get("/api/me/leave")
+async def me_leave(request: Request):
+    payload, emp = await _me_employee(request)
+    balances = await _leave_balances_for(payload["tenant"], emp)
+    requests = await get_leave_requests_for_user(
+        payload["tenant"], employee_id=payload["employee_id"])
+    return {"balances": balances, "requests": requests}
+
+
+@app.post("/api/me/leave")
+async def me_request_leave(request: Request):
+    """Employee requests leave → lands PENDING in the admin's queue. Even the
+    employee_id on the stored record comes from the token, not the body."""
+    payload, emp = await _me_employee(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    fields = _validated_leave(body)
+    if fields["type"] != "unpaid":
+        remaining = (await _leave_balances_for(payload["tenant"], emp))[fields["type"]]["remaining"]
+        if fields["days"] > remaining:
+            raise HTTPException(status_code=400,
+                                detail=f"You have {remaining} {fields['type']} day(s) left — this needs {fields['days']}.")
+    rid = await create_leave_request(payload["tenant"], {
+        **fields, "employee_id": payload["employee_id"],
+        "status": "pending", "source": "employee"})
+    return {"success": True, "request_id": rid}
+
+
+@app.get("/api/me/attendance")
+async def me_attendance(request: Request, month: str = ""):
+    payload, _ = await _me_employee(request)
+    month = (month or _dt.utcnow().strftime("%Y-%m")).strip()[:7]
+    if not (len(month) == 7 and _valid_ymd(month + "-01")):
+        raise HTTPException(status_code=400, detail="month must be YYYY-MM.")
+    rows = await get_attendance_for_month(payload["tenant"], month, payload["employee_id"])
+    return {"attendance": rows, "month": month}
+
+
+# ─────────────────────────────────────────────────────────────
 # EMPLOYEES — HRM module 1. Tenant-scoped, admin-only this version.
 # Employee data is personal data: every route is gated from the first
 # build, same leak discipline as the interview/written endpoints.
@@ -2902,7 +3132,7 @@ def _validated_employee(body: dict) -> dict:
 @app.get("/api/employees")
 async def list_employees(request: Request):
     user = await get_current_user(request)
-    employees = await get_employees_for_user(user["user_id"])
+    employees = [_safe_employee(e) for e in await get_employees_for_user(user["user_id"])]
     return {"employees": employees, "count": len(employees)}
 
 
@@ -2936,7 +3166,7 @@ async def create_employee_route(request: Request):
 
     employee_id = await create_employee(user["user_id"], fields)
     employee = await get_employee_for_user(employee_id, user["user_id"])
-    return {"success": True, "employee": employee}
+    return {"success": True, "employee": _safe_employee(employee)}
 
 
 @app.put("/api/employees/{employee_id}")
@@ -2953,7 +3183,7 @@ async def update_employee_route(request: Request, employee_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Employee not found.")
     employee = await get_employee_for_user(employee_id, user["user_id"])
-    return {"success": True, "employee": employee}
+    return {"success": True, "employee": _safe_employee(employee)}
 
 
 @app.post("/api/jobs/{job_id}/screen-pending")
