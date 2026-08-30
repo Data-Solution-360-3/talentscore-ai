@@ -87,8 +87,22 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 
       <div style="margin-top:1.1rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.95rem 1rem" id="cfg">
         <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem">Interview setup (recruiter-side)</div>
-        <label style="font-size:12px;font-weight:600;color:var(--t2)">Opening question(s) — one per line, up to 3</label>
-        <textarea id="cfg-questions" rows="3" style="width:100%;margin:.35rem 0 .7rem;padding:9px 11px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;resize:vertical">Tell me about a project you're proud of, and what your specific role was.</textarea>
+        <label style="font-size:12px;font-weight:600;color:var(--t2)">Opening question(s) — up to 3, each 🎙 Spoken or ⌨ Typed</label>
+        <div id="qrows" style="margin:.35rem 0 .25rem">
+          <div style="display:flex;gap:6px;margin-bottom:5px">
+            <input class="q-text" value="Tell me about a project you're proud of, and what your specific role was." style="flex:1;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px">
+            <select class="q-mode" style="width:110px;padding:8px 6px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:12.5px;font-weight:600"><option value="spoken" selected>🎙 Spoken</option><option value="typed">⌨ Typed</option></select>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:5px">
+            <input class="q-text" placeholder="Question 2 (optional)" style="flex:1;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px">
+            <select class="q-mode" style="width:110px;padding:8px 6px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:12.5px;font-weight:600"><option value="spoken" selected>🎙 Spoken</option><option value="typed">⌨ Typed</option></select>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:5px">
+            <input class="q-text" placeholder="Question 3 (optional)" style="flex:1;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px">
+            <select class="q-mode" style="width:110px;padding:8px 6px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:12.5px;font-weight:600"><option value="spoken" selected>🎙 Spoken</option><option value="typed">⌨ Typed</option></select>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:.7rem">Adaptive follow-ups are always spoken. ⌨ Typed questions run typed on candidate links; this console's own test call asks everything by voice.</div>
         <label style="font-size:12px;font-weight:600;color:var(--t2)">Total questions (turns)</label>
         <input id="cfg-turns" type="number" min="1" max="8" value="4" style="width:80px;margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:700">
         <label style="font-size:12px;font-weight:600;color:var(--t2);margin-left:1rem">Patience</label>
@@ -669,10 +683,22 @@ function onEvent(ev){
   }
 }
 
+// questions as [{text, mode}] — the server normalizes and stores this shape;
+// legacy string-only configs still read fine everywhere
+function collectQuestions(){
+  const rows = document.querySelectorAll('#qrows > div');
+  const out = [];
+  rows.forEach(r => {
+    const text = r.querySelector('.q-text').value.trim();
+    if(text) out.push({text: text.slice(0,300), mode: r.querySelector('.q-mode').value === 'typed' ? 'typed' : 'spoken'});
+  });
+  return out.slice(0,3);
+}
+
 async function start(){
   hideErr(); manualStop=false;
   // read the recruiter-side config and reset all interview state
-  cfgQuestions = $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+  cfgQuestions = collectQuestions();
   maxTurns = Math.max(1, Math.min(8, parseInt($("cfg-turns").value)||4));
   cfgVad = $("cfg-vad").value || "patient";
   aiSpeaking = false; bargeIns = 0; $("barge-count").textContent = "0";
@@ -749,7 +775,7 @@ async function createCandidateLink(){
       method:'POST', credentials:'include',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        questions: $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3),
+        questions: collectQuestions(),
         max_turns: Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4)),
         vad: $('cfg-vad').value || 'patient',
         proctoring: $('cfg-proc').value || 'off',
@@ -818,7 +844,7 @@ async function atjSave(){
         enabled: $('atj-enabled').checked,
         threshold: Math.max(0, Math.min(100, parseInt($('atj-th').value)||48)),
         daily_cap: Math.max(1, Math.min(200, parseInt($('atj-cap').value)||25)),
-        questions: $('cfg-questions').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3),
+        questions: collectQuestions(),
         max_turns: Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4)),
         vad: $('cfg-vad').value || 'patient',
         proctoring: $('cfg-proc').value || 'off',

@@ -76,6 +76,8 @@ h1{font-size:1.25rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;marg
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// questions are stored as {text, mode} since mixed mode; older sessions have plain strings
+const qText = q => typeof q === 'string' ? q : (q && q.text) || '';
 
 async function loadList(){
   try{
@@ -93,7 +95,7 @@ async function loadList(){
       const b = s.score_status==='scored' ? 'b-scored' : (s.score_status==='failed' ? 'b-failed' : 'b-pending');
       return `<div class="row" onclick="loadDetail('${esc(s._id)}')">
         <div>
-          <div style="font-weight:700;font-size:.92rem">${esc((s.config&&s.config.questions&&s.config.questions[0])||'Interview').slice(0,60)}</div>
+          <div style="font-weight:700;font-size:.92rem">${esc(qText(s.config&&s.config.questions&&s.config.questions[0])||'Interview').slice(0,60)}</div>
           <div class="meta">${esc((s.created_at||'').replace('T',' ').slice(0,16))} · ${s.questions_asked||0} questions · ${s.status}</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -110,19 +112,51 @@ async function loadDetail(id){
   if(!r.ok){ alert('Could not load session'); return; }
   const s = await r.json();
   const res = s.score_result;
+  const wr = s.written_result;
   let html = '';
   if(res){
-    html += `<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:.2rem">
-      <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
-      <span style="font-size:.85rem;color:var(--t2)">${esc(res.summary||'')}</span></div>
-    <div class="evrow"><span>scorer ${esc(res.scorer_version)}</span><span>blend ${res.blend?res.blend.strict+'/'+res.blend.generous:''}</span></div>
-    <div style="margin:1rem 0">` + res.dimensions.map(d => `
+    // Two rubrics measure with different instruments — segment scores sit side
+    // by side, and there is deliberately NO blended overall number.
+    if(wr){
+      html += `<div style="display:flex;gap:1.6rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.2rem">
+        <div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Spoken segment</div>
+          <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>
+        <div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Typed segment</div>
+          <span class="score-big">${wr.segment_score}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>
+        <span style="font-size:.78rem;color:var(--t3);max-width:280px;line-height:1.5">Different rubrics, shown separately — not averaged into one number.</span>
+      </div>
+      <div style="font-size:.85rem;color:var(--t2);margin-bottom:.2rem">${esc(res.summary||'')}</div>`;
+    }else{
+      html += `<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:.2rem">
+        <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
+        <span style="font-size:.85rem;color:var(--t2)">${esc(res.summary||'')}</span></div>`;
+    }
+    html += `<div class="evrow"><span>scorer ${esc(res.scorer_version)}</span><span>blend ${res.blend?res.blend.strict+'/'+res.blend.generous:''}</span>${wr?`<span>written scorer ${esc(wr.scorer_version||'')}</span>`:''}</div>`;
+    if(wr) html += `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .1rem">Spoken segment — conversation rubric</div>`;
+    html += `<div style="margin:.6rem 0 1rem">` + res.dimensions.map(d => `
       <div class="dim">
         <div class="dim-top"><span>${esc(d.name)}</span><span>${d.score}/20 <span style="font-weight:500;color:var(--t3);font-size:11px">(strict ${d.strict} · generous ${d.generous})</span></span></div>
         <div class="dim-bar"><i style="width:${(d.score/20*100).toFixed(0)}%"></i></div>
         <div class="dim-reason">${esc(d.reason)}</div>
         ${d.evidence?`<div class="dim-ev">“${esc(d.evidence)}”</div>`:''}
       </div>`).join('') + `</div>`;
+    if(wr){
+      html += `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.4rem 0 .1rem">Typed segment — written rubric</div>`;
+      html += (wr.answers||[]).map(a => `
+        <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.8rem .95rem;margin:.6rem 0">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:.88rem;font-weight:700;color:var(--navy)">
+            <span>${esc(a.question||'Typed question')}</span><span>${a.overall}/100</span></div>
+          ${(a.dimensions||[]).map(d => `
+          <div class="dim">
+            <div class="dim-top" style="font-size:.85rem"><span>${esc(d.name)}</span><span>${d.score}/20</span></div>
+            <div class="dim-bar"><i style="width:${(d.score/20*100).toFixed(0)}%"></i></div>
+            <div class="dim-reason">${esc(d.reason||'')}</div>
+          </div>`).join('')}
+          ${a.summary?`<div style="font-size:.82rem;color:var(--t2);margin-top:.35rem">${esc(a.summary)}</div>`:''}
+        </div>`).join('');
+    }else if(s.written_error){
+      html += `<div class="notice">Typed segment scoring failed: ${esc(s.written_error)}</div>`;
+    }
   }else{
     html += `<div class="notice">Scoring: ${esc(s.score_status||'pending')}${s.score_error?' — '+esc(s.score_error):''}. Reload in a moment.</div>`;
   }
@@ -151,7 +185,7 @@ async function loadDetail(id){
   <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
   html += (s.transcript||[]).map(t => `
     <div class="turn ${t.role==='ai'?'ai':'you'}">
-      <span class="who">${t.role==='ai'?'Interviewer':'Candidate'}</span>${esc(t.text)}
+      <span class="who">${t.role==='ai'?'Interviewer':'Candidate'}${t.mode==='typed'?' · ⌨ typed answer':''}</span>${esc(t.text)}
     </div>`).join('') || '<div class="notice">No transcript captured.</div>';
 
   $('detail').innerHTML = html;
