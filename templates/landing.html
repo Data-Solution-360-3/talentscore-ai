@@ -210,7 +210,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .dim-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.6rem}
 .dim-name{font-size:.98rem;font-weight:800;color:var(--navy);letter-spacing:-.01em}
 .dim-w{font-size:.8rem;font-weight:800;color:var(--orange2);background:var(--og);border-radius:var(--r-pill);padding:3px 10px;white-space:nowrap}
-.dim-desc{font-size:.875rem;color:var(--t2);line-height:1.55;margin-bottom:.9rem}
+.dim-top{margin-bottom:.9rem}
 .dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden}
 .dim-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--orange)}
 .dims-note{text-align:center;font-size:.9rem;color:var(--t3);margin-top:var(--sp-3);line-height:1.6}
@@ -336,7 +336,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     <div class="hero-copy">
       <div class="hero-eyebrow rv">🇧🇩 Built for Bangladesh's HR teams</div>
       <h1 class="hero-h1 rv" style="--d:.06s">Every candidate,<br>scored on <span class="o">your&nbsp;rubric.</span></h1>
-      <p class="hero-lead rv" style="--d:.12s">One link takes a candidate from <b>CV upload</b> into a <b>live AI interview</b> — scored on six weighted dimensions you control, with every number recomputed in code and kept on the record.</p>
+      <p class="hero-lead rv" style="--d:.12s">One link: CV screening, then a live AI interview. Every score recomputed in code.</p>
       <div class="hero-actions rv" style="--d:.18s">
         <a class="btn-hero" href="#access">Request access
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -345,7 +345,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
       </div>
       <div class="trust rv" style="--d:.24s">
         <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>One link, CV to interview</span>
-        <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>Scored in code, not guessed</span>
+        <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>Scored in code</span>
         <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>Fair to every accent</span>
       </div>
     </div>
@@ -390,7 +390,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     <div class="sec-head rv">
       <span class="sec-eyebrow">How it works</span>
       <h2 class="sec-title">One link, both halves of the funnel</h2>
-      <p class="sec-sub">The job description sets the standard once. Every candidate is measured against that same standard — first on paper, then in conversation.</p>
+      <p class="sec-sub">One standard per job — first on paper, then in conversation.</p>
     </div>
 
     <div class="part-label rv"><b>A</b> CV screening</div>
@@ -399,19 +399,19 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
         <div class="step3-n">1</div>
         <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
         <div class="step3-t">Post the job, share one link</div>
-        <div class="step3-d">Set the role's weighting — or start from one of eight presets — and share the public apply link. Prefer batches? Upload a folder of PDFs yourself instead.</div>
+        <div class="step3-d">Set your weights, share the apply link — or upload a batch.</div>
       </div>
       <div class="step3 rv" style="--d:.07s">
         <div class="step3-n">2</div>
         <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 .5 1.65A3 3 0 0 0 5 13a3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0-1.5-2.35A3 3 0 0 0 18 9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
         <div class="step3-t">Every CV scored on your rubric</div>
-        <div class="step3-d">Each CV is scored twice from opposing angles, blended, then the final number is recomputed deterministically — never taken on trust from the model.</div>
+        <div class="step3-d">Two passes, blended, recomputed in code.</div>
       </div>
       <div class="step3 rv" style="--d:.14s">
         <div class="step3-n">3</div>
         <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
         <div class="step3-t">Ranked in your dashboard</div>
-        <div class="step3-d">A sortable list with a full report per candidate, four pipeline stages, and interview or rejection emails sent from your own address.</div>
+        <div class="step3-d">Full report per candidate, emails from your own address.</div>
       </div>
     </div>
 
@@ -420,34 +420,34 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
       <div class="rv">
         <div class="part-label gn"><b>B</b> The live AI interview</div>
         <h3 class="iv-title">Then the interview<br>comes <span class="o">to them.</span></h3>
-        <p class="iv-sub">Candidates who clear your CV threshold flow straight into a live interview — same link, same sitting, in their browser. No scheduling, no second email, no app to install.</p>
+        <p class="iv-sub">Clear the CV threshold, and the interview starts — same link, same sitting, in the browser.</p>
         <div class="iv-points">
           <div class="iv-point">
             <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
             <div>
               <div class="iv-point-t">A real conversation, not a form</div>
-              <div class="iv-point-d">The AI interviewer speaks, listens, and adapts its follow-ups to what the candidate actually says — using your job's approved questions, identical for everyone.</div>
+              <div class="iv-point-d">Adaptive follow-ups, from your job's questions — identical for everyone.</div>
             </div>
           </div>
           <div class="iv-point">
             <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
             <div>
               <div class="iv-point-t">Every question shown as text, always</div>
-              <div class="iv-point-d">Spoken and on screen at the same time — so candidates can read as well as listen, and an accent on either side never costs anyone a question.</div>
+              <div class="iv-point-d">Spoken and on screen — read as well as listen.</div>
             </div>
           </div>
           <div class="iv-point">
             <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
             <div>
               <div class="iv-point-t">Typed answers where writing reveals more</div>
-              <div class="iv-point-d">You mark any question as typed; the interviewer reads it aloud, then waits silently while the candidate writes. Spoken and written answers are scored on separate rubrics — shown side by side, never blended.</div>
+              <div class="iv-point-d">The interviewer waits silently while they write.</div>
             </div>
           </div>
           <div class="iv-point">
             <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
             <div>
               <div class="iv-point-t">Scored fairly, monitored honestly</div>
-              <div class="iv-point-d">Substance over fluency in every score, evidence quoted from the transcript, and proctoring that produces signals for your review — never automatic verdicts.</div>
+              <div class="iv-point-d">Substance over fluency. Signals for review, never verdicts.</div>
             </div>
           </div>
         </div>
@@ -480,53 +480,53 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     <div class="sec-head rv">
       <span class="sec-eyebrow">What it does</span>
       <h2 class="sec-title">The whole funnel, honestly built</h2>
-      <p class="sec-sub">No invented numbers, no logo wall. Seven things this product actually does — each one something we run our own hiring on.</p>
+      <p class="sec-sub">Seven things it actually does. We run our own hiring on every one.</p>
     </div>
     <div class="caps">
 
       <div class="cap cap-feat rv">
         <div class="cap-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <div>
-          <div class="cap-t">Fair to every candidate — by rule, not by hope</div>
-          <div class="cap-d">Scoring measures the <b>substance</b> of an answer, never the polish of the English. A sharp answer in broken English <b>must outscore</b> a fluent answer that says nothing — written into every scorer, spoken and written, and tested against real transcripts before every release. Built for candidates who interview in their second language, because ours do.</div>
-          <span class="rule"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified by fairness tests on every scoring change</span>
+          <div class="cap-t">Fair to every candidate</div>
+          <div class="cap-d">Substance scores. English polish doesn't. <b>A sharp answer in broken English beats a fluent empty one.</b></div>
+          <span class="rule"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Tested on every scoring change</span>
         </div>
       </div>
 
       <div class="cap rv">
         <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
         <div class="cap-t">One link, full funnel</div>
-        <div class="cap-d">A candidate opens your apply link, uploads a CV, and — if they qualify — flows straight into a live interview. Same sitting, no second link, no login.</div>
+        <div class="cap-d">Apply, CV, interview — one link, one sitting.</div>
       </div>
 
       <div class="cap rv" style="--d:.07s">
         <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></div>
         <div class="cap-t">AI CV screening</div>
-        <div class="cap-d">Six weighted dimensions you control, scored twice from opposing angles — and the final number recomputed in code, never taken on trust from the model.</div>
+        <div class="cap-d">Six weighted dimensions. Scored in code, not guessed.</div>
       </div>
 
       <div class="cap rv" style="--d:.14s">
         <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
         <div class="cap-t">Live AI interview</div>
-        <div class="cap-d">A real spoken conversation that adapts to what the candidate says, with typed questions where written answers reveal more — drawn from your job description, identical for every candidate.</div>
+        <div class="cap-d">Adaptive spoken + typed questions, drawn from your job.</div>
       </div>
 
       <div class="cap rv">
         <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
-        <div class="cap-t">Proctoring, honestly framed</div>
-        <div class="cap-d">Presence monitoring and flagged snapshots, each labeled with when coverage changed and why. Signals for your reviewers — never an automatic verdict, and we won't call it cheat-proof.</div>
+        <div class="cap-t">Honest proctoring</div>
+        <div class="cap-d">Monitored and flagged for your review. Never called cheat-proof.</div>
       </div>
 
       <div class="cap rv" style="--d:.07s">
         <div class="cap-ico gn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
         <div class="cap-t">Full audit trail</div>
-        <div class="cap-d">Every score keeps its evidence — per-dimension reasoning, quoted answers, the exact job description it was measured against. When someone asks why a candidate ranked there, you have the answer.</div>
+        <div class="cap-d">Every score shows its evidence.</div>
       </div>
 
       <div class="cap rv" style="--d:.14s">
         <div class="cap-ico gn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-        <div class="cap-t">Built for Bangladesh's HR teams</div>
-        <div class="cap-d">Made in Dhaka for how teams here hire — batches of PDFs, candidate emails from your own Gmail, and everything working on a phone over mobile data.</div>
+        <div class="cap-t">Built for Bangladesh</div>
+        <div class="cap-d">PDF batches, Gmail sends, works on a phone.</div>
       </div>
 
     </div>
@@ -539,7 +539,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     <div class="sec-head rv">
       <span class="sec-eyebrow">What actually runs</span>
       <h2 class="sec-title">One CV, six checks, two opinions</h2>
-      <p class="sec-sub">The score isn't a single answer from a language model. The CV and the job description are parsed separately, scored twice from opposing angles, then checked by deterministic code that the model never sees.</p>
+      <p class="sec-sub">Parsed separately, scored twice, checked by deterministic code.</p>
     </div>
 
     <div class="flow-wrap rv">
@@ -690,41 +690,35 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     <div class="sec-head rv">
       <span class="sec-eyebrow">The rubric</span>
       <h2 class="sec-title">Six dimensions, weighted for the role</h2>
-      <p class="sec-sub">Each dimension is scored 0–20. The weights below are the balanced default — a senior engineering role and a sales role shouldn't be graded the same way, so you can change them.</p>
+      <p class="sec-sub">Each scored 0–20. The weights are yours to change.</p>
     </div>
     <div class="dims">
       <div class="dim rv">
         <div class="dim-top"><span class="dim-name">Skills Match</span><span class="dim-w">25%</span></div>
-        <div class="dim-desc">Which required skills and technologies actually appear, after normalising synonyms so Postgres and PostgreSQL aren't counted as two different things.</div>
-        <div class="dim-bar"><i style="width:100%"></i></div>
+<div class="dim-bar"><i style="width:100%"></i></div>
       </div>
       <div class="dim rv" style="--d:.05s">
         <div class="dim-top"><span class="dim-name">Experience Relevance</span><span class="dim-w">20%</span></div>
-        <div class="dim-desc">Whether the work history is the kind of work the role asks for — not just how many years of it there are.</div>
-        <div class="dim-bar"><i style="width:80%"></i></div>
+<div class="dim-bar"><i style="width:80%"></i></div>
       </div>
       <div class="dim rv" style="--d:.1s">
         <div class="dim-top"><span class="dim-name">Achievement &amp; Impact</span><span class="dim-w">20%</span></div>
-        <div class="dim-desc">Evidence of outcomes rather than responsibilities. What shipped, what moved, what the candidate was actually accountable for.</div>
-        <div class="dim-bar"><i style="width:80%"></i></div>
+<div class="dim-bar"><i style="width:80%"></i></div>
       </div>
       <div class="dim rv">
         <div class="dim-top"><span class="dim-name">Role Alignment</span><span class="dim-w">15%</span></div>
-        <div class="dim-desc">Seniority and scope fit. A strong candidate for a different level is still a mismatch for this one.</div>
-        <div class="dim-bar"><i style="width:60%"></i></div>
+<div class="dim-bar"><i style="width:60%"></i></div>
       </div>
       <div class="dim rv" style="--d:.05s">
         <div class="dim-top"><span class="dim-name">Education &amp; Certifications</span><span class="dim-w">10%</span></div>
-        <div class="dim-desc">Degrees and certifications weighed against what the job description actually requires, not against a general prestige ranking.</div>
-        <div class="dim-bar"><i style="width:40%"></i></div>
+<div class="dim-bar"><i style="width:40%"></i></div>
       </div>
       <div class="dim rv" style="--d:.1s">
         <div class="dim-top"><span class="dim-name">Stability &amp; Tenure</span><span class="dim-w">10%</span></div>
-        <div class="dim-desc">Job-change pattern across the career, with guardrails so a short career isn't mistaken for a pattern.</div>
-        <div class="dim-bar"><i style="width:40%"></i></div>
+<div class="dim-bar"><i style="width:40%"></i></div>
       </div>
     </div>
-    <p class="dims-note rv">Eight presets ship with the app — balanced, sales, senior and junior engineering, manager, operations, data &amp; analytics, creative — or set the six weights yourself.</p>
+    <p class="dims-note rv">Eight presets ship with the app — or set all six yourself.</p>
   </div>
 </section>
 
@@ -735,7 +729,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
       <div class="use-inner">
         <span class="use-eyebrow">Who runs on it today</span>
         <h2 class="use-title">We built it for our own hiring first</h2>
-        <p class="use-body">TopCandidate screens every application at <strong>LinkX360</strong> and <strong>Data Solution 360</strong> — the two companies behind it. Our own candidates go through the same apply link, the same rubric, and the same live interview we're offering you. When a scorer was unfair to candidates answering in their second language, we felt it in our own pipeline first — and fixed it there before anything shipped.</p>
+        <p class="use-body">Every application at <strong>LinkX360</strong> and <strong>Data Solution 360</strong> — the two companies behind it — runs through this exact funnel.</p>
         <div class="use-stats">
           <div>
             <div class="use-stat-num gn">292</div>
@@ -754,7 +748,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
             <div class="use-stat-lbl">companies —<br>both of them ours</div>
           </div>
         </div>
-        <p class="use-caveat">These are our real internal numbers as of August 2026, from our own two companies. We don't have customer adoption figures to show you yet — and we'd rather show you honest small numbers than invented big ones.</p>
+        <p class="use-caveat">Real internal numbers, August 2026. Honest small numbers beat invented big ones.</p>
       </div>
     </div>
   </div>
@@ -770,7 +764,7 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     </div>
     <div class="access rv">
       <div class="access-title">Contact us for access</div>
-      <p class="access-body">Tell us what you're hiring for and how many CVs you're working through. If it's a fit, we'll set your account up and walk you through the first batch ourselves.</p>
+      <p class="access-body">Tell us what you're hiring for. If it's a fit, we set you up and walk the first batch with you.</p>
       <div class="access-list">
         <div class="access-item">
           <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
@@ -804,44 +798,28 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
     </div>
     <div class="faq rv">
       <details class="faq-item">
-        <summary class="faq-q">What is the live AI interview, exactly?</summary>
-        <div class="faq-a">A real-time spoken conversation with an AI interviewer, in the candidate's browser — no app to install. It asks your job's approved questions (the same set for every candidate, which fair comparison requires), adapts its follow-ups to what the candidate actually says, and shows every question as text on screen as well as speaking it. Some questions can be answered in writing instead, where a composed answer reveals more.</div>
+        <summary class="faq-q">What is the live AI interview?</summary>
+        <div class="faq-a">A real-time spoken conversation in the browser — your job's questions, identical for every candidate, every question also shown as text. Some are answered in writing.</div>
       </details>
       <details class="faq-item">
-        <summary class="faq-q">Is the interview scoring fair to candidates whose English isn't fluent?</summary>
-        <div class="faq-a">This is the rule we test hardest. The scorers grade the substance of an answer — relevance, specifics, real events — and are explicitly instructed that clarity of thought is never the same thing as fluent English. A sharp answer in broken English must outscore a fluent answer that says nothing, and we verify that with test transcripts before every scoring change goes live. Garbled speech-recognition output is treated as a transcription error, never held against the candidate.</div>
+        <summary class="faq-q">Is scoring fair to candidates whose English isn't fluent?</summary>
+        <div class="faq-a">The scorers grade substance, not fluency — a sharp answer in broken English must outscore a fluent empty one, verified with test transcripts before every scoring change.</div>
       </details>
       <details class="faq-item">
         <summary class="faq-q">Does the proctoring catch cheating?</summary>
-        <div class="faq-a">It produces signals, not verdicts — presence monitoring, flagged snapshots, and a timeline showing exactly when coverage changed and why. A human reviews them; nothing is auto-rejected. And we won't claim it's cheat-proof, because no browser-based system is: someone determined enough can always use a second device. What you get is honest evidence, honestly labeled.</div>
+        <div class="faq-a">It produces signals for human review — monitoring, flagged snapshots, a coverage timeline. Nothing is auto-rejected, and no browser system is cheat-proof.</div>
       </details>
       <details class="faq-item">
-        <summary class="faq-q">What file formats can I upload?</summary>
-        <div class="faq-a">PDF only. Anything else is rejected before it reaches the scorer, so a stray .docx in a batch fails fast rather than silently scoring as an empty CV.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Does a missing requirement automatically reject a candidate?</summary>
-        <div class="faq-a">No. A missing hard requirement applies a penalty of 15 to 25 points, capped at 35 across all gaps. It pushes a candidate down the ranking; it never removes them from it. The decision stays yours.</div>
+        <summary class="faq-q">Does a missing requirement reject a candidate?</summary>
+        <div class="faq-a">No. It applies a capped penalty and pushes the candidate down the ranking — never off it.</div>
       </details>
       <details class="faq-item">
         <summary class="faq-q">What happens when the two scoring passes disagree?</summary>
-        <div class="faq-a">If the strict and upside passes land more than 12 points apart, the result is flagged low-confidence and any Strong Hire or Hire recommendation is downgraded to Maybe. A Reject is never upgraded by this rule — disagreement makes us more cautious, not less.</div>
+        <div class="faq-a">More than 12 points apart: flagged low-confidence and downgraded to Maybe. Never upgraded.</div>
       </details>
       <details class="faq-item">
-        <summary class="faq-q">Does the AI-written-CV signal lower a candidate's score?</summary>
-        <div class="faq-a">No, and that's deliberate. It's computed from writing-style patterns and shown on the report as a signal for you to weigh. It's kept entirely out of the scoring maths, because a polished CV is evidence of effort, not of dishonesty.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Where do candidate CVs and interview recordings go?</summary>
-        <div class="faq-a">CV text and interview transcripts are sent to OpenAI's API for parsing and scoring — that's how the analysis works, and we'd rather say so plainly than claim your data never leaves the building. Results are stored in our database so you can reopen reports later; candidate PDFs are deleted after 30 days; and you can delete any screening from the app.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Can I change how candidates are weighted?</summary>
-        <div class="faq-a">Yes. Eight presets ship with the app, and every one of the six dimension weights can be set per role. The weights you choose are what the final score is computed from.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Can I email candidates from inside the app?</summary>
-        <div class="faq-a">Yes — interview invitations and rejections are sent through your own connected mailbox, so replies come back to you and the thread lives in your normal inbox.</div>
+        <summary class="faq-q">Where does candidate data go?</summary>
+        <div class="faq-a">CV text and transcripts go to OpenAI's API for scoring — we say so plainly. PDFs delete after 30 days, and you can delete any screening.</div>
       </details>
     </div>
   </div>
