@@ -301,12 +301,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 #page-candidates{--lift-sm:0 1px 2px rgba(20,40,72,.03),0 4px 16px rgba(20,40,72,.05)}
 #page-candidates .card{border:none;border-radius:16px;box-shadow:var(--lift-sm)}
 #page-candidates .filters-row{margin-bottom:0}
-#page-candidates .cand-primary{gap:8px}
-#page-candidates .cand-more{gap:8px;margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border)}
-#page-candidates .cand-more.hidden{display:none}
-#page-candidates .mf-lbl{font-size:11px;font-weight:700;color:var(--t3)}
-#page-candidates .more-filters-btn{margin-left:auto;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t2);background:var(--s2);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s,color .15s}
-#page-candidates .more-filters-btn:hover,#page-candidates .more-filters-btn.active{background:var(--og);color:var(--orange2)}
+#page-candidates .cand-primary{gap:10px;align-items:center}
+/* soft rounded controls matching the reskin */
+#page-candidates .cand-fi{font-size:13px;padding:10px 13px;background:#fff;border:1px solid var(--border2);border-radius:10px;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+#page-candidates .cand-fi:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--og)}
+#page-candidates select.cand-fi{cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238593AB' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
 /* roomy soft rows (comfortable mode only — dense keeps its own tight padding) */
 #page-candidates .tbl th{font-size:10px;letter-spacing:.05em;color:var(--t3);padding:11px 14px;border-bottom:1px solid var(--border)}
 #page-candidates .tbl:not(.dense) td{padding:15px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -666,60 +665,36 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- Filters — 4 primary controls; the rest fold behind "More filters".
-       Every id + onchange is unchanged; the secondary ones are just hidden
-       until opened, so filter logic is identical. -->
-  <div class="card cand-filters" style="margin-bottom:12px;padding:.9rem">
+  <!-- Filters — four clean controls in one soft row. The Stage/Score/
+       Experience/Date controls are kept in a hidden block (below) so their
+       ids still resolve: applyFilters/clearFilters read them unchanged, and
+       the dashboard's filterByStage() still drives f-stage. -->
+  <div class="card cand-filters" style="margin-bottom:12px;padding:.95rem 1rem">
     <div class="filters-row cand-primary">
-      <input class="filter-input" id="f-search" placeholder="🔍 Search by name, skill..." oninput="applyFilters()" style="flex:1;min-width:190px">
-      <select class="filter-select" id="f-job" onchange="applyFilters()"><option value="">All jobs</option></select>
-      <select class="filter-select" id="f-result" onchange="applyFilters()">
+      <input class="filter-input cand-fi" id="f-search" placeholder="🔍 Search by name or skill…" oninput="applyFilters()" style="flex:1;min-width:220px">
+      <select class="filter-select cand-fi" id="f-job" onchange="applyFilters()"><option value="">All jobs</option></select>
+      <select class="filter-select cand-fi" id="f-result" onchange="applyFilters()">
         <option value="">All results</option>
         <option value="STRONG HIRE">Strong Hire</option>
         <option value="HIRE">Hire</option>
         <option value="MAYBE">Maybe</option>
         <option value="REJECT">Reject</option>
       </select>
-      <select class="filter-select" id="f-sort" onchange="applyFilters()">
+      <select class="filter-select cand-fi" id="f-sort" onchange="applyFilters()" title="Sort candidates">
         <option value="score">Highest score</option>
-        <option value="newest">Newest first</option>
-        <option value="exp">Most experienced</option>
-        <option value="name">Name A–Z</option>
+        <option value="newest">Newest date</option>
+        <option value="job">Job name (A–Z)</option>
       </select>
-      <button type="button" class="more-filters-btn" id="more-filters-btn" onclick="toggleMoreFilters()">More filters <span id="mf-caret">▾</span></button>
     </div>
-    <div class="filters-row cand-more hidden" id="cand-more-row">
-      <span class="mf-lbl">Stage</span>
-      <select class="filter-select" id="f-stage" onchange="applyFilters()">
-        <option value="">All stages</option>
-        <option value="screening">Screening</option>
-        <option value="review">— needs review</option>
-        <option value="interview">Interview</option>
-        <option value="shortlisted">Shortlisted</option>
-        <option value="rejected">Rejected</option>
-      </select>
-      <span class="mf-lbl">Score</span>
-      <select class="filter-select" id="f-score" onchange="applyFilters()">
-        <option value="">Any score</option>
-        <option value="80">80+ (Strong)</option>
-        <option value="60">60+ (Good)</option>
-        <option value="40">40+ (Average)</option>
-        <option value="0">Below 40 (Weak)</option>
-      </select>
-      <span class="mf-lbl">Experience</span>
-      <select class="filter-select" id="f-exp" onchange="applyFilters()">
-        <option value="">Any experience</option>
-        <option value="0">0–2 years (Junior)</option>
-        <option value="3">3–5 years (Mid)</option>
-        <option value="6">6+ years (Senior)</option>
-      </select>
-      <span class="mf-lbl">Date</span>
-      <input type="date" class="filter-input" id="f-date-from" onchange="applyFilters()" title="From date" style="width:135px">
-      <span style="color:var(--t3)">→</span>
-      <input type="date" class="filter-input" id="f-date-to" onchange="applyFilters()" title="To date" style="width:135px">
-      <button class="filter-clear" onclick="clearFilters()" style="margin-left:auto">✕ Clear</button>
+    <!-- Kept for logic (hidden): dashboard funnel/stat clicks set f-stage;
+         applyFilters/clearFilters reference all of these. Not shown in the bar. -->
+    <div id="cand-hidden-filters" style="display:none">
+      <select id="f-stage"><option value="">All stages</option><option value="screening">Screening</option><option value="review">— needs review</option><option value="interview">Interview</option><option value="shortlisted">Shortlisted</option><option value="rejected">Rejected</option></select>
+      <select id="f-score"><option value="">Any score</option><option value="80">80+</option><option value="60">60+</option><option value="40">40+</option><option value="0">Below 40</option></select>
+      <select id="f-exp"><option value="">Any experience</option><option value="0">0–2</option><option value="3">3–5</option><option value="6">6+</option></select>
+      <input type="date" id="f-date-from"><input type="date" id="f-date-to">
     </div>
-    <div style="font-size:11px;color:var(--t3);margin-top:.6rem" id="filter-count">Showing all candidates</div>
+    <div style="font-size:11.5px;color:var(--t3);margin-top:.7rem" id="filter-count">Showing all candidates</div>
   </div>
 
   <div class="card">
@@ -1754,6 +1729,10 @@ function applyFilters(){
 
   if(sort==='score')filtered.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0));
   else if(sort==='newest')filtered.sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+  // Job name A–Z — same localeCompare pattern as the name sort, on job_title.
+  else if(sort==='job')filtered.sort((a,b)=>(a.job_title||a.company||'').localeCompare(b.job_title||b.company||''));
+  // 'exp' and 'name' are no longer dropdown options but kept so any
+  // programmatic sort value still resolves.
   else if(sort==='exp')filtered.sort((a,b)=>(parseInt(b.years_experience)||0)-(parseInt(a.years_experience)||0));
   else if(sort==='name')filtered.sort((a,b)=>(a.candidate_name||'').localeCompare(b.candidate_name||''));
 
