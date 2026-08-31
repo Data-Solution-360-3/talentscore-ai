@@ -181,13 +181,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <div class="q-label" id="q-label">Getting ready…</div>
   <div class="question" id="question"><span class="caret"></span></div>
   <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
-  <div id="scen" style="display:none;margin:10px 0;background:#F4FAF6;border:1.5px solid #CDE7D8;border-radius:14px;padding:12px 14px;text-align:left">
-    <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#3C7A5A;margin-bottom:5px">Written exercise — the scenario</div>
-    <div id="scen-text" style="font-size:14px;line-height:1.65;color:#1F2A24;white-space:pre-wrap"></div>
-    <div style="font-size:11.5px;color:#6B7B72;margin-top:7px">This stays on screen — refer back to it while you answer.</div>
+  <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:14px 16px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08)">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="background:#16A34A;color:#fff;border-radius:9999px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.6px">📋 CASE STUDY</span>
+      <span id="scen-prog" style="font-size:11px;font-weight:800;color:#3C7A5A"></span>
+    </div>
+    <div id="scen-text" style="font-size:14.5px;line-height:1.7;color:#1F2A24;white-space:pre-wrap"></div>
+    <div style="font-size:11.5px;color:#6B7B72;margin-top:8px">This case study stays on screen — every question below is about it.</div>
   </div>
   <div class="typed" id="typed">
-    <div class="typed-label">Type your answer</div>
+    <div class="typed-label" id="typed-label">Type your answer</div>
+    <div id="typed-q" style="display:none;font-size:15px;font-weight:700;color:#142848;line-height:1.55;margin:2px 0 10px;text-align:left"></div>
     <textarea id="typed-ta" maxlength="4000" placeholder="Type your answer here…"></textarea>
     <div class="typed-hints"><span>Take your time — the interviewer will wait.</span><span>🎙 Mic paused while you type</span></div>
     <button class="typed-submit" id="typed-submit" type="button">Submit answer</button>
@@ -220,6 +224,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 // ═════════════════════════════════════════════════════════════
 const TOKEN = "{{TOKEN}}";
 const MAX_TURNS = parseInt("{{MAX_TURNS}}") || 4;
+const SCEN_Q = parseInt("{{SCEN_Q}}") || 0;   // scenario question count — for "N of 4" progress only
 const PROCTORING = "{{PROCTORING}}";      // off | S | M — disclosure, not a control
 const IV_NAME = "{{IV_NAME}}";
 const CALLS_URL = "https://api.openai.com/v1/realtime/calls";
@@ -241,7 +246,7 @@ let typing=false, typedCallId=null, typedQuestion='', restoreTD=null;
 const TYPED_KEY='tc-typed-'+TOKEN;
 // scenario section — the model pins the scenario via show_scenario, and every
 // typed answer from then on belongs to the scenario set (scored together)
-let scenActive=false, scenText='';
+let scenActive=false, scenText='', scenQN=0;
 const SCEN_KEY='tc-scen-'+TOKEN;
 
 // ── presence / question UI ───────────────────────────────────
@@ -261,7 +266,8 @@ function updateProgress(){
   $('progress').classList.remove('hidden');
   const n = Math.min(Math.max(questionsAsked,1), MAX_TURNS);
   $('prog-n').textContent = 'Question '+n;
-  $('q-label').textContent = closing||closingDone ? 'Wrapping up' : 'Question '+n;
+  $('q-label').textContent = closing||closingDone ? 'Wrapping up'
+    : (typing && scenActive ? 'Scenario question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'') : 'Question '+n);
 }
 
 // ── engine: mint / connect / recovery (candidate endpoints) ──
@@ -383,15 +389,35 @@ function enterTyped(callId, question){
   if(callId) typedCallId = callId;
   if(question) typedQuestion = question.slice(0,300);
   sendVad(null); setMic(false);
-  if(!typing){
+  const firstOpen = !typing;
+  if(firstOpen){
     typing = true;
     try{ $('typed-ta').value = sessionStorage.getItem(TYPED_KEY) || ''; }catch(_){}
     $('typed').classList.add('on');
   }
+  // Scenario progress: each fresh panel open inside the scenario section is
+  // the next scenario question (a post-drop re-call of the SAME question
+  // keeps typing=true and does not advance the counter).
+  if(scenActive && firstOpen) scenQN = SCEN_Q ? Math.min(scenQN+1, SCEN_Q) : scenQN+1;
+  // The question renders INSIDE the panel, directly above the answer box —
+  // immune to the top question slot being overwritten by the next spoken
+  // transcript, and always on-screen next to where the candidate types.
+  if(typedQuestion){
+    $('typed-q').textContent = typedQuestion;
+    $('typed-q').style.display = 'block';
+  }
+  $('typed-label').textContent = scenActive
+    ? 'Scenario question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'')+' — type your answer'
+    : 'Type your answer';
+  if(scenActive){
+    $('scen-prog').textContent = 'Question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'')+' about this case';
+    $('q-label').textContent = 'Scenario question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'');
+  }
   if(question) renderQuestionFinal(question);
   setPresence('think','Waiting for your answer — type below');
   $('typed-ta').focus();
-  log('typed phase: open', typedCallId ? '(tool '+typedCallId+')' : '(no call id)');
+  log('typed phase: open', typedCallId ? '(tool '+typedCallId+')' : '(no call id)',
+      scenActive ? 'scenario q'+scenQN : '');
 }
 // ── scenario section: pin the scenario, ack the tool, let the model speak ──
 function showScenario(callId, text){
@@ -400,6 +426,7 @@ function showScenario(callId, text){
   scenActive = true;
   try{ sessionStorage.setItem(SCEN_KEY, scenText); }catch(_){}
   $('scen-text').textContent = scenText;
+  $('scen-prog').textContent = SCEN_Q ? SCEN_Q+' written questions follow' : 'Written questions follow';
   $('scen').style.display = 'block';
   transcript.push({role:'ai', text: scenText, mode:'scenario'});
   if(dc && dc.readyState==='open'){
@@ -423,6 +450,7 @@ function submitTyped(){
   ta.value='';
   typing = false;
   $('typed').classList.remove('on');
+  $('typed-q').style.display='none';
   setMic(true);
   if(restoreTD) sendVad(restoreTD);
   if(dc && dc.readyState==='open'){
@@ -451,10 +479,13 @@ function onEvent(ev){
 
   if(t.includes('audio_transcript.delta') || t.includes('output_text.delta')){
     aiBuf += (msg.delta || '');
-    renderQuestionStream();                     // the question, as text, live
+    if(!typing) renderQuestionStream();         // the question, as text, live
   }else if(t.includes('audio_transcript.done') || t.includes('output_text.done')){
     const text = (msg.transcript || aiBuf || '').trim(); aiBuf='';
-    if(text){ transcript.push({role:'ai', text}); renderQuestionFinal(text); }
+    // While the typed panel is open, the panel's own question header is the
+    // display of record — a late transcript.done for the same response must
+    // not overwrite it (this was why scenario questions "disappeared").
+    if(text){ transcript.push({role:'ai', text}); if(!typing) renderQuestionFinal(text); }
   }else if(t.includes('input_audio_transcription') && (t.includes('completed')||t.includes('done'))){
     const text = (msg.transcript || '').trim();
     if(text) transcript.push({role:'you', text});

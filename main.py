@@ -2205,6 +2205,9 @@ async def candidate_interview_page(token: str):
         "{{MAX_TURNS}}": str(int(cfg.get("max_turns", 4))),
         "{{EST_MINUTES}}": str(max(4, int(cfg.get("max_turns", 4)) * 2 + 2)),
         "{{PROCTORING}}": esc(cfg.get("proctoring"), "off"),
+        # Scenario QUESTION COUNT only — for "Scenario question N of K"
+        # progress. The scenario itself still never leaves the server.
+        "{{SCEN_Q}}": str(len((_normalize_scenario(cfg.get("scenario")) or {"questions": []})["questions"])),
     }.items():
         page = page.replace(key, val)
     return HTMLResponse(page)
@@ -2812,11 +2815,16 @@ async def set_job_viva_config(request: Request, job_id: str):
     # with defaults. Config precedence: payload > previously stored > defaults.
     existing_cfg = (job.get("viva") or {}).get("config")
     cfg_source = body if "questions" in body else (existing_cfg or body)
+    cfg = _validated_viva_config(dict(cfg_source))
+    # The job modal can flip proctoring on its own, without resending (or
+    # clobbering) the rest of the stored setup.
+    if body.get("proctoring") in ("off", "S", "M"):
+        cfg["proctoring"] = body["proctoring"]
     viva = {
         "enabled": True,
         "threshold": threshold,
         "daily_cap": daily_cap,
-        "config": _validated_viva_config(dict(cfg_source)),
+        "config": cfg,
         "updated_at": _dt.utcnow(),
     }
     if not viva["config"].get("job_title"):

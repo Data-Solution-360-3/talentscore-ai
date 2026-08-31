@@ -3726,6 +3726,12 @@ function renderPublicLink(job, spend){
               <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
                 <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
                        style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+              <label style="font-size:11px;font-weight:600;color:var(--t2)">Proctoring
+                <select id="viva-proc" style="margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
+                  <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
+                  <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
+                  <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
+                </select></label>
               <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
             </div>
             <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
@@ -4063,10 +4069,13 @@ async function iqDiscard(){
 async function saveJobViva(jobId, enabled){
   const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
   const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));
+  const proc = ['off','S','M'].includes(document.getElementById('viva-proc')?.value)
+    ? document.getElementById('viva-proc').value : undefined;
   const res = await fetch(`/api/jobs/${jobId}/viva`,{
     method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(enabled ? {enabled:true, threshold:th, daily_cap:cap} : {enabled:false})
+    body: JSON.stringify(enabled ? {enabled:true, threshold:th, daily_cap:cap,
+                                    ...(proc?{proctoring:proc}:{})} : {enabled:false})
   });
   let d={}; try{ d=await res.json(); }catch(_){}
   if(!res.ok) throw new Error(d.detail || `Server returned ${res.status}`);
@@ -4077,7 +4086,7 @@ async function saveJobViva(jobId, enabled){
     renderPublicLink(window._currentJob, window._currentSpend);
   }
   toast(enabled
-    ? `Live interview ON — threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day`
+    ? `Live interview ON — threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day, proctoring ${(d.viva.config&&d.viva.config.proctoring)||'off'}`
     : 'Live interview off — applications are CV-only again', {type:'success'});
   // The auto-prompt: enabling the gate on a job with no approved question set
   // means candidates get the manual/default setup — point at the card below.
