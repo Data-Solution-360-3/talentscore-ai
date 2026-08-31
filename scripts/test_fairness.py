@@ -113,11 +113,99 @@ async def main() -> int:
         print("\n\033[31mWRITTEN GATE FAILED\033[0m — do NOT put this scorer in front of a real candidate.")
 
     spoken_ok = await spoken_gate(key)
-    if written_ok and spoken_ok:
-        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken)\033[0m\n")
+    cv_ok = await cv_gate(key)
+    if written_ok and spoken_ok and cv_ok:
+        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + cv)\033[0m\n")
         return 0
     print("\n\033[31mFAIRNESS GATE FAILED\033[0m — the failing path must not touch a real candidate.\n")
     return 1
+
+
+# ── CV gate — the CV scorer's own A-beats-B test, plus report-format checks. ──
+# A: rough second-language English, real quantified substance matching the JD.
+# B: fluent, polished, buzzword-rich, no evidence and thin skills.
+# The engine must rank A above B, and the reference-format report must be a
+# faithful copy of the engine's numbers (format layer, not a second scorer).
+
+CV_JD = """Data Analyst — Dhaka.
+We need a data analyst to build dashboards and reports for management.
+Required skills: SQL, Power BI, Excel, Python.
+Responsibilities: build Power BI dashboards, write SQL queries against our
+database, automate recurring Excel reports, clean and prepare data with
+Python. 3+ years experience required. BSc in a quantitative field preferred."""
+
+CV_A = """Md. Rafiq Islam — rafiq.islam@example.com — Dhaka
+SUMMARY
+I am work 4 year as data analyst. I make dashboard and report for management team.
+WORK EXPERIENCE
+Data Analyst — Meghna Retail Ltd (2021 - present)
+- I am build 12 Power BI dashboard for sales team. Management team use every week for decision.
+- I write SQL query for take data from company database. Some query very complex, join 6 table.
+- I make Python script (pandas) for clean messy sales data. Before need 3 day by hand, now script finish in 2 hour.
+- Excel monthly report automatic with macro. Report error go down 80% after I do this.
+EDUCATION
+BSc in Statistics, Jagannath University, 2020
+SKILLS
+SQL, Power BI, DAX, Excel, Python, pandas"""
+
+CV_B = """Jonathan Sterling-Hayes — j.sterlinghayes@example.com — London
+SUMMARY
+Dynamic, results-oriented professional passionate about leveraging synergies and
+championing data-driven excellence to unlock transformative business value.
+WORK EXPERIENCE
+Insights Associate — Global Solutions Inc (2023 - 2024)
+- Collaborated with cross-functional stakeholders to drive impactful outcomes.
+- Leveraged cutting-edge methodologies to optimise mission-critical deliverables.
+- Championed a culture of innovation and continuous improvement across the organisation.
+EDUCATION
+BA in Communications, 2022
+SKILLS
+Microsoft Office, Communication, Leadership, Teamwork, Strategic Thinking"""
+
+
+async def cv_gate(key) -> bool:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from scorer import run_screening_pipeline
+    print("\n" + "═" * 62)
+    print("CV GATE — the CV scorer itself, A/B + report-format integrity")
+    print("A: rough English, quantified evidence, JD-matching skills.")
+    print("B: fluent buzzwords, no evidence, off-JD skills.")
+
+    results = {}
+    for label, cv in (("A", CV_A), ("B", CV_B)):
+        res, err = await run_screening_pipeline(cv_text=cv, jd_text=CV_JD, api_key=key)
+        if err or not res:
+            print(f"\n  {label}: pipeline failed — {err}")
+            return False
+        results[label] = res
+        rep = res.get("report") or {}
+        print(f"\n  {label}: overall {res.get('overall_score')}/100 · engine rec {res.get('recommendation')}"
+              f" · report verdict {rep.get('verdict')} · coverage {rep.get('skillsCoveragePercent')}%")
+
+    a, b = results["A"]["overall_score"], results["B"]["overall_score"]
+    ok_ab = a > b
+
+    rep = results["A"].get("report") or {}
+    bd = rep.get("breakdown") or {}
+    band = "hire" if a >= 75 else ("maybe" if a >= 50 else "reject")
+    fmt_ok = (rep.get("overallScore") == a
+              and rep.get("verdict") == band
+              and len(bd) == 6
+              and "matchedSkills" in bd.get("skillsMatch", {})
+              and all("reasoning" in v and "weight" in v for v in bd.values())
+              and isinstance(rep.get("interviewQuestions"), list)
+              and isinstance(rep.get("hiringRisks"), list)
+              and "None identified" not in rep.get("hiringRisks", []))
+
+    print("\n" + "─" * 62)
+    print(f"  A vs B margin: {'+' if a - b >= 0 else ''}{a - b} points "
+          f"→ {'PASS' if ok_ab else 'FAIL — CV fairness broken: polish beat substance'}")
+    print(f"  report format integrity (copied numbers, verdict band, 6 dims, "
+          f"skills arrays, clean risks) → {'PASS' if fmt_ok else 'FAIL — report drifts from engine'}")
+    print("─" * 62)
+    if ok_ab and fmt_ok:
+        print("\033[32mCV GATE PASSED\033[0m — substance beat polish; report is a faithful view.")
+    return ok_ab and fmt_ok
 
 
 # ── SPOKEN gate (L4) — the same A/B/C, as live-interview transcripts. ──

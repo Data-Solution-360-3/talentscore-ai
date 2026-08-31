@@ -176,12 +176,39 @@ function rico(r){
 }
 function initials(n){if(!n||n==='Unknown')return'?';return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();}
 
+// Mirror of the server's build_report() for rows scored before the report
+// format existed — same mapping, so old and new rows render identically.
+function buildReportClient(d){
+  const dims={};(d.dimensions||[]).forEach(x=>dims[x.name]=x);
+  const KEYS={'Skills Match':'skillsMatch','Experience Relevance':'experienceRelevance',
+    'Education & Certifications':'educationCertifications','Achievement & Impact':'achievementImpact',
+    'Role Alignment':'roleAlignment','Stability & Tenure':'stabilityTenure'};
+  const breakdown={};
+  Object.entries(KEYS).forEach(([name,key])=>{
+    const x=dims[name]||{};
+    const e={name, score:Math.round((x.score||0)*10)/10, weight:Math.round((x.weight||0)*100), reasoning:x.feedback||''};
+    if(name==='Skills Match'){e.matchedSkills=x.matched_skills||[];e.missingSkills=x.missing_skills||[];}
+    breakdown[key]=e;
+  });
+  const overall=Math.round(d.overall_score||0);
+  const clean=(a,cap)=>(a||[]).map(s=>String(s).trim()).filter(s=>s&&s.toLowerCase()!=='none identified').slice(0,cap);
+  const req=((d.parsed_jd||{}).required_skills)||[];
+  return {overallScore:overall,
+    verdict: overall>=75?'hire':overall>=50?'maybe':'reject',
+    skillsCoveragePercent: req.length? Math.round(d.skills_coverage_pct||0) : null,
+    aiSummary:d.summary||'', breakdown,
+    keyStrengths:clean(d.key_strengths,5), criticalGaps:clean(d.critical_gaps,5),
+    interviewQuestions:clean(d.interview_questions,5), hiringRisks:clean(d.hiring_risks,3)};
+}
+
 function render(d){
-  const score=Math.round(d.overall_score||0);
+  const rep=d.report||buildReportClient(d);
+  const score=rep.overallScore||Math.round(d.overall_score||0);
   const col=gc(score);
   const rec=(d.recommendation||'MAYBE').toUpperCase();
+  const verdict=(rep.verdict||'maybe').toUpperCase();
   const sc=d.score_consistency||{};
-  const cov=d.skills_coverage_pct||0;
+  const cov=rep.skillsCoveragePercent;   // number, or null = "not scored"
   const date=d.created_at?new Date(d.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
 
   document.getElementById('detail-panel').innerHTML = `
@@ -192,7 +219,7 @@ function render(d){
         <div class="cand-role">${d.current_title||'—'}</div>
         <div class="chips">
           <span class="chip">${d.years_experience||'?'} yrs exp</span>
-          <span class="chip bl">${cov}% skills matched</span>
+          <span class="chip bl">${cov===null?'skills coverage not scored':cov+'% skills matched'}</span>
           ${d.batch?'<span class="chip ac">Batch</span>':''}
           <span class="chip">${date}</span>
         </div>
@@ -205,28 +232,32 @@ function render(d){
         <span class="sden">/100</span>
       </div>
       <div style="flex:1">
-        <div class="rpill ${rcls(rec)}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${rico(rec)}</svg>
-          ${rec}
+        <div class="rpill ${rcls({'HIRE':'HIRE','MAYBE':'MAYBE','REJECT':'REJECT'}[verdict]||'MAYBE')}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${rico(verdict)}</svg>
+          ${verdict}
         </div>
         <div class="rreason">${d.recommendation_reason||''}</div>
+        <div style="font-size:10.5px;color:var(--t3);margin-top:4px">Verdict bands: hire ≥75 · maybe 50–74 · reject &lt;50${rec!==verdict?` · engine recommendation: ${rec}`:''}</div>
       </div>
     </div>
 
     <div class="conf-strip">
       <span class="clbl">Confidence</span>
       <span class="cbadge ${sc.confidence==='High'?'ch':sc.confidence==='Medium'?'cm':'cl'}">${sc.confidence||'High'}</span>
-      <span class="cmeta">Run 1: ${sc.run_1||'—'} · Run 2: ${sc.run_2||'—'} · Δ ${sc.difference||0} pts</span>
+      <span class="cmeta">Strict: ${sc.strict_pass??sc.run_1??'—'} · Upside: ${sc.upside_pass??sc.run_2??'—'} · Δ ${sc.difference||0} pts</span>
     </div>
 
     <div class="card">
       <div class="card-ttl">AI Assessment</div>
-      <div class="sum-txt">${d.summary||'—'}</div>
-      <div class="cov-row">
-        <div class="cov-lbl">Skills coverage</div>
-        <div class="cov-bg"><div class="cov-fill" id="cov-fill" style="background:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}"></div></div>
-        <div class="cov-pct" style="color:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}">${cov}%</div>
-      </div>
+      <div class="sum-txt">${rep.aiSummary||d.summary||'—'}</div>
+      ${cov===null
+        ? `<div class="cov-row"><div class="cov-lbl">Skills coverage</div>
+             <span style="font-size:11.5px;color:var(--t3)">Not scored — this role has no required skills configured to compare against.</span></div>`
+        : `<div class="cov-row">
+             <div class="cov-lbl">Skills coverage</div>
+             <div class="cov-bg"><div class="cov-fill" id="cov-fill" style="background:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}"></div></div>
+             <div class="cov-pct" style="color:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}">${cov}%</div>
+           </div>`}
     </div>
 
     <div class="card">
@@ -252,27 +283,28 @@ function render(d){
       <div class="pb" id="pd-jd"></div>
     </div>`;
 
-  setTimeout(()=>{const f=document.getElementById('cov-fill');if(f)f.style.width=cov+'%';},200);
+  setTimeout(()=>{const f=document.getElementById('cov-fill');if(f&&cov!==null)f.style.width=cov+'%';},200);
 
   const grid=document.getElementById('sgrid');
-  (d.dimensions||[]).forEach(dim=>{
+  Object.values(rep.breakdown||{}).forEach(dim=>{
     const p=Math.round((dim.score/20)*100);const c=gc(p);
-    const wt=dim.weight?Math.round(dim.weight*100)+'%':'';
-    const mp=(dim.matched_skills||[]).slice(0,3).map(s=>'<span class="pg">'+s+'</span>').join('');
-    const rp=(dim.missing_skills||[]).slice(0,3).map(s=>'<span class="pr">'+s+'</span>').join('');
+    const mp=(dim.matchedSkills||[]).slice(0,4).map(s=>'<span class="pg">'+s+'</span>').join('');
+    const rp=(dim.missingSkills||[]).slice(0,4).map(s=>'<span class="pr">'+s+'</span>').join('');
     const el=document.createElement('div');el.className='sg';
-    el.innerHTML='<div class="sg-top" style="background:'+c.b+'"></div><div class="sg-hd"><div><div class="sg-name">'+dim.name+'</div>'+(wt?'<div class="sg-wt">'+wt+' weight</div>':'')+
+    el.innerHTML='<div class="sg-top" style="background:'+c.b+'"></div><div class="sg-hd"><div><div class="sg-name">'+dim.name+'</div>'+(dim.weight?'<div class="sg-wt">'+dim.weight+'% weight</div>':'')+
       '</div><span class="sg-score" style="color:'+c.t+'">'+dim.score.toFixed(1)+'<span style="font-size:10px;font-weight:400;opacity:.4">/20</span></span></div>'+
       '<div class="bar-bg"><div class="bar-fill" style="background:'+c.b+'" data-pct="'+p+'"></div></div>'+
-      '<p class="sg-fb">'+(dim.feedback||'')+'</p><div class="pills">'+(mp||'')+(rp||'')+'</div>';
+      '<p class="sg-fb">'+(dim.reasoning||'')+'</p><div class="pills">'+(mp||'')+(rp||'')+'</div>';
     grid.appendChild(el);
   });
   setTimeout(()=>{document.querySelectorAll('.bar-fill').forEach(b=>{b.style.width=b.dataset.pct+'%';});},300);
 
-  document.getElementById('strl').innerHTML=(d.key_strengths||[]).map(s=>'<li>'+s+'</li>').join('');
-  document.getElementById('gapl').innerHTML=(d.critical_gaps||[]).map(s=>'<li>'+s+'</li>').join('');
-  document.getElementById('ql').innerHTML=(d.interview_questions||[]).map(s=>'<li>'+s+'</li>').join('');
-  document.getElementById('rl').innerHTML=(d.hiring_risks||['None identified']).map(s=>'<li>'+s+'</li>').join('');
+  document.getElementById('strl').innerHTML=(rep.keyStrengths||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
+  document.getElementById('gapl').innerHTML=(rep.criticalGaps||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
+  document.getElementById('ql').innerHTML=(rep.interviewQuestions||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">—</li>';
+  document.getElementById('rl').innerHTML=(rep.hiringRisks||[]).length
+    ? rep.hiringRisks.map(s=>'<li>'+s+'</li>').join('')
+    : '<li style="color:var(--t3)">None identified — no concrete evidence-based risks flagged.</li>';
   document.getElementById('pd-cv').textContent=JSON.stringify(d.parsed_cv||{},null,2);
   document.getElementById('pd-jd').textContent=JSON.stringify(d.parsed_jd||{},null,2);
 }

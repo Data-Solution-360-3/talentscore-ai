@@ -992,6 +992,84 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
 
 
 # ─────────────────────────────────────────────────────────────
+# REFERENCE-FORMAT REPORT — presentation layer ONLY
+# ─────────────────────────────────────────────────────────────
+# A second VIEW of the same scored result, shaped like the reference format
+# (camelCase names, per-dimension weight+reasoning, matched/missing skills on
+# the skills dimension, hire>=75 / maybe 50-74 / reject<50 verdict bands, and
+# a NULLABLE skills coverage). Every number is COPIED from the engine's
+# blended, code-recomputed output — nothing here re-scores anything.
+#
+# Dimension note, deliberate: the reference's sixth dimension is
+# "Presentation & Clarity". We keep OUR "Stability & Tenure" instead —
+# scoring presentation polish is scoring English, which the ESL fairness
+# rules exist to prevent. Flagged to the owner rather than silently adopted.
+
+REPORT_FORMAT_VERSION = "report-1.0"
+
+_REPORT_KEYS = {
+    "Skills Match": "skillsMatch",
+    "Experience Relevance": "experienceRelevance",
+    "Education & Certifications": "educationCertifications",
+    "Achievement & Impact": "achievementImpact",
+    "Role Alignment": "roleAlignment",
+    "Stability & Tenure": "stabilityTenure",
+}
+
+
+def build_report(result: dict) -> dict:
+    """Reference-shaped view of a scored result. Format only."""
+    dims = {str(d.get("name", "")): d for d in (result.get("dimensions") or [])}
+    breakdown = {}
+    for name, key in _REPORT_KEYS.items():
+        d = dims.get(name, {})
+        try:
+            score = round(float(d.get("score", 0)), 1)
+        except Exception:
+            score = 0.0
+        try:
+            weight = int(round(float(d.get("weight", 0) or 0) * 100))
+        except Exception:
+            weight = 0
+        entry = {"name": name, "score": score, "weight": weight,
+                 "reasoning": str(d.get("feedback", ""))}
+        if name == "Skills Match":
+            entry["matchedSkills"] = [str(s) for s in (d.get("matched_skills") or [])]
+            entry["missingSkills"] = [str(s) for s in (d.get("missing_skills") or [])]
+        breakdown[key] = entry
+
+    overall = int(result.get("overall_score", 0))
+    verdict = "hire" if overall >= 75 else ("maybe" if overall >= 50 else "reject")
+
+    # Nullable coverage, reference semantics: null means "the role has no
+    # required skills configured to compare against" — NOT the same as 0%,
+    # which means skills were compared and none matched.
+    required = (result.get("parsed_jd") or {}).get("required_skills") or []
+    coverage = None if not required else int(result.get("skills_coverage_pct") or 0)
+
+    def _clean(items, cap):
+        out = []
+        for x in (items or []):
+            s = str(x).strip()
+            if s and s.lower() != "none identified":
+                out.append(s)
+        return out[:cap]
+
+    return {
+        "format_version": REPORT_FORMAT_VERSION,
+        "overallScore": overall,
+        "verdict": verdict,
+        "skillsCoveragePercent": coverage,
+        "aiSummary": str(result.get("summary", "")),
+        "breakdown": breakdown,
+        "keyStrengths": _clean(result.get("key_strengths"), 5),
+        "criticalGaps": _clean(result.get("critical_gaps"), 5),
+        "interviewQuestions": _clean(result.get("interview_questions"), 5),
+        "hiringRisks": _clean(result.get("hiring_risks"), 3),
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # SELF-CONTRADICTION VALIDATOR
 # ─────────────────────────────────────────────────────────────
 
@@ -1109,6 +1187,11 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
 
         # ── Validate score range ──
         final["overall_score"] = max(0, min(100, int(final["overall_score"])))
+
+        # ── Reference-format report — a formatting pass over the final result;
+        #    built LAST so it sees the validated score, merged risks, and
+        #    parsed JD (for nullable coverage) ──
+        final["report"] = build_report(final)
 
         return final, None
 
