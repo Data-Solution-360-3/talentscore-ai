@@ -329,7 +329,8 @@ def main():
                 line(None, method, path, str(e)[:60]); failures.append((method, path, "exception"))
         # Attendance & Leave (HRM module 2) — personal data, admin-only in
         # Part 1. Every route must refuse a credential-free client.
-        for method, path in (("GET", "/api/leave/requests"), ("POST", "/api/leave/requests"),
+        for method, path in (("GET", "/api/hr/summary"),
+                             ("GET", "/api/leave/requests"), ("POST", "/api/leave/requests"),
                              ("POST", "/api/leave/requests/000000000000000000000000/decide"),
                              ("GET", "/api/leave/balances"),
                              ("GET", "/api/attendance?month=2026-08"),
@@ -360,6 +361,7 @@ def main():
                 ("GET", "/api/employees"), ("POST", "/api/employees"),
                 ("GET", "/api/screenings"), ("GET", "/api/jobs"),
                 ("GET", "/api/stats"), ("GET", "/api/analytics/skills-gaps"),
+                ("GET", "/api/hr/summary"),
                 ("GET", "/api/leave/requests"), ("POST", "/api/leave/requests"),
                 ("GET", "/api/leave/balances"),
                 ("GET", "/api/attendance?month=2026-08"), ("POST", "/api/attendance/mark"),
@@ -512,6 +514,7 @@ def main():
             ("GET", "/api/admin/diagnostics", None),
             ("GET", "/api/keys", None),
             ("GET", "/api/employees", None),
+            ("GET", "/api/hr/summary", None),
             ("GET", "/api/leave/requests", None),
             ("GET", "/api/leave/balances", None),
         ]

@@ -62,7 +62,7 @@ from database import (
     create_employee, get_employees_for_user, get_employee_for_user,
     update_employee_for_user, find_employee_by_email, EMPLOYEE_STATUSES,
     create_leave_request, get_leave_requests_for_user, claim_leave_decision,
-    leave_taken_days, mark_attendance, get_attendance_for_month,
+    leave_taken_days, mark_attendance, get_attendance_for_month, hr_summary_counts,
     LEAVE_TYPES, DEFAULT_LEAVE_ALLOWANCES, ATTENDANCE_STATUSES,
     set_employee_invite, get_employee_by_invite, set_employee_password,
     find_employee_logins, update_employee_contact,
@@ -2756,6 +2756,14 @@ def _validated_leave(body: dict) -> dict:
         raise HTTPException(status_code=400, detail="A single request can cover at most 90 days.")
     return {"type": ltype, "start_date": start, "end_date": end, "days": days,
             "reason": str(body.get("reason", "")).strip()[:500]}
+
+
+@app.get("/api/hr/summary")
+async def hr_summary(request: Request):
+    """Additive dashboard counts for the HR cards. Tenant-scoped, and entirely
+    separate from the hiring stats — it reads only the HRM collections."""
+    user = await get_current_user(request)
+    return await hr_summary_counts(user["user_id"])
 
 
 @app.get("/api/leave/requests")

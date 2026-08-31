@@ -102,6 +102,42 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
+
+/* ── Dashboard soft-SaaS restyle — SCOPED to #page-overview so the shared
+   .stat/.stats-grid/.funnel classes on other pages are untouched. Presentation
+   only; every #ov-* / #fn-* id and its data wiring is unchanged. ── */
+#page-overview{--lift-sm:0 1px 2px rgba(20,40,72,.03),0 4px 16px rgba(20,40,72,.05);--lift-md:0 2px 4px rgba(20,40,72,.04),0 12px 32px rgba(20,40,72,.07)}
+#page-overview .dsh-label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin:0 0 .8rem .2rem;display:flex;align-items:center;gap:8px}
+#page-overview .dsh-label .pill{font-size:9.5px;font-weight:800;padding:2px 9px;border-radius:9999px;background:var(--gg);color:var(--green);letter-spacing:.04em}
+#page-overview .dsh-stats{display:grid;gap:1.15rem;margin-bottom:1.75rem}
+#page-overview .dsh-stats.five{grid-template-columns:repeat(5,1fr)}
+#page-overview .dsh-stats.three{grid-template-columns:repeat(3,1fr)}
+#page-overview .dsh-stats .stat{background:var(--surface);border:none;border-radius:20px;padding:1.5rem 1.4rem;box-shadow:var(--lift-sm);overflow:visible;transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s}
+#page-overview .dsh-stats .stat:hover{transform:translateY(-4px);box-shadow:var(--lift-md)}
+#page-overview .dsh-stats .stat-bar{display:none}
+#page-overview .dsh-stats .stat-ico{position:static;width:42px;height:42px;border-radius:13px;margin-bottom:1rem}
+#page-overview .dsh-stats .stat-val{font-size:2.15rem;font-weight:900;letter-spacing:-1.4px;line-height:1}
+#page-overview .dsh-stats .stat-lbl{font-size:12.5px;font-weight:700;color:var(--t2);margin-top:.5rem;text-transform:none;letter-spacing:0}
+#page-overview .dsh-stats .stat-sub{font-size:11px;color:var(--t3);margin-top:2px}
+#page-overview .dsh-card{background:var(--surface);border:none;border-radius:20px;box-shadow:var(--lift-sm);padding:1.5rem 1.6rem;margin-bottom:1.5rem}
+#page-overview .funnel{gap:.9rem}
+#page-overview .funnel-stage{background:var(--s2);border:none;border-radius:12px;padding:1.1rem 1rem;box-shadow:none;transition:transform .2s,box-shadow .2s,background .2s}
+#page-overview .funnel-stage:hover{transform:translateY(-3px);box-shadow:var(--lift-sm);background:#fff}
+#page-overview .funnel-num{font-size:1.7rem;font-weight:900;letter-spacing:-1px}
+#page-overview .dsh-split{display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem}
+#page-overview .dsh-split .dsh-card{margin-bottom:0}
+#page-overview .today-item{display:flex;gap:11px;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid var(--border)}
+#page-overview .today-item:last-child{border-bottom:none}
+#page-overview .today-ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex-shrink:0}
+#page-overview .today-t{font-size:13px;font-weight:700;line-height:1.35}
+#page-overview .today-s{font-size:11.5px;color:var(--t3);margin-top:1px}
+#page-overview .today-cta{margin-top:.35rem;font-size:11.5px;font-weight:700;color:var(--orange2);cursor:pointer;background:none;border:none;padding:0;font-family:inherit}
+#page-overview .today-empty{font-size:12px;color:var(--t3);padding:.6rem 0}
+@media (prefers-reduced-motion:reduce){#page-overview .dsh-stats .stat,#page-overview .funnel-stage{transition:none}}
+@media(max-width:1000px){#page-overview .dsh-stats.five{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){#page-overview .dsh-split{grid-template-columns:1fr}}
+@media(max-width:720px){#page-overview .dsh-stats.five,#page-overview .dsh-stats.three{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){#page-overview .dsh-stats.five,#page-overview .dsh-stats.three{grid-template-columns:1fr}}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
 /* One hover rule — there used to be two, the second silently cancelling the
    first's shadow. Gentle lift on the existing shadow token. */
@@ -483,43 +519,72 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- 4 focused KPIs (was 7). Each one is action-oriented: total work done, what's good, what needs attention, where to invest more. -->
-  <div class="stats-grid">
+  <!-- HIRING — 5 KPIs (existing data + ids, restyled soft). "In interview" is
+       a new card reading s.byStage.interview (already computed; no new logic). -->
+  <div class="dsh-label">Hiring</div>
+  <div class="stats-grid dsh-stats five">
     <div class="stat" onclick="showPage('candidates')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--navy)"></div>
-      <div class="stat-ico" style="background:var(--ig)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-      <div class="stat-lbl">Total screened</div>
+      <div class="stat-ico" style="background:var(--ig)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
       <div class="stat-val" id="ov-total">0</div>
+      <div class="stat-lbl">Total screened</div>
       <div class="stat-sub">candidates evaluated</div>
     </div>
     <div class="stat" onclick="filterByRec('hire')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--amber)"></div>
-      <div class="stat-ico" style="background:var(--amg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></div>
-      <div class="stat-lbl">AI recommends hire</div>
+      <div class="stat-ico" style="background:var(--amg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></div>
       <div class="stat-val" id="ov-airec" style="color:var(--amber)">0</div>
-      <div class="stat-sub">STRONG HIRE + HIRE</div>
+      <div class="stat-lbl">AI recommends hire</div>
+      <div class="stat-sub">strong hire + hire</div>
     </div>
     <div class="stat" onclick="filterByStage('shortlisted')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--green)"></div>
-      <div class="stat-ico" style="background:var(--gg)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-      <div class="stat-lbl">You shortlisted</div>
+      <div class="stat-ico" style="background:var(--gg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
       <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
+      <div class="stat-lbl">Shortlisted</div>
       <div class="stat-sub">your decision</div>
+    </div>
+    <div class="stat" onclick="filterByStage('interview')" style="cursor:pointer">
+      <div class="stat-bar" style="background:var(--orange)"></div>
+      <div class="stat-ico" style="background:var(--og)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
+      <div class="stat-val" id="ov-interview">0</div>
+      <div class="stat-lbl">In interview</div>
+      <div class="stat-sub">live interview stage</div>
     </div>
     <div class="stat" onclick="showPage('jobs')" style="cursor:pointer">
       <div class="stat-bar" style="background:var(--orange)"></div>
-      <div class="stat-ico" style="background:var(--og)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+      <div class="stat-ico" style="background:var(--og)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+      <div class="stat-val" id="ov-jobs" style="color:var(--orange2)">0</div>
       <div class="stat-lbl">Active jobs</div>
-      <div class="stat-val" id="ov-jobs" style="color:var(--orange)">0</div>
       <div class="stat-sub">open roles</div>
     </div>
   </div>
 
-  <!-- Pipeline funnel. Every cell is a STAGE count on the same (deduped) base, so the four
-       stage cells sum to Screened exactly. "Review needed" is a derived view of Screening
-       (never triaged by a human), shown as a sub-count rather than a cell of its own —
-       it is a subset of Screening, so giving it a cell would break the sum. -->
-  <div class="card" style="margin-bottom:10px">
+  <!-- TEAM / HR — new additive count cards from the HRM collections. -->
+  <div class="dsh-label">Team <span class="pill">HR</span></div>
+  <div class="dsh-stats three">
+    <div class="stat" onclick="showPage('employees')" style="cursor:pointer">
+      <div class="stat-ico" style="background:var(--ig)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="stat-val" id="hr-employees">0</div>
+      <div class="stat-lbl">Total employees</div>
+      <div class="stat-sub">active staff records</div>
+    </div>
+    <div class="stat" onclick="showPage('leave')" style="cursor:pointer">
+      <div class="stat-ico" style="background:var(--amg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+      <div class="stat-val" id="hr-pending" style="color:var(--amber)">0</div>
+      <div class="stat-lbl">Pending leave</div>
+      <div class="stat-sub">awaiting your approval</div>
+    </div>
+    <div class="stat" onclick="showPage('leave')" style="cursor:pointer">
+      <div class="stat-ico" style="background:var(--gg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div>
+      <div class="stat-val" id="hr-onleave" style="color:var(--green)">0</div>
+      <div class="stat-lbl">On leave today</div>
+      <div class="stat-sub">approved absences</div>
+    </div>
+  </div>
+
+  <!-- Pipeline funnel — same ids, same numbers, same logic; restyled soft. -->
+  <div class="dsh-card">
     <div class="card-hd">
       <div class="card-title">Candidate pipeline</div>
       <label class="dedup-toggle" title="One person applying to two roles counts as two candidacies. This merges repeat screenings of the same person for the same role.">
@@ -536,18 +601,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- Recent applicants (full-width). The old layout split this into a 2/3 + 1/3 column with "Jobs performance" on the right,
-       but Jobs performance is already on the Analytics page and the Jobs page. Less duplication = cleaner dashboard. -->
-  <div class="card">
-    <div class="card-hd">
-      <div class="card-title">Recent applicants</div>
-      <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button>
+  <!-- Recent applicants + a Today panel (both from real data). -->
+  <div class="dsh-split">
+    <div class="dsh-card">
+      <div class="card-hd">
+        <div class="card-title">Recent applicants</div>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button>
+      </div>
+      <div class="tbl-wrap no-scroll">
+        <table class="tbl">
+          <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
+          <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a></div></div></td></tr></tbody>
+        </table>
+      </div>
     </div>
-    <div class="tbl-wrap no-scroll">
-      <table class="tbl">
-        <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
-        <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a></div></div></td></tr></tbody>
-      </table>
+    <div class="dsh-card">
+      <div class="card-hd"><div class="card-title">Today</div></div>
+      <div id="ov-today"><div class="today-empty">Loading…</div></div>
     </div>
   </div>
 </div>
@@ -2706,28 +2776,35 @@ function setDedupe(on){
 }
 
 // ── OVERVIEW ──
+// Defensive write: never let a moved/absent card crash the whole render (one
+// null getElementById used to blank every stat). Values are unchanged — they
+// all still come straight from CandidateStats.
+function setNum(id, v){ const el=document.getElementById(id); if(el) el.textContent = v; }
+
 function renderOverview(){
   const s   = CandidateStats.compute(allResults);
   const rec = CandidateStats.rec;
 
-  // ── 4 stat cards ──
-  // "AI recommends hire" and "You shortlisted" answer different questions and are
+  // ── stat cards ──
+  // "AI recommends hire" and "Shortlisted" answer different questions and are
   // expected to disagree. The gap between them is the signal, not a bug.
-  document.getElementById('ov-total').textContent       = s.total;
-  document.getElementById('ov-airec').textContent       = s.aiRecommendsHire;
-  document.getElementById('ov-shortlisted').textContent = s.youShortlisted;
-  document.getElementById('ov-jobs').textContent        = allJobs.length;
+  setNum('ov-total', s.total);
+  setNum('ov-airec', s.aiRecommendsHire);
+  setNum('ov-shortlisted', s.youShortlisted);
+  setNum('ov-interview', s.byStage.interview);   // same value as the funnel cell
+  setNum('ov-jobs', allJobs.length);
+  loadHrSummary(s);   // HR cards + Today panel (separate, additive data)
 
   // ── Funnel: every cell is a stage count on the same base ──
   // No fallback. Zero renders as zero — a cell's meaning must not change with its value.
   const dt = document.getElementById('dedup-toggle');
   if(dt) dt.checked = DEDUPE_ON;
-  document.getElementById('fn-all').textContent         = s.total;
-  document.getElementById('fn-screening').textContent   = s.byStage.screening;
-  document.getElementById('fn-interview').textContent   = s.byStage.interview;
-  document.getElementById('fn-shortlisted').textContent = s.byStage.shortlisted;
-  document.getElementById('fn-rejected').textContent    = s.byStage.rejected;
-  document.getElementById('fn-review').textContent      = s.reviewNeeded + ' need review';
+  setNum('fn-all', s.total);
+  setNum('fn-screening', s.byStage.screening);
+  setNum('fn-interview', s.byStage.interview);
+  setNum('fn-shortlisted', s.byStage.shortlisted);
+  setNum('fn-rejected', s.byStage.rejected);
+  setNum('fn-review', s.reviewNeeded + ' need review');
 
   // ── Recent applicants (now shows applied job) ──
   const recent = s.rows.slice(0, 8);
@@ -2752,6 +2829,49 @@ function renderOverview(){
         cta: icon('bolt',12,'margin-right:4px')+'Screen your first CV',
         ctaHref: '/batch',
       });
+}
+
+// ── HR summary cards + Today panel (new, additive; separate from hiring stats) ──
+let _hrCache = null, _hrFetchedAt = 0;
+async function loadHrSummary(s){
+  // Cheap count query; cache 15s so the many renderOverview() calls don't spam it.
+  const now = Date.now();
+  if(_hrCache && (now - _hrFetchedAt) < 15000){ paintHr(_hrCache, s); return; }
+  try{
+    const r = await fetch('/api/hr/summary', {credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    _hrCache = await r.json(); _hrFetchedAt = now;
+    paintHr(_hrCache, s);
+  }catch(e){
+    // HR data failing must never blank the hiring dashboard — degrade quietly.
+    setNum('hr-employees','—'); setNum('hr-pending','—'); setNum('hr-onleave','—');
+    const t=document.getElementById('ov-today'); if(t) t.innerHTML='<div class="today-empty">Couldn’t load today’s items.</div>';
+  }
+}
+function paintHr(hr, s){
+  setNum('hr-employees', hr.employees);
+  setNum('hr-pending', hr.pending_leave);
+  setNum('hr-onleave', hr.on_leave_today);
+  const inv = s ? s.byStage.interview : 0;
+  const box = document.getElementById('ov-today');
+  if(!box) return;
+  const items = [];
+  if(hr.pending_leave > 0) items.push(['amg','#D97706',
+    '<path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
+    `${hr.pending_leave} leave request${hr.pending_leave>1?'s':''} pending`, 'Waiting for your approval',
+    "showPage('leave')", 'Review in Leave →']);
+  if(hr.on_leave_today > 0) items.push(['gg','#16A34A',
+    '<path d="M20 6L9 17l-5-5"/>',
+    `${hr.on_leave_today} employee${hr.on_leave_today>1?'s':''} on leave today`, 'Approved absences', '', '']);
+  if(inv > 0) items.push(['og','#F57C2E',
+    '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/>',
+    `${inv} candidate${inv>1?'s':''} in interview`, 'Live interview stage', "showPage('pipeline')", 'Open pipeline →']);
+  box.innerHTML = items.length ? items.map(([bg,st,path,t,sub,act,cta])=>`
+    <div class="today-item">
+      <div class="today-ico" style="background:var(--${bg})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${st}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${path}</svg></div>
+      <div><div class="today-t">${t}</div><div class="today-s">${sub}</div>${cta?`<button class="today-cta" onclick="${act}">${cta}</button>`:''}</div>
+    </div>`).join('')
+    : '<div class="today-empty">Nothing needs your attention today.</div>';
 }
 
 // ── PIPELINE ──
@@ -4000,12 +4120,12 @@ async function loadFromDB(){
     skeletonTableBody('jobs-tbl',      4, 9);
     skeletonTableBody('job-perf-tbl',  4, 8);
     skeletonTableBody('ov-recent-tbl', 5, 5);
-    // Stat-card skeletons on the dashboard (4 cards)
+    // Stat-card skeletons on the dashboard's hiring row (5 cards)
     const statsGrid = document.querySelector('#page-overview .stats-grid');
     if(statsGrid && !statsGrid.dataset.sklShown){
       statsGrid.dataset.sklShown = '1';
       statsGrid.dataset.origHtml = statsGrid.innerHTML;
-      statsGrid.innerHTML = skeletonStat() + skeletonStat() + skeletonStat() + skeletonStat();
+      statsGrid.innerHTML = skeletonStat() + skeletonStat() + skeletonStat() + skeletonStat() + skeletonStat();
     }
     // Pipeline funnel numbers — show shimmer instead of zeros
     document.querySelectorAll('#funnel-row .funnel-num').forEach(el=>{

@@ -1341,6 +1341,23 @@ async def mark_attendance(user_id: str, employee_id: str, date: str,
         upsert=True)
 
 
+async def hr_summary_counts(user_id: str) -> dict:
+    """Lightweight, additive dashboard counts — tenant-scoped, independent of
+    the hiring stats. Never touches CandidateStats or any screening query."""
+    match = user_match_field("user_id", user_id)
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    employees = await db.employees.count_documents(
+        {**match, "status": {"$ne": "terminated"}})
+    pending_leave = await db.leave_requests.count_documents(
+        {**match, "status": "pending"})
+    # People with an APPROVED leave spanning today — distinct employees.
+    on_leave_ids = await db.leave_requests.distinct("employee_id", {
+        **match, "status": "approved",
+        "start_date": {"$lte": today}, "end_date": {"$gte": today}})
+    return {"employees": employees, "pending_leave": pending_leave,
+            "on_leave_today": len(on_leave_ids)}
+
+
 async def get_attendance_for_month(user_id: str, month: str,
                                    employee_id: str = "") -> list:
     q = {**user_match_field("user_id", user_id),
