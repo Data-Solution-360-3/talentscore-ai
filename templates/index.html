@@ -65,9 +65,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 /* ── LAYOUT ── */
 .shell{display:flex;padding-top:56px;min-height:100vh}
+/* mode toggle in the top bar */
+.mode-toggle{display:inline-flex;background:var(--s2);border:1px solid var(--border);border-radius:9999px;padding:3px;margin-left:14px}
+.mode-toggle .mt-btn{font-family:inherit;font-size:12.5px;font-weight:800;border:none;background:none;color:var(--t3);padding:6px 16px;border-radius:9999px;cursor:pointer;transition:.15s}
+.mode-toggle .mt-btn.on{background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.3)}
 
 /* ── SIDEBAR ── */
-.sidebar{width:210px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:.75rem .6rem;position:fixed;top:56px;left:0;height:calc(100vh - 56px);overflow-y:auto;display:flex;flex-direction:column;z-index:100}
+.sidebar{width:84px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:12px 8px;position:fixed;top:56px;left:0;height:calc(100vh - 56px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;z-index:100}
+/* slim icon rail — icon + small label, green active, same in both modes */
+.rail-set{display:flex;flex-direction:column;gap:4px}
+.rail-set.hidden{display:none}
+.ri-bottom{margin-top:auto;display:flex;flex-direction:column;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
+.sidebar .ri{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;border-radius:12px;color:var(--t2);cursor:pointer;background:none;border:none;font-family:inherit;width:100%;transition:.14s;position:relative}
+.sidebar .ri:hover{background:var(--gg);color:var(--green)}
+.sidebar .ri.act{background:var(--gg);color:var(--green)}
+.sidebar .ri.act::before{content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--green);border-radius:0 3px 3px 0}
+.sidebar .ri svg{width:19px;height:19px}
+.sidebar .ri .lb{font-size:9.5px;font-weight:700;letter-spacing:.01em;text-align:center;line-height:1.15}
+.sidebar .ri .sb-badge{position:absolute;top:5px;right:12px;margin:0;font-size:8.5px;font-weight:800;background:var(--orange);color:#fff;border-radius:9px;padding:0 5px;min-width:15px;text-align:center}
+.sidebar .ri .sb-badge:empty,.sidebar .ri .sb-badge[data-zero="1"]{display:none}
 .sb-sec{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);padding:0 8px;margin:1rem 0 3px}
 .sb-sec:first-child{margin-top:0}
 .sb-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:var(--rs);font-size:12px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;background:none;border:none;font-family:inherit;width:100%;text-align:left;position:relative}
@@ -83,7 +99,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .sb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0}
 
 /* ── MAIN ── */
-.main{margin-left:210px;flex:1;padding:1.5rem 1.75rem 4rem;min-height:calc(100vh - 56px)}
+.main{margin-left:84px;flex:1;padding:1.5rem 1.75rem 4rem;min-height:calc(100vh - 56px)}
 .page{display:none}
 .page.act{display:block}
 
@@ -106,62 +122,67 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 /* ── Reference-layout dashboard — SCOPED to #page-overview. Green primary,
    orange accent, charcoal text, no navy/blue. Sidebar + top bar unaffected. ── */
-#page-overview{--rg-green:#16A34A;--rg-green2:#128A40;--rg-gg:rgba(22,163,74,.10);--rg-gg2:rgba(22,163,74,.16);
+.rd{--rg-green:#16A34A;--rg-green2:#128A40;--rg-gg:rgba(22,163,74,.10);--rg-gg2:rgba(22,163,74,.16);
   --rg-org:#F57C2E;--rg-org2:#E16A1F;--rg-og:rgba(245,124,46,.12);
   --rg-pur:#7C5CD6;--rg-pg:rgba(124,92,214,.12);--rg-red:#E4544B;--rg-rd:rgba(228,84,75,.12);
   --rg-ink:#1F2A24;--rg-mut:#6B7B72;--rg-mut2:#93A29A;--rg-soft:#F4FAF6;--rg-line:#E6EFE9;
   --rg-sh:0 1px 2px rgba(24,60,40,.03),0 6px 20px rgba(24,60,40,.05);--rg-sh2:0 2px 4px rgba(24,60,40,.04),0 14px 34px rgba(24,60,40,.08)}
-#page-overview .rd{color:var(--rg-ink)}
-#page-overview .rd-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
-#page-overview .rd-col{display:flex;flex-direction:column;gap:18px;min-width:0}
-#page-overview .rd-sec{font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink)}
-#page-overview .rd-card{background:var(--surface);border-radius:20px;box-shadow:var(--rg-sh);padding:18px}
-#page-overview .rd-h{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
-#page-overview .rd-see{font-size:12px;font-weight:700;color:var(--rg-org2);cursor:pointer}
-#page-overview .rd-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-#page-overview .rd-stat{background:var(--surface);border-radius:16px;box-shadow:var(--rg-sh);padding:16px;cursor:pointer;transition:transform .2s,box-shadow .2s}
-#page-overview .rd-stat:hover{transform:translateY(-3px);box-shadow:var(--rg-sh2)}
-#page-overview .rd-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:11px}
-#page-overview .rd-ico.gn{background:var(--rg-gg)} #page-overview .rd-ico.pu{background:var(--rg-pg)} #page-overview .rd-ico.rd-red{background:var(--rg-rd)}
-#page-overview .rd-val{font-size:1.9rem;font-weight:900;letter-spacing:-1px;line-height:1;color:var(--rg-ink)}
-#page-overview .rd-lbl{font-size:12px;color:var(--rg-mut);font-weight:600;margin-top:4px}
-#page-overview .rd-charts{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
-#page-overview .rd-bars{display:flex;align-items:flex-end;gap:12px;height:132px;padding-top:8px}
-#page-overview .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
-#page-overview .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
-#page-overview .rd-bars .bar:hover i{background:var(--rg-green)}
-#page-overview .rd-bars .bar span{font-size:10px;color:var(--rg-mut2);font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#page-overview .rd-donutwrap{display:flex;align-items:center;gap:16px}
-#page-overview .rd-leg{font-size:12px;color:var(--rg-mut);display:flex;flex-direction:column;gap:9px}
-#page-overview .rd-leg b{color:var(--rg-ink)}
-#page-overview .rd-leg .d{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
-#page-overview .rd-act{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--rg-line);cursor:pointer}
-#page-overview .rd-act:last-child{border-bottom:none}
-#page-overview .rd-act:hover{background:var(--rg-soft);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px}
-#page-overview .rd-thumb{width:34px;height:34px;border-radius:50%;background:var(--rg-soft);display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--rg-green2);flex-shrink:0}
-#page-overview .rd-who{flex:1;min-width:0}
-#page-overview .rd-nm{font-size:13px;font-weight:700;color:var(--rg-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#page-overview .rd-rl{font-size:11px;color:var(--rg-mut2)}
-#page-overview .rd-pill{font-size:10px;font-weight:800;padding:3px 11px;border-radius:9999px;flex-shrink:0}
-#page-overview .p-hired{background:var(--rg-gg);color:var(--rg-green2)} #page-overview .p-short{background:var(--rg-pg);color:var(--rg-pur)} #page-overview .p-rej{background:var(--rg-rd);color:var(--rg-red)} #page-overview .p-int{background:var(--rg-og);color:var(--rg-org2)} #page-overview .p-screen{background:var(--rg-soft);color:var(--rg-mut)}
-#page-overview .rd-days{display:flex;gap:6px;margin-bottom:14px}
-#page-overview .rd-day{flex:1;text-align:center;padding:8px 0;border-radius:12px;font-size:11px;color:var(--rg-mut)}
-#page-overview .rd-day b{display:block;font-size:15px;font-weight:800;color:var(--rg-ink);margin-top:3px}
-#page-overview .rd-day.on{background:var(--rg-green);color:rgba(255,255,255,.85)} #page-overview .rd-day.on b{color:#fff}
-#page-overview .rd-empty{text-align:center;padding:14px 10px;color:var(--rg-mut2)}
-#page-overview .rd-empty-t{font-size:13px;font-weight:700;color:var(--rg-mut);margin-top:8px}
-#page-overview .rd-empty-s{font-size:11.5px;margin-top:3px;line-height:1.5}
-#page-overview .rd-jobcard{background:linear-gradient(135deg,var(--rg-gg),rgba(245,124,46,.06));border-radius:16px;padding:16px;cursor:pointer}
-#page-overview .rd-jobcard .co{font-size:11px;font-weight:800;color:var(--rg-org2);text-transform:uppercase;letter-spacing:.05em}
-#page-overview .rd-jobcard .ti{font-size:16px;font-weight:800;color:var(--rg-ink);margin:4px 0 8px}
-#page-overview .rd-jobcard .mt{display:flex;gap:8px;flex-wrap:wrap}
-#page-overview .rd-jobcard .chip{font-size:10.5px;font-weight:700;color:var(--rg-mut);background:#fff;border-radius:9999px;padding:3px 10px}
-#page-overview .rd-jobcard .r{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
-#page-overview .rd-jobcard .ap{font-size:12px;color:var(--rg-mut)} #page-overview .rd-jobcard .ap b{color:var(--rg-green2);font-size:15px}
-#page-overview .rd-mini{background:var(--rg-green);color:#fff;border:none;border-radius:9999px;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 14px;cursor:pointer}
-@media (prefers-reduced-motion:reduce){#page-overview .rd-stat{transition:none}}
-@media(max-width:1000px){#page-overview .rd-grid{grid-template-columns:1fr}#page-overview .rd-charts{grid-template-columns:1fr}}
-@media(max-width:480px){#page-overview .rd-stats{grid-template-columns:1fr}}
+.rd{color:var(--rg-ink)}
+.rd .rd-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.rd .rd-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.rd .rd-sec{font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink)}
+.rd .rd-card{background:var(--surface);border-radius:20px;box-shadow:var(--rg-sh);padding:18px}
+.rd .rd-h{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.rd .rd-see{font-size:12px;font-weight:700;color:var(--rg-org2);cursor:pointer}
+.rd .rd-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rd .rd-stat{background:var(--surface);border-radius:16px;box-shadow:var(--rg-sh);padding:16px;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.rd .rd-stat:hover{transform:translateY(-3px);box-shadow:var(--rg-sh2)}
+.rd .rd-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:11px}
+.rd .rd-ico.gn{background:var(--rg-gg)} .rd .rd-ico.pu{background:var(--rg-pg)} .rd .rd-ico.rd-red{background:var(--rg-rd)}
+.rd .rd-val{font-size:1.9rem;font-weight:900;letter-spacing:-1px;line-height:1;color:var(--rg-ink)}
+.rd .rd-lbl{font-size:12px;color:var(--rg-mut);font-weight:600;margin-top:4px}
+.rd .rd-charts{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.rd .rd-bars{display:flex;align-items:flex-end;gap:12px;height:132px;padding-top:8px}
+.rd .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
+.rd .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
+.rd .rd-bars .bar:hover i{background:var(--rg-green)}
+.rd .rd-bars .bar span{font-size:10px;color:var(--rg-mut2);font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd .rd-donutwrap{display:flex;align-items:center;gap:16px}
+.rd .rd-leg{font-size:12px;color:var(--rg-mut);display:flex;flex-direction:column;gap:9px}
+.rd .rd-leg b{color:var(--rg-ink)}
+.rd .rd-leg .d{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
+.rd .rd-act{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--rg-line);cursor:pointer}
+.rd .rd-act:last-child{border-bottom:none}
+.rd .rd-act:hover{background:var(--rg-soft);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px}
+.rd .rd-thumb{width:34px;height:34px;border-radius:50%;background:var(--rg-soft);display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--rg-green2);flex-shrink:0}
+.rd .rd-who{flex:1;min-width:0}
+.rd .rd-nm{font-size:13px;font-weight:700;color:var(--rg-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd .rd-rl{font-size:11px;color:var(--rg-mut2)}
+.rd .rd-pill{font-size:10px;font-weight:800;padding:3px 11px;border-radius:9999px;flex-shrink:0}
+.rd .p-hired{background:var(--rg-gg);color:var(--rg-green2)} .rd .p-short{background:var(--rg-pg);color:var(--rg-pur)} .rd .p-rej{background:var(--rg-rd);color:var(--rg-red)} .rd .p-int{background:var(--rg-og);color:var(--rg-org2)} .rd .p-screen{background:var(--rg-soft);color:var(--rg-mut)}
+.rd .rd-days{display:flex;gap:6px;margin-bottom:14px}
+.rd .rd-day{flex:1;text-align:center;padding:8px 0;border-radius:12px;font-size:11px;color:var(--rg-mut)}
+.rd .rd-day b{display:block;font-size:15px;font-weight:800;color:var(--rg-ink);margin-top:3px}
+.rd .rd-day.on{background:var(--rg-green);color:rgba(255,255,255,.85)} .rd .rd-day.on b{color:#fff}
+.rd .att-row{display:flex;gap:10px}
+.rd .att-a{flex:1;text-align:center;background:var(--rg-soft);border-radius:14px;padding:14px 8px}
+.rd .att-n{font-size:1.5rem;font-weight:900;letter-spacing:-1px;line-height:1}
+.rd .att-t{font-size:10.5px;color:var(--rg-mut);font-weight:600;margin-top:4px}
+.rd .rd-mini.g{background:var(--rg-soft);color:var(--rg-mut)}
+.rd .rd-empty{text-align:center;padding:14px 10px;color:var(--rg-mut2)}
+.rd .rd-empty-t{font-size:13px;font-weight:700;color:var(--rg-mut);margin-top:8px}
+.rd .rd-empty-s{font-size:11.5px;margin-top:3px;line-height:1.5}
+.rd .rd-jobcard{background:linear-gradient(135deg,var(--rg-gg),rgba(245,124,46,.06));border-radius:16px;padding:16px;cursor:pointer}
+.rd .rd-jobcard .co{font-size:11px;font-weight:800;color:var(--rg-org2);text-transform:uppercase;letter-spacing:.05em}
+.rd .rd-jobcard .ti{font-size:16px;font-weight:800;color:var(--rg-ink);margin:4px 0 8px}
+.rd .rd-jobcard .mt{display:flex;gap:8px;flex-wrap:wrap}
+.rd .rd-jobcard .chip{font-size:10.5px;font-weight:700;color:var(--rg-mut);background:#fff;border-radius:9999px;padding:3px 10px}
+.rd .rd-jobcard .r{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.rd .rd-jobcard .ap{font-size:12px;color:var(--rg-mut)} .rd .rd-jobcard .ap b{color:var(--rg-green2);font-size:15px}
+.rd .rd-mini{background:var(--rg-green);color:#fff;border:none;border-radius:9999px;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 14px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.rd .rd-stat{transition:none}}
+@media(max-width:1000px){.rd .rd-grid{grid-template-columns:1fr}.rd .rd-charts{grid-template-columns:1fr}}
+@media(max-width:480px){.rd .rd-stats{grid-template-columns:1fr}}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
 /* One hover rule — there used to be two, the second silently cancelling the
    first's shadow. Gentle lift on the existing shadow token. */
@@ -461,8 +482,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <span class="t-name">TopCandidate<span style="color:#F06000">.pro</span></span>
     <span class="t-by">by LinkX360</span>
   </a>
-  <!-- Nav lives in the left sidebar (single source). Middle intentionally
-       empty — room for contextual info later. -->
+  <!-- Mode toggle — swaps the sidebar rail + main dashboard. Session-remembered. -->
+  <div class="mode-toggle" role="tablist" aria-label="App mode">
+    <button class="mt-btn on" id="mt-hiring" onclick="setMode('hiring')">Hiring</button>
+    <button class="mt-btn" id="mt-hrm" onclick="setMode('hrm')">HRM</button>
+  </div>
   <div class="t-right">
     <!-- Usage indicator — single primary location for "how many screenings used" -->
     <div id="t-usage-wrap" style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:6px 12px;cursor:pointer;transition:border-color .15s" onclick="showPage('dashboard');showUsageModal()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Click to see usage details">
@@ -488,62 +512,37 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </header>
 
 <div class="shell">
-<!-- SIDEBAR -->
-<aside class="sidebar">
-  <div class="sb-sec">Overview</div>
-  <button class="sb-item act" id="sb-overview" onclick="showPage('overview')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-    Dashboard
-  </button>
-  <div class="sb-sec">Screening</div>
-
-  <button class="sb-item" id="sb-candidates" onclick="showPage('candidates')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-    All Candidates
-    <span class="sb-badge" id="sb-cand-cnt">0</span>
-  </button>
-  <button class="sb-item" id="sb-pipeline" onclick="showPage('pipeline')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    Pipeline
-  </button>
-  <div class="sb-sec">Jobs</div>
-  <button class="sb-item" id="sb-jobs" onclick="showPage('jobs')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-    Job Postings
-    <span class="sb-badge" id="sb-job-cnt">0</span>
-  </button>
-  <div class="sb-sec">HR</div>
-  <button class="sb-item" id="sb-employees" onclick="showPage('employees')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    Employees
-    <span class="sb-badge" id="sb-emp-cnt">0</span>
-  </button>
-  <button class="sb-item" id="sb-leave" onclick="showPage('leave')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
-    Leave
-    <span class="sb-badge" id="sb-leave-cnt">0</span>
-  </button>
-  <button class="sb-item" id="sb-attendance" onclick="showPage('attendance')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    Attendance
-  </button>
-  <div class="sb-sec">Analytics</div>
-  <button class="sb-item" id="sb-analytics" onclick="showPage('analytics')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-    Analytics
-  </button>
-
-  <!-- Audit Trail removed from the sidebar (its /audit page + route stay
-       alive). Settings is now a clear, pinned item at the bottom. -->
-  <div class="sb-settings">
-    <button class="sb-item" onclick="location.href='/settings'">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Settings
-    </button>
+<!-- SIDEBAR — slim icon rail, two mode item-sets (swapped by the top toggle) -->
+<aside class="sidebar" id="sidebar">
+  <!-- HIRING mode items -->
+  <div class="rail-set" id="rail-hiring">
+    <button class="sb-item ri act" id="sb-overview" onclick="showPage('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="lb">Dashboard</span></button>
+    <button class="sb-item ri" id="sb-candidates" onclick="showPage('candidates')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg><span class="lb">Candidates</span><span class="sb-badge" id="sb-cand-cnt"></span></button>
+    <button class="sb-item ri" id="sb-pipeline" onclick="showPage('pipeline')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="lb">Pipeline</span></button>
+    <button class="sb-item ri" id="sb-jobs" onclick="showPage('jobs')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span class="lb">Jobs</span><span class="sb-badge" id="sb-job-cnt"></span></button>
+    <button class="sb-item ri" id="sb-analytics" onclick="showPage('analytics')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="lb">Analytics</span></button>
   </div>
-  <div class="sb-footer">
-    <div class="sb-company" id="sb-company">Company</div>
-    <div class="sb-status"><span class="sb-dot"></span>All systems operational</div>
+  <!-- HRM mode items -->
+  <div class="rail-set hidden" id="rail-hrm">
+    <button class="sb-item ri" id="sb-hrm-dashboard" onclick="showPage('hrm-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="lb">HRM</span></button>
+    <button class="sb-item ri" id="sb-employees" onclick="showPage('employees')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="lb">Employees</span><span class="sb-badge" id="sb-emp-cnt"></span></button>
+    <button class="sb-item ri" id="sb-leave" onclick="showPage('leave')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg><span class="lb">Leave</span><span class="sb-badge" id="sb-leave-cnt"></span></button>
+    <button class="sb-item ri" id="sb-attendance" onclick="showPage('attendance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="lb">Attendance</span></button>
+  </div>
+  <div class="ri-bottom">
+    <button class="sb-item ri" onclick="location.href='/settings'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="lb">Settings</span></button>
+    <button class="sb-item ri" onclick="logout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="lb">Logout</span></button>
   </div>
 </aside>
 
@@ -619,6 +618,55 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="rd-card">
           <div class="rd-h">Open Jobs Highlight <span class="rd-see" onclick="showPage('jobs')">All jobs →</span></div>
           <div id="ov-jobhi"><div class="rd-empty">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HRM DASHBOARD (HRM mode home) — real employee/leave/attendance data.
+     Same green+orange soft-card style as the recruitment dashboard.
+══════════════════════════════════════════ -->
+<div class="page" id="page-hrm-dashboard">
+  <div class="ph-row">
+    <div class="ph"><h1>HRM Dashboard</h1><p>Your team, leave, and attendance at a glance</p></div>
+  </div>
+  <div class="rd">
+    <div class="rd-grid">
+      <div class="rd-col">
+        <div class="rd-sec">HRM Overview</div>
+        <div class="rd-stats">
+          <div class="rd-stat" onclick="showPage('employees')">
+            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div class="rd-val" id="hrm-employees">0</div><div class="rd-lbl">Total Employees</div>
+          </div>
+          <div class="rd-stat" onclick="showPage('leave')">
+            <div class="rd-ico" style="background:var(--rg-og)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9820A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+            <div class="rd-val" id="hrm-pending">0</div><div class="rd-lbl">Pending Leave</div>
+          </div>
+          <div class="rd-stat" onclick="showPage('leave')">
+            <div class="rd-ico" style="background:var(--rg-og)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div>
+            <div class="rd-val" id="hrm-onleave">0</div><div class="rd-lbl">On Leave Today</div>
+          </div>
+          <div class="rd-stat" onclick="showPage('attendance')">
+            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <div class="rd-val" id="hrm-present">0</div><div class="rd-lbl">Present Today</div>
+          </div>
+        </div>
+        <div class="rd-card">
+          <div class="rd-h">Attendance Today <span class="rd-see" onclick="showPage('attendance')">Attendance →</span></div>
+          <div id="hrm-att"><div class="rd-empty">Loading…</div></div>
+        </div>
+      </div>
+      <div class="rd-col">
+        <div class="rd-card">
+          <div class="rd-h">Pending Leave <span class="rd-see" onclick="showPage('leave')">Leave →</span></div>
+          <div id="hrm-leave"><div class="rd-empty">Loading…</div></div>
+        </div>
+        <div class="rd-card">
+          <div class="rd-h">Employees <span class="rd-see" onclick="showPage('employees')">All →</span></div>
+          <div id="hrm-emp-note" style="font-size:12px;color:var(--rg-mut);line-height:1.7">Loading…</div>
         </div>
       </div>
     </div>
@@ -1087,6 +1135,27 @@ function showPage(id){
   if(id==='employees')loadEmployees();
   if(id==='leave')loadLeave();
   if(id==='attendance')loadAttendance();
+  if(id==='hrm-dashboard')renderHrmDashboard();
+}
+
+// ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
+// dashboard. Remembered within the session so paging doesn't reset it. ──
+window.APP_MODE = 'hiring';
+function setMode(m){
+  m = (m === 'hrm') ? 'hrm' : 'hiring';
+  window.APP_MODE = m;
+  try{ sessionStorage.setItem('appmode', m); }catch(_){}
+  const hiring = m === 'hiring';
+  document.getElementById('rail-hiring')?.classList.toggle('hidden', !hiring);
+  document.getElementById('rail-hrm')?.classList.toggle('hidden', hiring);
+  document.getElementById('mt-hiring')?.classList.toggle('on', hiring);
+  document.getElementById('mt-hrm')?.classList.toggle('on', !hiring);
+  showPage(hiring ? 'overview' : 'hrm-dashboard');
+}
+function initMode(){
+  let m = 'hiring';
+  try{ m = sessionStorage.getItem('appmode') || 'hiring'; }catch(_){}
+  setMode(m);
 }
 
 // ── MODALS ──
@@ -2917,6 +2986,71 @@ async function loadHrSummary(){
   }catch(e){ setNum('ov-hired','—'); }   // HR failure never blanks the hiring cards
 }
 
+// ── HRM DASHBOARD (HRM mode) — reads employee/leave/attendance; no fake data ──
+async function renderHrmDashboard(){
+  // Stat cards + attendance breakdown from /api/hr/summary.
+  try{
+    const r = await fetch('/api/hr/summary', {credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const hr = await r.json();
+    setNum('hrm-employees', hr.employees);
+    setNum('hrm-pending', hr.pending_leave);
+    setNum('hrm-onleave', hr.on_leave_today);
+    setNum('hrm-present', hr.present_today);
+    const a = hr.attendance_today || {present:0,absent:0,leave:0,holiday:0};
+    const marked = a.present + a.absent + a.leave + a.holiday;
+    const cell = (n,t,c) => `<div class="att-a"><div class="att-n" style="color:${c}">${n}</div><div class="att-t">${t}</div></div>`;
+    document.getElementById('hrm-att').innerHTML = marked
+      ? `<div class="att-row">${cell(a.present,'Present','var(--rg-green2)')}${cell(a.absent,'Absent','var(--rg-red)')}${cell(a.leave,'On leave','var(--rg-org2)')}${cell(a.holiday,'Holiday','var(--rg-mut)')}</div>`
+      : `<div class="rd-empty" style="padding:18px 10px"><div class="rd-empty-t">Nothing marked today</div><div class="rd-empty-s">Mark attendance on the Attendance grid to see today's summary.</div></div>`;
+    const manual = Math.max(0, hr.employees - hr.hired);
+    document.getElementById('hrm-emp-note').innerHTML = hr.employees
+      ? `<b style="color:var(--rg-ink)">${hr.employees}</b> active · ${hr.hired} hired through the funnel · ${manual} added manually.<br>Manage records, leave allowances, and portal access.`
+      : 'No employees yet. Add staff on the Employees page — hired candidates can also become employees from their report.';
+  }catch(e){
+    ['hrm-employees','hrm-pending','hrm-onleave','hrm-present'].forEach(id=>setNum(id,'—'));
+    const el=document.getElementById('hrm-att'); if(el) el.innerHTML='<div class="rd-empty">Couldn’t load attendance.</div>';
+  }
+  // Pending leave list (join employee names).
+  try{
+    const [lr, emps] = await Promise.all([
+      fetch('/api/leave/requests?status=pending', {credentials:'include'}).then(r=>r.json()),
+      fetch('/api/employees', {credentials:'include'}).then(r=>r.json()),
+    ]);
+    const byId = {}; (emps.employees||[]).forEach(e=>byId[e._id]=e);
+    const rows = (lr.requests||[]).slice(0, 6);
+    const TL = {annual:'Annual',sick:'Sick',unpaid:'Unpaid'};
+    const box = document.getElementById('hrm-leave');
+    box.innerHTML = rows.length ? rows.map(l=>{
+      const e=byId[l.employee_id]; const nm=e?e.name:'—';
+      const dates = l.start_date + (l.end_date&&l.end_date!==l.start_date?' → '+l.end_date:'');
+      return `<div class="rd-act" style="cursor:default">
+        <span class="rd-thumb">${(nm.trim()[0]||'?').toUpperCase()}</span>
+        <div class="rd-who"><div class="rd-nm">${escapeHtml(nm)}</div><div class="rd-rl">${TL[l.type]||l.type} · ${l.days}d · ${escapeHtml(dates)}</div></div>
+        <button class="rd-mini" onclick="hrmDecideLeave('${l._id}','approve')">Approve</button>
+        <button class="rd-mini g" onclick="hrmDecideLeave('${l._id}','reject')">Reject</button>
+      </div>`;
+    }).join('') : '<div class="rd-empty" style="padding:18px 10px"><div class="rd-empty-t">No pending requests</div><div class="rd-empty-s">Leave requests awaiting approval appear here.</div></div>';
+  }catch(e){
+    const el=document.getElementById('hrm-leave'); if(el) el.innerHTML='<div class="rd-empty">Couldn’t load leave.</div>';
+  }
+}
+
+async function hrmDecideLeave(id, action){
+  const ok = await confirmDialog({
+    title: action==='approve'?'Approve leave?':'Reject leave?',
+    body: action==='approve'?'This deducts from the employee\'s balance.':'',
+    danger: action==='reject', confirmText: action==='approve'?'Approve':'Reject'});
+  if(!ok) return;
+  try{
+    const r = await fetch(`/api/leave/requests/${id}/decide`, {method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast(action==='approve'?'Leave approved — balance updated':'Leave rejected', {type:'success'});
+    renderHrmDashboard();
+  }catch(e){ toast('Could not '+action+': '+e.message, {type:'error'}); }
+}
+
 // ── PIPELINE ──
 function renderPipeline(){
   // Same dedup rule as every other page, driven by the Dashboard toggle.
@@ -4205,7 +4339,7 @@ async function loadFromDB(){
     document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
     const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
     document.getElementById('t-plan').textContent=planName;
-    document.getElementById('sb-company').textContent=me.company||'';
+    { const sc=document.getElementById('sb-company'); if(sc) sc.textContent=me.company||''; }
     // Update usage bar
     const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
     const limit=planLimits[me.plan||'trial']||10;
@@ -4279,6 +4413,8 @@ async function loadFromDB(){
 }
 
 loadFromDB();
+// Apply the saved app mode (Hiring default) — swaps the rail + default dashboard.
+initMode();
 
 // Poll /api/auth/me every 60 seconds to catch plan changes made by the admin,
 // so the client sees upgrades (trial → starter) within a minute — no page refresh needed.

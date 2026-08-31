@@ -1358,8 +1358,18 @@ async def hr_summary_counts(user_id: str) -> dict:
     on_leave_ids = await db.leave_requests.distinct("employee_id", {
         **match, "status": "approved",
         "start_date": {"$lte": today}, "end_date": {"$gte": today}})
+    # Today's attendance breakdown (only reflects what's actually been marked).
+    att = {"present": 0, "absent": 0, "leave": 0, "holiday": 0}
+    cursor = db.attendance.aggregate([
+        {"$match": {**match, "date": today}},
+        {"$group": {"_id": "$status", "n": {"$sum": 1}}},
+    ])
+    async for row in cursor:
+        if row["_id"] in att:
+            att[row["_id"]] = int(row["n"])
     return {"employees": employees, "hired": hired,
-            "pending_leave": pending_leave, "on_leave_today": len(on_leave_ids)}
+            "pending_leave": pending_leave, "on_leave_today": len(on_leave_ids),
+            "present_today": att["present"], "attendance_today": att}
 
 
 async def get_attendance_for_month(user_id: str, month: str,
