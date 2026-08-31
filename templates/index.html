@@ -1879,8 +1879,43 @@ function toggleMoreFilters(){
   const caret = document.getElementById('mf-caret'); if(caret) caret.textContent = open ? '▴' : '▾';
 }
 
+// ── Live-interview scores, joined to candidates by application_id. One
+// fetch, cached 15s — sessions save with the application binding, so the
+// CV score and the interview score for the same person line up here.
+let _ivMap=null, _ivFetchedAt=0;
+async function loadIvMap(){
+  const now=Date.now();
+  if(_ivMap && now-_ivFetchedAt<15000) return _ivMap;
+  try{
+    const r=await fetch('/api/viva-live/sessions',{credentials:'include'});
+    if(!r.ok){ _ivMap=_ivMap||{}; return _ivMap; }
+    const d=await r.json().catch(()=>({}));
+    const m={};
+    (d.sessions||[]).forEach(s=>{
+      const aid=s.application_id; if(!aid || m[aid]) return;   // newest first
+      m[aid]={id:s._id,
+        overall:(s.score_result&&s.score_result.overall!=null)?s.score_result.overall:null,
+        scen:(s.scenario_result&&s.scenario_result.overall!=null)?s.scenario_result.overall:null,
+        done:s.status==='completed', score_status:s.score_status};
+    });
+    _ivMap=m; _ivFetchedAt=now;
+  }catch(_){ _ivMap=_ivMap||{}; }
+  return _ivMap;
+}
+function ivCell(r){
+  const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
+  if(!iv) return '<span style="font-size:10px;color:var(--t3)" title="No live interview recorded for this candidate">not taken</span>';
+  if(iv.overall==null) return `<span class="badge b-amber" style="font-size:9px">${iv.done?'scoring…':'in progress'}</span>`;
+  return `<a class="tbl-link" href="/viva-live/sessions#${iv.id}" onclick="event.stopPropagation()" title="Open the full interview report" style="font-weight:800;color:${gc(iv.overall)}">${iv.overall}</a>`;
+}
+
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
+  // Interview scores load once in the background; the first arrival re-renders.
+  if(_ivMap===null){
+    _ivMap={};   // guard against a re-entrant loop while the fetch is in flight
+    loadIvMap().then(()=>{ if(document.getElementById('page-candidates')?.classList.contains('act')) renderCandidates(results); });
+  }
   // Render the sortable thead each time so the sort indicator stays in sync.
   // (cheap — only 10 columns and only when this page is visible)
   const thead = document.getElementById('cands-thead');
@@ -1888,8 +1923,8 @@ function renderCandidates(results){
     thead.innerHTML = '<tr>' +
       sortableHeader('cands-tbl', 'Candidate', 'candidate_name', 'asc') +
       sortableHeader('cands-tbl', 'Applied job', 'job_title', 'asc') +
-      sortableHeader('cands-tbl', 'Score', 'score', 'desc') +
-      '<th>Skills matched</th><th>Gaps</th>' +
+      sortableHeader('cands-tbl', 'CV score', 'score', 'desc') +
+      '<th>Interview</th><th>Skills matched</th><th>Gaps</th>' +
       sortableHeader('cands-tbl', 'Experience', 'years_experience', 'desc') +
       '<th>Education</th>' +
       sortableHeader('cands-tbl', 'Result', 'rec', 'asc') +
@@ -1901,7 +1936,7 @@ function renderCandidates(results){
     // Same blank table cell otherwise looks identical and confuses users.
     const hasAnyData = allResults && allResults.length > 0;
     if(hasAnyData){
-      tbody.innerHTML = emptyStateRow(10, {
+      tbody.innerHTML = emptyStateRow(11, {
         icon: 'filter',
         title: 'No candidates match these filters',
         body: 'Try widening your filters or clearing them to see all '+allResults.length+' candidates.',
@@ -1909,7 +1944,7 @@ function renderCandidates(results){
         ctaAction: 'clearFilters()',
       });
     } else {
-      tbody.innerHTML = emptyStateRow(10, {
+      tbody.innerHTML = emptyStateRow(11, {
         icon: 'candidates',
         title: 'No candidates screened yet',
         body: 'Upload some CVs against a job description to see them ranked and analyzed here.',
@@ -1946,6 +1981,7 @@ function renderCandidates(results){
       <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${r.candidate_name||'Unknown'}</a></td>
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
       <td>${scoreRing(score, 'sm')}</td>
+      <td>${ivCell(r)}</td>
       <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
       <td>${gapsCell}</td>
       <td style="font-size:12px;color:var(--t2)">${r.years_experience||'?'} yrs</td>
@@ -2105,6 +2141,16 @@ function openCandModal(id){
           <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${cov}%;background:${gc(cov)};border-radius:3px"></div></div>
           <span style="font-size:11px;font-weight:700;color:${gc(cov)}">${cov}%</span>
         </div>
+        ${(()=>{ const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
+          return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:10px;color:var(--t3);width:90px">Live interview</span>
+            ${iv ? (iv.overall!=null
+              ? `<a class="tbl-link" href="/viva-live/sessions#${iv.id}" style="font-weight:800;color:${gc(iv.overall)}">${iv.overall}/100</a>
+                 ${iv.scen!=null?`<span style="font-size:10px;color:var(--t3)">· scenario ${iv.scen}/100</span>`:''}
+                 <a class="tbl-link" href="/viva-live/sessions#${iv.id}" style="font-size:10px">full report →</a>`
+              : `<span class="badge b-amber">${iv.done?'scoring…':'in progress'}</span>`)
+            : '<span style="font-size:11px;color:var(--t3)">not taken yet</span>'}
+          </div>`; })()}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <span style="font-size:10px;color:var(--t3);width:90px">AI Confidence</span>
           <span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span>
@@ -3735,6 +3781,49 @@ function iqEditorRows(list){
       <button onclick="iqDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
     </div>`).join('');
 }
+// ── topic clusters (the spoken part) — same draft/approve discipline ──
+function iqTopics(){ const st=window._iqState; return st.editing ? st.workT : (st.draft ? (st.draft.topics||null) : null); }
+function iqTSet(i,f,v){ const t=iqTopics(); if(t&&t[i]) t[i][f]=v; }
+function iqTF(i,j,v){ const t=iqTopics(); if(t&&t[i]) t[i].followups[j]=v; }
+function iqTFDel(i,j){ const t=iqTopics(); if(t&&t[i]){ t[i].followups.splice(j,1); iqRender(); } }
+function iqTFAdd(i){ const t=iqTopics(); if(t&&t[i]&&t[i].followups.length<5){ t[i].followups.push(''); iqRender(); } }
+function iqTDel(i){ const t=iqTopics(); if(t){ t.splice(i,1); iqRender(); } }
+function iqTAdd(){ const t=iqTopics(); if(t&&t.length<4){ t.push({topic:'',main:'',followups:['','','']}); iqRender(); } }
+function iqTopicsPayload(){
+  const tps=iqTopics(); if(!tps) return null;
+  const clean=tps.map(t=>({topic:String(t.topic||'').trim(), main:String(t.main||'').trim(),
+                           followups:(t.followups||[]).map(f=>String(f).trim()).filter(Boolean)}))
+                 .filter(t=>t.main);
+  if(!clean.length || clean.some(t=>!t.followups.length)) return {invalid:true};
+  return clean;
+}
+function iqSpokenTotal(tps){ return tps.reduce((a,t)=>a+1+(t.followups||[]).filter(f=>String(f).trim()).length,0); }
+function iqTopicEditor(tps){
+  return tps.map((t,i)=>`
+    <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;flex-shrink:0">Topic ${i+1}</span>
+        <input value="${escapeHtml(t.topic||'')}" maxlength="80" placeholder="Topic label (e.g. Dashboard building)" oninput="iqTSet(${i},'topic',this.value)"
+               style="flex:1;padding:6px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700">
+        <button onclick="iqTDel(${i})" title="Remove topic" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
+        <span style="font-size:10px;font-weight:800;color:var(--green);width:44px;text-align:right;flex-shrink:0">MAIN</span>
+        <input value="${escapeHtml(t.main||'')}" maxlength="300" oninput="iqTSet(${i},'main',this.value)"
+               style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+      </div>
+      ${(t.followups||[]).map((f,j)=>`
+      <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:var(--t3);width:44px;text-align:right;flex-shrink:0">F${j+1}</span>
+        <input value="${escapeHtml(f)}" maxlength="300" oninput="iqTF(${i},${j},this.value)"
+               style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+        <button onclick="iqTFDel(${i},${j})" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
+      </div>`).join('')}
+      ${(t.followups||[]).length<5?`<button class="btn btn-xs" onclick="iqTFAdd(${i})" style="margin-left:50px">+ Follow-up</button>`:''}
+    </div>`).join('')
+    + (tps.length<4?'<button class="btn btn-xs" onclick="iqTAdd()">+ Add topic</button>':'');
+}
+
 // ── the written scenario (typed section) — same draft/approve discipline ──
 function iqScen(){ const st=window._iqState; return st.editing ? st.scenWork : (st.draft ? (st.draft.scenario||null) : null); }
 function iqScenSet(o){ const st=window._iqState; if(st.editing) st.scenWork=o; else if(st.draft) st.draft.scenario=o; }
@@ -3780,18 +3869,22 @@ function iqRender(){
   const body = document.getElementById('iq-body');
   if(!body || !st) return;
   if(st.editing || st.draft){
-    const list = iqList();
+    const tps = iqTopics();
+    const list = tps ? [] : iqList();
     iqChip(`<span class="badge b-amber">DRAFT — not used yet</span>`);
+    const scenN = (iqScen()&&(iqScen().questions||[]).filter(q=>String(q).trim()).length)||0;
     body.innerHTML = `
       <div style="background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.3);border-radius:var(--rs);padding:7px 10px;font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:8px">
         ${st.editing || st.approved
           ? '<strong>Editing.</strong> The previously approved set stays live for candidates until you approve these changes.'
           : '<strong>Draft</strong> — candidates never see these until you approve.'}
       </div>
-      ${iqEditorRows(list)}
+      ${tps ? iqTopicEditor(tps) : iqEditorRows(list)}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">
-        <button class="btn btn-xs" onclick="iqAdd()">+ Add question</button>
-        <span id="iq-counter" style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(list)}</span>
+        ${tps ? '' : '<button class="btn btn-xs" onclick="iqAdd()">+ Add question</button>'}
+        <span id="iq-counter" style="font-size:11.5px;font-weight:700;color:var(--t2)">${tps
+          ? `${iqSpokenTotal(tps)} spoken across ${tps.length} topic(s) + ${scenN} written = ${iqSpokenTotal(tps)+scenN} questions, exactly`
+          : iqCounts(list)}</span>
       </div>
       ${iqScenEditor()}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px">
@@ -3803,7 +3896,13 @@ function iqRender(){
   }else if(st.approved){
     iqChip(`<span class="badge b-green">APPROVED · used for all candidates</span>`);
     body.innerHTML = `
-      ${st.approved.questions.map((q,i)=>`
+      ${st.approved.topics ? st.approved.topics.map((t,i)=>`
+        <div style="margin-bottom:7px">
+          <div style="font-size:11px;font-weight:800;color:var(--t2)">Topic ${i+1} — ${escapeHtml(t.topic||'')}</div>
+          <div style="font-size:12px;line-height:1.5;margin:2px 0 0 12px">🎙 ${escapeHtml(t.main)} <span style="font-size:9.5px;font-weight:800;color:var(--green)">MAIN</span></div>
+          ${(t.followups||[]).map(f=>`<div style="font-size:12px;color:var(--t2);line-height:1.5;margin:2px 0 0 12px">↳ ${escapeHtml(f)}</div>`).join('')}
+        </div>`).join('')
+      : st.approved.questions.map((q,i)=>`
         <div style="display:flex;gap:7px;margin-bottom:4px;font-size:12px;line-height:1.5;color:var(--text)">
           <span style="font-weight:700;color:var(--t3);width:18px;text-align:right;flex-shrink:0">${i+1}.</span>
           <span style="flex:1">${escapeHtml(q.text)}</span>
@@ -3817,24 +3916,35 @@ function iqRender(){
       </div>` : `
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px">No written scenario — this interview has no written exercise.</div>`}
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
-        <span style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(st.approved.questions)}</span>
+        <span style="font-size:11.5px;font-weight:700;color:var(--t2)">${st.approved.topics
+          ? `${st.approved.count} spoken across ${st.approved.topics.length} topic(s)`
+          : iqCounts(st.approved.questions)}</span>
         <button class="btn btn-xs" onclick="iqEditApproved()">Edit questions</button>
       </div>
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
-        Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups${st.approved.scenario?` + ${st.approved.scenario.questions.length} scenario answers`:''}.
+        ${st.approved.topics
+          ? `Every candidate answers this exact set. Turn budget is EXACT: ${st.approved.count} spoken${st.approved.scenario?` + ${st.approved.scenario.questions.length} written`:''} = ${st.approved.count + (st.approved.scenario?st.approved.scenario.questions.length:0)} questions — no extra questions are added.`
+          : `Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups${st.approved.scenario?` + ${st.approved.scenario.questions.length} scenario answers`:''}.`}
       </div>`;
   }else{
     iqChip(`<span class="badge" style="background:var(--s2);color:var(--t3)">NO QUESTIONS</span>`);
     body.innerHTML = `
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <label style="font-size:11px;font-weight:600;color:var(--t2)">How many
-          <input id="iq-count" type="number" min="4" max="15" value="10"
-                 style="width:52px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+        <label style="font-size:11px;font-weight:600;color:var(--t2)">Topics
+          <input id="iq-topics" type="number" min="1" max="4" value="2"
+                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+        <label style="font-size:11px;font-weight:600;color:var(--t2)">Follow-ups each
+          <input id="iq-followups" type="number" min="1" max="5" value="3"
+                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+        <label style="font-size:11px;font-weight:600;color:var(--t2)">Scenario questions
+          <input id="iq-scenq" type="number" min="2" max="4" value="4"
+                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
         <button class="btn btn-xs btn-primary" id="iq-gen" onclick="iqGenerate()">Generate from job description</button>
       </div>
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
-        AI drafts role-relevant questions from this job's description — about 70% spoken, 30% typed.
-        You review and edit every question before any candidate sees them.
+        AI drafts a structured interview from this job's description: spoken topic clusters
+        (each 1 main + follow-ups on the same topic) and one written scenario with its questions.
+        Default 2×(1+3) + 4 = 12 questions, asked EXACTLY — you review and edit everything before approval.
       </div>`;
   }
 }
@@ -3848,6 +3958,7 @@ function iqEditApproved(){
   const st = window._iqState;
   st.editing = true;
   st.work = JSON.parse(JSON.stringify(st.approved.questions));
+  st.workT = st.approved.topics ? JSON.parse(JSON.stringify(st.approved.topics)) : null;
   st.scenWork = st.approved.scenario ? JSON.parse(JSON.stringify(st.approved.scenario)) : null;
   iqRender();
 }
@@ -3861,18 +3972,20 @@ function iqSyncJobCache(){
 }
 async function iqGenerate(){
   const st = window._iqState;
-  const n = Math.max(4, Math.min(15, parseInt(document.getElementById('iq-count')?.value)||10));
+  const nt = Math.max(1, Math.min(4, parseInt(document.getElementById('iq-topics')?.value)||2));
+  const nf = Math.max(1, Math.min(5, parseInt(document.getElementById('iq-followups')?.value)||3));
+  const ns = Math.max(2, Math.min(4, parseInt(document.getElementById('iq-scenq')?.value)||4));
   const btn = document.getElementById('iq-gen');
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions/generate`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({count:n})});
+      body: JSON.stringify({topics:nt, followups:nf, scenario_questions:ns})});
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
-    st.draft = d.draft; st.editing = false; st.work = null;
+    st.draft = d.draft; st.editing = false; st.work = null; st.workT = null;
     iqSyncJobCache(); iqRender();
-    toast(`${d.draft.count} questions drafted${d.draft.scenario?' + a written scenario':''} — review and approve below`, {type:'success'});
+    toast(`${(d.draft.topics||[]).length} topic(s), ${d.draft.count} spoken questions${d.draft.scenario?' + a written scenario':''} drafted — review and approve below`, {type:'success'});
     if(d.scenario_error) toast('Scenario generation failed: '+d.scenario_error+' — you can write one manually below.', {type:'error'});
   }catch(e){
     toast('Could not generate questions: '+e.message, {type:'error'});
@@ -3887,13 +4000,16 @@ function iqRegenerate(){
 }
 async function iqSaveDraft(){
   const st = window._iqState;
-  const list = iqList().filter(q=>q.text.trim());
+  const tps = iqTopicsPayload();
+  if(tps && tps.invalid){ toast('Every topic needs a main question and at least one follow-up.', {type:'error'}); return; }
+  const list = tps ? [] : iqList().filter(q=>q.text.trim());
   const scen = iqScenPayload();
   if(scen && scen.invalid){ toast('The scenario needs text and at least 2 questions — or remove it.', {type:'error'}); return; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'save_draft', questions:list, scenario:scen})});
+      body: JSON.stringify(tps ? {action:'save_draft', topics:tps, scenario:scen}
+                               : {action:'save_draft', questions:list, scenario:scen})});
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
     st.draft = d.draft; iqSyncJobCache();
@@ -3902,8 +4018,10 @@ async function iqSaveDraft(){
 }
 async function iqApprove(){
   const st = window._iqState;
-  const list = iqList().filter(q=>q.text.trim());
-  if(list.length < 4 || list.length > 15){
+  const tps = iqTopicsPayload();
+  if(tps && tps.invalid){ toast('Every topic needs a main question and at least one follow-up.', {type:'error'}); return; }
+  const list = tps ? [] : iqList().filter(q=>q.text.trim());
+  if(!tps && (list.length < 4 || list.length > 15)){
     toast('An approved set needs 4–15 questions with text.', {type:'error'}); return;
   }
   const scen = iqScenPayload();
@@ -3913,10 +4031,11 @@ async function iqApprove(){
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'approve', questions:list, scenario:scen})});
+      body: JSON.stringify(tps ? {action:'approve', topics:tps, scenario:scen}
+                               : {action:'approve', questions:list, scenario:scen})});
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
-    st.approved = d.approved; st.draft = null; st.editing = false; st.work = null;
+    st.approved = d.approved; st.draft = null; st.editing = false; st.work = null; st.workT = null;
     iqSyncJobCache(); iqRender();
     toast('Approved — every interview for this job now uses this set', {type:'success'});
   }catch(e){
@@ -3926,7 +4045,7 @@ async function iqApprove(){
 }
 async function iqDiscard(){
   const st = window._iqState;
-  if(st.editing){ st.editing = false; st.work = null; iqRender(); return; }
+  if(st.editing){ st.editing = false; st.work = null; st.workT = null; iqRender(); return; }
   if(!confirm('Discard this draft?')) return;
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {

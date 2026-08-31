@@ -221,6 +221,11 @@ async function loadDetail(id){
   window.scrollTo({top:0});
 }
 
+// Deep link from the Candidates page: /viva-live/sessions#<session_id>
+window.addEventListener('load', ()=>{
+  if(location.hash.length>1) loadDetail(decodeURIComponent(location.hash.slice(1)));
+});
+
 $('btn-back').addEventListener('click', ()=>{
   $('detail-card').classList.add('hidden');
   $('list-card').classList.remove('hidden');

@@ -635,6 +635,36 @@ def main():
         except Exception as e:
             line(None, "POST", "/api/viva-live/preview-session (scenario)", str(e)[:60])
             failures.append(("POST", "/api/viva-live/preview-session (scenario)", "exception"))
+        # Topic-structured sets: budget must be EXACT (the count-mismatch fix:
+        # a 10-question set used to ask 12 because "+2 adaptive follow-ups"
+        # rode on top). 2 topics x (1 main + 3 follow-ups) + 4 scenario = 12.
+        try:
+            r = c.post("/api/viva-live/preview-session", json={
+                "topics": [
+                    {"topic": "T1", "main": "Main one?",
+                     "followups": ["F1?", "F2?", "F3?"]},
+                    {"topic": "T2", "main": "Main two?",
+                     "followups": ["F4?", "F5?", "F6?"]},
+                ],
+                "scenario": {"text": "A smoke-test scenario about a late report.",
+                             "questions": ["Q1?", "Q2?", "Q3?", "Q4?"]}})
+            body = r.json() if r.status_code == 200 else {}
+            ok = (r.status_code == 200
+                  and body.get("exact_budget") is True
+                  and int(body.get("max_turns", 0)) == 12          # 8 spoken + 4 written, EXACT
+                  and len(body.get("questions", [])) == 8
+                  and len(body.get("topics") or []) == 2
+                  and body.get("scenario_tool_registered") is True
+                  and body.get("tool_registered") is True)
+            line(r.status_code, "POST", "/api/viva-live/preview-session (topics)",
+                 "2x(1+3)+4 -> budget exactly 12, both tools" if ok
+                 else f"TOPIC BUDGET BROKEN: {str({k: body.get(k) for k in ('exact_budget','max_turns')})[:80]}")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva-live/preview-session (topics)", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session (topics)", str(e)[:60])
+            failures.append(("POST", "/api/viva-live/preview-session (topics)", "exception"))
         # Job-based sets: 10 questions must survive the pipeline intact — this
         # exact check catches a cap regression (questions were [:3] before
         # job-based sets raised the limits) and a mode-mangling one.

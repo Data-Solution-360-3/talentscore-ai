@@ -1531,6 +1531,32 @@ _TYPED_RULES = (
     "(TYPED) opening question as a voice-answer question.\n")
 
 
+def _normalize_topics(raw) -> list[dict]:
+    """[{"topic","main","followups"}] — the spoken part in topic clusters.
+    The single validator for every path that stores or launches topics."""
+    out = []
+    for t in (raw or [])[:4]:
+        if not isinstance(t, dict):
+            continue
+        topic = str(t.get("topic", "")).strip()[:80]
+        main = str(t.get("main", "")).strip()[:300]
+        fups = [str(q).strip()[:300] for q in (t.get("followups") or [])
+                if str(q).strip()][:5]
+        if main:
+            out.append({"topic": topic or "Topic", "main": main, "followups": fups})
+    return out
+
+
+def _flatten_topics(topics: list[dict]) -> list[dict]:
+    """Topics -> the flat normalized question list every existing path
+    (storage, recovery caps, preview) already understands. All spoken."""
+    qs = []
+    for t in topics:
+        qs.append({"text": t["main"], "mode": "spoken"})
+        qs.extend({"text": f, "mode": "spoken"} for f in t["followups"])
+    return qs[:_VIVA_MAX_QUESTIONS]
+
+
 def _normalize_scenario(raw) -> dict | None:
     """{"text", "questions": [2-4 strings]} or None. The single validator for
     every path that stores or launches a scenario — generation, review-save,
@@ -1586,33 +1612,68 @@ _SCENARIO_RULES_TEMPLATE = (
 
 def _build_live_instructions(questions: list, max_turns: int,
                              interviewer_name: str = "",
-                             scenario: dict | None = None) -> str:
-    """questions: normalized [{"text","mode"}] dicts (see _normalize_questions).
-    scenario: normalized {"text","questions"} or None (see _normalize_scenario)."""
+                             scenario: dict | None = None,
+                             topics: list | None = None) -> str:
+    """questions: normalized [{"text","mode"}] (see _normalize_questions).
+    scenario: normalized {"text","questions"} or None (_normalize_scenario).
+    topics: normalized topic clusters or None (_normalize_topics).
+
+    Two shapes: TOPICS mode is fully scripted — main + follow-ups per topic,
+    plus the scenario section, and the total EQUALS max_turns exactly (this is
+    the count-mismatch fix: no adaptive questions ride on top of what the
+    recruiter approved). Legacy mode (flat questions) keeps the old adaptive
+    behaviour for existing configs.
+    """
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
-    if has_typed:
-        numbered = "\n".join(
-            f"  {i+1}. ({'TYPED' if q['mode'] == 'typed' else 'SPOKEN'}) {q['text']}"
-            for i, q in enumerate(questions))
-    else:
-        numbered = "\n".join(f"  {i+1}. {q['text']}" for i, q in enumerate(questions))
     name_line = (f"Your name is {interviewer_name}. Introduce yourself by that name "
                  "in your one greeting sentence. " if interviewer_name else "")
+
+    if topics:
+        blocks, i = [], 0
+        for tn, t in enumerate(topics):
+            lines = []
+            i += 1
+            lines.append(f"  {i}. (MAIN) {t['main']}")
+            for f in t["followups"]:
+                i += 1
+                lines.append(f"  {i}. (FOLLOW-UP) {f}")
+            blocks.append(f"TOPIC {tn + 1} — {t['topic']}:\n" + "\n".join(lines))
+        middle = (
+            f"- This interview is FULLY SCRIPTED: you ask EXACTLY {max_turns} questions total, "
+            "one per turn, then close. Never add, merge, skip, reorder, or invent questions — "
+            "the exact count is a promise made to the recruiter.\n"
+            "- The SPOKEN part comes first: the topics below, in order. Within each topic ask "
+            "the main question, then its follow-ups, exactly as written.\n"
+            "- If an answer is unclear or dodges, you may rephrase THAT question once in simpler "
+            "words — a rephrase is the same question, never a new one.\n"
+            "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short "
+            "sentences — this is a phone conversation, not an essay.\n"
+            + "\n".join(blocks) + "\n")
+    else:
+        if has_typed:
+            numbered = "\n".join(
+                f"  {i+1}. ({'TYPED' if q['mode'] == 'typed' else 'SPOKEN'}) {q['text']}"
+                for i, q in enumerate(questions))
+        else:
+            numbered = "\n".join(f"  {i+1}. {q['text']}" for i, q in enumerate(questions))
+        middle = (
+            f"- Opening questions — ask these first, in this order:\n{numbered}\n"
+            "- Once the opening questions are used, every further question is an ADAPTIVE follow-up "
+            "decided from what the candidate actually said:\n"
+            "  * vague or generic answer -> ask for one specific, concrete example\n"
+            "  * strong, specific answer -> go one level deeper into its most interesting detail\n"
+            "  * an answer that dodged the question -> rephrase the question once, simply\n"
+            "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
+            "this is a phone conversation, not an essay.\n")
+
     return (
         "You are conducting a live spoken screening interview, in ENGLISH only. "
         f"Professional, warm, efficient. {name_line}\n\n"
         "STRUCTURE\n"
         f"- You will ask a TOTAL of {max_turns} questions across the interview, one at a time, then close.\n"
-        "- Open with ONE short greeting sentence, then immediately ask the first opening question below. "
+        "- Open with ONE short greeting sentence, then immediately ask the first question. "
         "Never greet again after that.\n"
-        f"- Opening questions — ask these first, in this order:\n{numbered}\n"
-        "- Once the opening questions are used, every further question is an ADAPTIVE follow-up "
-        "decided from what the candidate actually said:\n"
-        "  * vague or generic answer -> ask for one specific, concrete example\n"
-        "  * strong, specific answer -> go one level deeper into its most interesting detail\n"
-        "  * an answer that dodged the question -> rephrase the question once, simply\n"
-        "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
-        "this is a phone conversation, not an essay.\n"
+        + middle
         + (_TYPED_RULES if has_typed else "")
         + (_SCENARIO_RULES_TEMPLATE.format(
                k=len(scenario["questions"]), max_turns=max_turns,
@@ -2053,6 +2114,16 @@ def _validated_viva_config(body: dict) -> dict:
         cfg["max_turns"] = max(cfg["max_turns"],
                                min(_VIVA_MAX_TURNS_CAP,
                                    len(questions) + len(scenario["questions"])))
+    topics = _normalize_topics(body.get("topics"))
+    if topics:
+        # Topic-structured interview: fully scripted, so the budget is EXACT —
+        # spoken questions + scenario questions, nothing added on top. This is
+        # the count-mismatch fix: what the recruiter approved is what is asked.
+        cfg["topics"] = topics
+        cfg["questions"] = _flatten_topics(topics)
+        cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
+                               len(cfg["questions"])
+                               + (len(scenario["questions"]) if scenario else 0))
     return cfg
 
 
@@ -2071,11 +2142,14 @@ async def viva_live_preview_session(request: Request):
     config = _validated_viva_config(body)
     questions = _normalize_questions(config.get("questions"))
     scenario = _normalize_scenario(config.get("scenario"))
+    topics = _normalize_topics(config.get("topics"))
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
                                             interviewer_name=config.get("interviewer_name", ""),
-                                            scenario=scenario)
+                                            scenario=scenario, topics=topics)
     return {
+        "topics": topics or None,
+        "exact_budget": bool(topics),   # scripted set: asked == approved, no +2
         "questions": questions,
         "has_typed": has_typed,
         "tool_registered": bool(has_typed),   # mirrors the mint's tools= branch
@@ -2173,12 +2247,13 @@ async def candidate_session_token(request: Request, token: str):
     if not questions:
         questions = [{"text": _VIVA_DEFAULT_QUESTION, "mode": "spoken"}]
     scenario = _normalize_scenario(cfg.get("scenario"))
+    topics = _normalize_topics(cfg.get("topics"))
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     max_turns = int(cfg.get("max_turns", 4))
     asked = min(asked, max_turns)
     instructions = _build_live_instructions(questions, max_turns,
                                             interviewer_name=cfg.get("interviewer_name", ""),
-                                            scenario=scenario)
+                                            scenario=scenario, topics=topics)
     recovered = False
     if transcript:
         lines = []
@@ -2283,7 +2358,8 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "config": {"questions": cfg.get("questions"), "max_turns": cfg.get("max_turns"),
                    "vad": cfg.get("vad"), "job_title": cfg.get("job_title", ""),
                    "interviewer_name": cfg.get("interviewer_name", ""),
-                   "scenario": _normalize_scenario(cfg.get("scenario"))},
+                   "scenario": _normalize_scenario(cfg.get("scenario")),
+                   "topics": _normalize_topics(cfg.get("topics")) or None},
         "questions_asked": _i(body.get("questions_asked"), 0, 20),
         "recoveries": _i(body.get("recoveries"), 0, 50),
         "barge_ins": _i(body.get("barge_ins"), 0, 200),
@@ -2660,12 +2736,20 @@ async def public_apply_status(token: str, application_id: str):
         # follow-ups, unless the manual setting was already higher.
         approved = ((job.get("interview_questions") or {}).get("approved") or {})
         jqs = _normalize_questions(approved.get("questions"))
+        jtopics = _normalize_topics(approved.get("topics"))
         jsc = _normalize_scenario(approved.get("scenario"))
-        if jqs:
+        scen_turns = len(jsc["questions"]) if jsc else 0
+        if jtopics:
+            # Topic-structured set: fully scripted, budget EXACT. This is the
+            # count-mismatch fix — the old path added "+2 adaptive follow-ups"
+            # ON TOP of the approved count, so a 10-question set asked 12.
+            cfg["topics"] = jtopics
+            cfg["questions"] = _flatten_topics(jtopics)
+            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
+                                   len(cfg["questions"]) + scen_turns)
+        elif jqs:
+            # Legacy flat set keeps its documented "+2 adaptive follow-ups".
             cfg["questions"] = jqs
-            # Budget: every main question + 2 spoken adaptive follow-ups + one
-            # turn per scenario question (the written section's own turns).
-            scen_turns = len(jsc["questions"]) if jsc else 0
             cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
                                    max(int(cfg.get("max_turns", 4)),
                                        len(jqs) + 2 + scen_turns))
@@ -2746,7 +2830,7 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     """Owner: generate the job's interview questions from its JD — ON DEMAND,
     once, into the DRAFT slot. The approved slot (what candidates actually
     get) is never touched by generation."""
-    from question_gen import (generate_interview_questions, generate_written_scenario,
+    from question_gen import (generate_topic_questions, generate_written_scenario,
                               GEN_MODEL)
     user = await get_current_user(request)
     job = await owned_job(job_id, user)
@@ -2756,24 +2840,32 @@ async def job_interview_questions_generate(request: Request, job_id: str):
         body = await request.json()
     except Exception:
         body = {}
-    try:
-        count = max(4, min(15, int(body.get("count", 10))))
-    except Exception:
-        count = 10
+
+    def _clamp(key, default, lo, hi):
+        try:
+            return max(lo, min(hi, int(body.get(key, default))))
+        except Exception:
+            return default
+    n_topics = _clamp("topics", 2, 1, 4)
+    followups = _clamp("followups", 3, 1, 5)
+    scen_k = _clamp("scenario_questions", 4, 2, 4)
     if not await rate_limit_allows(f"iqgen:{job_id}", 10, 86400):
         raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
-    questions, err = await generate_interview_questions(
-        job.get("description") or "", count, OPENAI_API_KEY,
-        job_title=job.get("title") or "")
-    if err or not questions:
+
+    # One click drafts the whole structured interview: the spoken topic
+    # clusters AND the written scenario, from the same JD. Both go to the
+    # DRAFT slot only; the scenario's failure is non-fatal and surfaced.
+    topics, err = await generate_topic_questions(
+        job.get("description") or "", OPENAI_API_KEY,
+        job_title=job.get("title") or "", n_topics=n_topics, followups=followups)
+    if err or not topics:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
-    # The written section's scenario, from the same JD in the same click. Its
-    # failure is non-fatal — the questions draft still lands, with the error
-    # surfaced so the recruiter can regenerate.
     scenario, scen_err = await generate_written_scenario(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", k=3)
-    draft = {"questions": questions, "count": len(questions),
+        job_title=job.get("title") or "", k=scen_k)
+    topics = _normalize_topics(topics)
+    flat = _flatten_topics(topics)
+    draft = {"topics": topics, "questions": flat, "count": len(flat),
              "generated_at": _dt.utcnow(), "model": GEN_MODEL,
              "scenario": _normalize_scenario(scenario)}
     await update_job_interview_questions(job["_id"], {"draft": draft})
@@ -2802,23 +2894,31 @@ async def job_interview_questions_save(request: Request, job_id: str):
     if action not in ("save_draft", "approve"):
         raise HTTPException(status_code=400, detail="Unknown action.")
 
-    questions = _normalize_questions(body.get("questions"))
-    # The scenario rides the same review-then-approve flow: whatever the
-    # recruiter edited is what gets stored; an AI scenario never goes live
-    # unseen. A body without a usable scenario approves as questions-only.
+    # Topic-structured sets (the new shape) and legacy flat sets both ride the
+    # same review-then-approve flow: whatever the recruiter edited is what gets
+    # stored; an AI question or scenario never goes live unseen.
+    topics = _normalize_topics(body.get("topics"))
+    questions = _flatten_topics(topics) if topics else _normalize_questions(body.get("questions"))
     scenario = _normalize_scenario(body.get("scenario"))
     if action == "approve":
-        if not 4 <= len(questions) <= _VIVA_MAX_QUESTIONS:
+        if topics:
+            if not all(t["followups"] for t in topics):
+                raise HTTPException(status_code=400,
+                                    detail="Every topic needs a main question and at least one follow-up.")
+            if not 2 <= len(questions) <= _VIVA_MAX_QUESTIONS:
+                raise HTTPException(status_code=400,
+                                    detail=f"An approved set needs 2–{_VIVA_MAX_QUESTIONS} spoken questions in total.")
+        elif not 4 <= len(questions) <= _VIVA_MAX_QUESTIONS:
             raise HTTPException(status_code=400,
                                 detail=f"An approved set needs 4–{_VIVA_MAX_QUESTIONS} questions.")
-        approved = {"questions": questions, "count": len(questions),
+        approved = {"topics": topics or None, "questions": questions, "count": len(questions),
                     "approved_at": _dt.utcnow(), "scenario": scenario}
         await update_job_interview_questions(job["_id"], {"approved": approved, "draft": None})
         return {"success": True, "approved": serialize_mongo(approved), "draft": None}
     if not questions:
         raise HTTPException(status_code=400, detail="At least one question is required.")
-    draft = {"questions": questions, "count": len(questions), "updated_at": _dt.utcnow(),
-             "scenario": scenario}
+    draft = {"topics": topics or None, "questions": questions, "count": len(questions),
+             "updated_at": _dt.utcnow(), "scenario": scenario}
     await update_job_interview_questions(job["_id"], {"draft": draft})
     return {"success": True, "draft": serialize_mongo(draft)}
 

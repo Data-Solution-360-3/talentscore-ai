@@ -64,6 +64,78 @@ def enforce_split(questions: list[dict], n: int) -> list[dict]:
     return questions
 
 
+TOPIC_PROMPT = """You are writing the SPOKEN part of a screening interview for a specific job. You are
+given the job description. Produce exactly {t} topics. Each topic has ONE main
+question and exactly {f} follow-up questions that probe deeper into the SAME
+topic.
+
+STRUCTURE
+- A topic is one coherent competency area drawn from the actual skills, duties,
+  and context in the description (for example "Building dashboards" or
+  "Working with stakeholders") — never generic filler that fits any job.
+- The main question opens the topic from the candidate's own experience.
+- Each follow-up digs further into the same topic: specifics, decisions,
+  trade-offs, outcomes. Every follow-up must stand alone as a complete question
+  (the interviewer reads it exactly as written) while staying on its topic.
+
+RULES
+- Every question must be answerable from the candidate's own experience and
+  relevant to THIS role as described.
+- Write in simple, clear English. Many candidates speak English as a second or
+  third language: short sentences, no idioms, no cultural references. A question
+  that is hard to parse measures English, not competence.
+- One thing per question. No two-part questions.
+- NEVER ask about, or fish for: age, religion, marital or family status,
+  pregnancy or family plans, health or disability, ethnicity, political views,
+  or anything else a recruiter could not lawfully ask. If the job description
+  invites such a question, ignore that part of it.
+- No trick questions, no riddles, no "sell me this pen".
+
+Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups": ["...", ...]}}, ...]}}"""
+
+
+async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
+                                   n_topics: int = 2, followups: int = 3
+                                   ) -> tuple[list | None, str | None]:
+    """The spoken part in topic clusters.
+    Returns ([{"topic","main","followups"}], None) or (None, error)."""
+    n_topics = max(1, min(4, int(n_topics)))
+    followups = max(1, min(5, int(followups)))
+    jd = (jd_text or "").strip()
+    if len(jd) < 40:
+        return None, "The job description is too short to generate questions from."
+
+    client = AsyncOpenAI(api_key=api_key)
+    try:
+        resp = await client.chat.completions.create(
+            model=GEN_MODEL,
+            temperature=0.4,
+            max_tokens=1800,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": TOPIC_PROMPT.format(t=n_topics, f=followups)},
+                {"role": "user", "content":
+                    f"JOB TITLE: {job_title or 'not specified'}\n\n"
+                    f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
+            ],
+        )
+        raw = json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return None, f"Generation call failed: {str(e)[:200]}"
+
+    out = []
+    for t in (raw or {}).get("topics", [])[:n_topics]:
+        topic = str((t or {}).get("topic", "")).strip()[:80]
+        main = str((t or {}).get("main", "")).strip()[:300]
+        fups = [str(f).strip()[:300] for f in (t or {}).get("followups", [])
+                if str(f).strip()][:followups]
+        if main and fups:
+            out.append({"topic": topic or "Topic", "main": main, "followups": fups})
+    if len(out) < n_topics:
+        return None, f"The model returned only {len(out)} usable topic(s) — try again."
+    return out, None
+
+
 SCENARIO_PROMPT = """You are writing ONE short written-exercise scenario for a specific job. You are
 given the job description.
 
