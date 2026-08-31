@@ -41,10 +41,14 @@ h1{font-size:1.25rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;marg
 .dim-bar i{display:block;height:100%;background:var(--orange)}
 .dim-reason{font-size:.84rem;color:var(--t2);line-height:1.5}
 .dim-ev{font-size:.8rem;color:var(--t3);font-style:italic;margin-top:.25rem;border-left:3px solid var(--border2);padding-left:.6rem}
-.turn{margin:.45rem 0;font-size:.88rem;line-height:1.55}
-.turn.ai{color:var(--t2)}
-.turn.you{color:var(--navy);font-weight:600}
-.turn .who{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);display:block}
+/* Transcript: color-coded speakers — interviewer = navy bubble on the left,
+   candidate = green bubble indented right. Readable at a glance. */
+.turn{margin:.5rem 0;font-size:.88rem;line-height:1.6;padding:.55rem .85rem;border-radius:12px;max-width:92%}
+.turn.ai{background:rgba(30,58,95,.07);border-left:3px solid #1E3A5F;color:var(--t2);border-top-left-radius:4px}
+.turn.you{background:rgba(22,163,74,.09);border-left:3px solid var(--green);color:var(--navy);font-weight:600;margin-left:8%;border-top-left-radius:4px}
+.turn .who{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px}
+.turn.ai .who{color:#1E3A5F}
+.turn.you .who{color:var(--green)}
 .notice{padding:1.2rem;text-align:center;color:var(--t2);font-size:.92rem}
 .back{font-size:13px;font-weight:700;color:var(--orange2);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;margin-bottom:.8rem}
 .evrow{display:flex;gap:1.2rem;font-size:12px;color:var(--t3);margin-top:.5rem;flex-wrap:wrap}
@@ -214,14 +218,20 @@ async function loadDetail(id){
     <div style="font-size:11px;color:var(--t3);margin-top:.35rem;line-height:1.5">Continuous camera/screen streams run in-browser to drive the watchdog and are <b>not persisted</b> — full video storage needs the object-storage phase. The frames stored for review load below.</div>
     <div id="pr-snaps" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:.5rem;font-size:11.5px;color:var(--t3)">Loading stored frames…</div>
     </div>`;
-  }else if(pr){
-    html += `<div class="evrow" style="margin-bottom:.6rem"><span style="color:var(--t3)">Proctoring: off for this session</span></div>`;
+  }else{
+    // Honest empty state: nothing captured because nothing was ASKED to be
+    // captured — distinct from "proctoring ran but stored no frames".
+    html += `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Proctoring</div>
+    <div style="background:var(--s2);border:1px dashed var(--border);border-radius:var(--r-lg);padding:.8rem .95rem;font-size:.85rem;color:var(--t2);line-height:1.6">
+      🎥 <b>No proctoring for this interview.</b> It was set to <b>Off</b> in the interview setup when this candidate's link was created — no camera or screen was requested, so there is nothing to review here.
+      <div style="font-size:11.5px;color:var(--t3);margin-top:.35rem">To proctor future interviews on a job: job card → Live interview → Proctoring → Snapshot or Continuous → Save.</div>
+    </div>`;
   }
   html += `
   <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
   html += (s.transcript||[]).map(t => `
     <div class="turn ${t.role==='ai'?'ai':'you'}">
-      <span class="who">${t.role==='ai'?'Interviewer':'Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ scenario answer':' · ⌨ typed answer'):''}${t.mode==='scenario'?' · 📋 scenario shown':''}</span>${esc(t.text)}
+      <span class="who">${t.role==='ai'?('🤖 '+esc((s.config&&s.config.interviewer_name)||'AI Interviewer')):'🗣 Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ scenario answer':' · ⌨ typed answer'):''}${t.mode==='scenario'?' · 📋 scenario shown':''}</span>${esc(t.text)}
     </div>`).join('') || '<div class="notice">No transcript captured.</div>';
 
   $('detail').innerHTML = html;
@@ -241,7 +251,7 @@ async function loadDetail(id){
             <img src="${sn.img}" style="height:96px;border-radius:8px;border:1px solid var(--border);display:block" alt="proctoring frame">
             <figcaption style="font-size:9.5px;color:var(--t3);margin-top:2px">${esc((sn.created_at||'').replace('T',' ').slice(5,16))} · ${sn.kind==='scr'?'screen':'camera'}</figcaption>
           </figure>`).join('')
-        : 'No frames were stored for this session (proctoring off, camera denied, or recorded before frame storage existed).';
+        : '⚠ Proctoring was ON but no frames are stored — either the camera was denied, this session predates frame storage (before Sep 1), or capture failed. For a fresh session this is a bug worth reporting.';
     }catch(_){ wrap.textContent = 'Could not load stored frames.'; }
   }
 }
