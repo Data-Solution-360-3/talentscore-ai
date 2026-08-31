@@ -604,6 +604,35 @@ async function procStart(mode){
     covPush('start','tier M — camera snapshots');
   }
   proc.watchTimer = setInterval(watchdog, 2000);
+  // Persisted frames: a hard-capped set of small JPEGs uploaded during the
+  // interview so the recruiter has something REVIEWABLE afterwards (the
+  // continuous streams above are watchdog-only and are not persisted yet).
+  // Server enforces its own atomic cap + rate limit + byte cap.
+  proc.upTimer = setInterval(upSnap, 90000);
+  setTimeout(upSnap, 8000);
+}
+async function upSnap(){
+  if(!proc || (proc.upCount||0) >= 12) return;
+  proc.upTick = (proc.upTick||0) + 1;
+  const shots = [];
+  if(proc.camMode!=='off' && proc.camMode!=='unavailable'){
+    const d = grab($('proc-cam')); if(d) shots.push(['cam', d]);
+  }
+  if(proc.upTick % 2 === 0 && (proc.scrMode==='continuous' || proc.scrMode==='snapshots')){
+    const d = grab($('proc-scr-hidden')); if(d) shots.push(['scr', d]);
+  }
+  for(const [kind, img] of shots){
+    if((proc.upCount||0) >= 12) break;
+    try{
+      const r = await fetch('/api/interview/'+TOKEN+'/snapshot', {method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({img, kind})});
+      if(r.ok){
+        const j = await r.json().catch(()=>({}));
+        if(j.stored) proc.upCount = (proc.upCount||0) + 1;
+        else if(j.cap_reached) proc.upCount = 12;
+      }
+    }catch(_){}
+  }
 }
 function grab(v){ const c=$('proc-canvas'); if(!v.videoWidth) return null;
   c.width=320; c.height=Math.round(320*v.videoHeight/v.videoWidth);
@@ -656,6 +685,7 @@ async function watchdog(){
 function procStop(){
   if(!proc) return null;
   clearInterval(proc.watchTimer); clearInterval(proc.snapTimer); clearInterval(proc.scrSnapTimer);
+  clearInterval(proc.upTimer);
   try{ proc.camRec&&proc.camRec.state!=='inactive'&&proc.camRec.stop(); }catch(_){}
   try{ proc.scrRec&&proc.scrRec.state!=='inactive'&&proc.scrRec.stop(); }catch(_){}
   try{ proc.camStream&&proc.camStream.getTracks().forEach(t=>t.stop()); }catch(_){}

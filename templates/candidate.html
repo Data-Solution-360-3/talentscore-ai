@@ -204,7 +204,10 @@ function buildReportClient(d){
 function render(d){
   const rep=d.report||buildReportClient(d);
   const score=rep.overallScore||Math.round(d.overall_score||0);
-  const col=gc(score);
+  const hasIv = d.interview_score!=null && d.overall_combined!=null;
+  const headline = hasIv ? Math.round(d.overall_combined) : score;
+  const ivp = d.interview_parts||{};
+  const col=gc(headline);
   const rec=(d.recommendation||'MAYBE').toUpperCase();
   const verdict=(rep.verdict||'maybe').toUpperCase();
   const sc=d.score_consistency||{};
@@ -228,8 +231,8 @@ function render(d){
 
     <div class="score-hd">
       <div class="score-circle" style="border-color:${col.br}">
-        <span class="snum" style="color:${col.t}">${score}</span>
-        <span class="sden">/100</span>
+        <span class="snum" style="color:${col.t}">${headline}</span>
+        <span class="sden">${hasIv?'overall':'/100'}</span>
       </div>
       <div style="flex:1">
         <div class="rpill ${rcls({'HIRE':'HIRE','MAYBE':'MAYBE','REJECT':'REJECT'}[verdict]||'MAYBE')}">
@@ -237,7 +240,7 @@ function render(d){
           ${verdict}
         </div>
         <div class="rreason">${d.recommendation_reason||''}</div>
-        <div style="font-size:10.5px;color:var(--t3);margin-top:4px">Verdict bands: hire ≥75 · maybe 50–74 · reject &lt;50${rec!==verdict?` · engine recommendation: ${rec}`:''}</div>
+        <div style="font-size:10.5px;color:var(--t3);margin-top:4px">Verdict bands: hire ≥75 · maybe 50–74 · reject &lt;50${rec!==verdict?` · engine recommendation: ${rec}`:''}${hasIv?' · verdict reflects the CV screening':''}</div>
       </div>
     </div>
 
@@ -245,6 +248,21 @@ function render(d){
       <span class="clbl">Confidence</span>
       <span class="cbadge ${sc.confidence==='High'?'ch':sc.confidence==='Medium'?'cm':'cl'}">${sc.confidence||'High'}</span>
       <span class="cmeta">Strict: ${sc.strict_pass??sc.run_1??'—'} · Upside: ${sc.upside_pass??sc.run_2??'—'} · Δ ${sc.difference||0} pts</span>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Live interview</div>
+      ${hasIv ? `
+        <div style="display:flex;gap:1.4rem;align-items:baseline;flex-wrap:wrap">
+          <div><div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase">Overall</div>
+            <span style="font-size:1.5rem;font-weight:900;color:${gc(headline).t}">${headline}</span>
+            <span style="font-size:10.5px;color:var(--t3)"> = CV ${score} × ${(d.overall_weights&&d.overall_weights.cv)||0.35} + Interview ${Math.round(d.interview_score)} × ${(d.overall_weights&&d.overall_weights.interview)||0.65}</span></div>
+          <div><div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase">Interview</div>
+            <span style="font-size:1.5rem;font-weight:900;color:${gc(d.interview_score).t}">${Math.round(d.interview_score)}</span>
+            <span style="font-size:10.5px;color:var(--t3)"> spoken ${ivp.spoken??'—'}${ivp.written!=null?' · written '+ivp.written:''} (weights ${(ivp.weights&&ivp.weights.spoken)||0.6}/${(ivp.weights&&ivp.weights.written)||0.4}, fixed — never question counts)</span></div>
+        </div>
+        ${d.interview_session_id?`<a href="/viva-live/sessions#${d.interview_session_id}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:700;color:var(--accent)">Open full interview session → transcript, per-dimension scores, stored proctoring frames</a>`:''}`
+      : `<div style="font-size:12.5px;color:var(--t3)">Interview pending — the overall above is the CV score alone. Once a completed interview is scored, Overall becomes CV × 0.35 + Interview × 0.65.</div>`}
     </div>
 
     <div class="card">

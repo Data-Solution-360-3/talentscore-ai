@@ -67,7 +67,8 @@ from database import (
     set_employee_invite, get_employee_by_invite, set_employee_password,
     find_employee_logins, update_employee_contact,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
-    kpi_data, get_admin_screenings,
+    kpi_data, reserve_snapshot_slot, save_proctor_snapshot,
+    get_snapshots_for_token, SNAPSHOT_MAX_BYTES, get_admin_screenings,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1988,6 +1989,13 @@ async def score_live_session(session_id: str):
             if written_error:
                 print(f"[VIVA-LIVE] written segment scoring failed for {session_id}: {written_error}")
 
+        # ── Combined numbers. FIXED weights everywhere — never per-question
+        # counts — so no score can drift with how many questions were asked
+        # (the count-mismatch class of bug, closed at the combination layer).
+        # interview = 0.6 spoken + 0.4 written; overall = 0.35 CV + 0.65 interview.
+        IV_W_SPOKEN, IV_W_WRITTEN = 0.6, 0.4
+        OV_W_CV, OV_W_IV = 0.35, 0.65
+
         scenario_result, scenario_error = None, None
         if scen_pairs:
             scen_cfg = (sess.get("config") or {}).get("scenario") or {}
@@ -2002,6 +2010,22 @@ async def score_live_session(session_id: str):
             if scenario_error:
                 print(f"[VIVA-LIVE] scenario scoring failed for {session_id}: {scenario_error}")
 
+        # One combined interview number from the existing segment scores.
+        spoken_overall = int(result.get("overall", 0))
+        wr_scores = []
+        if written_result and written_result.get("segment_score") is not None:
+            wr_scores.append(int(written_result["segment_score"]))
+        if scenario_result and scenario_result.get("overall") is not None:
+            wr_scores.append(int(scenario_result["overall"]))
+        if wr_scores:
+            written_overall = round(sum(wr_scores) / len(wr_scores))
+            interview_score = round(IV_W_SPOKEN * spoken_overall + IV_W_WRITTEN * written_overall)
+        else:
+            written_overall = None
+            interview_score = spoken_overall
+        interview_parts = {"spoken": spoken_overall, "written": written_overall,
+                           "weights": {"spoken": IV_W_SPOKEN, "written": IV_W_WRITTEN}}
+
         await db.interview_sessions.update_one(
             {"_id": _OID(session_id)},
             {"$set": {"score_status": "scored", "score_result": result,
@@ -2009,7 +2033,31 @@ async def score_live_session(session_id: str):
                       "written_error": written_error,
                       "scenario_result": scenario_result,
                       "scenario_error": scenario_error,
+                      "interview_score": interview_score,
+                      "interview_parts": interview_parts,
                       "scored_at": _dt.utcnow(), "score_error": None}})
+
+        # Write the combined numbers back onto the candidate's SCREENING, so
+        # every ranking surface reads one document. Completed interviews only —
+        # an abandoned partial run never enters the overall.
+        try:
+            if sess.get("status") == "completed" and sess.get("application_id"):
+                app_doc = await db.applications.find_one(
+                    {"_id": _OID(str(sess["application_id"]))}, {"screening_id": 1})
+                sid = app_doc and app_doc.get("screening_id")
+                if sid:
+                    scr = await db.screenings.find_one({"_id": _OID(str(sid))}, {"overall_score": 1})
+                    if scr is not None:
+                        cv = int(scr.get("overall_score") or 0)
+                        await db.screenings.update_one({"_id": scr["_id"]}, {"$set": {
+                            "interview_score": interview_score,
+                            "interview_parts": interview_parts,
+                            "interview_session_id": session_id,
+                            "overall_combined": round(OV_W_CV * cv + OV_W_IV * interview_score),
+                            "overall_weights": {"cv": OV_W_CV, "interview": OV_W_IV},
+                            "interview_scored_at": _dt.utcnow()}})
+        except Exception as wb:
+            print(f"[VIVA-LIVE] screening write-back failed for {session_id}: {wb}")
     except Exception as e:
         print(f"[VIVA-LIVE] session scoring failed for {session_id}: {e}")
         try:
@@ -2099,10 +2147,79 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
 
 @app.get("/api/viva-live/sessions")
 async def viva_live_list_sessions(request: Request):
-    """Owner-only: recorded live-interview sessions, newest first."""
+    """Owner-only: recorded live-interview sessions, newest first, with the
+    applicant's name joined in so the list is trackable by person."""
     await require_admin(request)
     sessions = await get_interview_sessions()
+    from bson import ObjectId as _OID
+    oids = []
+    for s in sessions:
+        try:
+            if s.get("application_id"):
+                oids.append(_OID(str(s["application_id"])))
+        except Exception:
+            pass
+    names = {}
+    if oids:
+        async for a in db.applications.find({"_id": {"$in": oids}}, {"name": 1, "email": 1}):
+            names[str(a["_id"])] = {"name": a.get("name"), "email": a.get("email")}
+    for s in sessions:
+        info = names.get(str(s.get("application_id") or ""))
+        if info:
+            s["candidate_name"] = info["name"]
+            s["candidate_email"] = info["email"]
     return {"sessions": sessions, "count": len(sessions)}
+
+
+@app.post("/api/interview/{token}/snapshot")
+async def candidate_snapshot_upload(request: Request, token: str):
+    """Candidate page uploads a proctoring frame. Token-authed like the mint;
+    bounded three ways: rate limit, per-interview atomic cap, and a byte cap —
+    a hostile client cannot fill the database however fast it posts."""
+    live = await get_live_interview_by_token(token)
+    if not live:
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+    if not await rate_limit_allows(f"snap:{token}", 20, 600):
+        raise HTTPException(status_code=429, detail="Too many uploads.")
+    try:
+        body = await request.json()
+        img = str(body.get("img", ""))
+        kind = "scr" if body.get("kind") == "scr" else "cam"
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    prefix = "data:image/jpeg;base64,"
+    if not img.startswith(prefix):
+        raise HTTPException(status_code=400, detail="JPEG data URL required.")
+    import base64
+    try:
+        data = base64.b64decode(img[len(prefix):], validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image data.")
+    if not data or len(data) > SNAPSHOT_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Snapshot too large.")
+    if not await reserve_snapshot_slot(token):
+        # Cap reached: acknowledged, not stored. The page stops trying.
+        return {"stored": False, "cap_reached": True}
+    await save_proctor_snapshot(token, str(live.get("user_id") or ""),
+                                str(live.get("application_id") or "") or None, kind, data)
+    return {"stored": True}
+
+
+@app.get("/api/viva-live/sessions/{session_id}/snapshots")
+async def viva_live_session_snapshots(request: Request, session_id: str):
+    """Owner-only: the stored proctoring frames for one session, as data URLs.
+    Candidate personal data — same access discipline as the CV files."""
+    await require_admin(request)
+    sess = await get_interview_session(session_id)
+    if not sess or not sess.get("interview_token"):
+        return {"snapshots": []}
+    import base64
+    snaps = await get_snapshots_for_token(sess["interview_token"])
+    return {"snapshots": [
+        {"kind": s["kind"],
+         "created_at": s["created_at"].isoformat() if s.get("created_at") else None,
+         "img": "data:image/jpeg;base64," + base64.b64encode(s["data"]).decode()}
+        for s in snaps if s.get("data")]}
 
 
 @app.get("/api/viva-live/sessions/{session_id}")

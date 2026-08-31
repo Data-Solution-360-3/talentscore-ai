@@ -69,6 +69,10 @@ async def connect():
     # the 243 CVs migrated by migration 001 stay exempt: their expires_at was
     # unset, so this index can never touch them.
     await db.application_files.create_index("expires_at", expireAfterSeconds=0)
+    # Proctoring snapshots: candidate personal data — TTL'd like the CV PDFs,
+    # fetched only through owner-gated endpoints, keyed by interview token.
+    await db.proctor_snapshots.create_index("expires_at", expireAfterSeconds=0)
+    await db.proctor_snapshots.create_index("token")
     await db.application_files.create_index("screening_id")
     await db.application_files.create_index("application_id")
     await db.rate_hits.create_index("expires_at", expireAfterSeconds=0)
@@ -1122,6 +1126,52 @@ async def reserve_live_mint(token: str) -> bool:
 async def complete_live_interview(token: str) -> None:
     await db.live_interviews.update_one(
         {"public_token": token}, {"$inc": {"completed_sessions": 1}})
+
+
+# ── Proctoring snapshots (the stored, reviewable record) ─────
+# Continuous A/V is NOT persisted here — that needs object storage (a later
+# phase). What IS stored: a hard-capped set of small JPEG frames per
+# interview, TTL'd, and readable only through owner-gated endpoints. The cap
+# is atomic on the live-interview doc, so a hostile client can't fill the
+# database however fast it posts.
+
+SNAPSHOT_CAP_PER_INTERVIEW = 12
+SNAPSHOT_MAX_BYTES = 150_000
+SNAPSHOT_TTL_DAYS = 30
+
+
+async def reserve_snapshot_slot(token: str) -> bool:
+    doc = await db.live_interviews.find_one_and_update(
+        {"public_token": token, "active": True,
+         "snap_count": {"$not": {"$gte": SNAPSHOT_CAP_PER_INTERVIEW}}},
+        {"$inc": {"snap_count": 1}},
+    )
+    return doc is not None
+
+
+async def save_proctor_snapshot(token: str, user_id: str, application_id: str | None,
+                                kind: str, data: bytes) -> None:
+    now = datetime.utcnow()
+    await db.proctor_snapshots.insert_one({
+        "token": token,
+        "user_id": user_id,
+        "application_id": application_id,
+        "kind": kind if kind in ("cam", "scr") else "cam",
+        "data": Binary(data),
+        "size": len(data),
+        "created_at": now,
+        "expires_at": now + timedelta(days=SNAPSHOT_TTL_DAYS),
+    })
+
+
+async def get_snapshots_for_token(token: str, limit: int = 20) -> list:
+    out = []
+    cursor = db.proctor_snapshots.find({"token": token}).sort("created_at", 1).limit(limit)
+    async for doc in cursor:
+        out.append({"kind": doc.get("kind", "cam"),
+                    "created_at": doc.get("created_at"),
+                    "data": bytes(doc.get("data") or b"")})
+    return out
 
 
 # ── One-link flow: viva-after-CV gating ──────────────────────

@@ -91,12 +91,16 @@ async function loadList(){
     if(!d.sessions.length){ $('list-notice').textContent = 'No live interviews recorded yet.'; return; }
     $('list-notice').textContent = '';
     $('list').innerHTML = d.sessions.map(s => {
-      const sc = s.score_status==='scored' ? (s.score_result? s.score_result.overall : '—') : null;
+      const sc = s.score_status==='scored'
+        ? (s.interview_score!=null ? s.interview_score : (s.score_result? s.score_result.overall : '—')) : null;
       const b = s.score_status==='scored' ? 'b-scored' : (s.score_status==='failed' ? 'b-failed' : 'b-pending');
+      const title = s.candidate_name
+        ? s.candidate_name
+        : (qText(s.config&&s.config.questions&&s.config.questions[0])||'Interview');
       return `<div class="row" onclick="loadDetail('${esc(s._id)}')">
         <div>
-          <div style="font-weight:700;font-size:.92rem">${esc(qText(s.config&&s.config.questions&&s.config.questions[0])||'Interview').slice(0,60)}</div>
-          <div class="meta">${esc((s.created_at||'').replace('T',' ').slice(0,16))} · ${s.questions_asked||0} questions · ${s.status}</div>
+          <div style="font-weight:700;font-size:.92rem">${esc(title).slice(0,60)}</div>
+          <div class="meta">${esc((s.created_at||'').replace('T',' ').slice(0,16))} · ${s.questions_asked||0} questions · ${s.status}${s.candidate_email?' · '+esc(s.candidate_email):''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           ${sc!==null?`<span style="font-weight:900;font-size:1.2rem">${sc}</span>`:''}
@@ -120,6 +124,9 @@ async function loadDetail(id){
     // side by side, and there is deliberately NO blended overall number.
     if(wr || sr){
       html += `<div style="display:flex;gap:1.6rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.2rem">
+        ${s.interview_score!=null?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--green,#16A34A)">Interview — combined</div>
+          <span class="score-big">${s.interview_score}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
+          <div style="font-size:.72rem;color:var(--t3)">spoken ×${(s.interview_parts&&s.interview_parts.weights&&s.interview_parts.weights.spoken)||0.6} + written ×${(s.interview_parts&&s.interview_parts.weights&&s.interview_parts.weights.written)||0.4} — fixed weights, never question counts</div></div>`:''}
         <div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Spoken segment</div>
           <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>
         ${wr?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Typed segment</div>
@@ -203,7 +210,9 @@ async function loadDetail(id){
     html += (pr.coverage_segments||[]).map(cs =>
       `<div><b style="font-variant-numeric:tabular-nums">${mmss(cs.t)}</b> — ${esc(cs.change)}<span style="color:var(--t3)"> · ${esc(cs.reason)}</span></div>`).join('')
       || '<div>No coverage events recorded.</div>';
-    html += `<div style="margin-top:.4rem;color:var(--t3)">ended: camera ${esc(pr.final_cam||'—')}, screen ${esc(pr.final_scr||'—')} · ${pr.snapshots||0} snapshot(s) · ${((pr.cam_bytes+pr.scr_bytes)/1048576).toFixed(1)} MB recorded</div>
+    html += `<div style="margin-top:.4rem;color:var(--t3)">ended: camera ${esc(pr.final_cam||'—')}, screen ${esc(pr.final_scr||'—')} · ${pr.snapshots||0} snapshot(s) · ${((pr.cam_bytes+pr.scr_bytes)/1048576).toFixed(1)} MB streamed for the watchdog</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:.35rem;line-height:1.5">Continuous camera/screen streams run in-browser to drive the watchdog and are <b>not persisted</b> — full video storage needs the object-storage phase. The frames stored for review load below.</div>
+    <div id="pr-snaps" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:.5rem;font-size:11.5px;color:var(--t3)">Loading stored frames…</div>
     </div>`;
   }else if(pr){
     html += `<div class="evrow" style="margin-bottom:.6rem"><span style="color:var(--t3)">Proctoring: off for this session</span></div>`;
@@ -219,6 +228,22 @@ async function loadDetail(id){
   $('list-card').classList.add('hidden');
   $('detail-card').classList.remove('hidden');
   window.scrollTo({top:0});
+
+  // Stored proctoring frames — owner-gated, loaded after the shell renders.
+  const wrap = document.getElementById('pr-snaps');
+  if(wrap){
+    try{
+      const r = await fetch('/api/viva-live/sessions/'+id+'/snapshots', {credentials:'include'});
+      const d2 = r.ok ? await r.json() : {snapshots:[]};
+      const snaps = d2.snapshots||[];
+      wrap.innerHTML = snaps.length
+        ? snaps.map(sn => `<figure style="margin:0">
+            <img src="${sn.img}" style="height:96px;border-radius:8px;border:1px solid var(--border);display:block" alt="proctoring frame">
+            <figcaption style="font-size:9.5px;color:var(--t3);margin-top:2px">${esc((sn.created_at||'').replace('T',' ').slice(5,16))} · ${sn.kind==='scr'?'screen':'camera'}</figcaption>
+          </figure>`).join('')
+        : 'No frames were stored for this session (proctoring off, camera denied, or recorded before frame storage existed).';
+    }catch(_){ wrap.textContent = 'Could not load stored frames.'; }
+  }
 }
 
 // Deep link from the Candidates page: /viva-live/sessions#<session_id>

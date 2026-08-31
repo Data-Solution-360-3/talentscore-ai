@@ -1553,6 +1553,17 @@ const _RING_SIZES = {
   lg: {box: 60, r: 24, stroke: 4,  fontSize: 17},   // modal hero
 };
 
+// The candidate's HEADLINE number: overall (CV 35% + interview 65%) once the
+// interview is scored, else the CV score alone with pending=true. The
+// combined value is computed server-side when the session scores and stored
+// on the screening — this helper only chooses which stored number to show.
+function ovOf(r){
+  const cv = r.score||Math.round(r.overall_score||0);
+  if(r.overall_combined!=null && r.interview_score!=null)
+    return {s:Math.round(r.overall_combined), cv, iv:Math.round(r.interview_score), pending:false};
+  return {s:cv, cv, iv:null, pending:true};
+}
+
 function scoreRing(score, size, opts){
   opts = opts || {};
   const cfg = _RING_SIZES[size || 'md'];
@@ -1903,6 +1914,10 @@ async function loadIvMap(){
   return _ivMap;
 }
 function ivCell(r){
+  // Preferred source: the combined score written back onto the screening when
+  // the session scored. The _ivMap join stays as fallback for older sessions.
+  if(r.interview_score!=null && r.interview_session_id)
+    return `<a class="tbl-link" href="/viva-live/sessions#${r.interview_session_id}" onclick="event.stopPropagation()" title="Open the full interview report (transcript, scores, stored frames)" style="font-weight:800;color:${gc(r.interview_score)}">${Math.round(r.interview_score)}</a>`;
   const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
   if(!iv) return '<span style="font-size:10px;color:var(--t3)" title="No live interview recorded for this candidate">not taken</span>';
   if(iv.overall==null) return `<span class="badge b-amber" style="font-size:9px">${iv.done?'scoring…':'in progress'}</span>`;
@@ -1923,7 +1938,7 @@ function renderCandidates(results){
     thead.innerHTML = '<tr>' +
       sortableHeader('cands-tbl', 'Candidate', 'candidate_name', 'asc') +
       sortableHeader('cands-tbl', 'Applied job', 'job_title', 'asc') +
-      sortableHeader('cands-tbl', 'CV score', 'score', 'desc') +
+      sortableHeader('cands-tbl', 'Overall', '_ov', 'desc') +
       '<th>Interview</th><th>Skills matched</th><th>Gaps</th>' +
       sortableHeader('cands-tbl', 'Experience', 'years_experience', 'desc') +
       '<th>Education</th>' +
@@ -1957,7 +1972,9 @@ function renderCandidates(results){
     return;
   }
 
-  // Sort (if a sort is active) then paginate.
+  // Sort (if a sort is active) then paginate. _ov = the headline overall
+  // (combined when interviewed, CV alone when pending) so sorting ranks on it.
+  results.forEach(r=>{ r._ov = ovOf(r).s; });
   const sorted = applySort(results, 'cands-tbl');
   const pg = applyPagination(sorted, 'cands-tbl');
 
@@ -1980,7 +1997,10 @@ function renderCandidates(results){
     return`<tr class="row-click" onclick="openCandModal('${r._id}')">
       <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${r.candidate_name||'Unknown'}</a></td>
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
-      <td>${scoreRing(score, 'sm')}</td>
+      <td>${(()=>{const ov=ovOf(r);return scoreRing(ov.s,'sm')+
+        (ov.pending
+          ?'<div style="font-size:8.5px;color:var(--amber);font-weight:700;margin-top:2px">IV pending · CV only</div>'
+          :'<div style="font-size:8.5px;color:var(--t3);font-weight:600;margin-top:2px">CV '+ov.cv+' · IV '+ov.iv+'</div>');})()}</td>
       <td>${ivCell(r)}</td>
       <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
       <td>${gapsCell}</td>
@@ -2122,7 +2142,10 @@ function openCandModal(id){
     <div class="cand-detail-grid">
       <div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-          ${scoreRing(score, 'lg')}
+          ${(()=>{const ov=ovOf(r);return scoreRing(ov.s,'lg')+
+            '<div style="min-width:74px">'+(ov.pending
+              ?'<div style="font-size:9px;font-weight:800;color:var(--amber)">CV ONLY</div><div style="font-size:8.5px;color:var(--t3)">interview pending</div>'
+              :'<div style="font-size:9px;font-weight:800;color:var(--green)">OVERALL</div><div style="font-size:8.5px;color:var(--t3)">CV '+ov.cv+' ×0.35<br>IV '+ov.iv+' ×0.65</div>')+'</div>';})()}
           <div style="flex:1;min-width:0">
             <div style="font-size:15px;font-weight:700;margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
             <div style="font-size:11px;color:var(--t2);margin-bottom:5px">${r.current_title||'—'} · ${r.years_experience||'?'} yrs</div>
@@ -3359,7 +3382,7 @@ function renderPipeline(){
         }
         return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s;margin-bottom:6px" onmouseover="this.style.borderColor='var(--indigo)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            ${scoreRing(score, 'sm')}
+            ${scoreRing(ovOf(r).s, 'sm')}
             <div style="min-width:0;flex:1">
               <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.candidate_name||'Unknown'}</div>
               <div style="font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.current_title||'—'}</div>
@@ -5109,7 +5132,7 @@ function kpiRenderAll(api){
   kpiColumns('kpi-vol',bk.buckets,['#16A34A']);
 
   const byJob={};
-  s.rows.forEach(r=>{ const j=r.job_id||''; (byJob[j]=byJob[j]||{n:0,sum:0}); byJob[j].n++; byJob[j].sum+=(r.score||r.overall_score||0); });
+  s.rows.forEach(r=>{ const j=r.job_id||''; (byJob[j]=byJob[j]||{n:0,sum:0}); byJob[j].n++; byJob[j].sum+=ovOf(r).s; });
   const jrows=Object.entries(byJob).map(([jid,v])=>{
     const j=(allJobs||[]).find(x=>x._id===jid);
     const avg=Math.round(v.sum/v.n);

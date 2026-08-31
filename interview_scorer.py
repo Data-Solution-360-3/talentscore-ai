@@ -400,6 +400,10 @@ Score these four dimensions (0-20) for the interview as a whole:
 4. Role Competency — Does the conversation show relevant knowledge, judgment, or skill for the role?
 
 ---
+LENGTH NORMALIZATION — the interview's question count must not move the score:
+
+You are scoring the QUALITY of the answers given, never their quantity. Interviews come in different lengths (6 questions, 12 questions) set by the recruiter — that is not the candidate's doing. A short interview with excellent answers scores exactly as high as a long interview with excellent answers. Answering more questions adequately earns no extra credit, and having been asked fewer questions is no penalty. Judge the consistent pattern of quality across whatever was asked, as a rate — not an accumulation.
+---
 SPOKEN LANGUAGE — read before scoring:
 - Fillers ("um", "you know"), false starts, self-corrections, and repetition are normal speech, not disorganized thinking. Never penalize them.
 - Short conversational answers to follow-up questions are normal — judge them in the context of the question asked, not against essay length.

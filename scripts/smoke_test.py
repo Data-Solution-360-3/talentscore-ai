@@ -433,6 +433,30 @@ def main():
         except Exception as e:
             line(None, "POST", "/api/jobs/{id}/viva", str(e)[:60]); failures.append(("POST", "/api/jobs/{id}/viva", "exception"))
         try:
+            r = c.post("/api/interview/smoke-not-a-real-token/snapshot",
+                       json={"img": "data:image/jpeg;base64,AAAA", "kind": "cam"})
+            ok = r.status_code == 404   # dead token: neutral refusal, nothing stored
+            line(r.status_code, "POST", "/api/interview/{unknown}/snapshot",
+                 "refused, nothing stored" if ok else "UNEXPECTED")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/interview/{unknown}/snapshot", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/interview/{unknown}/snapshot", str(e)[:60])
+            failures.append(("POST", "/api/interview/{unknown}/snapshot", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.get("/api/viva-live/sessions/000000000000000000000000/snapshots")
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/viva-live/sessions/{id}/snapshots",
+                 "gated (owner-only)" if gated else "NOT GATED — candidate images leak!")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/viva-live/sessions/{id}/snapshots", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/viva-live/sessions/{id}/snapshots", str(e)[:60])
+            failures.append(("GET", "/api/viva-live/sessions/{id}/snapshots", "exception"))
+        try:
             with httpx.Client(base_url=base, timeout=30.0) as unauth:
                 r = unauth.get("/api/kpi")
             gated = r.status_code in (401, 403)
