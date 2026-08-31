@@ -471,6 +471,44 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 @media(max-width:1100px){.stats-grid-7{grid-template-columns:repeat(4,1fr)}.funnel{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:860px){.stats-grid{grid-template-columns:1fr 1fr}.dim-grid{grid-template-columns:1fr 1fr}.cand-detail-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}}
 @media(max-width:640px){.sidebar{display:none}.main{margin-left:0}.funnel{grid-template-columns:repeat(4,1fr)}}
+/* ── KPI dashboard ─────────────────────────────────────────── */
+.kpi-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.kpi-head h2{font-size:1.25rem;font-weight:900;color:var(--rg-ink);letter-spacing:-.5px}
+.kpi-head .sub{font-size:12px;color:var(--rg-mut);margin-top:2px;max-width:520px}
+.kpi-range{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.kpi-range select,.kpi-range input{padding:8px 10px;border:1.5px solid var(--border2);border-radius:10px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text);background:#fff}
+.kpi-sec{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--rg-mut);margin:20px 2px 10px}
+.kpi-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}
+.kpi-card{background:#fff;border-radius:16px;box-shadow:var(--rg-sh);padding:14px 16px}
+.kpi-card .kv{font-size:1.65rem;font-weight:900;color:var(--rg-ink);letter-spacing:-1px}
+.kpi-card .kl{font-size:12px;font-weight:700;color:var(--rg-mut);margin-bottom:6px}
+.kpi-card .ks{font-size:11px;color:var(--rg-mut2);margin-top:5px;line-height:1.5}
+.kpi-lim{display:inline-block;background:rgba(217,119,6,.12);color:#B45309;border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
+.kpi-zero{display:inline-block;background:var(--rg-soft);color:var(--rg-mut);border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
+.kpi-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:1000px){.kpi-grid2{grid-template-columns:1fr}}
+.kpi-chart-card{background:#fff;border-radius:20px;box-shadow:var(--rg-sh);padding:16px 18px;min-width:0}
+.kpi-ct{font-size:13.5px;font-weight:800;color:var(--rg-ink)}
+.kpi-cs{font-size:11.5px;color:var(--rg-mut);margin:2px 0 10px;line-height:1.5}
+.kpi-hrow{display:flex;align-items:center;gap:10px;margin:7px 0}
+.kpi-hlbl{flex:0 0 130px;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-htrack{flex:1;height:16px;background:var(--rg-soft);border-radius:8px;overflow:hidden;min-width:40px}
+.kpi-hfill{height:100%;background:var(--rg-green);border-radius:0 4px 4px 0}
+.kpi-hval{flex:0 0 auto;font-size:12px;font-weight:800;color:var(--rg-ink);font-variant-numeric:tabular-nums}
+.kpi-legend{display:flex;gap:14px;font-size:11.5px;color:var(--rg-mut);font-weight:600;margin-top:8px}
+.kpi-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.kpi-meter{height:12px;background:var(--rg-gg);border-radius:6px;overflow:hidden}
+.kpi-meter i{display:block;height:100%;background:var(--rg-green);border-radius:0 4px 4px 0;max-width:100%}
+.kpi-funrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.kpi-funcell{background:var(--rg-soft);border-radius:12px;padding:10px 12px;text-align:center}
+.kpi-funn{font-size:1.25rem;font-weight:900;color:var(--rg-ink)}
+.kpi-funl{font-size:10.5px;font-weight:700;color:var(--rg-mut);margin-top:2px}
+.kpi-funp{font-size:10.5px;font-weight:800;color:var(--rg-green2);margin-top:3px}
+#kpi-tip{position:fixed;z-index:999;background:#132018;color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;pointer-events:none;display:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+#kpi-tip b{display:block;font-size:13px}
+.kpi-note{font-size:11px;color:var(--rg-mut2);margin-top:10px;line-height:1.6}
+.kpi-empty{padding:18px 6px;text-align:center;font-size:12.5px;color:var(--rg-mut)}
+@media(max-width:640px){.kpi-funrow{grid-template-columns:repeat(2,1fr)}.kpi-hlbl{flex-basis:96px}}
 </style>
 </head>
 <body>
@@ -526,6 +564,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span class="lb">Jobs</span><span class="sb-badge" id="sb-job-cnt"></span></button>
     <button class="sb-item ri" id="sb-analytics" onclick="showPage('analytics')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="lb">Analytics</span></button>
+    <button class="sb-item ri" data-sb="kpi" onclick="showPage('kpi')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="lb">KPIs</span></button>
   </div>
   <!-- HRM mode items -->
   <div class="rail-set hidden" id="rail-hrm">
@@ -537,6 +577,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg><span class="lb">Leave</span><span class="sb-badge" id="sb-leave-cnt"></span></button>
     <button class="sb-item ri" id="sb-attendance" onclick="showPage('attendance')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="lb">Attendance</span></button>
+    <button class="sb-item ri" data-sb="kpi" onclick="showPage('kpi')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="lb">KPIs</span></button>
   </div>
   <div class="ri-bottom">
     <button class="sb-item ri" onclick="location.href='/settings'">
@@ -782,6 +824,101 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- ══════════════════════════════════════════
      6. ANALYTICS
 ══════════════════════════════════════════ -->
+<div class="page" id="page-kpi">
+  <div class="rd">
+  <div id="kpi-body">
+    <div class="kpi-head">
+      <div><h2>KPI dashboard</h2><div class="sub">Computed live from your data — hiring and HR together. Small samples are labelled, and a metric with no data says so instead of showing a number.</div></div>
+      <div class="kpi-range">
+        <select id="kpi-preset" onchange="kpiPresetChanged()">
+          <option value="month" selected>This month</option>
+          <option value="quarter">This quarter</option>
+          <option value="year">This year</option>
+          <option value="30">Last 30 days</option>
+          <option value="all">All time</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <span id="kpi-custom" class="hidden">
+          <input type="date" id="kpi-from"> <input type="date" id="kpi-to">
+          <button class="rd-mini" onclick="kpiApplyCustom()">Apply</button>
+        </span>
+        <span id="kpi-rangelbl" style="font-size:11.5px;color:var(--rg-mut);font-weight:600"></span>
+      </div>
+    </div>
+
+    <div class="kpi-sec">Hiring</div>
+    <div class="kpi-cards">
+      <div class="kpi-card"><div class="kl">CVs screened</div><div class="kv" id="kpi-screened">—</div><div class="ks" id="kpi-screened-s"></div></div>
+      <div class="kpi-card"><div class="kl">Time to hire<span id="kpi-tth-b"></span></div><div class="kv" id="kpi-tth">—</div><div class="ks" id="kpi-tth-s"></div></div>
+      <div class="kpi-card"><div class="kl">Cost per hire<span id="kpi-cph-b"></span></div><div class="kv" id="kpi-cph">—</div><div class="ks" id="kpi-cph-s"></div></div>
+      <div class="kpi-card"><div class="kl">Interview → hire<span id="kpi-ivh-b"></span></div><div class="kv" id="kpi-ivh">—</div><div class="ks" id="kpi-ivh-s"></div></div>
+    </div>
+
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Hiring funnel</div>
+        <div class="kpi-cs">Candidates screened in the range, by how far they got. Same definitions as the Pipeline — nothing recomputed.</div>
+        <div id="kpi-funnel"></div>
+        <div class="kpi-note" id="kpi-funnel-note"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Screening volume</div>
+        <div class="kpi-cs" id="kpi-vol-s">CVs screened per period</div>
+        <div id="kpi-vol"></div>
+      </div>
+    </div>
+
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Average score by job</div>
+        <div class="kpi-cs">Which roles attract stronger candidates (0–100, candidates screened in the range)</div>
+        <div id="kpi-scorejob"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Live interviews</div>
+        <div class="kpi-cs">AI interview sessions in the range</div>
+        <div id="kpi-iv"></div>
+      </div>
+    </div>
+
+    <div class="kpi-sec">HR</div>
+    <div class="kpi-cards">
+      <div class="kpi-card"><div class="kl">Headcount</div><div class="kv" id="kpi-head">—</div><div class="ks" id="kpi-head-s"></div></div>
+      <div class="kpi-card"><div class="kl">Attendance rate<span id="kpi-att-b"></span></div><div class="kv" id="kpi-att">—</div><div class="ks" id="kpi-att-s"></div></div>
+      <div class="kpi-card"><div class="kl">Leave days approved</div><div class="kv" id="kpi-leave">—</div><div class="ks" id="kpi-leave-s"></div></div>
+      <div class="kpi-card"><div class="kl">Turnover</div><div class="kv" id="kpi-turn">—</div><div class="ks" id="kpi-turn-s"></div></div>
+    </div>
+
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Headcount by department</div>
+        <div class="kpi-cs">Current active employees — a snapshot, not a range metric</div>
+        <div id="kpi-dept"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Attendance over time</div>
+        <div class="kpi-cs">Marked attendance per day in the range</div>
+        <div id="kpi-attchart"></div>
+        <div class="kpi-legend" id="kpi-attlegend"></div>
+      </div>
+    </div>
+
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Leave utilization</div>
+        <div class="kpi-cs">Approved leave starting in the range, against <b>annual</b> allowances — reads honestly on a year range</div>
+        <div id="kpi-leavechart"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Definitions &amp; assumptions</div>
+        <div class="kpi-note" id="kpi-defs" style="margin-top:4px"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+<div id="kpi-tip"></div>
+
 <div class="page" id="page-analytics">
   <div class="ph"><h1>Analytics & Insights</h1><p>How each of your job postings is performing</p></div>
 
@@ -1126,6 +1263,8 @@ function showPage(id){
   document.querySelectorAll('.sb-item,.tn').forEach(s=>s.classList.remove('act'));
   document.getElementById('page-'+id)?.classList.add('act');
   document.getElementById('sb-'+id)?.classList.add('act');
+  // Pages that live in BOTH rail sets can't share an id — data-sb marks them.
+  document.querySelectorAll('[data-sb="'+id+'"]').forEach(b=>b.classList.add('act'));
   // Update top nav
   const navMap={overview:'Overview',screener:'Screener',candidates:'Candidates',jobs:'Jobs',analytics:'Analytics'};
   document.querySelectorAll('.tn').forEach(t=>{if(t.textContent===navMap[id])t.classList.add('act');});
@@ -1136,6 +1275,7 @@ function showPage(id){
   if(id==='leave')loadLeave();
   if(id==='attendance')loadAttendance();
   if(id==='hrm-dashboard')renderHrmDashboard();
+  if(id==='kpi')renderKpi();
 }
 
 // ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
@@ -4448,6 +4588,339 @@ async function refreshPlan(){
   }catch(e){console.warn('[PLAN-REFRESH]',e);}
 }
 setInterval(refreshPlan, 60000);
+
+// ═══════════════ KPI DASHBOARD ═══════════════
+// Two data sources, deliberately split:
+//   client-side — CandidateStats over the SAME allResults rows every other
+//   page uses (funnel, volume, per-job averages). Definitions cannot drift.
+//   server-side — /api/kpi (hires join, interview counts, HR aggregates).
+// Honesty rules: small samples get a "limited data" pill, empty metrics say
+// "no data yet", estimates are labelled as estimates, and a failed fetch says
+// "couldn't load" — never a silent zero.
+const KPI_COST_CV = 0.054;   // actual, matches the Jobs page cost line
+const KPI_COST_IV = 0.35;    // ESTIMATE per live interview session
+let KPI_RANGE = null;
+
+function kpiPresetRange(p){
+  const now = new Date(); const end = now.toISOString().slice(0,10);
+  const iso = d => d.toISOString().slice(0,10);
+  const pad = n => String(n).padStart(2,'0');
+  if(p==='30'){ return {start: iso(new Date(Date.now()-29*86400000)), end, label:'Last 30 days'}; }
+  if(p==='quarter'){ const q=Math.floor(now.getUTCMonth()/3)*3+1; return {start:`${now.getUTCFullYear()}-${pad(q)}-01`, end, label:'This quarter'}; }
+  if(p==='year'){ return {start:`${now.getUTCFullYear()}-01-01`, end, label:'This year'}; }
+  if(p==='all'){ return {start:'2000-01-01', end, label:'All time'}; }
+  return {start:`${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-01`, end, label:'This month'};
+}
+function kpiPresetChanged(){
+  const p=document.getElementById('kpi-preset').value;
+  const custom=document.getElementById('kpi-custom');
+  if(p==='custom'){ custom.classList.remove('hidden'); return; }
+  custom.classList.add('hidden');
+  KPI_RANGE = kpiPresetRange(p); renderKpi();
+}
+function kpiApplyCustom(){
+  const f=document.getElementById('kpi-from').value, t=document.getElementById('kpi-to').value;
+  if(!f||!t||f>t){ toast('Pick a valid from/to range.'); return; }
+  KPI_RANGE={start:f,end:t,label:'Custom'}; renderKpi();
+}
+
+async function renderKpi(){
+  if(!KPI_RANGE) KPI_RANGE = kpiPresetRange('month');
+  const body=document.getElementById('kpi-body');
+  document.getElementById('kpi-rangelbl').textContent = KPI_RANGE.start+' → '+KPI_RANGE.end;
+  body.style.opacity=.55;                      // keep the frame while refetching
+  let api=null;
+  try{
+    const r=await fetch(`/api/kpi?start=${KPI_RANGE.start}&end=${KPI_RANGE.end}`);
+    if(r.ok) api=await r.json();
+  }catch(_){}
+  body.style.opacity=1;
+  kpiRenderAll(api);
+}
+
+// ── shared tooltip (textContent only — labels are data, not markup) ──
+function kpiTipShow(lines,x,y){
+  const t=document.getElementById('kpi-tip'); t.textContent='';
+  lines.forEach((s2,i)=>{ const n=document.createElement(i===0?'b':'div'); n.textContent=s2; t.appendChild(n); });
+  t.style.display='block';
+  const w=t.offsetWidth; let lx=x+14; if(lx+w>window.innerWidth-8) lx=x-w-14;
+  t.style.left=lx+'px'; t.style.top=Math.max(8,y-12)+'px';
+}
+function kpiTipHide(){ const t=document.getElementById('kpi-tip'); if(t) t.style.display='none'; }
+
+// ── column chart: single or 2-series stacked, green + neutral, hover per bucket ──
+function kpiColumns(elId, buckets, colors, names){
+  const el=document.getElementById(elId); if(!el) return;
+  if(!buckets.length || !buckets.some(b=>b.vals.some(v=>v>0))){
+    el.innerHTML='<div class="kpi-empty">No data in this range.</div>'; return;
+  }
+  const W=Math.max(280, el.clientWidth||480), H=180, padL=36, padB=20, padT=10;
+  const plotW=W-padL-8, plotH=H-padT-padB;
+  const totals=buckets.map(b=>b.vals.reduce((a,c)=>a+c,0));
+  const rawMax=Math.max(...totals,1);
+  const mag=Math.pow(10,Math.floor(Math.log10(rawMax)));
+  const yMax=[1,2,5,10].map(m=>m*mag).find(m=>m>=rawMax)||rawMax;
+  const step=plotW/buckets.length;
+  const bw=Math.min(24, Math.max(3, step*0.62));
+  let s='<svg width="'+W+'" height="'+H+'" style="display:block;max-width:100%">';
+  [0,.5,1].forEach(f=>{
+    const y=padT+plotH-plotH*f;
+    s+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-4}" y2="${y.toFixed(1)}" stroke="#E6EFE9" stroke-width="1"/>`;
+    s+=`<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" font-size="10" fill="#93A29A" text-anchor="end" font-family="Inter,sans-serif">${Math.round(yMax*f).toLocaleString()}</text>`;
+  });
+  buckets.forEach((b,i)=>{
+    const cx=padL+step*i+step/2;
+    let y=padT+plotH;
+    b.vals.forEach((v,si)=>{
+      const h=(v/yMax)*plotH;
+      if(h>0.5){
+        const top=y-h, r=Math.min(4,h/2);
+        s+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${r.toFixed(1)}" fill="${colors[si]}"/>`;
+        s+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${(y-Math.min(r,h)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.min(r,h).toFixed(1)}" fill="${colors[si]}"/>`;
+        y=top-2;                              // 2px surface gap between stacked segments
+      }
+    });
+  });
+  const lblIdx=new Set([0,buckets.length-1,Math.floor((buckets.length-1)/2)]);
+  buckets.forEach((b,i)=>{ if(lblIdx.has(i)){
+    const cx=padL+step*i+step/2;
+    s+=`<text x="${cx.toFixed(1)}" y="${H-5}" font-size="10" fill="#6B7B72" text-anchor="middle" font-family="Inter,sans-serif">${b.label}</text>`;
+  }});
+  buckets.forEach((b,i)=>{ s+=`<rect x="${(padL+step*i).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${H}" fill="transparent" data-i="${i}"/>`; });
+  s+='</svg>';
+  el.innerHTML=s;
+  const svg=el.querySelector('svg');
+  svg.addEventListener('pointermove',e=>{
+    const t=e.target.closest('rect[data-i]'); if(!t){ kpiTipHide(); return; }
+    const b=buckets[+t.dataset.i];
+    kpiTipShow([b.tip||b.label, ...b.vals.map((v,si)=>(names&&names[si]?names[si]+': ':'')+v.toLocaleString())], e.clientX, e.clientY);
+  });
+  svg.addEventListener('pointerleave',kpiTipHide);
+}
+
+// ── horizontal bars, single hue; opts.max fixes the scale (e.g. scores vs 100) ──
+function kpiHBars(elId, rows, opts){
+  const el=document.getElementById(elId); if(!el) return;
+  if(!rows.length){ el.innerHTML='<div class="kpi-empty">'+((opts&&opts.empty)||'No data in this range.')+'</div>'; return; }
+  const max=(opts&&opts.max)||Math.max(...rows.map(r=>r.value),1);
+  el.innerHTML=rows.map(r=>`
+    <div class="kpi-hrow">
+      <div class="kpi-hlbl" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</div>
+      <div class="kpi-htrack"><div class="kpi-hfill" style="width:${Math.min(100,Math.max(r.value>0?2:0,r.value/max*100)).toFixed(1)}%"></div></div>
+      <div class="kpi-hval">${escapeHtml(String(r.display!=null?r.display:r.value))}${r.badge||''}</div>
+    </div>`).join('');
+}
+
+// ── date bucketing: day ≤35d, week ≤170d, month beyond; all-time clamps to first datum ──
+function kBucketKey(d,mode){
+  if(mode==='day') return d;
+  if(mode==='month') return d.slice(0,7);
+  const dt=new Date(d+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()-((dt.getUTCDay()+6)%7));
+  return dt.toISOString().slice(0,10);
+}
+function kpiMakeBuckets(dates){
+  let s2=KPI_RANGE.start; const e=KPI_RANGE.end;
+  if(s2==='2000-01-01'){ const ds=dates.filter(Boolean).sort(); s2=ds.length?ds[0]:e; }
+  const spanDays=Math.max(1,Math.round((new Date(e+'T00:00:00Z')-new Date(s2+'T00:00:00Z'))/86400000)+1);
+  const mode= spanDays<=35?'day': spanDays<=170?'week':'month';
+  const counts={};
+  dates.forEach(d=>{ if(d&&d>=s2&&d<=e){ const k=kBucketKey(d,mode); counts[k]=(counts[k]||0)+1; } });
+  const keys=[];
+  if(mode==='month'){
+    let [y,m]=s2.split('-').map(Number); const pe=e.split('-').map(Number);
+    while((y<pe[0]||(y===pe[0]&&m<=pe[1])) && keys.length<240){ keys.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
+  }else{
+    const d=new Date(s2+'T00:00:00Z'); const end=new Date(e+'T00:00:00Z'); const seen=new Set();
+    while(d<=end && keys.length<400){ const k=kBucketKey(d.toISOString().slice(0,10),mode); if(!seen.has(k)){seen.add(k);keys.push(k);} d.setUTCDate(d.getUTCDate()+1); }
+  }
+  return {mode, buckets: keys.map(k=>({label: mode==='month'?k:k.slice(5), tip:(mode==='week'?'Week of ':'')+k, vals:[counts[k]||0]}))};
+}
+
+function kpiBadge(elId,n,thresh){
+  const b=document.getElementById(elId); if(!b) return;
+  if(n===0) b.innerHTML=' <span class="kpi-zero">no data yet</span>';
+  else if(n<thresh) b.innerHTML=` <span class="kpi-lim">limited data · n=${n}</span>`;
+  else b.innerHTML='';
+}
+function kpiFmtMoney(v){ return '$'+(v>=100?Math.round(v).toLocaleString():v.toFixed(2)); }
+
+function kpiRenderAll(api){
+  const K=id=>document.getElementById(id);
+  const rows=allResults.filter(r=>{ const d=(r.created_at||'').slice(0,10); return d && d>=KPI_RANGE.start && d<=KPI_RANGE.end; });
+  const s=CandidateStats.compute(rows);
+  const apiOk=!!api;
+  const tth=(api&&api.hiring&&api.hiring.time_to_hire)||{hires:0,measured:0,avg_days:null};
+  const iv=(api&&api.hiring&&api.hiring.interviews)||{sessions:0,completed:0};
+
+  // ── Hiring stat cards ──
+  K('kpi-screened').textContent=s.total.toLocaleString();
+  K('kpi-screened-s').textContent= s.hidden? `${s.hidden} duplicate(s) merged — dedupe follows the Dashboard toggle` : 'CVs scored in this range';
+
+  if(!apiOk){
+    K('kpi-tth').textContent='—'; K('kpi-tth-s').textContent='Couldn’t load from the server — refresh to retry';
+    K('kpi-cph').textContent='—'; K('kpi-cph-s').textContent='Couldn’t load from the server';
+    K('kpi-ivh').textContent='—'; K('kpi-ivh-s').textContent='Couldn’t load from the server';
+    ['kpi-tth-b','kpi-cph-b','kpi-ivh-b'].forEach(id=>K(id).innerHTML='');
+  }else{
+    if(tth.avg_days!=null){
+      K('kpi-tth').textContent=tth.avg_days+'d';
+      K('kpi-tth-s').textContent=`Avg days, CV screened → hired · measured on ${tth.measured} of ${tth.hires} hire(s)`;
+    }else{
+      K('kpi-tth').textContent='—';
+      K('kpi-tth-s').textContent= tth.hires? 'Hire(s) exist but none link back to a screening' : 'No hires in this range yet';
+    }
+    kpiBadge('kpi-tth-b',tth.measured,5);
+
+    const cost=s.total*KPI_COST_CV + iv.sessions*KPI_COST_IV;
+    if(tth.hires>0){
+      K('kpi-cph').textContent=kpiFmtMoney(cost/tth.hires);
+      K('kpi-cph-s').textContent=`${s.total} CV × $${KPI_COST_CV} + ${iv.sessions} interview × $${KPI_COST_IV} (est.) ÷ ${tth.hires} hire(s)`;
+    }else{
+      K('kpi-cph').textContent='—';
+      K('kpi-cph-s').textContent=`Screening + interview spend in range ≈ ${kpiFmtMoney(cost)} · no hires to divide by`;
+    }
+    kpiBadge('kpi-cph-b',tth.hires,3);
+
+    const ivPlus=s.byStage.interview+s.byStage.shortlisted;
+    if(ivPlus>0&&tth.hires<=ivPlus){
+      K('kpi-ivh').textContent=Math.round(tth.hires/ivPlus*100)+'%';
+      K('kpi-ivh-s').textContent=`${tth.hires} hired of ${ivPlus} at interview stage or beyond — a proxy; stages don’t keep history`;
+    }else{
+      K('kpi-ivh').textContent='—';
+      K('kpi-ivh-s').textContent= ivPlus===0? 'No candidates moved to interview stage in this range' : 'More hires than staged candidates — stage data too sparse to rate';
+    }
+    kpiBadge('kpi-ivh-b',ivPlus,5);
+  }
+
+  // ── Funnel (CandidateStats verbatim + hired from HR, clearly footnoted) ──
+  const fEl=K('kpi-funnel');
+  if(!s.total){
+    fEl.innerHTML='<div class="kpi-empty">No candidates screened in this range.</div>';
+    K('kpi-funnel-note').textContent='';
+  }else{
+    fEl.innerHTML='<div id="kpi-funbars"></div><div class="kpi-funrow" id="kpi-funcells"></div>';
+    const st=s.byStage;
+    kpiHBars('kpi-funbars',[
+      {label:'Screening',value:st.screening,display:st.screening},
+      {label:'Interview',value:st.interview,display:st.interview},
+      {label:'Shortlisted',value:st.shortlisted,display:st.shortlisted},
+      {label:'Rejected',value:st.rejected,display:st.rejected},
+    ]);
+    const ivPlus=st.interview+st.shortlisted;
+    const pct=(a,b)=> b>0? Math.round(a/b*100)+'% of applied' : '';
+    const hiredDisp= apiOk? tth.hires : '—';
+    K('kpi-funcells').innerHTML=[
+      ['Applied / screened',s.total,''],
+      ['Interview +',ivPlus,pct(ivPlus,s.total)],
+      ['Shortlisted',st.shortlisted,pct(st.shortlisted,s.total)],
+      ['Hired',hiredDisp, apiOk?pct(tth.hires,s.total):''],
+    ].map(c=>`<div class="kpi-funcell"><div class="kpi-funn">${c[1]}</div><div class="kpi-funl">${c[0]}</div><div class="kpi-funp">${c[2]}</div></div>`).join('');
+    K('kpi-funnel-note').textContent='“Interview +” counts candidates currently at interview stage or beyond (shortlisted). Stages are current positions, not a history. “Hired” counts employee records created from the funnel in the range — they may have been screened earlier.';
+  }
+
+  // ── Screening volume ──
+  const bk=kpiMakeBuckets(s.rows.map(r=>(r.created_at||'').slice(0,10)));
+  K('kpi-vol-s').textContent='CVs screened per '+bk.mode+(s.hidden?' (deduped)':'');
+  kpiColumns('kpi-vol',bk.buckets,['#16A34A']);
+
+  // ── Avg score by job (scale fixed to 100 so gaps aren’t exaggerated) ──
+  const byJob={};
+  s.rows.forEach(r=>{ const j=r.job_id||''; (byJob[j]=byJob[j]||{n:0,sum:0}); byJob[j].n++; byJob[j].sum+=(r.score||r.overall_score||0); });
+  const jrows=Object.entries(byJob).map(([jid,v])=>{
+    const j=(allJobs||[]).find(x=>x._id===jid);
+    const avg=Math.round(v.sum/v.n);
+    return {label:(j&&j.title)||'(no job)',value:avg,display:avg,
+            badge: v.n<5? ` <span class="kpi-lim">n=${v.n}</span>` : ` <span style="color:var(--rg-mut2);font-weight:600">· ${v.n} CVs</span>`};
+  }).sort((a,b)=>b.value-a.value).slice(0,8);
+  kpiHBars('kpi-scorejob',jrows,{max:100,empty:'No screened candidates in this range.'});
+
+  // ── Live interviews ──
+  const ivEl=K('kpi-iv');
+  if(!apiOk) ivEl.innerHTML='<div class="kpi-empty">Couldn’t load.</div>';
+  else if(!iv.sessions) ivEl.innerHTML='<div class="kpi-empty">No live interview sessions in this range.</div>';
+  else ivEl.innerHTML=`<div class="kpi-funrow" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-funcell"><div class="kpi-funn">${iv.sessions}</div><div class="kpi-funl">Sessions</div></div>
+    <div class="kpi-funcell"><div class="kpi-funn">${iv.completed}</div><div class="kpi-funl">Completed</div></div>
+    <div class="kpi-funcell"><div class="kpi-funn">${Math.round(iv.completed/iv.sessions*100)}%</div><div class="kpi-funl">Completion</div></div></div>`;
+
+  // ── HR ──
+  if(!apiOk){
+    [['kpi-head','kpi-head-s'],['kpi-att','kpi-att-s'],['kpi-leave','kpi-leave-s'],['kpi-turn','kpi-turn-s']]
+      .forEach(p=>{K(p[0]).textContent='—';K(p[1]).textContent='Couldn’t load from the server — refresh to retry';});
+    K('kpi-att-b').innerHTML='';
+    ['kpi-dept','kpi-attchart','kpi-leavechart'].forEach(id=>K(id).innerHTML='<div class="kpi-empty">Couldn’t load.</div>');
+    K('kpi-attlegend').innerHTML=''; K('kpi-defs').innerHTML=''; return;
+  }
+  const hr=api.hr;
+  const hc=hr.headcount;
+  K('kpi-head').textContent=hc.total;
+  K('kpi-head-s').textContent= hc.total? `${hc.on_leave} on leave now · current snapshot, not range-scoped` : 'No employees yet — add them on the Employees page';
+  kpiHBars('kpi-dept',hc.by_department.slice(0,8).map(d=>({label:d.department,value:d.n,display:d.n})),{empty:'No active employees yet.'});
+
+  const at=hr.attendance, A=at.totals, denom=A.present+A.absent;
+  if(denom>0){
+    K('kpi-att').textContent=Math.round(A.present/denom*100)+'%';
+    K('kpi-att-s').textContent=`${A.present} present / ${A.absent} absent over ${at.marked_days} marked day(s) — leave & holiday excluded`;
+  }else{ K('kpi-att').textContent='—'; K('kpi-att-s').textContent='No attendance marked in this range'; }
+  kpiBadge('kpi-att-b',at.marked_days,5);
+  let attDays=at.days;
+  if(attDays.length>35){
+    const wk={};
+    attDays.forEach(d=>{ const k=kBucketKey(d.date,'week'); (wk[k]=wk[k]||{present:0,absent:0}); wk[k].present+=d.present; wk[k].absent+=d.absent; });
+    attDays=Object.keys(wk).sort().map(k=>({date:'Week of '+k,label:k.slice(5),present:wk[k].present,absent:wk[k].absent}));
+  }
+  kpiColumns('kpi-attchart',
+    attDays.map(d=>({label:(d.label||d.date.slice(5)),tip:d.date,vals:[d.present,d.absent]})),
+    ['#16A34A','#93A29A'],['Present','Absent']);
+  K('kpi-attlegend').innerHTML= attDays.length?
+    '<span><i style="background:#16A34A"></i>Present</span><span><i style="background:#93A29A"></i>Absent</span>':'';
+
+  const lv=hr.leave, totLeave=lv.by_type.reduce((a,c)=>a+c.days,0);
+  K('kpi-leave').textContent=totLeave;
+  K('kpi-leave-s').textContent= totLeave?
+    lv.by_type.map(t=>`${t.days} ${t.type}`).join(' · ')+` · ${lv.pending_now} pending now`:
+    (lv.pending_now? `${lv.pending_now} request(s) pending approval` : 'No approved leave starting in this range');
+  const alw=lv.allowance_totals, byT={};
+  lv.by_type.forEach(t=>byT[t.type]=t.days);
+  if(alw.annual+alw.sick>0 || totLeave>0){
+    K('kpi-leavechart').innerHTML=['annual','sick','unpaid'].map(tp=>{
+      const taken=byT[tp]||0;
+      const allow= tp==='annual'?alw.annual : tp==='sick'?alw.sick : null;
+      const over= allow!=null && taken>allow;
+      const pctW= allow? Math.min(100,taken/allow*100) : 0;
+      return `<div style="margin:11px 0">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text)">
+          <span style="text-transform:capitalize">${tp}</span>
+          <span>${taken}${allow!=null?' / '+allow+' days':' days — no allowance applies'}${over?' <span class="kpi-lim">over allowance</span>':''}</span></div>
+        ${allow!=null?`<div class="kpi-meter" style="margin-top:5px"><i style="width:${pctW.toFixed(1)}%${over?';background:#D97706':''}"></i></div>`:''}
+      </div>`;
+    }).join('');
+  }else K('kpi-leavechart').innerHTML='<div class="kpi-empty">No employees with allowances yet.</div>';
+
+  const tn=hr.turnover;
+  if(tn.terminated_ever===0){
+    K('kpi-turn').textContent='—';
+    K('kpi-turn-s').innerHTML='<span class="kpi-zero">not enough data yet</span> No terminations recorded — this stays blank until there’s real history';
+  }else{
+    K('kpi-turn').textContent=tn.terminated_in_range;
+    K('kpi-turn-s').textContent=`Termination(s) in range · ${tn.terminated_ever} on record · a rate needs more history to be meaningful`;
+  }
+
+  K('kpi-defs').innerHTML=
+    `<b>CVs screened</b> — screening records created in the range${DEDUPE_ON?', duplicates merged (Dashboard toggle)':''}.<br>`+
+    `<b>Time to hire</b> — days from a CV being screened to the employee record created from that screening.<br>`+
+    `<b>Cost per hire</b> — $${KPI_COST_CV}/CV (actual) + $${KPI_COST_IV}/live interview (<b>estimate</b>), divided by hires in range.<br>`+
+    `<b>Interview → hire</b> — proxy: hires ÷ candidates currently at interview stage or beyond.<br>`+
+    `<b>Hired</b> — employee records with source “hired”, identical to the Dashboard’s Hired card.<br>`+
+    `<b>Attendance rate</b> — present ÷ (present + absent); leave and holiday days excluded from both sides.<br>`+
+    `<b>Leave utilization</b> — approved requests starting in the range vs summed <b>annual</b> allowances.<br>`+
+    `Records without a timestamp are excluded from ranged views. Every number is scoped to your account and queried fresh on each load — nothing is cached or invented.`;
+}
+
+let _kpiRz=null;
+window.addEventListener('resize',()=>{ clearTimeout(_kpiRz); _kpiRz=setTimeout(()=>{
+  if(document.getElementById('page-kpi')?.classList.contains('act')) renderKpi();
+},250); });
 </script>
 </body>
 </html>

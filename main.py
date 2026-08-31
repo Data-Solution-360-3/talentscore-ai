@@ -67,6 +67,7 @@ from database import (
     set_employee_invite, get_employee_by_invite, set_employee_password,
     find_employee_logins, update_employee_contact,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
+    kpi_data,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -923,6 +924,31 @@ async def batch_screen_endpoint(
 # ─────────────────────────────────────────────────────────────
 # SCREENINGS (tenant-scoped)
 # ─────────────────────────────────────────────────────────────
+
+@app.get("/api/kpi")
+async def kpi_dashboard(request: Request, start: str = "", end: str = ""):
+    """Server-side half of the KPI dashboard: hires/time-to-hire, interview
+    counts, and the HR aggregates. Tenant-scoped. The hiring funnel, screening
+    volume and per-job score averages are deliberately NOT here — the page
+    computes them client-side with CandidateStats over /api/screenings, so the
+    definitions cannot drift from the rest of the app."""
+    user = await get_current_user(request)
+
+    def _parse(s, fallback):
+        try:
+            return _dt.strptime(s, "%Y-%m-%d")
+        except Exception:
+            return fallback
+    now = _dt.utcnow()
+    d_start = _parse(start, now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+    d_end_day = _parse(end, now)
+    if d_end_day < d_start:
+        raise HTTPException(status_code=400, detail="End date is before start date.")
+    # Inclusive end for datetime-stamped collections.
+    d_end = d_end_day.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return await kpi_data(user["user_id"], d_start, d_end,
+                          d_start.strftime("%Y-%m-%d"), d_end_day.strftime("%Y-%m-%d"))
+
 
 @app.get("/api/screenings")
 async def list_screenings(request: Request, limit: int = 2000):

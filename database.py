@@ -1391,6 +1391,137 @@ async def reserve_viva_launch(job_id: str, cap: int) -> bool:
     return await reserve_spend(f"viva-launch:{job_id}:{now:%Y-%m-%d}", cap)
 
 
+# ── KPI dashboard ────────────────────────────────────────────
+# Only what the SPA cannot honestly compute client-side. The funnel, screening
+# volume and per-job averages come from CandidateStats over /api/screenings —
+# the same rows and definitions as every other page, deliberately NOT
+# recomputed here. Every block below returns its n so the UI can label
+# limited-data KPIs instead of dressing them up as trends.
+
+async def kpi_data(user_id: str, start: datetime, end: datetime,
+                   start_s: str, end_s: str) -> dict:
+    """start/end are inclusive datetimes for datetime-stamped collections;
+    start_s/end_s are the same bounds as YYYY-MM-DD strings for the HRM
+    collections, whose dates are lexicographic strings by design."""
+    scope = user_match_field("user_id", user_id)
+
+    # Hires in range = employee records created from the funnel. Time-to-hire
+    # joins back to the screening's created_at (screened-on-upload, so this is
+    # application -> hired). Hires without a screening link still count as
+    # hires but cannot contribute a duration.
+    hires = []
+    async for e in db.employees.find(
+            {**scope, "source": "hired",
+             "created_at": {"$gte": start, "$lte": end}},
+            {"screening_id": 1, "created_at": 1}):
+        hires.append(e)
+    scr_ids = []
+    for e in hires:
+        try:
+            scr_ids.append(ObjectId(str(e.get("screening_id"))))
+        except Exception:
+            pass
+    scr_dates = {}
+    if scr_ids:
+        async for s in db.screenings.find({"_id": {"$in": scr_ids}}, {"created_at": 1}):
+            scr_dates[str(s["_id"])] = s.get("created_at")
+    tth_days = []
+    for e in hires:
+        sd = scr_dates.get(str(e.get("screening_id") or ""))
+        if sd and e.get("created_at"):
+            tth_days.append(max(0.0, (e["created_at"] - sd).total_seconds() / 86400))
+    time_to_hire = {
+        "hires": len(hires),
+        "measured": len(tth_days),
+        "avg_days": round(sum(tth_days) / len(tth_days), 1) if tth_days else None,
+    }
+
+    iv_match = {**scope, "created_at": {"$gte": start, "$lte": end}}
+    interviews = {
+        "sessions": await db.interview_sessions.count_documents(iv_match),
+        "completed": await db.interview_sessions.count_documents(
+            {**iv_match, "status": "completed"}),
+    }
+
+    # Headcount is a NOW snapshot, not a range metric — the schema keeps no
+    # employment history beyond start/end dates, and pretending otherwise
+    # would be a fabricated trend.
+    emp_active = {**scope, "status": {"$ne": "terminated"}}
+    by_dept = []
+    async for row in db.employees.aggregate([
+            {"$match": emp_active},
+            {"$group": {"_id": {"$ifNull": ["$department", ""]}, "n": {"$sum": 1}}},
+            {"$sort": {"n": -1}}]):
+        by_dept.append({"department": row["_id"] or "Unassigned", "n": row["n"]})
+    headcount = {
+        "total": await db.employees.count_documents(emp_active),
+        "on_leave": await db.employees.count_documents({**scope, "status": "on_leave"}),
+        "by_department": by_dept,
+    }
+
+    # Attendance over the range, per day and per status. Rate is computed
+    # client-side as present/(present+absent) — leave and holiday are excluded
+    # from the denominator, and the UI says so.
+    att_days: dict[str, dict] = {}
+    att_totals = {"present": 0, "absent": 0, "leave": 0, "holiday": 0}
+    async for row in db.attendance.aggregate([
+            {"$match": {**scope, "date": {"$gte": start_s, "$lte": end_s}}},
+            {"$group": {"_id": {"date": "$date", "status": "$status"}, "n": {"$sum": 1}}}]):
+        d, st = row["_id"].get("date"), row["_id"].get("status")
+        if not d or st not in att_totals:
+            continue
+        att_days.setdefault(d, {"date": d, "present": 0, "absent": 0, "leave": 0, "holiday": 0})
+        att_days[d][st] += row["n"]
+        att_totals[st] += row["n"]
+    attendance = {
+        "days": sorted(att_days.values(), key=lambda x: x["date"]),
+        "totals": att_totals,
+        "marked_days": len(att_days),
+    }
+
+    # Leave: approved days whose leave STARTS in the range, by type. The
+    # allowance total is the sum of per-employee ANNUAL allowances — the UI
+    # must present utilization as vs-annual-allowance, which only reads
+    # honestly on a year-ish range.
+    leave_by_type = []
+    async for row in db.leave_requests.aggregate([
+            {"$match": {**scope, "status": "approved",
+                        "start_date": {"$gte": start_s, "$lte": end_s}}},
+            {"$group": {"_id": "$type", "days": {"$sum": "$days"}, "n": {"$sum": 1}}},
+            {"$sort": {"days": -1}}]):
+        leave_by_type.append({"type": row["_id"] or "other",
+                              "days": row["days"], "requests": row["n"]})
+    allowances = {"annual": 0, "sick": 0}
+    async for e in db.employees.find(emp_active, {"leave_allowances": 1}):
+        la = e.get("leave_allowances") or {}
+        allowances["annual"] += int(la.get("annual") or 0)
+        allowances["sick"] += int(la.get("sick") or 0)
+    leave = {
+        "by_type": leave_by_type,
+        "allowance_totals": allowances,
+        "pending_now": await db.leave_requests.count_documents(
+            {**scope, "status": "pending"}),
+    }
+
+    # Turnover: terminations whose end_date falls in the range. Zero history
+    # is the expected state for a young tenant — the UI shows "not enough
+    # data yet", never a fabricated 0.0% trend.
+    turnover = {
+        "terminated_in_range": await db.employees.count_documents(
+            {**scope, "status": "terminated",
+             "end_date": {"$gte": start_s, "$lte": end_s}}),
+        "terminated_ever": await db.employees.count_documents(
+            {**scope, "status": "terminated"}),
+    }
+
+    return {
+        "range": {"start": start_s, "end": end_s},
+        "hiring": {"time_to_hire": time_to_hire, "interviews": interviews},
+        "hr": {"headcount": headcount, "attendance": attendance,
+               "leave": leave, "turnover": turnover},
+    }
+
+
 # ── Live interview sessions (L4) ─────────────────────────────
 
 async def save_interview_session(doc: dict) -> str:
