@@ -2001,10 +2001,14 @@ async def score_live_session(session_id: str):
             scen_cfg = (sess.get("config") or {}).get("scenario") or {}
             scen_text = str(scen_cfg.get("text") or "")
             # Prefer the recruiter-approved question texts over the transcript's
-            # nearest-AI-turn heuristic when the counts line up.
+            # nearest-AI-turn heuristic — by INDEX, even when the candidate
+            # answered only some of them (an abandoned run's lone answer used
+            # to fall back to the heuristic, which grabbed the scenario
+            # read-aloud as its "question").
             approved_qs = [str(q) for q in (scen_cfg.get("questions") or [])]
-            if len(approved_qs) == len(scen_pairs):
-                scen_pairs = [(approved_qs[i], scen_pairs[i][1]) for i in range(len(scen_pairs))]
+            if approved_qs:
+                scen_pairs = [((approved_qs[i] if i < len(approved_qs) else scen_pairs[i][0]),
+                               scen_pairs[i][1]) for i in range(len(scen_pairs))]
             scenario_result, scenario_error = await score_scenario_answers(
                 scen_text, scen_pairs, OPENAI_API_KEY, job_title=job_title)
             if scenario_error:
