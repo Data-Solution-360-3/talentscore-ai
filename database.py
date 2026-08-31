@@ -1405,36 +1405,40 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
     collections, whose dates are lexicographic strings by design."""
     scope = user_match_field("user_id", user_id)
 
-    # Hires in range = employee records created from the funnel. Time-to-hire
-    # joins back to the screening's created_at (screened-on-upload, so this is
-    # application -> hired). Hires without a screening link still count as
-    # hires but cannot contribute a duration.
-    hires = []
+    # ALL funnel hires, all-time — the list is tiny (employee records created
+    # from screenings). The client range-filters it and derives time-to-hire,
+    # time-to-fill, MTD/QTD/YTD and growth from this ONE list, so every hire
+    # number on the page agrees by construction.
+    emp_docs = []
     async for e in db.employees.find(
-            {**scope, "source": "hired",
-             "created_at": {"$gte": start, "$lte": end}},
+            {**scope, "source": "hired"},
             {"screening_id": 1, "created_at": 1}):
-        hires.append(e)
+        emp_docs.append(e)
     scr_ids = []
-    for e in hires:
+    for e in emp_docs:
         try:
             scr_ids.append(ObjectId(str(e.get("screening_id"))))
         except Exception:
             pass
-    scr_dates = {}
+    scr_info = {}
     if scr_ids:
-        async for s in db.screenings.find({"_id": {"$in": scr_ids}}, {"created_at": 1}):
-            scr_dates[str(s["_id"])] = s.get("created_at")
-    tth_days = []
-    for e in hires:
-        sd = scr_dates.get(str(e.get("screening_id") or ""))
-        if sd and e.get("created_at"):
-            tth_days.append(max(0.0, (e["created_at"] - sd).total_seconds() / 86400))
-    time_to_hire = {
-        "hires": len(hires),
-        "measured": len(tth_days),
-        "avg_days": round(sum(tth_days) / len(tth_days), 1) if tth_days else None,
-    }
+        async for s in db.screenings.find(
+                {"_id": {"$in": scr_ids}},
+                {"created_at": 1, "job_id": 1, "source": 1}):
+            scr_info[str(s["_id"])] = s
+    hires = []
+    for e in emp_docs:
+        info = scr_info.get(str(e.get("screening_id") or ""))
+        hires.append({
+            "hired_at": e["created_at"].strftime("%Y-%m-%d") if e.get("created_at") else None,
+            "screened_at": (info["created_at"].strftime("%Y-%m-%d")
+                            if info is not None and info.get("created_at") else None),
+            "job_id": str(info.get("job_id")) if info is not None and info.get("job_id") else None,
+            # The channel the system actually tracks — never a guessed
+            # marketing source.
+            "channel": ("Apply link" if info is not None and info.get("source") == "public_apply"
+                        else ("Direct upload" if info is not None else None)),
+        })
 
     iv_match = {**scope, "created_at": {"$gte": start, "$lte": end}}
     interviews = {
@@ -1503,22 +1507,26 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
             {**scope, "status": "pending"}),
     }
 
-    # Turnover: terminations whose end_date falls in the range. Zero history
-    # is the expected state for a young tenant — the UI shows "not enough
-    # data yet", never a fabricated 0.0% trend.
-    turnover = {
-        "terminated_in_range": await db.employees.count_documents(
-            {**scope, "status": "terminated",
-             "end_date": {"$gte": start_s, "$lte": end_s}}),
-        "terminated_ever": await db.employees.count_documents(
-            {**scope, "status": "terminated"}),
-    }
+    # Employment timeline, all-time and name-free: enough to reconstruct
+    # headcount at any date, plus new joiners, turnover and retention — all
+    # client-side from ONE list, so those four can never disagree.
+    timeline = []
+    async for e in db.employees.find(
+            scope, {"start_date": 1, "end_date": 1, "created_at": 1, "status": 1}):
+        st = (e.get("start_date") or "").strip() or (
+            e["created_at"].strftime("%Y-%m-%d") if e.get("created_at") else None)
+        en = (e.get("end_date") or "").strip() or None
+        if e.get("status") != "terminated":
+            en = None
+        if st:
+            timeline.append({"start": st, "end": en})
 
     return {
         "range": {"start": start_s, "end": end_s},
-        "hiring": {"time_to_hire": time_to_hire, "interviews": interviews},
+        "hires": hires,
+        "interviews": interviews,
         "hr": {"headcount": headcount, "attendance": attendance,
-               "leave": leave, "turnover": turnover},
+               "leave": leave, "timeline": timeline},
     }
 
 
