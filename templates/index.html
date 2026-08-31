@@ -3735,6 +3735,46 @@ function iqEditorRows(list){
       <button onclick="iqDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
     </div>`).join('');
 }
+// ── the written scenario (typed section) — same draft/approve discipline ──
+function iqScen(){ const st=window._iqState; return st.editing ? st.scenWork : (st.draft ? (st.draft.scenario||null) : null); }
+function iqScenSet(o){ const st=window._iqState; if(st.editing) st.scenWork=o; else if(st.draft) st.draft.scenario=o; }
+function iqScenText(v){ const s=iqScen(); if(s) s.text=v; }
+function iqScenQ(i,v){ const s=iqScen(); if(s) s.questions[i]=v; }
+function iqScenQDel(i){ const s=iqScen(); if(s){ s.questions.splice(i,1); iqRender(); } }
+function iqScenQAdd(){ const s=iqScen(); if(s && s.questions.length<4){ s.questions.push(''); iqRender(); } }
+function iqScenAdd(){ iqScenSet({text:'', questions:['','']}); iqRender(); }
+function iqScenRemove(){ if(confirm('Remove the written scenario from this set?')){ iqScenSet(null); iqRender(); } }
+function iqScenPayload(){
+  const s = iqScen();
+  if(!s) return null;
+  const qs = (s.questions||[]).map(q=>String(q).trim()).filter(Boolean);
+  if(!String(s.text||'').trim() || qs.length < 2) return {invalid:true};
+  return {text: String(s.text).trim(), questions: qs};
+}
+function iqScenEditor(){
+  const s = iqScen();
+  const head = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:5px">Written scenario — the typed section</div>';
+  if(!s) return `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">${head}
+    <div style="font-size:11px;color:var(--t3);margin-bottom:6px">No scenario in this draft — without one, the interview has no written exercise.</div>
+    <button class="btn btn-xs" onclick="iqScenAdd()">+ Write a scenario manually</button></div>`;
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">${head}
+    <textarea maxlength="900" rows="3" oninput="iqScenText(this.value)"
+      style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;line-height:1.55;resize:vertical">${escapeHtml(s.text||'')}</textarea>
+    <div style="font-size:10.5px;color:var(--t3);margin:4px 0 7px">A short, easy, realistic situation (2–4 sentences). Shown to the candidate as text and read aloud once; the questions below are answered in typing and scored together as one set.</div>
+    ${(s.questions||[]).map((q,i)=>`
+      <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:var(--t3);width:22px;text-align:right;flex-shrink:0">Q${i+1}</span>
+        <input value="${escapeHtml(q)}" maxlength="300" oninput="iqScenQ(${i},this.value)"
+               style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+        <button onclick="iqScenQDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${(s.questions||[]).length<4?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add scenario question</button>':''}
+      <button class="btn btn-xs" onclick="iqScenRemove()" style="color:var(--t3)">Remove scenario</button>
+      <span style="font-size:10.5px;color:var(--t3)">2–4 questions about this exact situation.</span>
+    </div></div>`;
+}
+
 function iqRender(){
   const st = window._iqState;
   const body = document.getElementById('iq-body');
@@ -3753,6 +3793,7 @@ function iqRender(){
         <button class="btn btn-xs" onclick="iqAdd()">+ Add question</button>
         <span id="iq-counter" style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(list)}</span>
       </div>
+      ${iqScenEditor()}
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px">
         <button class="btn btn-xs btn-primary" id="iq-approve" onclick="iqApprove()">Approve — use for this job</button>
         ${st.editing ? '' : '<button class="btn btn-xs" onclick="iqSaveDraft()">Save draft</button>'}
@@ -3768,12 +3809,19 @@ function iqRender(){
           <span style="flex:1">${escapeHtml(q.text)}</span>
           <span style="font-size:10.5px;font-weight:700;color:${q.mode==='typed'?'var(--amber,#D97706)':'var(--t3)'};flex-shrink:0">${q.mode==='typed'?'⌨ typed':'🎙 spoken'}</span>
         </div>`).join('')}
+      ${st.approved.scenario ? `
+      <div style="margin-top:10px;padding:9px 11px;background:var(--s2);border-radius:var(--rs)">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Written scenario — typed section, scored as a set</div>
+        <div style="font-size:12px;line-height:1.55;margin:5px 0;color:var(--text)">${escapeHtml(st.approved.scenario.text)}</div>
+        ${st.approved.scenario.questions.map((q,i)=>`<div style="font-size:11.5px;color:var(--t2);margin-top:3px">⌨ Q${i+1}. ${escapeHtml(q)}</div>`).join('')}
+      </div>` : `
+      <div style="font-size:10.5px;color:var(--t3);margin-top:6px">No written scenario — this interview has no written exercise.</div>`}
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
         <span style="font-size:11.5px;font-weight:700;color:var(--t2)">${iqCounts(st.approved.questions)}</span>
         <button class="btn btn-xs" onclick="iqEditApproved()">Edit questions</button>
       </div>
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
-        Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups.
+        Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups${st.approved.scenario?` + ${st.approved.scenario.questions.length} scenario answers`:''}.
       </div>`;
   }else{
     iqChip(`<span class="badge" style="background:var(--s2);color:var(--t3)">NO QUESTIONS</span>`);
@@ -3800,6 +3848,7 @@ function iqEditApproved(){
   const st = window._iqState;
   st.editing = true;
   st.work = JSON.parse(JSON.stringify(st.approved.questions));
+  st.scenWork = st.approved.scenario ? JSON.parse(JSON.stringify(st.approved.scenario)) : null;
   iqRender();
 }
 function iqSyncJobCache(){
@@ -3823,7 +3872,8 @@ async function iqGenerate(){
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
     st.draft = d.draft; st.editing = false; st.work = null;
     iqSyncJobCache(); iqRender();
-    toast(`${d.draft.count} questions drafted — review and approve below`, {type:'success'});
+    toast(`${d.draft.count} questions drafted${d.draft.scenario?' + a written scenario':''} — review and approve below`, {type:'success'});
+    if(d.scenario_error) toast('Scenario generation failed: '+d.scenario_error+' — you can write one manually below.', {type:'error'});
   }catch(e){
     toast('Could not generate questions: '+e.message, {type:'error'});
     if(btn){ btn.disabled = false; btn.textContent = 'Generate from job description'; }
@@ -3838,10 +3888,12 @@ function iqRegenerate(){
 async function iqSaveDraft(){
   const st = window._iqState;
   const list = iqList().filter(q=>q.text.trim());
+  const scen = iqScenPayload();
+  if(scen && scen.invalid){ toast('The scenario needs text and at least 2 questions — or remove it.', {type:'error'}); return; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'save_draft', questions:list})});
+      body: JSON.stringify({action:'save_draft', questions:list, scenario:scen})});
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
     st.draft = d.draft; iqSyncJobCache();
@@ -3854,12 +3906,14 @@ async function iqApprove(){
   if(list.length < 4 || list.length > 15){
     toast('An approved set needs 4–15 questions with text.', {type:'error'}); return;
   }
+  const scen = iqScenPayload();
+  if(scen && scen.invalid){ toast('The scenario needs text and at least 2 questions — or remove it before approving.', {type:'error'}); return; }
   const btn = document.getElementById('iq-approve');
   if(btn){ btn.disabled = true; btn.textContent = 'Approving…'; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'approve', questions:list})});
+      body: JSON.stringify({action:'approve', questions:list, scenario:scen})});
     const d = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail || `Server returned ${r.status}`);
     st.approved = d.approved; st.draft = null; st.editing = false; st.work = null;

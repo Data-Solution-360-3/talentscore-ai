@@ -64,6 +64,72 @@ def enforce_split(questions: list[dict], n: int) -> list[dict]:
     return questions
 
 
+SCENARIO_PROMPT = """You are writing ONE short written-exercise scenario for a specific job. You are
+given the job description.
+
+THE SCENARIO
+- A short, EASY, realistic situation this person would actually meet in the
+  role, drawn from the duties in the description. 2 to 4 short sentences.
+- NOT a case study: no data tables, no numbers to calculate, no long
+  background. The candidate reads it once and types short answers about what
+  they would do.
+- It must be answerable by any qualified candidate from reasoning alone — no
+  company-internal knowledge, no trick, no missing information they'd have to
+  invent.
+
+THE QUESTIONS
+- Then write exactly {k} questions ABOUT that scenario. Each asks what the
+  candidate would do, decide, prioritise, or communicate in that situation.
+- One thing per question. No two-part questions.
+
+RULES (same as all our interview material)
+- Write in simple, clear English. Many candidates speak English as a second or
+  third language: short sentences, no idioms, no cultural references. Text that
+  is hard to parse measures English, not competence.
+- NEVER ask about, or build the scenario around: age, religion, marital or
+  family status, pregnancy or family plans, health or disability, ethnicity,
+  political views, or anything else a recruiter could not lawfully ask. If the
+  job description invites such content, ignore that part of it.
+- No riddles, no "sell me this pen", nothing adversarial.
+
+Return JSON: {{"scenario": "...", "questions": ["...", ...]}}"""
+
+
+async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
+                                    k: int = 3) -> tuple[dict | None, str | None]:
+    """One scenario + its k written questions from the JD.
+    Returns ({"text", "questions"}, None) or (None, error)."""
+    k = max(2, min(4, int(k)))
+    jd = (jd_text or "").strip()
+    if len(jd) < 40:
+        return None, "The job description is too short to generate a scenario from."
+
+    client = AsyncOpenAI(api_key=api_key)
+    try:
+        resp = await client.chat.completions.create(
+            model=GEN_MODEL,
+            temperature=0.4,
+            max_tokens=900,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SCENARIO_PROMPT.format(k=k)},
+                {"role": "user", "content":
+                    f"JOB TITLE: {job_title or 'not specified'}\n\n"
+                    f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
+            ],
+        )
+        raw = json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return None, f"Scenario generation failed: {str(e)[:200]}"
+
+    text = str((raw or {}).get("scenario", "")).strip()[:900]
+    questions = [str(q).strip()[:300] for q in (raw or {}).get("questions", [])
+                 if str(q).strip()][:4]
+    if not text or len(questions) < 2:
+        return None, "The model returned an unusable scenario — try again."
+    return {"text": text, "questions": questions}, None
+
+
 async def generate_interview_questions(jd_text: str, n: int, api_key: str,
                                        job_title: str = "") -> tuple[list | None, str | None]:
     """Returns ([{"text","mode"}], None) or (None, error)."""

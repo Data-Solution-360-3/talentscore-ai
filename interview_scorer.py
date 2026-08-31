@@ -229,6 +229,154 @@ async def score_written_answers(qa_pairs: list, api_key: str,
 
 
 # ─────────────────────────────────────────────────────────────
+# SCENARIO scorer — the written section as ONE coherent response.
+# The candidate saw a single workplace scenario and typed answers to 2-4
+# questions about it. Scoring them separately would punish natural
+# cross-referencing ("as I said above, I'd tell the manager first"), so the
+# SET gets one score, with the scenario given to the model as the context
+# the answers must actually engage with.
+
+SCENARIO_SCORER_VERSION = "scenario-1.0"
+
+SCENARIO_SYSTEM_PROMPT = """You are assessing a candidate's WRITTEN answers to a scenario exercise, for a job screening. The candidate was shown ONE short workplace scenario and typed answers to a few questions about it. The candidate wrote in English, which is their second or third language.
+
+Evaluate the answers TOGETHER, as one coherent response to the scenario. An answer may build on an earlier one — that is normal and good, not repetition. Score only what is asked. Return per-dimension scores 0-20 for the SET AS A WHOLE, with a one-sentence justification each citing specific evidence from the answers. Do not compute an overall score — that is done in code from your dimension scores.
+
+Score these four dimensions (0-20 each) for the set:
+
+1. Relevance — Do the answers actually engage with THIS scenario and address the questions asked about it? Generic advice that ignores the situation described scores low here, however polished.
+2. Depth & Specificity — Concrete actions, steps, and judgments grounded in the scenario's details — versus vague generalities that fit any situation.
+3. Clarity & Structure of Thought — Is the REASONING organized and easy to follow across the answers? Does the candidate's approach to the situation hang together? This measures the structure of the thinking, not the polish of the English.
+4. Role Competency — Do the answers show the knowledge, judgment, and priorities you would want from someone in this role facing this situation?
+
+---
+CRITICAL — FAIRNESS FOR SECOND-LANGUAGE CANDIDATES. Read before scoring:
+
+You are scoring the QUALITY OF THE CANDIDATE'S THINKING, not their command of English.
+
+- Judge "Clarity & Structure" as the coherence and organization of the ideas — is the answer easy to follow as an argument?
+- DO NOT lower any score for, and treat as completely irrelevant:
+  - grammar, tense, article, or preposition mistakes
+  - spelling errors or typos
+  - limited vocabulary, awkward phrasing, or non-native idiom
+  - short, simple sentences or plain word choice
+- A candidate who makes a sharp, well-organized point in broken English must score HIGHER than one who writes fluent, grammatically perfect English that rambles or says nothing.
+- If you notice yourself lowering a score because the English "sounds off" rather than because the thinking is unclear — stop. That is bias, not assessment. Re-read the answer for its substance and score that.
+---
+NON-ANSWERS — a separate rule from the fairness rule above:
+
+If an individual answer is blank, a single word, off-topic filler, or otherwise a non-answer: say so plainly in that answer's note and weigh the set down accordingly — do NOT invent merit that is not in the text. If ALL the answers are non-answers, score near zero (0-2) on ALL dimensions. A non-answer is a real signal the recruiter needs, not something to be generous about.
+
+These two rules do not conflict: rough English with real substance scores HIGH; emptiness — fluent or not — scores near ZERO.
+---
+
+Return strict JSON:
+{"dimensions": [{"name": "<one of the four>", "score": <0-20>, "reason": "<one sentence citing evidence>"}], "per_answer_notes": ["<one short neutral sentence per answer, in order>"], "summary": "<one neutral sentence on the set>"}"""
+
+
+def _build_scenario_prompt(angle: str, job_title: str, scenario: str, qa_pairs: list) -> str:
+    blocks = []
+    for i, (q, a) in enumerate(qa_pairs):
+        blocks.append(f"QUESTION {i+1}: {q}\nCANDIDATE'S TYPED ANSWER:\n\"\"\"\n{(a or '')[:MAX_ANSWER_CHARS]}\n\"\"\"")
+    return (
+        f"{angle}\n\nROLE BEING SCREENED FOR: {job_title or 'not specified'}\n\n"
+        f"THE SCENARIO THE CANDIDATE WAS SHOWN:\n\"\"\"\n{(scenario or '')[:1200]}\n\"\"\"\n\n"
+        + "\n\n".join(blocks)
+        + "\n\nScore the set of answers as one response to the scenario. Use the exact dimension names given in the instructions."
+    )
+
+
+def _scenario_dims(raw: dict) -> tuple[dict, list, str]:
+    """{dimension -> (score, reason)}, per-answer notes, summary — defensively parsed."""
+    dims = {}
+    for d in (raw or {}).get("dimensions", []):
+        name = str(d.get("name", "")).strip()
+        match = next((D for D in DIMENSIONS if D.lower().split()[0] == name.lower().split()[0]), None) if name else None
+        if match is None:
+            continue
+        try:
+            score = max(0.0, min(20.0, float(d.get("score", 0))))
+        except Exception:
+            score = 0.0
+        dims[match] = (score, str(d.get("reason", ""))[:400])
+    notes = [str(x)[:300] for x in (raw or {}).get("per_answer_notes", [])][:6]
+    return dims, notes, str((raw or {}).get("summary", ""))[:300]
+
+
+async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
+                                 job_title: str = "") -> tuple[dict | None, str | None]:
+    """Score the scenario answer SET. Returns (result, error).
+
+    Same honest-architecture rules as every other scorer: strict/generous
+    dual pass with the blend and overall recomputed in code, and an all-blank
+    set is a deterministic zero with no model call.
+    """
+    if not qa_pairs:
+        return None, "No scenario answers to score."
+    blank_idx = sorted(i for i, (_, a) in enumerate(qa_pairs) if _is_blank(a))
+
+    if len(blank_idx) == len(qa_pairs):
+        dims_out = [{"name": d, "score": 0, "strict": 0, "generous": 0,
+                     "reason": "Every answer was blank — scored zero deterministically, no model call."}
+                    for d in DIMENSIONS]
+        return {
+            "scorer_version": SCENARIO_SCORER_VERSION, "model": SCORING_MODEL,
+            "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
+            "scenario": (scenario or "")[:1200],
+            "qa": [{"question": q, "answer": (a or "")[:MAX_ANSWER_CHARS]} for q, a in qa_pairs],
+            "dimensions": dims_out, "overall": 0,
+            "per_answer_notes": ["No answer was given." for _ in qa_pairs],
+            "summary": "No answers were given to the scenario.",
+            "audit": {"strict": None, "generous": None, "all_blank": True},
+            "blank_answers": blank_idx,
+        }, None
+
+    client = AsyncOpenAI(api_key=api_key)
+
+    async def _call(angle: str, temperature: float) -> dict:
+        resp = await client.chat.completions.create(
+            model=SCORING_MODEL, temperature=temperature, max_tokens=1600,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SCENARIO_SYSTEM_PROMPT},
+                {"role": "user", "content": _build_scenario_prompt(angle, job_title, scenario, qa_pairs)},
+            ],
+        )
+        return json.loads(resp.choices[0].message.content)
+
+    try:
+        strict_raw, generous_raw = await asyncio.gather(
+            _call(STRICT_ANGLE, 0.2), _call(GENEROUS_ANGLE, 0.3))
+    except Exception as e:
+        return None, f"Scenario scoring call failed: {str(e)[:200]}"
+
+    s_dims, s_notes, s_sum = _scenario_dims(strict_raw)
+    g_dims, g_notes, g_sum = _scenario_dims(generous_raw)
+    blended, dims_out = {}, []
+    for d in DIMENSIONS:
+        ss, sr = s_dims.get(d, (0.0, "not scored"))
+        gs, gr = g_dims.get(d, (0.0, "not scored"))
+        bl = round(ss * BLEND_STRICT + gs * BLEND_GENEROUS, 1)
+        blended[d] = bl
+        dims_out.append({"name": d, "score": bl, "strict": ss, "generous": gs, "reason": sr or gr})
+    overall = max(0, min(100, round(sum(blended.values()) / 80 * 100)))
+
+    return {
+        "scorer_version": SCENARIO_SCORER_VERSION, "model": SCORING_MODEL,
+        "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
+        "scenario": (scenario or "")[:1200],
+        "qa": [{"question": q, "answer": (a or "")[:MAX_ANSWER_CHARS]} for q, a in qa_pairs],
+        "dimensions": dims_out, "overall": overall,
+        "per_answer_notes": s_notes or g_notes,
+        "summary": s_sum or g_sum,
+        "audit": {"strict": {d: s_dims.get(d, (None,))[0] for d in DIMENSIONS},
+                  "generous": {d: g_dims.get(d, (None,))[0] for d in DIMENSIONS},
+                  "all_blank": False},
+        "blank_answers": blank_idx,
+    }, None
+
+
+# ─────────────────────────────────────────────────────────────
 # SPOKEN interview scorer (L4) — whole-conversation, not per-answer.
 # A live follow-up answer ("yes, exactly — it was the cache") is legitimately
 # three words BECAUSE of context; per-exchange scoring would punish the very

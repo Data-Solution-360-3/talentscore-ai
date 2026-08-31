@@ -181,6 +181,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <div class="q-label" id="q-label">Getting ready…</div>
   <div class="question" id="question"><span class="caret"></span></div>
   <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
+  <div id="scen" style="display:none;margin:10px 0;background:#F4FAF6;border:1.5px solid #CDE7D8;border-radius:14px;padding:12px 14px;text-align:left">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#3C7A5A;margin-bottom:5px">Written exercise — the scenario</div>
+    <div id="scen-text" style="font-size:14px;line-height:1.65;color:#1F2A24;white-space:pre-wrap"></div>
+    <div style="font-size:11.5px;color:#6B7B72;margin-top:7px">This stays on screen — refer back to it while you answer.</div>
+  </div>
   <div class="typed" id="typed">
     <div class="typed-label">Type your answer</div>
     <textarea id="typed-ta" maxlength="4000" placeholder="Type your answer here…"></textarea>
@@ -234,6 +239,10 @@ let started=false;
 // mixed spoken/typed — the model flips the mode by calling begin_typed_answer
 let typing=false, typedCallId=null, typedQuestion='', restoreTD=null;
 const TYPED_KEY='tc-typed-'+TOKEN;
+// scenario section — the model pins the scenario via show_scenario, and every
+// typed answer from then on belongs to the scenario set (scored together)
+let scenActive=false, scenText='';
+const SCEN_KEY='tc-scen-'+TOKEN;
 
 // ── presence / question UI ───────────────────────────────────
 function setPresence(k, txt){
@@ -263,7 +272,9 @@ async function mintToken(){
       transcript: transcript.slice(-30),
       progress:{asked: questionsAsked},
       // recovery mid-type: tell the server which question the panel is holding
-      awaiting_typed: typing ? typedQuestion : null
+      awaiting_typed: typing ? typedQuestion : null,
+      // recovery mid-scenario: the card is still pinned; don't re-present it
+      scenario_shown: scenActive
     })
   });
   if(r.status===404) throw {dead:true};
@@ -382,11 +393,32 @@ function enterTyped(callId, question){
   $('typed-ta').focus();
   log('typed phase: open', typedCallId ? '(tool '+typedCallId+')' : '(no call id)');
 }
+// ── scenario section: pin the scenario, ack the tool, let the model speak ──
+function showScenario(callId, text){
+  scenText = String(text||'').slice(0,900);
+  if(!scenText){ log('show_scenario with empty text — ignored'); return; }
+  scenActive = true;
+  try{ sessionStorage.setItem(SCEN_KEY, scenText); }catch(_){}
+  $('scen-text').textContent = scenText;
+  $('scen').style.display = 'block';
+  transcript.push({role:'ai', text: scenText, mode:'scenario'});
+  if(dc && dc.readyState==='open'){
+    if(callId){
+      dc.send(JSON.stringify({type:'conversation.item.create',
+        item:{type:'function_call_output', call_id:callId,
+              output: JSON.stringify({displayed:true})}}));
+    }
+    dc.send(JSON.stringify({type:'response.create'}));
+  }
+  log('scenario pinned on screen ('+scenText.length+' chars)');
+}
+
 function submitTyped(){
   const ta = $('typed-ta');
   const text = ta.value.trim();
   if(!text){ ta.focus(); return; }
-  transcript.push({role:'you', text, mode:'typed'});
+  transcript.push(scenActive ? {role:'you', text, mode:'typed', scen:1}
+                             : {role:'you', text, mode:'typed'});
   try{ sessionStorage.removeItem(TYPED_KEY); }catch(_){}
   ta.value='';
   typing = false;
@@ -434,6 +466,9 @@ function onEvent(ev){
     if(msg.item.name==='begin_typed_answer'){
       let q=''; try{ q = String(JSON.parse(msg.item.arguments||'{}').question||''); }catch(_){}
       enterTyped(msg.item.call_id, q);
+    }else if(msg.item.name==='show_scenario'){
+      let sc=''; try{ sc = String(JSON.parse(msg.item.arguments||'{}').scenario||''); }catch(_){}
+      showScenario(msg.item.call_id, sc);
     }else{
       log('UNEXPECTED tool name — panel not opened');
     }

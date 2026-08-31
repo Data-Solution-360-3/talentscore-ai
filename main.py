@@ -1531,10 +1531,65 @@ _TYPED_RULES = (
     "(TYPED) opening question as a voice-answer question.\n")
 
 
+def _normalize_scenario(raw) -> dict | None:
+    """{"text", "questions": [2-4 strings]} or None. The single validator for
+    every path that stores or launches a scenario — generation, review-save,
+    approve, and config all go through here."""
+    if not isinstance(raw, dict):
+        return None
+    text = str(raw.get("text", "")).strip()[:900]
+    questions = [str(q).strip()[:300] for q in (raw.get("questions") or [])
+                 if str(q).strip()][:4]
+    if not text or len(questions) < 2:
+        return None
+    return {"text": text, "questions": questions}
+
+
+# The scenario's display signal, sibling to begin_typed_answer: the page never
+# receives the scenario server-side, so the model — which carries it in its
+# instructions — hands the text over by calling this tool, and the page pins
+# it on screen for the whole written section. If the model never calls it,
+# the scenario still gets read aloud: degraded, never broken.
+_SCENARIO_TOOL = {
+    "type": "function",
+    "name": "show_scenario",
+    "description": ("Display the written-exercise scenario on the candidate's screen. Call it "
+                    "once, at the start of the written scenario section, with the exact scenario "
+                    "text from your instructions. It stays visible while they type their answers."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "scenario": {"type": "string",
+                         "description": "The exact scenario text to display."},
+        },
+        "required": ["scenario"],
+    },
+}
+
+_SCENARIO_RULES_TEMPLATE = (
+    "\nWRITTEN SCENARIO SECTION — the final part of the interview\n"
+    "- Reserve the LAST {k} of your {max_turns} questions for this section. When the control "
+    "notes say {k} questions remain, begin it — never earlier, never skip it.\n"
+    "- To begin: say ONE short transition sentence — the last part is a short written exercise "
+    "about a work situation. Then call the tool show_scenario with the EXACT scenario text "
+    "below; it appears on the candidate's screen so they can keep referring to it. After the "
+    "tool result arrives, read the scenario aloud once, slowly and clearly.\n"
+    "- Then ask the scenario questions below one at a time, IN ORDER, each as a TYPED question: "
+    "read the question aloud, call begin_typed_answer with its exact text, and wait in silence. "
+    "All TYPED rules above apply to these questions.\n"
+    "- Ask these questions exactly as written. No adaptive follow-ups inside this section, and "
+    "never invent a different scenario or extra scenario questions.\n"
+    "- The scenario (pass verbatim to show_scenario, then read aloud):\n"
+    "  \"{scenario}\"\n"
+    "- The scenario questions, in order:\n{qlist}\n")
+
+
 def _build_live_instructions(questions: list, max_turns: int,
-                             interviewer_name: str = "") -> str:
-    """questions: normalized [{"text","mode"}] dicts (see _normalize_questions)."""
-    has_typed = any(q["mode"] == "typed" for q in questions)
+                             interviewer_name: str = "",
+                             scenario: dict | None = None) -> str:
+    """questions: normalized [{"text","mode"}] dicts (see _normalize_questions).
+    scenario: normalized {"text","questions"} or None (see _normalize_scenario)."""
+    has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     if has_typed:
         numbered = "\n".join(
             f"  {i+1}. ({'TYPED' if q['mode'] == 'typed' else 'SPOKEN'}) {q['text']}"
@@ -1558,7 +1613,12 @@ def _build_live_instructions(questions: list, max_turns: int,
         "  * an answer that dodged the question -> rephrase the question once, simply\n"
         "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
         "this is a phone conversation, not an essay.\n"
-        + (_TYPED_RULES if has_typed else "") +
+        + (_TYPED_RULES if has_typed else "")
+        + (_SCENARIO_RULES_TEMPLATE.format(
+               k=len(scenario["questions"]), max_turns=max_turns,
+               scenario=scenario["text"].replace('"', "'"),
+               qlist="\n".join(f"  {i+1}. {q}" for i, q in enumerate(scenario["questions"])))
+           if scenario else "") +
         "\nCONTROL NOTES\n"
         "- System messages of the form \"[Interview control note: ...]\" tell you how many questions "
         "remain. Obey them exactly. When a note says the questions are finished, respond to the "
@@ -1784,7 +1844,8 @@ async def score_live_session(session_id: str):
     two segment scores, NO blended overall. Both scorers carry the same ESL
     fairness rules and non-answer floor, both proven by the fairness gate."""
     from bson import ObjectId as _OID
-    from interview_scorer import score_spoken_interview, score_written_answers
+    from interview_scorer import (score_spoken_interview, score_written_answers,
+                                  score_scenario_answers)
     try:
         sess = await db.interview_sessions.find_one({"_id": _OID(session_id)})
         if not sess:
@@ -1797,16 +1858,20 @@ async def score_live_session(session_id: str):
         # Typed Q/A pairs: each typed answer with the nearest preceding
         # interviewer turn as its question. The spoken scorer sees the
         # conversation WITHOUT the typed answers — different instrument.
-        qa_pairs = []
+        qa_pairs, scen_pairs = [], []
         for i, t in enumerate(full):
             if (t or {}).get("mode") == "typed":
                 q = ""
                 for j in range(i - 1, -1, -1):
-                    if (full[j] or {}).get("role") == "ai":
+                    if (full[j] or {}).get("role") == "ai" and (full[j] or {}).get("mode") != "scenario":
                         q = str(full[j].get("text", ""))
                         break
-                qa_pairs.append((q, str(t.get("text", ""))))
-        spoken_only = [t for t in full if (t or {}).get("mode") != "typed"]
+                # scen-flagged answers belong to the scenario section and are
+                # scored as a SET with the scenario as context.
+                (scen_pairs if (t or {}).get("scen") else qa_pairs).append(
+                    (q, str(t.get("text", ""))))
+        spoken_only = [t for t in full
+                       if (t or {}).get("mode") not in ("typed", "scenario")]
 
         result, err = await score_spoken_interview(
             spoken_only, OPENAI_API_KEY, job_title=job_title)
@@ -1823,11 +1888,27 @@ async def score_live_session(session_id: str):
             if written_error:
                 print(f"[VIVA-LIVE] written segment scoring failed for {session_id}: {written_error}")
 
+        scenario_result, scenario_error = None, None
+        if scen_pairs:
+            scen_cfg = (sess.get("config") or {}).get("scenario") or {}
+            scen_text = str(scen_cfg.get("text") or "")
+            # Prefer the recruiter-approved question texts over the transcript's
+            # nearest-AI-turn heuristic when the counts line up.
+            approved_qs = [str(q) for q in (scen_cfg.get("questions") or [])]
+            if len(approved_qs) == len(scen_pairs):
+                scen_pairs = [(approved_qs[i], scen_pairs[i][1]) for i in range(len(scen_pairs))]
+            scenario_result, scenario_error = await score_scenario_answers(
+                scen_text, scen_pairs, OPENAI_API_KEY, job_title=job_title)
+            if scenario_error:
+                print(f"[VIVA-LIVE] scenario scoring failed for {session_id}: {scenario_error}")
+
         await db.interview_sessions.update_one(
             {"_id": _OID(session_id)},
             {"$set": {"score_status": "scored", "score_result": result,
                       "written_result": written_result,
                       "written_error": written_error,
+                      "scenario_result": scenario_result,
+                      "scenario_error": scenario_error,
                       "scored_at": _dt.utcnow(), "score_error": None}})
     except Exception as e:
         print(f"[VIVA-LIVE] session scoring failed for {session_id}: {e}")
@@ -1956,7 +2037,7 @@ def _validated_viva_config(body: dict) -> dict:
     except Exception:
         max_turns = 4
     max_turns = max(max_turns, len(questions))
-    return {
+    cfg = {
         "questions": questions,
         "max_turns": max_turns,
         "vad": body.get("vad") if body.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD,
@@ -1964,6 +2045,15 @@ def _validated_viva_config(body: dict) -> dict:
         "interviewer_name": str(body.get("interviewer_name", "")).strip()[:60] or "AI Interviewer",
         "job_title": str(body.get("job_title", "")).strip()[:120],
     }
+    scenario = _normalize_scenario(body.get("scenario"))
+    if scenario:
+        cfg["scenario"] = scenario
+        # The scenario's questions consume turns of their own — make sure the
+        # budget can hold the spoken openings plus the whole written section.
+        cfg["max_turns"] = max(cfg["max_turns"],
+                               min(_VIVA_MAX_TURNS_CAP,
+                                   len(questions) + len(scenario["questions"])))
+    return cfg
 
 
 @app.post("/api/viva-live/preview-session")
@@ -1980,15 +2070,24 @@ async def viva_live_preview_session(request: Request):
         raise HTTPException(status_code=400, detail="Invalid request body.")
     config = _validated_viva_config(body)
     questions = _normalize_questions(config.get("questions"))
-    has_typed = any(q["mode"] == "typed" for q in questions)
+    scenario = _normalize_scenario(config.get("scenario"))
+    has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
-                                            interviewer_name=config.get("interviewer_name", ""))
+                                            interviewer_name=config.get("interviewer_name", ""),
+                                            scenario=scenario)
     return {
         "questions": questions,
         "has_typed": has_typed,
         "tool_registered": bool(has_typed),   # mirrors the mint's tools= branch
         "tool_name": _TYPED_ANSWER_TOOL[0]["name"] if has_typed else None,
         "typed_rules_in_instructions": "begin_typed_answer" in instructions and "(TYPED)" in instructions,
+        "scenario": scenario,
+        "scenario_tool_registered": bool(scenario),   # mirrors the mint's tools= branch
+        "scenario_in_instructions": (bool(scenario)
+                                     and "show_scenario" in instructions
+                                     and "WRITTEN SCENARIO SECTION" in instructions
+                                     and scenario["text"].replace('"', "'") in instructions),
+        "max_turns": int(config.get("max_turns", 4)),
     }
 
 
@@ -2055,7 +2154,7 @@ async def candidate_session_token(request: Request, token: str):
         # Budget exhausted — same neutral closed message as a dead token.
         raise HTTPException(status_code=404, detail="This interview isn't available.")
 
-    transcript, asked, awaiting_typed = [], 0, ""
+    transcript, asked, awaiting_typed, scenario_shown = [], 0, "", False
     try:
         body = await request.json()
         if isinstance(body, dict):
@@ -2065,6 +2164,7 @@ async def candidate_session_token(request: Request, token: str):
             # Recovery while a typed answer was in progress: the client says
             # which question it is still holding the panel open for.
             awaiting_typed = str(body.get("awaiting_typed") or "").strip()[:300]
+            scenario_shown = bool(body.get("scenario_shown"))
     except Exception:
         pass
 
@@ -2072,11 +2172,13 @@ async def candidate_session_token(request: Request, token: str):
     questions = _normalize_questions(cfg.get("questions"))
     if not questions:
         questions = [{"text": _VIVA_DEFAULT_QUESTION, "mode": "spoken"}]
-    has_typed = any(q["mode"] == "typed" for q in questions)
+    scenario = _normalize_scenario(cfg.get("scenario"))
+    has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     max_turns = int(cfg.get("max_turns", 4))
     asked = min(asked, max_turns)
     instructions = _build_live_instructions(questions, max_turns,
-                                            interviewer_name=cfg.get("interviewer_name", ""))
+                                            interviewer_name=cfg.get("interviewer_name", ""),
+                                            scenario=scenario)
     recovered = False
     if transcript:
         lines = []
@@ -2090,14 +2192,25 @@ async def candidate_session_token(request: Request, token: str):
             instructions += _VIVA_RECOVERY_TEMPLATE.format(
                 lines=joined, asked=asked, max_turns=max_turns)
             recovered = True
+            if scenario and scenario_shown:
+                # The scenario was already presented before the drop — the page
+                # still has it pinned. Continue the section, don't restart it.
+                instructions += (
+                    "\n\nADDITIONALLY — WRITTEN SCENARIO IN PROGRESS. Before the drop you had "
+                    "already presented the written scenario; it is still visible on the "
+                    "candidate's screen. Do NOT call show_scenario again and do NOT re-read the "
+                    "scenario in full. Continue the scenario section from where the transcript "
+                    "leaves off: ask the next unanswered scenario question as a TYPED question.")
             if has_typed and awaiting_typed:
                 instructions += _VIVA_TYPED_RECOVERY_TEMPLATE.format(
                     q=awaiting_typed.replace('"', "'"))
 
     vad = cfg.get("vad", _VIVA_DEFAULT_VAD)
+    tools = None
+    if has_typed:
+        tools = list(_TYPED_ANSWER_TOOL) + ([_SCENARIO_TOOL] if scenario else [])
     try:
-        out = await _mint_realtime_secret(instructions, vad,
-                                          tools=_TYPED_ANSWER_TOOL if has_typed else None)
+        out = await _mint_realtime_secret(instructions, vad, tools=tools)
     except HTTPException:
         raise
     except Exception as e:
@@ -2139,9 +2252,16 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         entry = {"role": "ai" if (t or {}).get("role") == "ai" else "you"}
         # Typed answers are composed prose, not utterances — they keep their
         # mode tag (it routes them to the written scorer) and a longer cap.
+        # Scenario-section answers additionally carry scen, which routes them
+        # to the set-level scenario scorer instead of the per-answer one.
         if (t or {}).get("mode") == "typed":
             entry["mode"] = "typed"
             entry["text"] = text[:4000]
+            if (t or {}).get("scen"):
+                entry["scen"] = True
+        elif (t or {}).get("mode") == "scenario":
+            entry["mode"] = "scenario"       # the pinned scenario text itself
+            entry["text"] = text[:900]
         else:
             entry["text"] = text[:600]
         clean.append(entry)
@@ -2162,7 +2282,8 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "transcript": transcript,
         "config": {"questions": cfg.get("questions"), "max_turns": cfg.get("max_turns"),
                    "vad": cfg.get("vad"), "job_title": cfg.get("job_title", ""),
-                   "interviewer_name": cfg.get("interviewer_name", "")},
+                   "interviewer_name": cfg.get("interviewer_name", ""),
+                   "scenario": _normalize_scenario(cfg.get("scenario"))},
         "questions_asked": _i(body.get("questions_asked"), 0, 20),
         "recoveries": _i(body.get("recoveries"), 0, 50),
         "barge_ins": _i(body.get("barge_ins"), 0, 200),
@@ -2539,10 +2660,17 @@ async def public_apply_status(token: str, application_id: str):
         # follow-ups, unless the manual setting was already higher.
         approved = ((job.get("interview_questions") or {}).get("approved") or {})
         jqs = _normalize_questions(approved.get("questions"))
+        jsc = _normalize_scenario(approved.get("scenario"))
         if jqs:
             cfg["questions"] = jqs
+            # Budget: every main question + 2 spoken adaptive follow-ups + one
+            # turn per scenario question (the written section's own turns).
+            scen_turns = len(jsc["questions"]) if jsc else 0
             cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
-                                   max(int(cfg.get("max_turns", 4)), len(jqs) + 2))
+                                   max(int(cfg.get("max_turns", 4)),
+                                       len(jqs) + 2 + scen_turns))
+        if jsc:
+            cfg["scenario"] = jsc
         live_doc = await create_live_interview(str(job.get("user_id") or ""), cfg)
         await db.live_interviews.update_one(
             {"public_token": live_doc["public_token"]},
@@ -2618,7 +2746,8 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     """Owner: generate the job's interview questions from its JD — ON DEMAND,
     once, into the DRAFT slot. The approved slot (what candidates actually
     get) is never touched by generation."""
-    from question_gen import generate_interview_questions, GEN_MODEL
+    from question_gen import (generate_interview_questions, generate_written_scenario,
+                              GEN_MODEL)
     user = await get_current_user(request)
     job = await owned_job(job_id, user)
     if not OPENAI_API_KEY:
@@ -2638,10 +2767,20 @@ async def job_interview_questions_generate(request: Request, job_id: str):
         job_title=job.get("title") or "")
     if err or not questions:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
+    # The written section's scenario, from the same JD in the same click. Its
+    # failure is non-fatal — the questions draft still lands, with the error
+    # surfaced so the recruiter can regenerate.
+    scenario, scen_err = await generate_written_scenario(
+        job.get("description") or "", OPENAI_API_KEY,
+        job_title=job.get("title") or "", k=3)
     draft = {"questions": questions, "count": len(questions),
-             "generated_at": _dt.utcnow(), "model": GEN_MODEL}
+             "generated_at": _dt.utcnow(), "model": GEN_MODEL,
+             "scenario": _normalize_scenario(scenario)}
     await update_job_interview_questions(job["_id"], {"draft": draft})
-    return {"success": True, "draft": serialize_mongo(draft)}
+    out = {"success": True, "draft": serialize_mongo(draft)}
+    if scen_err:
+        out["scenario_error"] = scen_err
+    return out
 
 
 @app.post("/api/jobs/{job_id}/interview-questions")
@@ -2664,17 +2803,22 @@ async def job_interview_questions_save(request: Request, job_id: str):
         raise HTTPException(status_code=400, detail="Unknown action.")
 
     questions = _normalize_questions(body.get("questions"))
+    # The scenario rides the same review-then-approve flow: whatever the
+    # recruiter edited is what gets stored; an AI scenario never goes live
+    # unseen. A body without a usable scenario approves as questions-only.
+    scenario = _normalize_scenario(body.get("scenario"))
     if action == "approve":
         if not 4 <= len(questions) <= _VIVA_MAX_QUESTIONS:
             raise HTTPException(status_code=400,
                                 detail=f"An approved set needs 4–{_VIVA_MAX_QUESTIONS} questions.")
         approved = {"questions": questions, "count": len(questions),
-                    "approved_at": _dt.utcnow()}
+                    "approved_at": _dt.utcnow(), "scenario": scenario}
         await update_job_interview_questions(job["_id"], {"approved": approved, "draft": None})
         return {"success": True, "approved": serialize_mongo(approved), "draft": None}
     if not questions:
         raise HTTPException(status_code=400, detail="At least one question is required.")
-    draft = {"questions": questions, "count": len(questions), "updated_at": _dt.utcnow()}
+    draft = {"questions": questions, "count": len(questions), "updated_at": _dt.utcnow(),
+             "scenario": scenario}
     await update_job_interview_questions(job["_id"], {"draft": draft})
     return {"success": True, "draft": serialize_mongo(draft)}
 

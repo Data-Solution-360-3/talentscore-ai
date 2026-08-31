@@ -607,6 +607,34 @@ def main():
         except Exception as e:
             line(None, "POST", "/api/viva-live/preview-session (typed)", str(e)[:60])
             failures.append(("POST", "/api/viva-live/preview-session (typed)", "exception"))
+        # Scenario-based written section: a config with a scenario MUST
+        # register BOTH tools, put the scenario verbatim + section rules into
+        # the instructions, and grow the turn budget to hold its questions.
+        try:
+            r = c.post("/api/viva-live/preview-session", json={
+                "questions": [{"text": "Spoken q", "mode": "spoken"}],
+                "max_turns": 1,
+                "scenario": {"text": "A smoke-test scenario about a report deadline.",
+                             "questions": ["What would you do first?",
+                                           "How would you communicate the delay?"]}})
+            body = r.json() if r.status_code == 200 else {}
+            sc = body.get("scenario") or {}
+            ok = (r.status_code == 200
+                  and body.get("scenario_tool_registered") is True
+                  and body.get("scenario_in_instructions") is True
+                  and body.get("tool_registered") is True          # typed panel still armed
+                  and body.get("typed_rules_in_instructions") is True
+                  and len(sc.get("questions", [])) == 2
+                  and int(body.get("max_turns", 0)) >= 3)          # 1 spoken + 2 scenario
+            line(r.status_code, "POST", "/api/viva-live/preview-session (scenario)",
+                 "scenario -> both tools + rules + budget grown" if ok
+                 else f"SCENARIO FLOW BROKEN: {str(body)[:90]}")
+            checked += 1
+            if not ok:
+                failures.append(("POST", "/api/viva-live/preview-session (scenario)", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/viva-live/preview-session (scenario)", str(e)[:60])
+            failures.append(("POST", "/api/viva-live/preview-session (scenario)", "exception"))
         # Job-based sets: 10 questions must survive the pipeline intact — this
         # exact check catches a cap regression (questions were [:3] before
         # job-based sets raised the limits) and a mode-mangling one.
