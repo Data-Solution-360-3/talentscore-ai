@@ -723,7 +723,11 @@ function finishInterview(){
 function endInterview(){
   manualStop = true;
   window._procSummary = procStop();
-  saveSession('abandoned');
+  // Pressing End DURING the wrap-up is a finished interview, not an abandoned
+  // one — every question was asked and answered; only the goodbye was cut
+  // short. Labeling those "abandoned" kept fully-answered interviews out of
+  // the candidate's Overall.
+  saveSession((closing || closingDone) ? 'completed' : 'abandoned');
   cleanup(); recon(false);
   view('v-done');
 }

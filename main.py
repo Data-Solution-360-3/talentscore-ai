@@ -2038,24 +2038,33 @@ async def score_live_session(session_id: str):
                       "scored_at": _dt.utcnow(), "score_error": None}})
 
         # Write the combined numbers back onto the candidate's SCREENING, so
-        # every ranking surface reads one document. Completed interviews only —
-        # an abandoned partial run never enters the overall.
+        # every ranking surface reads one document. EVERY scored session with
+        # an intact chain writes back — gating on status=="completed" left
+        # fully-answered interviews (saved "abandoned" by the End button)
+        # invisible to the overall while the UI's session join still showed
+        # their score. Precedence: a completed session's numbers are never
+        # overwritten by an abandoned one.
         try:
-            if sess.get("status") == "completed" and sess.get("application_id"):
+            if sess.get("application_id"):
                 app_doc = await db.applications.find_one(
                     {"_id": _OID(str(sess["application_id"]))}, {"screening_id": 1})
                 sid = app_doc and app_doc.get("screening_id")
                 if sid:
-                    scr = await db.screenings.find_one({"_id": _OID(str(sid))}, {"overall_score": 1})
+                    scr = await db.screenings.find_one(
+                        {"_id": _OID(str(sid))}, {"overall_score": 1, "interview_status": 1})
                     if scr is not None:
-                        cv = int(scr.get("overall_score") or 0)
-                        await db.screenings.update_one({"_id": scr["_id"]}, {"$set": {
-                            "interview_score": interview_score,
-                            "interview_parts": interview_parts,
-                            "interview_session_id": session_id,
-                            "overall_combined": round(OV_W_CV * cv + OV_W_IV * interview_score),
-                            "overall_weights": {"cv": OV_W_CV, "interview": OV_W_IV},
-                            "interview_scored_at": _dt.utcnow()}})
+                        incoming = sess.get("status") or "abandoned"
+                        existing = scr.get("interview_status")
+                        if incoming == "completed" or existing != "completed":
+                            cv = int(scr.get("overall_score") or 0)
+                            await db.screenings.update_one({"_id": scr["_id"]}, {"$set": {
+                                "interview_score": interview_score,
+                                "interview_parts": interview_parts,
+                                "interview_session_id": session_id,
+                                "interview_status": incoming,
+                                "overall_combined": round(OV_W_CV * cv + OV_W_IV * interview_score),
+                                "overall_weights": {"cv": OV_W_CV, "interview": OV_W_IV},
+                                "interview_scored_at": _dt.utcnow()}})
         except Exception as wb:
             print(f"[VIVA-LIVE] screening write-back failed for {session_id}: {wb}")
     except Exception as e:
