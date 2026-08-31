@@ -104,41 +104,64 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
 
-/* ── Dashboard soft-SaaS restyle — SCOPED to #page-overview so the shared
-   .stat/.stats-grid/.funnel classes on other pages are untouched. Presentation
-   only; every #ov-* / #fn-* id and its data wiring is unchanged. ── */
-#page-overview{--lift-sm:0 1px 2px rgba(20,40,72,.03),0 4px 16px rgba(20,40,72,.05);--lift-md:0 2px 4px rgba(20,40,72,.04),0 12px 32px rgba(20,40,72,.07)}
-#page-overview .dsh-label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin:0 0 .8rem .2rem;display:flex;align-items:center;gap:8px}
-#page-overview .dsh-label .pill{font-size:9.5px;font-weight:800;padding:2px 9px;border-radius:9999px;background:var(--gg);color:var(--green);letter-spacing:.04em}
-#page-overview .dsh-stats{display:grid;gap:1.15rem;margin-bottom:1.75rem}
-#page-overview .dsh-stats.five{grid-template-columns:repeat(5,1fr)}
-#page-overview .dsh-stats.three{grid-template-columns:repeat(3,1fr)}
-#page-overview .dsh-stats .stat{background:var(--surface);border:none;border-radius:20px;padding:1.5rem 1.4rem;box-shadow:var(--lift-sm);overflow:visible;transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s}
-#page-overview .dsh-stats .stat:hover{transform:translateY(-4px);box-shadow:var(--lift-md)}
-#page-overview .dsh-stats .stat-bar{display:none}
-#page-overview .dsh-stats .stat-ico{position:static;width:42px;height:42px;border-radius:13px;margin-bottom:1rem}
-#page-overview .dsh-stats .stat-val{font-size:2.15rem;font-weight:900;letter-spacing:-1.4px;line-height:1}
-#page-overview .dsh-stats .stat-lbl{font-size:12.5px;font-weight:700;color:var(--t2);margin-top:.5rem;text-transform:none;letter-spacing:0}
-#page-overview .dsh-stats .stat-sub{font-size:11px;color:var(--t3);margin-top:2px}
-#page-overview .dsh-card{background:var(--surface);border:none;border-radius:20px;box-shadow:var(--lift-sm);padding:1.5rem 1.6rem;margin-bottom:1.5rem}
-#page-overview .funnel{gap:.9rem}
-#page-overview .funnel-stage{background:var(--s2);border:none;border-radius:12px;padding:1.1rem 1rem;box-shadow:none;transition:transform .2s,box-shadow .2s,background .2s}
-#page-overview .funnel-stage:hover{transform:translateY(-3px);box-shadow:var(--lift-sm);background:#fff}
-#page-overview .funnel-num{font-size:1.7rem;font-weight:900;letter-spacing:-1px}
-#page-overview .dsh-split{display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem}
-#page-overview .dsh-split .dsh-card{margin-bottom:0}
-#page-overview .today-item{display:flex;gap:11px;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid var(--border)}
-#page-overview .today-item:last-child{border-bottom:none}
-#page-overview .today-ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex-shrink:0}
-#page-overview .today-t{font-size:13px;font-weight:700;line-height:1.35}
-#page-overview .today-s{font-size:11.5px;color:var(--t3);margin-top:1px}
-#page-overview .today-cta{margin-top:.35rem;font-size:11.5px;font-weight:700;color:var(--orange2);cursor:pointer;background:none;border:none;padding:0;font-family:inherit}
-#page-overview .today-empty{font-size:12px;color:var(--t3);padding:.6rem 0}
-@media (prefers-reduced-motion:reduce){#page-overview .dsh-stats .stat,#page-overview .funnel-stage{transition:none}}
-@media(max-width:1000px){#page-overview .dsh-stats.five{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:900px){#page-overview .dsh-split{grid-template-columns:1fr}}
-@media(max-width:720px){#page-overview .dsh-stats.five,#page-overview .dsh-stats.three{grid-template-columns:1fr 1fr}}
-@media(max-width:480px){#page-overview .dsh-stats.five,#page-overview .dsh-stats.three{grid-template-columns:1fr}}
+/* ── Reference-layout dashboard — SCOPED to #page-overview. Green primary,
+   orange accent, charcoal text, no navy/blue. Sidebar + top bar unaffected. ── */
+#page-overview{--rg-green:#16A34A;--rg-green2:#128A40;--rg-gg:rgba(22,163,74,.10);--rg-gg2:rgba(22,163,74,.16);
+  --rg-org:#F57C2E;--rg-org2:#E16A1F;--rg-og:rgba(245,124,46,.12);
+  --rg-pur:#7C5CD6;--rg-pg:rgba(124,92,214,.12);--rg-red:#E4544B;--rg-rd:rgba(228,84,75,.12);
+  --rg-ink:#1F2A24;--rg-mut:#6B7B72;--rg-mut2:#93A29A;--rg-soft:#F4FAF6;--rg-line:#E6EFE9;
+  --rg-sh:0 1px 2px rgba(24,60,40,.03),0 6px 20px rgba(24,60,40,.05);--rg-sh2:0 2px 4px rgba(24,60,40,.04),0 14px 34px rgba(24,60,40,.08)}
+#page-overview .rd{color:var(--rg-ink)}
+#page-overview .rd-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+#page-overview .rd-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+#page-overview .rd-sec{font-size:15px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink)}
+#page-overview .rd-card{background:var(--surface);border-radius:20px;box-shadow:var(--rg-sh);padding:18px}
+#page-overview .rd-h{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--rg-ink);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+#page-overview .rd-see{font-size:12px;font-weight:700;color:var(--rg-org2);cursor:pointer}
+#page-overview .rd-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#page-overview .rd-stat{background:var(--surface);border-radius:16px;box-shadow:var(--rg-sh);padding:16px;cursor:pointer;transition:transform .2s,box-shadow .2s}
+#page-overview .rd-stat:hover{transform:translateY(-3px);box-shadow:var(--rg-sh2)}
+#page-overview .rd-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:11px}
+#page-overview .rd-ico.gn{background:var(--rg-gg)} #page-overview .rd-ico.pu{background:var(--rg-pg)} #page-overview .rd-ico.rd-red{background:var(--rg-rd)}
+#page-overview .rd-val{font-size:1.9rem;font-weight:900;letter-spacing:-1px;line-height:1;color:var(--rg-ink)}
+#page-overview .rd-lbl{font-size:12px;color:var(--rg-mut);font-weight:600;margin-top:4px}
+#page-overview .rd-charts{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+#page-overview .rd-bars{display:flex;align-items:flex-end;gap:12px;height:132px;padding-top:8px}
+#page-overview .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
+#page-overview .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
+#page-overview .rd-bars .bar:hover i{background:var(--rg-green)}
+#page-overview .rd-bars .bar span{font-size:10px;color:var(--rg-mut2);font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#page-overview .rd-donutwrap{display:flex;align-items:center;gap:16px}
+#page-overview .rd-leg{font-size:12px;color:var(--rg-mut);display:flex;flex-direction:column;gap:9px}
+#page-overview .rd-leg b{color:var(--rg-ink)}
+#page-overview .rd-leg .d{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
+#page-overview .rd-act{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--rg-line);cursor:pointer}
+#page-overview .rd-act:last-child{border-bottom:none}
+#page-overview .rd-act:hover{background:var(--rg-soft);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px}
+#page-overview .rd-thumb{width:34px;height:34px;border-radius:50%;background:var(--rg-soft);display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--rg-green2);flex-shrink:0}
+#page-overview .rd-who{flex:1;min-width:0}
+#page-overview .rd-nm{font-size:13px;font-weight:700;color:var(--rg-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#page-overview .rd-rl{font-size:11px;color:var(--rg-mut2)}
+#page-overview .rd-pill{font-size:10px;font-weight:800;padding:3px 11px;border-radius:9999px;flex-shrink:0}
+#page-overview .p-hired{background:var(--rg-gg);color:var(--rg-green2)} #page-overview .p-short{background:var(--rg-pg);color:var(--rg-pur)} #page-overview .p-rej{background:var(--rg-rd);color:var(--rg-red)} #page-overview .p-int{background:var(--rg-og);color:var(--rg-org2)} #page-overview .p-screen{background:var(--rg-soft);color:var(--rg-mut)}
+#page-overview .rd-days{display:flex;gap:6px;margin-bottom:14px}
+#page-overview .rd-day{flex:1;text-align:center;padding:8px 0;border-radius:12px;font-size:11px;color:var(--rg-mut)}
+#page-overview .rd-day b{display:block;font-size:15px;font-weight:800;color:var(--rg-ink);margin-top:3px}
+#page-overview .rd-day.on{background:var(--rg-green);color:rgba(255,255,255,.85)} #page-overview .rd-day.on b{color:#fff}
+#page-overview .rd-empty{text-align:center;padding:14px 10px;color:var(--rg-mut2)}
+#page-overview .rd-empty-t{font-size:13px;font-weight:700;color:var(--rg-mut);margin-top:8px}
+#page-overview .rd-empty-s{font-size:11.5px;margin-top:3px;line-height:1.5}
+#page-overview .rd-jobcard{background:linear-gradient(135deg,var(--rg-gg),rgba(245,124,46,.06));border-radius:16px;padding:16px;cursor:pointer}
+#page-overview .rd-jobcard .co{font-size:11px;font-weight:800;color:var(--rg-org2);text-transform:uppercase;letter-spacing:.05em}
+#page-overview .rd-jobcard .ti{font-size:16px;font-weight:800;color:var(--rg-ink);margin:4px 0 8px}
+#page-overview .rd-jobcard .mt{display:flex;gap:8px;flex-wrap:wrap}
+#page-overview .rd-jobcard .chip{font-size:10.5px;font-weight:700;color:var(--rg-mut);background:#fff;border-radius:9999px;padding:3px 10px}
+#page-overview .rd-jobcard .r{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+#page-overview .rd-jobcard .ap{font-size:12px;color:var(--rg-mut)} #page-overview .rd-jobcard .ap b{color:var(--rg-green2);font-size:15px}
+#page-overview .rd-mini{background:var(--rg-green);color:#fff;border:none;border-radius:9999px;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 14px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){#page-overview .rd-stat{transition:none}}
+@media(max-width:1000px){#page-overview .rd-grid{grid-template-columns:1fr}#page-overview .rd-charts{grid-template-columns:1fr}}
+@media(max-width:480px){#page-overview .rd-stats{grid-template-columns:1fr}}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
 /* One hover rule — there used to be two, the second silently cancelling the
    first's shadow. Gentle lift on the existing shadow token. */
@@ -537,105 +560,67 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- HIRING — 5 KPIs (existing data + ids, restyled soft). "In interview" is
-       a new card reading s.byStage.interview (already computed; no new logic). -->
-  <div class="dsh-label">Hiring</div>
-  <div class="stats-grid dsh-stats five">
-    <div class="stat" onclick="showPage('candidates')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--navy)"></div>
-      <div class="stat-ico" style="background:var(--ig)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-      <div class="stat-val" id="ov-total">0</div>
-      <div class="stat-lbl">Total screened</div>
-      <div class="stat-sub">candidates evaluated</div>
-    </div>
-    <div class="stat" onclick="filterByRec('hire')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--amber)"></div>
-      <div class="stat-ico" style="background:var(--amg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></div>
-      <div class="stat-val" id="ov-airec" style="color:var(--amber)">0</div>
-      <div class="stat-lbl">AI recommends hire</div>
-      <div class="stat-sub">strong hire + hire</div>
-    </div>
-    <div class="stat" onclick="filterByStage('shortlisted')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--green)"></div>
-      <div class="stat-ico" style="background:var(--gg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-      <div class="stat-val" id="ov-shortlisted" style="color:var(--green)">0</div>
-      <div class="stat-lbl">Shortlisted</div>
-      <div class="stat-sub">your decision</div>
-    </div>
-    <div class="stat" onclick="filterByStage('interview')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--orange)"></div>
-      <div class="stat-ico" style="background:var(--og)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
-      <div class="stat-val" id="ov-interview">0</div>
-      <div class="stat-lbl">In interview</div>
-      <div class="stat-sub">live interview stage</div>
-    </div>
-    <div class="stat" onclick="showPage('jobs')" style="cursor:pointer">
-      <div class="stat-bar" style="background:var(--orange)"></div>
-      <div class="stat-ico" style="background:var(--og)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
-      <div class="stat-val" id="ov-jobs" style="color:var(--orange2)">0</div>
-      <div class="stat-lbl">Active jobs</div>
-      <div class="stat-sub">open roles</div>
-    </div>
-  </div>
+  <!-- ══ Reference-layout dashboard (green primary · orange accent). Main
+       content area only; the labeled sidebar + top bar are unchanged. Every
+       number is populated by renderOverview() from the SAME CandidateStats /
+       real data — no computation changed. Every card is clickable. ══ -->
+  <div class="rd">
+    <div class="rd-grid">
+      <!-- LEFT column -->
+      <div class="rd-col">
+        <div class="rd-sec">Recruitment Overview</div>
+        <div class="rd-stats">
+          <div class="rd-stat" onclick="showPage('candidates')">
+            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+            <div class="rd-val" id="ov-total">0</div><div class="rd-lbl">Applicants</div>
+          </div>
+          <div class="rd-stat" onclick="filterByStage('shortlisted')">
+            <div class="rd-ico pu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CD6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+            <div class="rd-val" id="ov-shortlisted">0</div><div class="rd-lbl">Shortlisted</div>
+          </div>
+          <div class="rd-stat" onclick="showPage('employees')">
+            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <div class="rd-val" id="ov-hired">0</div><div class="rd-lbl">Hired</div>
+          </div>
+          <div class="rd-stat" onclick="filterByStage('rejected')">
+            <div class="rd-ico rd-red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E4544B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+            <div class="rd-val" id="ov-rejected">0</div><div class="rd-lbl">Rejected</div>
+          </div>
+        </div>
 
-  <!-- TEAM / HR — new additive count cards from the HRM collections. -->
-  <div class="dsh-label">Team <span class="pill">HR</span></div>
-  <div class="dsh-stats three">
-    <div class="stat" onclick="showPage('employees')" style="cursor:pointer">
-      <div class="stat-ico" style="background:var(--ig)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <div class="stat-val" id="hr-employees">0</div>
-      <div class="stat-lbl">Total employees</div>
-      <div class="stat-sub">active staff records</div>
-    </div>
-    <div class="stat" onclick="showPage('leave')" style="cursor:pointer">
-      <div class="stat-ico" style="background:var(--amg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
-      <div class="stat-val" id="hr-pending" style="color:var(--amber)">0</div>
-      <div class="stat-lbl">Pending leave</div>
-      <div class="stat-sub">awaiting your approval</div>
-    </div>
-    <div class="stat" onclick="showPage('leave')" style="cursor:pointer">
-      <div class="stat-ico" style="background:var(--gg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div>
-      <div class="stat-val" id="hr-onleave" style="color:var(--green)">0</div>
-      <div class="stat-lbl">On leave today</div>
-      <div class="stat-sub">approved absences</div>
-    </div>
-  </div>
+        <div class="rd-charts">
+          <div class="rd-card">
+            <div class="rd-h">Job Post Insights <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
+            <div class="rd-bars" id="ov-bars"></div>
+          </div>
+          <div class="rd-card">
+            <div class="rd-h">Job Summary <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
+            <div id="ov-donut" class="rd-donutwrap"></div>
+          </div>
+        </div>
 
-  <!-- Pipeline funnel — same ids, same numbers, same logic; restyled soft. -->
-  <div class="dsh-card">
-    <div class="card-hd">
-      <div class="card-title">Candidate pipeline</div>
-      <label class="dedup-toggle" title="One person applying to two roles counts as two candidacies. This merges repeat screenings of the same person for the same role.">
-        <input type="checkbox" id="dedup-toggle" onchange="setDedupe(this.checked)" checked>
-        <span>Merge duplicate candidacies</span>
-      </label>
-    </div>
-    <div class="funnel" id="funnel-row">
-      <div class="funnel-stage" onclick="filterByStage('all')"><div class="funnel-num" id="fn-all">0</div><div class="funnel-lbl">Screened</div><div class="funnel-bar" style="background:var(--navy)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('screening')"><div class="funnel-num" id="fn-screening">0</div><div class="funnel-lbl">Screening</div><div class="funnel-sub" id="fn-review">0 need review</div><div class="funnel-bar" style="background:var(--amber)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('interview')"><div class="funnel-num" id="fn-interview">0</div><div class="funnel-lbl">Interview</div><div class="funnel-bar" style="background:var(--orange)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('shortlisted')"><div class="funnel-num" id="fn-shortlisted">0</div><div class="funnel-lbl">Shortlisted</div><div class="funnel-bar" style="background:var(--green)"></div></div>
-      <div class="funnel-stage" onclick="filterByStage('rejected')"><div class="funnel-num" id="fn-rejected">0</div><div class="funnel-lbl">Rejected</div><div class="funnel-bar" style="background:var(--red)"></div></div>
-    </div>
-  </div>
-
-  <!-- Recent applicants + a Today panel (both from real data). -->
-  <div class="dsh-split">
-    <div class="dsh-card">
-      <div class="card-hd">
-        <div class="card-title">Recent applicants</div>
-        <button class="btn btn-ghost btn-sm" onclick="showPage('candidates')">View all →</button>
+        <div class="rd-card">
+          <div class="rd-h">Recent Activities <span class="rd-see" onclick="showPage('candidates')">View all →</span></div>
+          <div id="ov-activities"><div class="rd-empty">Loading…</div></div>
+        </div>
       </div>
-      <div class="tbl-wrap no-scroll">
-        <table class="tbl">
-          <thead><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Result</th><th>Action</th></tr></thead>
-          <tbody id="ov-recent-tbl"><tr><td colspan="5" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates yet</div><div class="es-body">Once you screen CVs, the most recent applicants will show up here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a></div></div></td></tr></tbody>
-        </table>
+
+      <!-- RIGHT column -->
+      <div class="rd-col">
+        <div class="rd-card">
+          <div class="rd-h">Today's Interview</div>
+          <div class="rd-days" id="ov-daystrip"></div>
+          <div class="rd-empty" style="padding:20px 10px">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#93A29A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+            <div class="rd-empty-t">No interviews scheduled</div>
+            <div class="rd-empty-s">Live interviews are launched on demand — there's no calendar schedule yet.</div>
+          </div>
+        </div>
+        <div class="rd-card">
+          <div class="rd-h">Open Jobs Highlight <span class="rd-see" onclick="showPage('jobs')">All jobs →</span></div>
+          <div id="ov-jobhi"><div class="rd-empty">Loading…</div></div>
+        </div>
       </div>
-    </div>
-    <div class="dsh-card">
-      <div class="card-hd"><div class="card-title">Today</div></div>
-      <div id="ov-today"><div class="today-empty">Loading…</div></div>
     </div>
   </div>
 </div>
@@ -2807,93 +2792,129 @@ function renderOverview(){
   const s   = CandidateStats.compute(allResults);
   const rec = CandidateStats.rec;
 
-  // ── stat cards ──
-  // "AI recommends hire" and "Shortlisted" answer different questions and are
-  // expected to disagree. The gap between them is the signal, not a bug.
-  setNum('ov-total', s.total);
-  setNum('ov-airec', s.aiRecommendsHire);
-  setNum('ov-shortlisted', s.youShortlisted);
-  setNum('ov-interview', s.byStage.interview);   // same value as the funnel cell
-  setNum('ov-jobs', allJobs.length);
-  loadHrSummary(s);   // HR cards + Today panel (separate, additive data)
+  // ── 4 stat cards — SAME values as before (from CandidateStats). Hired comes
+  //    from the HR summary (source=hired employees). Nothing recomputed. ──
+  setNum('ov-total', s.total);              // Applicants
+  setNum('ov-shortlisted', s.youShortlisted); // Shortlisted (= byStage.shortlisted)
+  setNum('ov-rejected', s.byStage.rejected);  // Rejected
+  loadHrSummary();                          // fills Hired (ov-hired)
 
-  // ── Funnel: every cell is a stage count on the same base ──
-  // No fallback. Zero renders as zero — a cell's meaning must not change with its value.
-  const dt = document.getElementById('dedup-toggle');
-  if(dt) dt.checked = DEDUPE_ON;
-  setNum('fn-all', s.total);
-  setNum('fn-screening', s.byStage.screening);
-  setNum('fn-interview', s.byStage.interview);
-  setNum('fn-shortlisted', s.byStage.shortlisted);
-  setNum('fn-rejected', s.byStage.rejected);
-  setNum('fn-review', s.reviewNeeded + ' need review');
-
-  // ── Recent applicants (now shows applied job) ──
-  const recent = s.rows.slice(0, 8);
-  document.getElementById('ov-recent-tbl').innerHTML = recent.length
-    ? recent.map(r => {
-        const score   = r.score || Math.round(r.overall_score || 0);
-        const recVal  = rec(r) || 'MAYBE';
-        const jobName = r.job_title || r.company || '—';
-        return `<tr onclick="openCandModal('${r._id}')">
-          <td><span class="tbl-link">${r.candidate_name||'Unknown'}</span><div style="font-size:10px;color:var(--t3)">${r.current_title||'—'}</div></td>
-          <td style="font-size:12px;color:var(--t2)">${jobName}</td>
-          <td>${scoreRing(score, 'sm')}</td>
-          <td><span class="badge ${tbcls(recVal)}">${recVal}</span></td>
-          <td><button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();openCandModal('${r._id}')">View</button></td>
-        </tr>`;
-      }).join('')
-    : emptyStateRow(5, {
-        icon: 'candidates',
-        size: 'compact',
-        title: 'No candidates yet',
-        body: 'Once you screen CVs, the most recent applicants will show up here.',
-        cta: icon('bolt',12,'margin-right:4px')+'Screen your first CV',
-        ctaHref: '/batch',
-      });
+  rdDayStrip();
+  rdJobInsights();
+  rdJobSummary();
+  rdActivities(s, rec);
+  rdJobHighlight();
 }
 
-// ── HR summary cards + Today panel (new, additive; separate from hiring stats) ──
+// Today's Interview — day strip (client-side dates; empty state stays static
+// because there is no scheduled-interview data model).
+function rdDayStrip(){
+  const el = document.getElementById('ov-daystrip'); if(!el) return;
+  const names = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const today = new Date(); const dow = today.getDay();
+  let html = '';
+  for(let i=-2;i<=2;i++){
+    const d = new Date(today); d.setDate(today.getDate()+i);
+    html += `<div class="rd-day${i===0?' on':''}">${names[d.getDay()]}<b>${d.getDate()}</b></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Job Post Insights — applicants per job (real data, grouped from allResults).
+// Presentation only; no stat computation touched.
+function rdJobInsights(){
+  const el = document.getElementById('ov-bars'); if(!el) return;
+  const rows = CandidateStats.compute(allResults).rows;
+  const byJob = {};
+  rows.forEach(r=>{ const k=r.job_id||'—'; byJob[k]=(byJob[k]||0)+1; });
+  const named = Object.entries(byJob).map(([jid,n])=>{
+    const j=(allJobs||[]).find(x=>x._id===jid);
+    return {jid, n, name:(j&&(j.title))|| (jid==='—'?'Other':'Untitled')};
+  }).sort((a,b)=>b.n-a.n).slice(0,6);
+  if(!named.length){ el.innerHTML='<div class="rd-empty" style="margin:auto">No applications yet.</div>'; return; }
+  const max = Math.max(...named.map(x=>x.n));
+  el.innerHTML = named.map(x=>`
+    <div class="bar" title="${escapeHtml(x.name)}: ${x.n}" onclick="viewCandidatesForJob('${x.jid}')">
+      <i style="height:${Math.max(6,Math.round(x.n/max*100))}%"></i>
+      <span>${escapeHtml((x.name||'').split(' ')[0])}</span>
+    </div>`).join('');
+}
+
+// Job Summary — open vs closed (real: is_public governs whether the link resolves).
+function rdJobSummary(){
+  const el = document.getElementById('ov-donut'); if(!el) return;
+  const jobs = allJobs||[];
+  const open = jobs.filter(j=>j.is_public).length;
+  const total = jobs.length, closed = total-open;
+  const pct = total ? Math.round(open/total*100) : 0;
+  el.innerHTML = `
+    <svg width="104" height="104" viewBox="0 0 42 42">
+      <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--rg-line)" stroke-width="6"/>
+      <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--rg-green)" stroke-width="6" stroke-linecap="round"
+              stroke-dasharray="${pct} ${100-pct}" stroke-dashoffset="25"/>
+      <text x="21" y="20" text-anchor="middle" font-size="8" font-weight="800" fill="var(--rg-ink)">${total}</text>
+      <text x="21" y="27" text-anchor="middle" font-size="3.4" fill="var(--rg-mut)">jobs</text>
+    </svg>
+    <div class="rd-leg">
+      <span><span class="d" style="background:var(--rg-green)"></span>Open <b>${open}</b></span>
+      <span><span class="d" style="background:var(--rg-line)"></span>Closed <b>${closed}</b></span>
+    </div>`;
+}
+
+// Recent Activities — recent candidates with colored status pills; row → report.
+function rdActivities(s, rec){
+  const el = document.getElementById('ov-activities'); if(!el) return;
+  const recent = s.rows.slice(0, 6);
+  if(!recent.length){ el.innerHTML='<div class="rd-empty" style="padding:20px 10px"><div class="rd-empty-t">No candidates yet</div><div class="rd-empty-s">Screened applicants appear here.</div></div>'; return; }
+  const pillFor = r => {
+    const st = CandidateStats.stageOf(r);
+    if(st==='shortlisted') return ['Shortlist','p-short'];
+    if(st==='rejected')    return ['Rejected','p-rej'];
+    if(st==='interview')   return ['Interview','p-int'];
+    return ['Screening','p-screen'];
+  };
+  el.innerHTML = recent.map(r=>{
+    const score=r.score||Math.round(r.overall_score||0);
+    const [lbl,cls]=pillFor(r);
+    const nm=(r.candidate_name||'Unknown');
+    return `<div class="rd-act" onclick="openCandModal('${r._id}')">
+      <span class="rd-thumb">${escapeHtml(nm.trim()[0]||'?').toUpperCase()}</span>
+      <div class="rd-who"><div class="rd-nm">${escapeHtml(nm)}</div><div class="rd-rl">${escapeHtml(r.job_title||r.current_title||'—')} · score ${score}</div></div>
+      <span class="rd-pill ${cls}">${lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+// Open Jobs Highlight — the open job with the most applicants; card → that job.
+function rdJobHighlight(){
+  const el = document.getElementById('ov-jobhi'); if(!el) return;
+  const jobs = (allJobs||[]).filter(j=>j.is_public);
+  const pool = jobs.length ? jobs : (allJobs||[]);
+  if(!pool.length){ el.innerHTML='<div class="rd-empty" style="padding:20px 10px"><div class="rd-empty-t">No open jobs</div><div class="rd-empty-s">Post a job to see it highlighted.</div></div>'; return; }
+  const rows = CandidateStats.compute(allResults).rows;
+  const count = j => rows.filter(r=>r.job_id===j._id).length;
+  const job = pool.slice().sort((a,b)=>count(b)-count(a))[0];
+  const dept=job.dept||job.department||''; const type=job.type||'Full-time';
+  const loc=job.loc||job.location||'';
+  el.innerHTML = `<div class="rd-jobcard" onclick="viewJobDetails('${job._id}')">
+    ${dept?`<div class="co">${escapeHtml(dept)}</div>`:''}
+    <div class="ti">${escapeHtml(job.title||'Untitled role')}</div>
+    <div class="mt"><span class="chip">${escapeHtml(type)}</span>${loc?`<span class="chip">${escapeHtml(loc)}</span>`:''}<span class="chip">${job.is_public?'Open':'Paused'}</span></div>
+    <div class="r"><span class="ap"><b>${count(job)}</b> applicant${count(job)===1?'':'s'}</span><button class="rd-mini" onclick="event.stopPropagation();viewJobDetails('${job._id}')">View job ↗</button></div>
+  </div>`;
+}
+
+// HR summary — fills the Hired card (source=hired employees). Cached 15s.
 let _hrCache = null, _hrFetchedAt = 0;
-async function loadHrSummary(s){
-  // Cheap count query; cache 15s so the many renderOverview() calls don't spam it.
+async function loadHrSummary(){
   const now = Date.now();
-  if(_hrCache && (now - _hrFetchedAt) < 15000){ paintHr(_hrCache, s); return; }
+  if(_hrCache && (now - _hrFetchedAt) < 15000){ setNum('ov-hired', _hrCache.hired); return; }
   try{
     const r = await fetch('/api/hr/summary', {credentials:'include'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     _hrCache = await r.json(); _hrFetchedAt = now;
-    paintHr(_hrCache, s);
-  }catch(e){
-    // HR data failing must never blank the hiring dashboard — degrade quietly.
-    setNum('hr-employees','—'); setNum('hr-pending','—'); setNum('hr-onleave','—');
-    const t=document.getElementById('ov-today'); if(t) t.innerHTML='<div class="today-empty">Couldn’t load today’s items.</div>';
-  }
-}
-function paintHr(hr, s){
-  setNum('hr-employees', hr.employees);
-  setNum('hr-pending', hr.pending_leave);
-  setNum('hr-onleave', hr.on_leave_today);
-  const inv = s ? s.byStage.interview : 0;
-  const box = document.getElementById('ov-today');
-  if(!box) return;
-  const items = [];
-  if(hr.pending_leave > 0) items.push(['amg','#D97706',
-    '<path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
-    `${hr.pending_leave} leave request${hr.pending_leave>1?'s':''} pending`, 'Waiting for your approval',
-    "showPage('leave')", 'Review in Leave →']);
-  if(hr.on_leave_today > 0) items.push(['gg','#16A34A',
-    '<path d="M20 6L9 17l-5-5"/>',
-    `${hr.on_leave_today} employee${hr.on_leave_today>1?'s':''} on leave today`, 'Approved absences', '', '']);
-  if(inv > 0) items.push(['og','#F57C2E',
-    '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/>',
-    `${inv} candidate${inv>1?'s':''} in interview`, 'Live interview stage', "showPage('pipeline')", 'Open pipeline →']);
-  box.innerHTML = items.length ? items.map(([bg,st,path,t,sub,act,cta])=>`
-    <div class="today-item">
-      <div class="today-ico" style="background:var(--${bg})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${st}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${path}</svg></div>
-      <div><div class="today-t">${t}</div><div class="today-s">${sub}</div>${cta?`<button class="today-cta" onclick="${act}">${cta}</button>`:''}</div>
-    </div>`).join('')
-    : '<div class="today-empty">Nothing needs your attention today.</div>';
+    setNum('ov-hired', _hrCache.hired);
+  }catch(e){ setNum('ov-hired','—'); }   // HR failure never blanks the hiring cards
 }
 
 // ── PIPELINE ──

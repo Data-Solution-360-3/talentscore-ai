@@ -1348,14 +1348,18 @@ async def hr_summary_counts(user_id: str) -> dict:
     today = datetime.utcnow().strftime("%Y-%m-%d")
     employees = await db.employees.count_documents(
         {**match, "status": {"$ne": "terminated"}})
+    # "Hired" = staff who came through the hiring funnel (source=hired),
+    # still active. Real signal, distinct from manually-added staff.
+    hired = await db.employees.count_documents(
+        {**match, "status": {"$ne": "terminated"}, "source": "hired"})
     pending_leave = await db.leave_requests.count_documents(
         {**match, "status": "pending"})
     # People with an APPROVED leave spanning today — distinct employees.
     on_leave_ids = await db.leave_requests.distinct("employee_id", {
         **match, "status": "approved",
         "start_date": {"$lte": today}, "end_date": {"$gte": today}})
-    return {"employees": employees, "pending_leave": pending_leave,
-            "on_leave_today": len(on_leave_ids)}
+    return {"employees": employees, "hired": hired,
+            "pending_leave": pending_leave, "on_leave_today": len(on_leave_ids)}
 
 
 async def get_attendance_for_month(user_id: str, month: str,
