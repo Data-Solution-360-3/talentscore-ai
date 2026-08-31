@@ -2198,16 +2198,6 @@ function openCandModal(id){
           <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${cov}%;background:${gc(cov)};border-radius:3px"></div></div>
           <span style="font-size:11px;font-weight:700;color:${gc(cov)}">${cov}%</span>
         </div>
-        ${(()=>{ const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
-          return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="font-size:10px;color:var(--t3);width:90px">Live interview</span>
-            ${iv ? (iv.overall!=null
-              ? `<a class="tbl-link" href="/viva-live/sessions#${iv.id}" style="font-weight:800;color:${gc(iv.overall)}">${iv.overall}/100</a>
-                 ${iv.scen!=null?`<span style="font-size:10px;color:var(--t3)">· scenario ${iv.scen}/100</span>`:''}
-                 <a class="tbl-link" href="/viva-live/sessions#${iv.id}" style="font-size:10px">full report →</a>`
-              : `<span class="badge b-amber">${iv.done?'scoring…':'in progress'}</span>`)
-            : '<span style="font-size:11px;color:var(--t3)">not taken yet</span>'}
-          </div>`; })()}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <span style="font-size:10px;color:var(--t3);width:90px">AI Confidence</span>
           <span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span>
