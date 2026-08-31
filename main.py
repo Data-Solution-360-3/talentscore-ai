@@ -68,7 +68,9 @@ from database import (
     find_employee_logins, update_employee_contact,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
     kpi_data, reserve_snapshot_slot, save_proctor_snapshot,
-    get_snapshots_for_token, SNAPSHOT_MAX_BYTES, get_admin_screenings,
+    get_snapshots_for_token, SNAPSHOT_MAX_BYTES,
+    upsert_salary_structure, get_salary_structures, create_payroll_run,
+    list_payroll_runs, get_payroll_run, approve_payroll_run, get_admin_screenings,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -925,6 +927,99 @@ async def batch_screen_endpoint(
 # ─────────────────────────────────────────────────────────────
 # SCREENINGS (tenant-scoped)
 # ─────────────────────────────────────────────────────────────
+
+# ── Payroll (HRM module 2) — admin-only; salary is the most sensitive data
+# in the product, so every route is owner-gated and tenant-scoped. The money
+# math is HELD: tax is a placeholder, LWP is proposed-not-deducted, and
+# marking a run paid is refused outright until the owner confirms the math.
+
+@app.get("/api/payroll/salaries")
+async def payroll_salaries(request: Request):
+    user = await require_admin(request)
+    structures = await get_salary_structures(user["user_id"])
+    out = []
+    async for e in db.employees.find(
+            {**user_match_field("user_id", user["user_id"]), "status": {"$ne": "terminated"}}):
+        s = structures.get(str(e["_id"]))
+        out.append({"employee_id": str(e["_id"]), "name": e.get("name"),
+                    "department": e.get("department") or "",
+                    "role_title": e.get("role_title") or "",
+                    "structure": s})
+    out.sort(key=lambda x: (x["name"] or "").lower())
+    return {"employees": out}
+
+
+@app.post("/api/payroll/salaries/{employee_id}")
+async def payroll_set_salary(request: Request, employee_id: str):
+    user = await require_admin(request)
+    from bson import ObjectId as _OID
+    try:
+        emp = await db.employees.find_one(
+            {**user_match_field("user_id", user["user_id"]), "_id": _OID(employee_id)})
+    except Exception:
+        emp = None
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    doc = await upsert_salary_structure(user["user_id"], employee_id, body)
+    return {"success": True, "structure": serialize_mongo(doc)}
+
+
+@app.get("/api/payroll/runs")
+async def payroll_runs_list(request: Request):
+    user = await require_admin(request)
+    return {"runs": await list_payroll_runs(user["user_id"]), "math_held": True}
+
+
+@app.post("/api/payroll/runs")
+async def payroll_run_create(request: Request):
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+        month = str(body.get("month", "")).strip()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    import re as _re
+    if not _re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(status_code=400, detail="Month must be YYYY-MM.")
+    run, err = await create_payroll_run(user["user_id"], month)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"success": True, "run": run}
+
+
+@app.get("/api/payroll/runs/{run_id}")
+async def payroll_run_detail(request: Request, run_id: str):
+    user = await require_admin(request)
+    run, slips = await get_payroll_run(user["user_id"], run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return {"run": run, "payslips": slips, "math_held": True}
+
+
+@app.post("/api/payroll/runs/{run_id}/approve")
+async def payroll_run_approve(request: Request, run_id: str):
+    user = await require_admin(request)
+    if not await approve_payroll_run(user["user_id"], run_id):
+        raise HTTPException(status_code=400, detail="Only a draft run can be approved.")
+    return {"success": True}
+
+
+@app.post("/api/payroll/runs/{run_id}/pay")
+async def payroll_run_pay(request: Request, run_id: str):
+    """Deliberately blocked. The tax line is a placeholder and LWP is not
+    deducted — paying against unconfirmed money math is the worst bug this
+    product could ship. Unblocks only when the owner confirms BD tax slabs
+    and the LWP formula."""
+    await require_admin(request)
+    raise HTTPException(status_code=400, detail=(
+        "Marking a run PAID is disabled: the tax line is a placeholder and the "
+        "leave-without-pay deduction is not finalized. Confirm the money math "
+        "first — then this unlocks."))
+
 
 @app.get("/api/kpi")
 async def kpi_dashboard(request: Request, start: str = "", end: str = ""):

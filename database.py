@@ -1459,6 +1459,162 @@ async def get_admin_screenings(limit: int = 100, skip: int = 0) -> tuple[list, i
     return out, total
 
 
+# ── Payroll (HRM module 2) — SKELETON: structure yes, money math HELD ──
+# The tax line is a PLACEHOLDER (0) until the owner confirms BD tax slabs,
+# LWP (leave-without-pay) is surfaced as days + a PROPOSED amount but is NOT
+# deducted, and net is explicitly "net before tax". Marking a run "paid" is
+# hard-blocked at the route until the math is confirmed. A wrong salary is
+# the worst bug — nothing here computes money the owner hasn't approved.
+
+PAYROLL_STATUSES = ("draft", "approved", "paid")
+SALARY_MAX = 10_000_000   # BDT, sanity cap on any single component
+
+
+def _sal_int(v) -> int:
+    try:
+        return max(0, min(SALARY_MAX, int(v)))
+    except Exception:
+        return 0
+
+
+async def upsert_salary_structure(user_id: str, employee_id: str, body: dict) -> dict:
+    doc = {
+        "user_id": user_id,
+        "employee_id": employee_id,
+        "currency": "BDT",
+        "basic": _sal_int(body.get("basic")),
+        "house_rent": _sal_int(body.get("house_rent")),
+        "medical": _sal_int(body.get("medical")),
+        "transport": _sal_int(body.get("transport")),
+        "pf_deduction": _sal_int(body.get("pf_deduction")),
+        "updated_at": datetime.utcnow(),
+    }
+    await db.salary_structures.update_one(
+        {**user_match_field("user_id", user_id), "employee_id": employee_id},
+        {"$set": doc}, upsert=True)
+    return doc
+
+
+async def get_salary_structures(user_id: str) -> dict:
+    out = {}
+    async for s in db.salary_structures.find(user_match_field("user_id", user_id)):
+        out[str(s.get("employee_id"))] = serialize_mongo(s)
+    return out
+
+
+async def _unpaid_leave_days(user_id: str, employee_id: str, month: str) -> int:
+    """Approved unpaid-leave days whose leave STARTS in the month — the same
+    string-range convention the leave module already uses. APPROXIMATION,
+    flagged on every payslip: a request spanning a month boundary counts
+    wholly in its start month. Do not finalize a deduction on this without
+    the owner's sign-off."""
+    total = 0
+    async for lr in db.leave_requests.find({
+            **user_match_field("user_id", user_id),
+            "employee_id": employee_id, "type": "unpaid", "status": "approved",
+            "start_date": {"$gte": f"{month}-01", "$lte": f"{month}-31"}}):
+        try:
+            total += int(lr.get("days") or 0)
+        except Exception:
+            pass
+    return total
+
+
+async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str | None]:
+    """Draft run for a month: one draft payslip per active employee WITH a
+    salary structure. Replaces an existing DRAFT for the same month; refuses
+    to touch an approved/paid one. Returns (run, error)."""
+    existing = await db.payroll_runs.find_one(
+        {**user_match_field("user_id", user_id), "month": month})
+    if existing and existing.get("status") != "draft":
+        return None, f"A {existing.get('status')} run already exists for {month} — it can't be replaced."
+    structures = await get_salary_structures(user_id)
+    if not structures:
+        return None, "No salary structures set yet — set salaries on the Payroll page first."
+
+    slips, totals = [], {"gross": 0, "pf": 0, "net_before_tax": 0}
+    async for e in db.employees.find(
+            {**user_match_field("user_id", user_id), "status": {"$ne": "terminated"}}):
+        s = structures.get(str(e["_id"]))
+        if not s:
+            continue
+        gross = s["basic"] + s["house_rent"] + s["medical"] + s["transport"]
+        lwp_days = await _unpaid_leave_days(user_id, str(e["_id"]), month)
+        # PROPOSED formula only — shown, never deducted: basic / 30 * days.
+        lwp_proposed = round(s["basic"] / 30 * lwp_days) if lwp_days else 0
+        net_bt = gross - s["pf_deduction"]
+        slips.append({
+            "employee_id": str(e["_id"]),
+            "employee_name": e.get("name"),
+            "department": e.get("department") or "",
+            "month": month,
+            "basic": s["basic"], "house_rent": s["house_rent"],
+            "medical": s["medical"], "transport": s["transport"],
+            "gross": gross,
+            "pf_deduction": s["pf_deduction"],
+            "lwp_days": lwp_days,
+            "lwp_proposed_amount": lwp_proposed,   # NOT deducted — proposal only
+            "tax_placeholder": 0,                   # TODO: BD tax slabs, owner-confirmed
+            "net_before_tax": net_bt,
+        })
+        totals["gross"] += gross
+        totals["pf"] += s["pf_deduction"]
+        totals["net_before_tax"] += net_bt
+    if not slips:
+        return None, "No active employees have a salary structure for this run."
+
+    now = datetime.utcnow()
+    run_doc = {"user_id": user_id, "month": month, "status": "draft",
+               "employees": len(slips), "totals": totals,
+               "math_held": True,   # tax placeholder + LWP not deducted
+               "created_at": now}
+    if existing:
+        await db.payslips.delete_many({"run_id": str(existing["_id"])})
+        await db.payroll_runs.update_one({"_id": existing["_id"]}, {"$set": run_doc})
+        run_id = str(existing["_id"])
+    else:
+        res = await db.payroll_runs.insert_one(run_doc)
+        run_id = str(res.inserted_id)
+    for sl in slips:
+        sl["run_id"] = run_id
+        sl["user_id"] = user_id
+    await db.payslips.insert_many(slips)
+    run_doc["_id"] = run_id
+    return serialize_mongo(run_doc), None
+
+
+async def list_payroll_runs(user_id: str) -> list:
+    out = []
+    async for r in db.payroll_runs.find(
+            user_match_field("user_id", user_id)).sort("month", -1).limit(36):
+        out.append(serialize_mongo(r))
+    return out
+
+
+async def get_payroll_run(user_id: str, run_id: str) -> tuple[dict | None, list]:
+    try:
+        run = await db.payroll_runs.find_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(run_id)})
+    except Exception:
+        return None, []
+    if not run:
+        return None, []
+    slips = []
+    async for s in db.payslips.find({"run_id": str(run["_id"])}).sort("employee_name", 1):
+        slips.append(serialize_mongo(s))
+    return serialize_mongo(run), slips
+
+
+async def approve_payroll_run(user_id: str, run_id: str) -> bool:
+    try:
+        res = await db.payroll_runs.update_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(run_id), "status": "draft"},
+            {"$set": {"status": "approved", "approved_at": datetime.utcnow()}})
+        return res.modified_count == 1
+    except Exception:
+        return False
+
+
 # ── KPI dashboard ────────────────────────────────────────────
 # Only what the SPA cannot honestly compute client-side. The funnel, screening
 # volume and per-job averages come from CandidateStats over /api/screenings —

@@ -456,6 +456,22 @@ def main():
         except Exception as e:
             line(None, "GET", "/api/viva-live/sessions/{id}/snapshots", str(e)[:60])
             failures.append(("GET", "/api/viva-live/sessions/{id}/snapshots", "exception"))
+        # Payroll: salary is the most sensitive data in the product — every
+        # route must refuse a credential-free client.
+        for meth, path in (("GET", "/api/payroll/salaries"), ("POST", "/api/payroll/runs"),
+                           ("GET", "/api/payroll/runs")):
+            try:
+                with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                    r = (unauth.get(path) if meth == "GET"
+                         else unauth.post(path, json={"month": "2026-01"}))
+                gated = r.status_code in (401, 403)
+                line(r.status_code, meth, path,
+                     "gated (owner-only)" if gated else "NOT GATED — SALARY DATA LEAK!")
+                checked += 1
+                if not gated:
+                    failures.append((meth, path, r.status_code))
+            except Exception as e:
+                line(None, meth, path, str(e)[:60]); failures.append((meth, path, "exception"))
         try:
             with httpx.Client(base_url=base, timeout=30.0) as unauth:
                 r = unauth.get("/api/kpi")
@@ -565,6 +581,8 @@ def main():
             ("GET", "/api/leave/balances", None),
             ("GET", "/api/kpi", None),
             ("GET", "/api/admin/screenings?limit=5", None),
+            ("GET", "/api/payroll/salaries", None),
+            ("GET", "/api/payroll/runs", None),
         ]
         if job_id:
             checks += [

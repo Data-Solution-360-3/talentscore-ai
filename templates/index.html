@@ -612,6 +612,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg><span class="lb">Leave</span><span class="sb-badge" id="sb-leave-cnt"></span></button>
     <button class="sb-item ri" id="sb-attendance" onclick="showPage('attendance')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="lb">Attendance</span></button>
+    <button class="sb-item ri" id="sb-payroll" onclick="showPage('payroll')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg><span class="lb">Payroll</span></button>
     <button class="sb-item ri" data-sb="kpi" onclick="showPage('kpi')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="lb">KPIs</span></button>
   </div>
@@ -859,6 +861,38 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- ══════════════════════════════════════════
      6. ANALYTICS
 ══════════════════════════════════════════ -->
+<div class="page" id="page-payroll">
+  <div class="ph"><h1>Payroll</h1><p>Salary structures and monthly runs — the money math is held until you confirm it</p></div>
+  <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:var(--r-lg);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.65">
+    ⚠ <strong>Money math deliberately incomplete.</strong> Tax is a <strong>placeholder (0)</strong> until you confirm BD tax slabs. Leave-without-pay shows a <strong>proposed</strong> amount (basic ÷ 30 × approved unpaid days, start-month counting) but is <strong>not deducted</strong>. Every net is <strong>net before tax</strong>. “Mark paid” is blocked server-side until you approve the math.
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:13px;font-weight:800;margin-bottom:8px">Salary structures <span style="font-size:10.5px;font-weight:600;color:var(--t3)">— per employee, BDT/month</span></div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase;text-align:right">
+      <th style="text-align:left;padding:6px 8px">Employee</th><th>Basic</th><th>House rent</th><th>Medical</th><th>Transport</th><th>PF deduction</th><th>Gross</th><th></th>
+    </tr></thead><tbody id="pay-sal-tbl"><tr><td colspan="8" style="padding:14px;color:var(--t3)">Loading…</td></tr></tbody></table></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:800">Monthly runs</div>
+      <input type="month" id="pay-month" style="padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:600">
+      <button class="btn btn-xs btn-primary" onclick="payCreateRun()">Create draft run</button>
+      <span style="font-size:11px;color:var(--t3)">One draft payslip per active employee with a structure. Drafts can be re-created; approved runs are locked.</span>
+    </div>
+    <div id="pay-runs" style="font-size:12px;color:var(--t3)">Loading…</div>
+  </div>
+  <div class="card hidden" id="pay-run-card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:800" id="pay-run-title">Run</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-xs btn-primary" id="pay-approve" onclick="payApprove()">Approve run</button>
+        <button class="btn btn-xs" title="Blocked until the money math is confirmed" onclick="payPayBlocked()">Mark paid 🔒</button>
+      </div>
+    </div>
+    <div id="pay-slips" style="margin-top:8px"></div>
+  </div>
+</div>
+
 <div class="page" id="page-kpi">
   <div class="rd">
   <div id="kpi-body">
@@ -1380,6 +1414,7 @@ function showPage(id){
   if(id==='attendance')loadAttendance();
   if(id==='hrm-dashboard')renderHrmDashboard();
   if(id==='kpi')renderKpi();
+  if(id==='payroll')loadPayroll();
 }
 
 // ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
@@ -4956,6 +4991,157 @@ async function refreshPlan(){
   }catch(e){console.warn('[PLAN-REFRESH]',e);}
 }
 setInterval(refreshPlan, 60000);
+
+// ═══════════════ PAYROLL (HRM module 2) — money math held ═══════════════
+let _payRuns=[], _paySlips=[], _payRunId=null;
+
+async function loadPayroll(){
+  try{
+    const r=await fetch('/api/payroll/salaries',{credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const rows=d.employees||[];
+    const inp=(f,id,v)=>`<input type="number" min="0" id="ps-${f}-${id}" value="${v||0}" style="width:86px;padding:6px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;text-align:right">`;
+    document.getElementById('pay-sal-tbl').innerHTML = rows.length? rows.map(e=>{
+      const s=e.structure||{};
+      const gross=(s.basic||0)+(s.house_rent||0)+(s.medical||0)+(s.transport||0);
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:7px 8px;text-align:left"><b>${escapeHtml(e.name||'—')}</b><div style="font-size:10px;color:var(--t3)">${escapeHtml(e.department||'')}${e.role_title?' · '+escapeHtml(e.role_title):''}</div></td>
+        <td style="padding:6px 3px;text-align:right">${inp('basic',e.employee_id,s.basic)}</td>
+        <td style="padding:6px 3px;text-align:right">${inp('house_rent',e.employee_id,s.house_rent)}</td>
+        <td style="padding:6px 3px;text-align:right">${inp('medical',e.employee_id,s.medical)}</td>
+        <td style="padding:6px 3px;text-align:right">${inp('transport',e.employee_id,s.transport)}</td>
+        <td style="padding:6px 3px;text-align:right">${inp('pf_deduction',e.employee_id,s.pf_deduction)}</td>
+        <td style="padding:6px 8px;font-weight:800;text-align:right" id="ps-gross-${e.employee_id}">${gross.toLocaleString()}</td>
+        <td style="padding:6px 8px"><button class="btn btn-xs btn-primary" onclick="paySaveSalary('${e.employee_id}')">Save</button></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="8" style="padding:14px;color:var(--t3)">No active employees — add staff on the Employees page first.</td></tr>';
+  }catch(e){ toast('Could not load salaries: '+e.message,{type:'error'}); }
+  payLoadRuns();
+  const m=document.getElementById('pay-month');
+  if(m && !m.value) m.value=new Date().toISOString().slice(0,7);
+}
+
+async function paySaveSalary(id){
+  const g=f=>Math.max(0,parseInt(document.getElementById('ps-'+f+'-'+id)?.value)||0);
+  const body={basic:g('basic'),house_rent:g('house_rent'),medical:g('medical'),transport:g('transport'),pf_deduction:g('pf_deduction')};
+  try{
+    const r=await fetch('/api/payroll/salaries/'+id,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    const el=document.getElementById('ps-gross-'+id);
+    if(el) el.textContent=(body.basic+body.house_rent+body.medical+body.transport).toLocaleString();
+    toast('Salary saved',{type:'success'});
+  }catch(e){ toast('Save failed: '+e.message,{type:'error'}); }
+}
+
+async function payLoadRuns(){
+  try{
+    const r=await fetch('/api/payroll/runs',{credentials:'include'});
+    if(!r.ok) return;
+    const d=await r.json();
+    _payRuns=d.runs||[];
+    document.getElementById('pay-runs').innerHTML = _payRuns.length? _payRuns.map(x=>`
+      <div onclick="payOpenRun('${x._id}')" style="display:flex;justify-content:space-between;gap:10px;padding:9px 6px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12.5px;align-items:center">
+        <span><b>${x.month}</b> · ${x.employees} payslip(s)</span>
+        <span>gross ${Number((x.totals||{}).gross||0).toLocaleString()} · net-before-tax ${Number((x.totals||{}).net_before_tax||0).toLocaleString()}
+          <span class="badge ${x.status==='draft'?'b-amber':'b-green'}" style="margin-left:8px">${(x.status||'').toUpperCase()}</span></span>
+      </div>`).join('') : 'No runs yet — pick a month above and create the first draft.';
+  }catch(_){}
+}
+
+async function payCreateRun(){
+  const month=document.getElementById('pay-month').value;
+  if(!month){ toast('Pick a month first.',{type:'error'}); return; }
+  try{
+    const r=await fetch('/api/payroll/runs',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({month})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast('Draft run created for '+month,{type:'success'});
+    payLoadRuns(); payOpenRun(d.run._id);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+
+async function payOpenRun(id){
+  try{
+    const r=await fetch('/api/payroll/runs/'+id,{credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    _payRunId=id; _paySlips=d.payslips||[];
+    const run=d.run;
+    document.getElementById('pay-run-card').classList.remove('hidden');
+    document.getElementById('pay-run-title').textContent='Run '+run.month+' — '+(run.status||'').toUpperCase();
+    document.getElementById('pay-approve').style.display = run.status==='draft'?'':'none';
+    document.getElementById('pay-slips').innerHTML=`
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase">
+        <th style="text-align:left;padding:6px">Employee</th><th style="text-align:right;padding:6px">Basic</th><th style="text-align:right;padding:6px">Allowances</th><th style="text-align:right;padding:6px">Gross</th><th style="text-align:right;padding:6px">PF</th><th style="text-align:right;padding:6px">LWP days</th><th style="text-align:right;padding:6px">LWP proposed*</th><th style="text-align:right;padding:6px">Tax</th><th style="text-align:right;padding:6px">Net before tax</th><th></th>
+      </tr></thead><tbody>
+      ${_paySlips.map(p=>`<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px"><b>${escapeHtml(p.employee_name||'—')}</b></td>
+        <td style="padding:6px;text-align:right">${Number(p.basic).toLocaleString()}</td>
+        <td style="padding:6px;text-align:right">${Number(p.house_rent+p.medical+p.transport).toLocaleString()}</td>
+        <td style="padding:6px;text-align:right;font-weight:700">${Number(p.gross).toLocaleString()}</td>
+        <td style="padding:6px;text-align:right">−${Number(p.pf_deduction).toLocaleString()}</td>
+        <td style="padding:6px;text-align:right">${p.lwp_days}</td>
+        <td style="padding:6px;text-align:right;color:var(--amber)">${Number(p.lwp_proposed_amount).toLocaleString()}</td>
+        <td style="padding:6px;text-align:right"><span class="badge b-amber" style="font-size:8.5px">PLACEHOLDER</span></td>
+        <td style="padding:6px;text-align:right;font-weight:800">${Number(p.net_before_tax).toLocaleString()}</td>
+        <td style="padding:6px"><button class="btn btn-xs" onclick="payPrintSlip('${p._id}')">Payslip</button></td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:8px;line-height:1.6">* LWP proposed = basic ÷ 30 × approved unpaid-leave days starting in the month — <b>shown for review, not deducted</b>. Tax is a placeholder pending BD slab confirmation. Net before tax = gross − PF only.</div>`;
+    document.getElementById('pay-run-card').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){ toast('Could not open run: '+e.message,{type:'error'}); }
+}
+
+async function payApprove(){
+  if(!_payRunId) return;
+  if(!confirm('Approve this run? The draft locks; tax stays a placeholder and nothing is marked paid.')) return;
+  try{
+    const r=await fetch('/api/payroll/runs/'+_payRunId+'/approve',{method:'POST',credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast('Run approved',{type:'success'});
+    payLoadRuns(); payOpenRun(_payRunId);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+
+async function payPayBlocked(){
+  // Calls the endpoint so the SERVER states the hold — honesty from the source.
+  try{
+    const r=await fetch('/api/payroll/runs/'+(_payRunId||'x')+'/pay',{method:'POST',credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    toast(d.detail||'Blocked until the money math is confirmed.',{type:'error'});
+  }catch(_){ toast('Blocked until the money math is confirmed.',{type:'error'}); }
+}
+
+function payPrintSlip(id){
+  const p=_paySlips.find(x=>x._id===id); if(!p) return;
+  const w=window.open('','_blank','width=680,height=760');
+  const money=n=>Number(n||0).toLocaleString();
+  w.document.write(`<html><head><title>Payslip ${escapeHtml(p.employee_name||'')} — ${p.month}</title>
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#142848;max-width:560px;margin:0 auto}
+  h2{margin:0}.mut{color:#8593AB;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+  td{padding:7px 4px;border-bottom:1px solid #E4E8F0}.r{text-align:right}.warn{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:9px 12px;font-size:11px;color:#9A3412;margin-top:14px;line-height:1.5}
+  .tot{font-weight:800;border-top:2px solid #142848}</style></head><body>
+  <h2>Payslip — ${p.month}</h2>
+  <div class="mut">${escapeHtml(p.employee_name||'')}${p.department?' · '+escapeHtml(p.department):''} · BDT · DRAFT (money math held)</div>
+  <table>
+    <tr><td>Basic</td><td class="r">${money(p.basic)}</td></tr>
+    <tr><td>House rent allowance</td><td class="r">${money(p.house_rent)}</td></tr>
+    <tr><td>Medical allowance</td><td class="r">${money(p.medical)}</td></tr>
+    <tr><td>Transport allowance</td><td class="r">${money(p.transport)}</td></tr>
+    <tr class="tot"><td>Gross</td><td class="r">${money(p.gross)}</td></tr>
+    <tr><td>Provident fund</td><td class="r">−${money(p.pf_deduction)}</td></tr>
+    <tr><td>Income tax</td><td class="r">PLACEHOLDER — pending BD slab confirmation</td></tr>
+    <tr><td>Leave without pay (${p.lwp_days} day(s)) — proposed, NOT deducted</td><td class="r">(${money(p.lwp_proposed_amount)})</td></tr>
+    <tr class="tot"><td>Net before tax</td><td class="r">${money(p.net_before_tax)}</td></tr>
+  </table>
+  <div class="warn">⚠ This is a DRAFT payslip from an incomplete money model: income tax is a placeholder and the
+  leave-without-pay deduction is a proposal that has not been applied. Do not treat this as a payable amount.</div>
+  <script>window.print()<\/script></body></html>`);
+  w.document.close();
+}
 
 // ═══════════════ KPI DASHBOARD ═══════════════
 // Two data sources, deliberately split:
