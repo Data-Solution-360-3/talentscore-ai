@@ -76,7 +76,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:14px;background:var(--indigo);border-radius:0 2px 2px 0}
 .sb-badge{margin-left:auto;font-size:9px;font-weight:700;background:var(--s3);color:var(--t3);border-radius:8px;padding:1px 6px}
 .sb-item.act .sb-badge{background:var(--ig);color:var(--orange)}
-.sb-footer{margin-top:auto;padding:.6rem 6px 0;border-top:1px solid var(--border);font-size:11px}
+.sb-settings{margin-top:auto;padding-top:.5rem;border-top:1px solid var(--border)}
+.sb-footer{padding:.6rem 6px 0;font-size:11px}
 .sb-company{font-weight:600;color:var(--t2);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-status{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)}
 .sb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0}
@@ -438,13 +439,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <span class="t-name">TopCandidate<span style="color:#F06000">.pro</span></span>
     <span class="t-by">by LinkX360</span>
   </a>
-  <div class="t-sep"></div>
-  <nav class="t-nav">
-    <button class="tn act" onclick="showPage('overview')">Overview</button>
-    <button class="tn" onclick="showPage('candidates')">Candidates</button>
-    <button class="tn" onclick="showPage('jobs')">Jobs</button>
-    <button class="tn" onclick="showPage('analytics')">Analytics</button>
-  </nav>
+  <!-- Nav lives in the left sidebar (single source). Middle intentionally
+       empty — room for contextual info later. -->
   <div class="t-right">
     <!-- Usage indicator — single primary location for "how many screenings used" -->
     <div id="t-usage-wrap" style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:6px 12px;cursor:pointer;transition:border-color .15s" onclick="showPage('dashboard');showUsageModal()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Click to see usage details">
@@ -462,9 +458,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
     <a href="/batch" class="t-btn accent" style="padding:7px 14px;font-weight:600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen CVs</a>
-    <a href="/settings" class="t-btn" title="Settings">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </a>
     <div style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:5px 9px;cursor:pointer;transition:border-color .15s" onclick="logout()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Sign out">
       <div class="t-avatar" id="t-avatar" style="width:22px;height:22px;font-size:9px">TC</div>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -517,16 +510,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
     Analytics
   </button>
-  <button class="sb-item" id="sb-audit" onclick="showPage('audit')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-    Audit Trail
-  </button>
+
+  <!-- Audit Trail removed from the sidebar (its /audit page + route stay
+       alive). Settings is now a clear, pinned item at the bottom. -->
+  <div class="sb-settings">
+    <button class="sb-item" onclick="location.href='/settings'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </div>
   <div class="sb-footer">
     <div class="sb-company" id="sb-company">Company</div>
-    <a href="/settings" style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);text-decoration:none;padding:4px 0;transition:color .12s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Account settings
-    </a>
     <div class="sb-status"><span class="sb-dot"></span>All systems operational</div>
   </div>
 </aside>
