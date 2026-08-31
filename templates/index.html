@@ -293,6 +293,31 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 /* ── FILTERS ── */
 .filters-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+
+/* ── Candidates page reskin — SCOPED to #page-candidates so no other table,
+   filter bar, or badge changes. Presentation only; every id/sort/filter and
+   the density toggle keep working. ── */
+#page-candidates{--lift-sm:0 1px 2px rgba(20,40,72,.03),0 4px 16px rgba(20,40,72,.05)}
+#page-candidates .card{border:none;border-radius:16px;box-shadow:var(--lift-sm)}
+#page-candidates .filters-row{margin-bottom:0}
+#page-candidates .cand-primary{gap:8px}
+#page-candidates .cand-more{gap:8px;margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border)}
+#page-candidates .cand-more.hidden{display:none}
+#page-candidates .mf-lbl{font-size:11px;font-weight:700;color:var(--t3)}
+#page-candidates .more-filters-btn{margin-left:auto;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t2);background:var(--s2);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s,color .15s}
+#page-candidates .more-filters-btn:hover,#page-candidates .more-filters-btn.active{background:var(--og);color:var(--orange2)}
+/* roomy soft rows (comfortable mode only — dense keeps its own tight padding) */
+#page-candidates .tbl th{font-size:10px;letter-spacing:.05em;color:var(--t3);padding:11px 14px;border-bottom:1px solid var(--border)}
+#page-candidates .tbl:not(.dense) td{padding:15px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+#page-candidates .tbl tbody tr{transition:background .12s}
+#page-candidates .tbl tbody tr:hover td{background:var(--s2)}
+#page-candidates .tbl tbody tr:last-child td{border-bottom:none}
+/* softer skill chips + compact gaps chip */
+#page-candidates .tag.matched{background:var(--gg);color:var(--green);border:none;font-weight:600;padding:3px 9px;border-radius:999px}
+#page-candidates .gaps-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--rg);color:#B4433A;white-space:nowrap;cursor:default}
+#page-candidates .gaps-chip.none{background:var(--gg);color:var(--green)}
+#page-candidates .gaps-chip .gaps-more{opacity:.7;font-weight:800}
+#page-candidates .tbl.dense .gaps-chip{font-size:9px;padding:1px 6px}
 .filter-select{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--t2);outline:none;transition:border-color .12s;cursor:pointer}
 .filter-select:focus{border-color:var(--indigo)}
 .filter-input{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s}
@@ -647,11 +672,30 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="card" style="margin-bottom:10px;padding:.85rem">
-    <div class="filters-row">
-      <input class="filter-input" id="f-search" placeholder="🔍 Search by name, skill..." oninput="applyFilters()" style="flex:1;min-width:180px">
+  <!-- Filters — 4 primary controls; the rest fold behind "More filters".
+       Every id + onchange is unchanged; the secondary ones are just hidden
+       until opened, so filter logic is identical. -->
+  <div class="card cand-filters" style="margin-bottom:12px;padding:.9rem">
+    <div class="filters-row cand-primary">
+      <input class="filter-input" id="f-search" placeholder="🔍 Search by name, skill..." oninput="applyFilters()" style="flex:1;min-width:190px">
       <select class="filter-select" id="f-job" onchange="applyFilters()"><option value="">All jobs</option></select>
+      <select class="filter-select" id="f-result" onchange="applyFilters()">
+        <option value="">All results</option>
+        <option value="STRONG HIRE">Strong Hire</option>
+        <option value="HIRE">Hire</option>
+        <option value="MAYBE">Maybe</option>
+        <option value="REJECT">Reject</option>
+      </select>
+      <select class="filter-select" id="f-sort" onchange="applyFilters()">
+        <option value="score">Highest score</option>
+        <option value="newest">Newest first</option>
+        <option value="exp">Most experienced</option>
+        <option value="name">Name A–Z</option>
+      </select>
+      <button type="button" class="more-filters-btn" id="more-filters-btn" onclick="toggleMoreFilters()">More filters <span id="mf-caret">▾</span></button>
+    </div>
+    <div class="filters-row cand-more hidden" id="cand-more-row">
+      <span class="mf-lbl">Stage</span>
       <select class="filter-select" id="f-stage" onchange="applyFilters()">
         <option value="">All stages</option>
         <option value="screening">Screening</option>
@@ -660,13 +704,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="shortlisted">Shortlisted</option>
         <option value="rejected">Rejected</option>
       </select>
-      <select class="filter-select" id="f-result" onchange="applyFilters()">
-        <option value="">All results</option>
-        <option value="STRONG HIRE">Strong Hire</option>
-        <option value="HIRE">Hire</option>
-        <option value="MAYBE">Maybe</option>
-        <option value="REJECT">Reject</option>
-      </select>
+      <span class="mf-lbl">Score</span>
       <select class="filter-select" id="f-score" onchange="applyFilters()">
         <option value="">Any score</option>
         <option value="80">80+ (Strong)</option>
@@ -674,29 +712,26 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="40">40+ (Average)</option>
         <option value="0">Below 40 (Weak)</option>
       </select>
+      <span class="mf-lbl">Experience</span>
       <select class="filter-select" id="f-exp" onchange="applyFilters()">
         <option value="">Any experience</option>
         <option value="0">0–2 years (Junior)</option>
         <option value="3">3–5 years (Mid)</option>
         <option value="6">6+ years (Senior)</option>
       </select>
-      <input type="date" class="filter-input" id="f-date-from" onchange="applyFilters()" title="From date" style="width:130px">
-      <input type="date" class="filter-input" id="f-date-to" onchange="applyFilters()" title="To date" style="width:130px">
-      <select class="filter-select" id="f-sort" onchange="applyFilters()">
-        <option value="score">Highest score</option>
-        <option value="newest">Newest first</option>
-        <option value="exp">Most experienced</option>
-        <option value="name">Name A–Z</option>
-      </select>
-      <button class="filter-clear" onclick="clearFilters()">✕ Clear</button>
+      <span class="mf-lbl">Date</span>
+      <input type="date" class="filter-input" id="f-date-from" onchange="applyFilters()" title="From date" style="width:135px">
+      <span style="color:var(--t3)">→</span>
+      <input type="date" class="filter-input" id="f-date-to" onchange="applyFilters()" title="To date" style="width:135px">
+      <button class="filter-clear" onclick="clearFilters()" style="margin-left:auto">✕ Clear</button>
     </div>
-    <div style="font-size:11px;color:var(--t3)" id="filter-count">Showing all candidates</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:.6rem" id="filter-count">Showing all candidates</div>
   </div>
 
   <div class="card">
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead id="cands-thead"><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Skills matched</th><th>Missing skills</th><th>Experience</th><th>Education</th><th>Result</th><th>Date</th><th>Actions</th></tr></thead>
+        <thead id="cands-thead"><tr><th>Candidate</th><th>Applied job</th><th>Score</th><th>Skills matched</th><th>Gaps</th><th>Experience</th><th>Education</th><th>Result</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="cands-tbl"><tr><td colspan="10" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="es-title">No candidates screened yet</div><div class="es-body">Upload CVs against a job description to see them ranked, analyzed, and ready for review here.</div><div class="es-actions"><a href="/batch" class="btn btn-primary btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen your first CV</a><button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">Create a job first</button></div></div></td></tr></tbody>
       </table>
       <div id="cands-foot"></div>
@@ -1593,6 +1628,15 @@ function setDensity(dense){
   document.getElementById('dens-compact')?.classList.toggle('active', dense);
 }
 
+// Collapse/expand the secondary filters (Stage, Score, Experience, Date).
+// Purely a show/hide — the controls and their onchange handlers are untouched.
+function toggleMoreFilters(){
+  const row = document.getElementById('cand-more-row');
+  const open = row.classList.toggle('hidden') === false;
+  document.getElementById('more-filters-btn')?.classList.toggle('active', open);
+  const caret = document.getElementById('mf-caret'); if(caret) caret.textContent = open ? '▴' : '▾';
+}
+
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
   // Render the sortable thead each time so the sort indicator stays in sync.
@@ -1603,7 +1647,7 @@ function renderCandidates(results){
       sortableHeader('cands-tbl', 'Candidate', 'candidate_name', 'asc') +
       sortableHeader('cands-tbl', 'Applied job', 'job_title', 'asc') +
       sortableHeader('cands-tbl', 'Score', 'score', 'desc') +
-      '<th>Skills matched</th><th>Missing skills</th>' +
+      '<th>Skills matched</th><th>Gaps</th>' +
       sortableHeader('cands-tbl', 'Experience', 'years_experience', 'desc') +
       '<th>Education</th>' +
       sortableHeader('cands-tbl', 'Result', 'rec', 'asc') +
@@ -1643,7 +1687,12 @@ function renderCandidates(results){
   tbody.innerHTML=pg.slice.map(r=>{
     const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
-    const missing=(r.critical_gaps||[]).slice(0,2);
+    const allGaps=(r.critical_gaps||[]);
+    // Compact gaps chip: first gap + "+N", full list on hover, all in the modal.
+    // Same data as before — just no longer two stacked red boxes per row.
+    const gapsCell = allGaps.length
+      ? `<span class="gaps-chip" title="Missing: ${escapeHtml(allGaps.join(', '))}">⚠ ${escapeHtml(allGaps[0])}${allGaps.length>1?` <span class="gaps-more">+${allGaps.length-1}</span>`:''}</span>`
+      : `<span class="gaps-chip none">✓ None</span>`;
     const edu=r.parsed_cv?.education?.[0];
     const stage=r.stage||'pending';
     const sl_active = stage==='shortlisted' ? 'box-shadow:0 0 0 2px var(--green);font-weight:700' : '';
@@ -1656,8 +1705,8 @@ function renderCandidates(results){
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
       <td>${scoreRing(score, 'sm')}</td>
       <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
-      <td>${missing.map(s=>`<span class="tag missing">${s}</span>`).join('')||'<span class="badge b-green" style="font-size:9px">None</span>'}</td>
-      <td style="font-size:11px">${r.years_experience||'?'} yrs</td>
+      <td>${gapsCell}</td>
+      <td style="font-size:12px;color:var(--t2)">${r.years_experience||'?'} yrs</td>
       <td style="font-size:10px;color:var(--t3)">${edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—'}</td>
       <td><span class="badge ${tbcls(rec)}">${rec}</span>${stageBadge(stage)}${r.viva_capped?`<span class="badge b-amber" style="font-size:9px;margin-left:4px" title="Qualified for the live interview, but the job's daily interview cap was reached — send them a candidate link from /viva-live">INTERVIEW CAPPED</span>`:''}</td>
       <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
