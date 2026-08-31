@@ -3805,7 +3805,13 @@ function iqTopicsPayload(){
 }
 function iqSpokenTotal(tps){ return tps.reduce((a,t)=>a+1+(t.followups||[]).filter(f=>String(f).trim()).length,0); }
 function iqTopicEditor(tps){
-  return tps.map((t,i)=>`
+  const hasScen = !!iqScen();
+  const split = (hasScen && tps.length>1) ? Math.ceil(tps.length/2) : tps.length;
+  const divider = `<div style="display:flex;align-items:center;gap:8px;margin:10px 0">
+    <div style="flex:1;height:1px;background:var(--border)"></div>
+    <span style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.05em">📋 written scenario sits here — the middle of the interview</span>
+    <div style="flex:1;height:1px;background:var(--border)"></div></div>`;
+  const parts = tps.map((t,i)=>`
     <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
         <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;flex-shrink:0">Topic ${i+1}</span>
@@ -3826,7 +3832,10 @@ function iqTopicEditor(tps){
         <button onclick="iqTFDel(${i},${j})" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
       </div>`).join('')}
       ${(t.followups||[]).length<5?`<button class="btn btn-xs" onclick="iqTFAdd(${i})" style="margin-left:50px">+ Follow-up</button>`:''}
-    </div>`).join('')
+    </div>`);
+  if(hasScen && split < tps.length) parts.splice(split, 0, divider);
+  else if(hasScen) parts.push(divider.replace('the middle of the interview','after these topics — add a 2nd topic to sandwich it'));
+  return parts.join('')
     + (tps.length<4?'<button class="btn btn-xs" onclick="iqTAdd()">+ Add topic</button>':'');
 }
 
@@ -3929,7 +3938,7 @@ function iqRender(){
       </div>
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
         ${st.approved.topics
-          ? `Every candidate answers this exact set. Turn budget is EXACT: ${st.approved.count} spoken${st.approved.scenario?` + ${st.approved.scenario.questions.length} written`:''} = ${st.approved.count + (st.approved.scenario?st.approved.scenario.questions.length:0)} questions — no extra questions are added.`
+          ? `Every candidate answers this exact set. Turn budget is EXACT: ${st.approved.count} spoken${st.approved.scenario?` + ${st.approved.scenario.questions.length} written`:''} = ${st.approved.count + (st.approved.scenario?st.approved.scenario.questions.length:0)} questions — no extra questions are added.${st.approved.scenario&&st.approved.topics.length>1?` Order: Spoken Block 1 (topic${Math.ceil(st.approved.topics.length/2)>1?'s':''} 1–${Math.ceil(st.approved.topics.length/2)}) → written scenario → Spoken Block 2.`:''}`
           : `Every candidate to this job answers this exact set — same questions, same modes. Turn budget: ${st.approved.count} questions + 2 spoken follow-ups${st.approved.scenario?` + ${st.approved.scenario.questions.length} scenario answers`:''}.`}
       </div>`;
   }else{

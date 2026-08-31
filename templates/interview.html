@@ -246,7 +246,7 @@ let typing=false, typedCallId=null, typedQuestion='', restoreTD=null;
 const TYPED_KEY='tc-typed-'+TOKEN;
 // scenario section — the model pins the scenario via show_scenario, and every
 // typed answer from then on belongs to the scenario set (scored together)
-let scenActive=false, scenText='', scenQN=0;
+let scenActive=false, scenText='', scenQN=0, scenDone=false;
 const SCEN_KEY='tc-scen-'+TOKEN;
 
 // ── presence / question UI ───────────────────────────────────
@@ -279,8 +279,8 @@ async function mintToken(){
       progress:{asked: questionsAsked},
       // recovery mid-type: tell the server which question the panel is holding
       awaiting_typed: typing ? typedQuestion : null,
-      // recovery mid-scenario: the card is still pinned; don't re-present it
-      scenario_shown: scenActive
+      // recovery mid- or post-scenario: it was presented; don't re-present it
+      scenario_shown: scenActive || scenDone
     })
   });
   if(r.status===404) throw {dead:true};
@@ -451,6 +451,14 @@ function submitTyped(){
   typing = false;
   $('typed').classList.remove('on');
   $('typed-q').style.display='none';
+  // Three-phase order: once the last scenario question is submitted, the
+  // written section is over — unpin the case study so Spoken Block 2 doesn't
+  // read as being about it.
+  if(scenActive && SCEN_Q && scenQN >= SCEN_Q){
+    scenActive = false; scenDone = true;
+    $('scen').style.display = 'none';
+    log('scenario section complete — card unpinned, returning to spoken');
+  }
   setMic(true);
   if(restoreTD) sendVad(restoreTD);
   if(dc && dc.readyState==='open'){

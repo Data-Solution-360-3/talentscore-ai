@@ -655,10 +655,13 @@ def main():
                   and len(body.get("questions", [])) == 8
                   and len(body.get("topics") or []) == 2
                   and body.get("scenario_tool_registered") is True
-                  and body.get("tool_registered") is True)
+                  and body.get("tool_registered") is True
+                  # the three-phase order: spoken -> scenario in the MIDDLE -> spoken
+                  and body.get("structure") == ["spoken:4", "scenario:4", "spoken:4"]
+                  and body.get("scenario_in_middle") is True)
             line(r.status_code, "POST", "/api/viva-live/preview-session (topics)",
-                 "2x(1+3)+4 -> budget exactly 12, both tools" if ok
-                 else f"TOPIC BUDGET BROKEN: {str({k: body.get(k) for k in ('exact_budget','max_turns')})[:80]}")
+                 "spoken:4 -> scenario:4 -> spoken:4, budget exactly 12" if ok
+                 else f"3-PHASE BROKEN: {str({k: body.get(k) for k in ('structure','scenario_in_middle','max_turns')})[:90]}")
             checked += 1
             if not ok:
                 failures.append(("POST", "/api/viva-live/preview-session (topics)", r.status_code))

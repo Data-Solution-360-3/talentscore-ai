@@ -1618,37 +1618,76 @@ def _build_live_instructions(questions: list, max_turns: int,
     scenario: normalized {"text","questions"} or None (_normalize_scenario).
     topics: normalized topic clusters or None (_normalize_topics).
 
-    Two shapes: TOPICS mode is fully scripted — main + follow-ups per topic,
-    plus the scenario section, and the total EQUALS max_turns exactly (this is
-    the count-mismatch fix: no adaptive questions ride on top of what the
-    recruiter approved). Legacy mode (flat questions) keeps the old adaptive
-    behaviour for existing configs.
+    TOPICS mode is fully scripted with a FIXED three-phase order: Spoken
+    Block 1 (the first half of the topics), the written scenario in the
+    MIDDLE, then Spoken Block 2 (the rest). Question numbering runs straight
+    through all three phases and the total EQUALS max_turns exactly — no
+    adaptive questions ride on top of what the recruiter approved.
+    Legacy mode (flat questions) keeps the old adaptive behaviour, with the
+    scenario — if any — as a final section.
     """
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     name_line = (f"Your name is {interviewer_name}. Introduce yourself by that name "
                  "in your one greeting sentence. " if interviewer_name else "")
 
     if topics:
-        blocks, i = [], 0
-        for tn, t in enumerate(topics):
-            lines = []
-            i += 1
-            lines.append(f"  {i}. (MAIN) {t['main']}")
-            for f in t["followups"]:
+        split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
+        i = 0
+
+        def block(ts, first_tn):
+            nonlocal i
+            out = []
+            for tn, t in enumerate(ts, start=first_tn):
+                lines = []
                 i += 1
-                lines.append(f"  {i}. (FOLLOW-UP) {f}")
-            blocks.append(f"TOPIC {tn + 1} — {t['topic']}:\n" + "\n".join(lines))
+                lines.append(f"  {i}. (MAIN) {t['main']}")
+                for f in t["followups"]:
+                    i += 1
+                    lines.append(f"  {i}. (FOLLOW-UP) {f}")
+                out.append(f"TOPIC {tn} — {t['topic']}:\n" + "\n".join(lines))
+            return "\n".join(out)
+
+        b1 = block(topics[:split], 1)
+        scen_block = ""
+        if scenario:
+            after_q = i
+            qlines = []
+            for q in scenario["questions"]:
+                i += 1
+                qlines.append(f"  {i}. (TYPED) {q}")
+            scen_block = (
+                f"WRITTEN SCENARIO — the middle of the interview, right after question {after_q}\n"
+                f"- Immediately after question {after_q} is answered, begin this section: say ONE short "
+                "transition sentence (the next part is a short written exercise about a work situation), "
+                "then call the tool show_scenario with the EXACT scenario text below. It appears on the "
+                "candidate's screen. After the tool result arrives, read the scenario aloud once, slowly "
+                "and clearly.\n"
+                "- Then ask the scenario questions below one at a time, IN ORDER, each as a TYPED "
+                "question: read it aloud, call begin_typed_answer with its exact text, and wait in "
+                "silence (all TYPED rules above apply). Never invent a different scenario or extra "
+                "scenario questions.\n"
+                f"- The scenario (pass verbatim to show_scenario, then read aloud):\n"
+                f"  \"{scenario['text'].replace(chr(34), chr(39))}\"\n"
+                "- The scenario questions:\n" + "\n".join(qlines) + "\n")
+        b2 = block(topics[split:], split + 1) if split < len(topics) else ""
+        if scenario and b2:
+            scen_block += ("- After the last scenario question is submitted, say one short sentence "
+                           "that you are returning to spoken questions, then continue with Spoken "
+                           "Block 2 below.\n")
         middle = (
-            f"- This interview is FULLY SCRIPTED: you ask EXACTLY {max_turns} questions total, "
-            "one per turn, then close. Never add, merge, skip, reorder, or invent questions — "
-            "the exact count is a promise made to the recruiter.\n"
-            "- The SPOKEN part comes first: the topics below, in order. Within each topic ask "
-            "the main question, then its follow-ups, exactly as written.\n"
-            "- If an answer is unclear or dodges, you may rephrase THAT question once in simpler "
-            "words — a rephrase is the same question, never a new one.\n"
-            "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short "
-            "sentences — this is a phone conversation, not an essay.\n"
-            + "\n".join(blocks) + "\n")
+            f"- This interview is FULLY SCRIPTED: you ask EXACTLY {max_turns} questions total, one per "
+            "turn, then close. Never add, merge, skip, reorder, or invent questions — the exact count "
+            "is a promise made to the recruiter.\n"
+            + ("- The order is FIXED: Spoken Block 1, then the written scenario in the middle, then "
+               "Spoken Block 2.\n" if scenario and b2 else "")
+            + "- Within each topic ask the main question, then its follow-ups, exactly as written.\n"
+            "- If an answer is unclear or dodges, you may rephrase THAT question once in simpler words "
+            "— a rephrase is the same question, never a new one.\n"
+            "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
+            "this is a phone conversation, not an essay.\n"
+            + (("SPOKEN BLOCK 1:\n" + b1 + "\n") if (scenario and b2) else (b1 + "\n"))
+            + scen_block
+            + (("SPOKEN BLOCK 2 — after the scenario section:\n" + b2 + "\n") if b2 else ""))
     else:
         if has_typed:
             numbered = "\n".join(
@@ -1679,7 +1718,7 @@ def _build_live_instructions(questions: list, max_turns: int,
                k=len(scenario["questions"]), max_turns=max_turns,
                scenario=scenario["text"].replace('"', "'"),
                qlist="\n".join(f"  {i+1}. {q}" for i, q in enumerate(scenario["questions"])))
-           if scenario else "") +
+           if (scenario and not topics) else "") +
         "\nCONTROL NOTES\n"
         "- System messages of the form \"[Interview control note: ...]\" tell you how many questions "
         "remain. Obey them exactly. When a note says the questions are finished, respond to the "
@@ -2147,8 +2186,17 @@ async def viva_live_preview_session(request: Request):
     instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
                                             interviewer_name=config.get("interviewer_name", ""),
                                             scenario=scenario, topics=topics)
+    structure = None
+    if topics:
+        split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
+        s1 = sum(1 + len(t["followups"]) for t in topics[:split])
+        s2 = sum(1 + len(t["followups"]) for t in topics[split:])
+        structure = ([f"spoken:{s1}"]
+                     + ([f"scenario:{len(scenario['questions'])}"] if scenario else [])
+                     + ([f"spoken:{s2}"] if s2 else []))
     return {
         "topics": topics or None,
+        "structure": structure,   # the three-phase layout, in order
         "exact_budget": bool(topics),   # scripted set: asked == approved, no +2
         "questions": questions,
         "has_typed": has_typed,
@@ -2159,8 +2207,11 @@ async def viva_live_preview_session(request: Request):
         "scenario_tool_registered": bool(scenario),   # mirrors the mint's tools= branch
         "scenario_in_instructions": (bool(scenario)
                                      and "show_scenario" in instructions
-                                     and "WRITTEN SCENARIO SECTION" in instructions
+                                     and "WRITTEN SCENARIO" in instructions
                                      and scenario["text"].replace('"', "'") in instructions),
+        "scenario_in_middle": (bool(topics and scenario) and "SPOKEN BLOCK 2" in instructions
+                               and instructions.index("WRITTEN SCENARIO")
+                                   < instructions.index("SPOKEN BLOCK 2")),
         "max_turns": int(config.get("max_turns", 4)),
     }
 
@@ -2277,8 +2328,9 @@ async def candidate_session_token(request: Request, token: str):
                     "\n\nADDITIONALLY — WRITTEN SCENARIO IN PROGRESS. Before the drop you had "
                     "already presented the written scenario; it is still visible on the "
                     "candidate's screen. Do NOT call show_scenario again and do NOT re-read the "
-                    "scenario in full. Continue the scenario section from where the transcript "
-                    "leaves off: ask the next unanswered scenario question as a TYPED question.")
+                    "scenario in full. Continue from where the transcript leaves off: ask the next "
+                    "unanswered scenario question as a TYPED question — or, if every scenario "
+                    "question is already answered, continue with the remaining spoken questions.")
             if has_typed and awaiting_typed:
                 instructions += _VIVA_TYPED_RECOVERY_TEMPLATE.format(
                     q=awaiting_typed.replace('"', "'"))
