@@ -443,6 +443,17 @@ def main():
                 failures.append(("GET", "/api/kpi", r.status_code))
         except Exception as e:
             line(None, "GET", "/api/kpi", str(e)[:60]); failures.append(("GET", "/api/kpi", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.get("/api/admin/screenings")
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/admin/screenings",
+                 "gated (admin-only, fresh role)" if gated else "NOT GATED — cross-tenant leak!")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/admin/screenings", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/admin/screenings", str(e)[:60]); failures.append(("GET", "/api/admin/screenings", "exception"))
         for iq_path in ("/api/jobs/000000000000000000000000/interview-questions/generate",
                         "/api/jobs/000000000000000000000000/interview-questions"):
             try:
@@ -529,6 +540,7 @@ def main():
             ("GET", "/api/leave/requests", None),
             ("GET", "/api/leave/balances", None),
             ("GET", "/api/kpi", None),
+            ("GET", "/api/admin/screenings?limit=5", None),
         ]
         if job_id:
             checks += [

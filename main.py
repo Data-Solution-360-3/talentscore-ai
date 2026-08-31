@@ -67,7 +67,7 @@ from database import (
     set_employee_invite, get_employee_by_invite, set_employee_password,
     find_employee_logins, update_employee_contact,
     VIVA_THRESHOLD_DEFAULT, VIVA_DAILY_LAUNCH_CAP_DEFAULT, serialize_mongo,
-    kpi_data,
+    kpi_data, get_admin_screenings,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -3760,18 +3760,29 @@ async def delete_job_endpoint(request: Request, job_id: str):
 
 @app.get("/api/admin/users")
 async def admin_list_users(request: Request):
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    # require_admin reads the role FRESH from the DB — the old JWT-role check
+    # here meant a stale token (promoted after login, or demoted and not yet
+    # expired) got the wrong answer for up to 30 days.
+    await require_admin(request)
     users = await get_all_users()
     return {"users": users, "count": len(users)}
 
 
+@app.get("/api/admin/screenings")
+async def admin_list_screenings(request: Request, limit: int = 100, skip: int = 0):
+    """Cross-tenant screenings for the admin portal: projected, paginated,
+    with the true platform total — the old path shipped every full document
+    (~2.4MB for 300 rows), which stalls slow links and only grows."""
+    await require_admin(request)
+    limit = max(1, min(500, limit))
+    skip = max(0, min(100000, skip))
+    rows, total = await get_admin_screenings(limit=limit, skip=skip)
+    return {"screenings": rows, "count": len(rows), "total": total}
+
+
 @app.post("/api/admin/users/{user_id}/toggle")
 async def admin_toggle_user(request: Request, user_id: str):
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     target = await get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -3789,9 +3800,7 @@ async def admin_create_user(
     plan: str = Form("trial"),
     role: str = Form("client"),
 ):
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
     try:
@@ -4082,9 +4091,7 @@ async def get_team(request: Request):
 @app.post("/api/admin/migrate-screenings")
 async def migrate_screenings(request: Request):
     """Admin tool: assign ALL screenings to the admin user."""
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     from database import db
     # Reassign ALL screenings to admin
     result = await db.screenings.update_many(
@@ -4097,9 +4104,7 @@ async def migrate_screenings(request: Request):
 @app.post("/api/admin/transfer-to/{target_email}")
 async def transfer_to_user(request: Request, target_email: str):
     """Admin: transfer ALL screenings to a specific user by email."""
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     target = await get_user_by_email(target_email)
     if not target:
         raise HTTPException(status_code=404, detail=f"User {target_email} not found.")
@@ -4122,9 +4127,7 @@ async def transfer_to_user(request: Request, target_email: str):
 @app.post("/api/admin/migrate-from/{source_user_id}")
 async def migrate_from_user(request: Request, source_user_id: str):
     """Admin tool: move screenings from one user to admin."""
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     from database import db
     result = await db.screenings.update_many(
         {"user_id": source_user_id},
@@ -4153,9 +4156,7 @@ async def transfer_screenings(
     to_email: str = Form(""),
 ):
     """Transfer all screenings from one user to another."""
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     from database import db
     
     # Find target user by email if user_id not provided
@@ -4188,9 +4189,7 @@ async def transfer_screenings(
 @app.post("/api/admin/make-admin/{email}")
 async def make_admin(request: Request, email: str):
     """Make any user an admin."""
-    user = await get_current_user(request)
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
     target = await get_user_by_email(email)
     if not target:
         raise HTTPException(status_code=404, detail=f"User {email} not found.")

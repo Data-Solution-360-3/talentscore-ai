@@ -1391,6 +1391,24 @@ async def reserve_viva_launch(job_id: str, cap: int) -> bool:
     return await reserve_spend(f"viva-launch:{job_id}:{now:%Y-%m-%d}", cap)
 
 
+async def get_admin_screenings(limit: int = 100, skip: int = 0) -> tuple[list, int]:
+    """Cross-tenant screenings for the admin portal — PROJECTED to the table's
+    columns and paginated. The full documents average ~35KB each (parsed CV,
+    dimensions, breakdowns); 300 of them is a 2.4MB response that stalls slow
+    connections. This projection is ~50x lighter and count_documents gives the
+    true platform total regardless of the page size."""
+    proj = {"candidate_name": 1, "company": 1, "overall_score": 1,
+            "recommendation": 1, "skills_coverage_pct": 1,
+            "years_experience": 1, "created_at": 1, "user_id": 1}
+    cursor = (db.screenings.find({}, proj)
+              .sort("created_at", -1).skip(skip).limit(limit))
+    out = []
+    async for d in cursor:
+        out.append(serialize_mongo(d))
+    total = await db.screenings.count_documents({})
+    return out, total
+
+
 # ── KPI dashboard ────────────────────────────────────────────
 # Only what the SPA cannot honestly compute client-side. The funnel, screening
 # volume and per-job averages come from CandidateStats over /api/screenings —

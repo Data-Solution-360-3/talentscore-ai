@@ -502,6 +502,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <script>
 let allUsers=[], allScreenings=[], faqItems=[], pricingData=[];
+let screenTotal=0;   // true cross-tenant total from the server, not array length
 
 // ── NAVIGATION ──
 function nav(id){
@@ -526,39 +527,72 @@ function fmt(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-
 function showOk(id){const el=document.getElementById(id);el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 
 // ── LOAD DATA ──
+// Every fetch has a hard timeout, and every failure renders a visible
+// "Failed to load" + Retry instead of the old silent console.error that left
+// "Loading..." on screen forever.
+function tFetch(path, ms){
+  const c=new AbortController();
+  setTimeout(()=>c.abort(), ms||30000);
+  return fetch(path,{credentials:'include',signal:c.signal});
+}
+function loadFailed(msg){
+  const row=(cols)=>`<tr><td colspan="${cols}" class="tbl-empty" style="color:#f43f5e">
+    ${msg} <button class="btn btn-xs" style="margin-left:8px" onclick="loadAll()">Retry</button></td></tr>`;
+  document.getElementById('users-tbl').innerHTML=row(8);
+  document.getElementById('screens-tbl').innerHTML=row(7);
+  document.getElementById('sb-info').textContent=msg;
+}
 async function loadAll(){
   try{
     const [meRes,usersRes,screenRes,statsRes]=await Promise.all([
-      fetch('/api/auth/me',{credentials:'include'}),
-      fetch('/api/admin/users',{credentials:'include'}),
-      fetch('/api/screenings?limit=500',{credentials:'include'}),
-      fetch('/api/stats',{credentials:'include'})
+      tFetch('/api/auth/me'),
+      tFetch('/api/admin/users'),
+      // Projected + paginated admin endpoint — ~50x lighter than pulling the
+      // full cross-tenant documents, and it returns the true platform total.
+      tFetch('/api/admin/screenings?limit=100'),
+      tFetch('/api/stats')
     ]);
-    if(meRes.status===401||usersRes.status===403){window.location.href='/login';return;}
+    if([meRes,usersRes,screenRes].some(r=>r.status===401||r.status===403)){window.location.href='/login';return;}
+    if(!usersRes.ok||!screenRes.ok||!meRes.ok)
+      throw new Error(`server error (users ${usersRes.status}, screenings ${screenRes.status})`);
     const me=await meRes.json();
     const usersData=await usersRes.json();
     const screenData=await screenRes.json();
-    const statsData=await statsRes.json();
+    const statsData=await statsRes.json().catch(()=>({}));
 
     allUsers=usersData.users||[];
     allScreenings=screenData.screenings||[];
+    screenTotal=screenData.total!=null?screenData.total:allScreenings.length;
 
     document.getElementById('t-admin-email').textContent=me.email;
     document.getElementById('sb-info').textContent='Signed in as '+me.email;
     document.getElementById('sb-users-cnt').textContent=allUsers.length;
-    document.getElementById('sb-screen-cnt').textContent=allScreenings.length;
+    document.getElementById('sb-screen-cnt').textContent=screenTotal;
 
     renderDashboard(statsData);
     renderUsers();
     renderScreenings();
     loadSettings();
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error(e);
+    loadFailed('Failed to load — '+(e.name==='AbortError'?'timed out after 30s':(e.message||'network error')));
+  }
+}
+async function loadMoreScreenings(){
+  try{
+    const r=await tFetch('/api/admin/screenings?limit=100&skip='+allScreenings.length);
+    if(!r.ok) throw new Error('server '+r.status);
+    const d=await r.json();
+    allScreenings=allScreenings.concat(d.screenings||[]);
+    screenTotal=d.total!=null?d.total:screenTotal;
+    renderScreenings();
+  }catch(e){alert('Could not load more: '+(e.message||e));}
 }
 
 // ── DASHBOARD ──
 function renderDashboard(stats){
   document.getElementById('ov-users').textContent=allUsers.length;
-  document.getElementById('ov-screens').textContent=allScreenings.length;
+  document.getElementById('ov-screens').textContent=screenTotal;
   document.getElementById('ov-active').textContent=allUsers.filter(u=>u.active!==false).length;
   document.getElementById('ov-avg').textContent=stats.avg_score||'—';
   document.getElementById('recent-count').textContent=allUsers.length+' total users';
@@ -671,8 +705,11 @@ function renderScreenings(){
     const matchR=!recF||((s.recommendation||'').toUpperCase()===recF);
     return matchQ&&matchR;
   });
-  document.getElementById('screen-count').textContent='Showing '+filtered.length+' of '+allScreenings.length+' screenings';
-  document.getElementById('screens-tbl').innerHTML=filtered.slice(0,100).map(s=>{
+  document.getElementById('screen-count').textContent='Showing '+filtered.length+' of '+allScreenings.length+' loaded ('+screenTotal+' total across all companies)';
+  const moreRow = allScreenings.length<screenTotal
+    ? `<tr><td colspan="7" style="text-align:center;padding:10px"><button class="btn btn-xs" onclick="loadMoreScreenings()">Load ${Math.min(100,screenTotal-allScreenings.length)} more (newest first)</button></td></tr>`
+    : '';
+  document.getElementById('screens-tbl').innerHTML=(filtered.map(s=>{
     const score=Math.round(s.overall_score||0);
     const rec=(s.recommendation||'MAYBE').toUpperCase();
     return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer">
@@ -684,7 +721,7 @@ function renderScreenings(){
       <td>${s.years_experience||'?'} yrs</td>
       <td>${fmt(s.created_at)}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="7" class="tbl-empty">No screenings found</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="tbl-empty">No screenings found</td></tr>')+moreRow;
 }
 function filterScreenings(){renderScreenings();}
 
