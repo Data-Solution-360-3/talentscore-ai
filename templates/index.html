@@ -191,10 +191,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     radial-gradient(700px 420px at 108% 120%, #e4ecdb 0%, transparent 55%),
     #eef1ea;
   border:1px solid rgba(255,255,255,.65);border-radius:28px;
-  padding:22px 24px 26px;box-shadow:0 20px 50px -22px rgba(23,52,4,.22);
+  padding:14px 24px 24px;box-shadow:0 20px 50px -22px rgba(23,52,4,.22);
   color:var(--dx-ink);font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
-.dashx .dx-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.dashx .dx-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .dashx .dx-hd h1{font-size:22px;font-weight:750;letter-spacing:-.4px;color:var(--dx-ink)}
 .dashx .dx-hd p{color:var(--dx-muted);font-size:13px;margin-top:3px}
 .dashx .dx-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
@@ -758,7 +758,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="dashx">
     <div class="dx-hd">
       <div><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
-      <button class="btn btn-ghost btn-sm" onclick="exportAll()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export all</button>
     </div>
 
     <!-- Stat tiles — SAME ids + SAME real values (renderOverview / CandidateStats) -->
