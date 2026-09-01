@@ -70,7 +70,11 @@ from database import (
     kpi_data, reserve_snapshot_slot, save_proctor_snapshot,
     get_snapshots_for_token, SNAPSHOT_MAX_BYTES,
     upsert_salary_structure, get_salary_structures, create_payroll_run,
-    list_payroll_runs, get_payroll_run, approve_payroll_run, get_admin_screenings,
+    list_payroll_runs, get_payroll_run, approve_payroll_run,
+    create_perf_cycle, list_perf_cycles, get_perf_cycle, set_perf_cycle_status,
+    delete_perf_cycle, add_perf_assignment, remove_perf_assignment,
+    list_perf_assignments, list_reviews_for_employee, get_review_for_employee,
+    submit_review_answers, PERF_RELATIONS, PERF_SCALE_MAX, get_admin_screenings,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -927,6 +931,161 @@ async def batch_screen_endpoint(
 # ─────────────────────────────────────────────────────────────
 # SCREENINGS (tenant-scoped)
 # ─────────────────────────────────────────────────────────────
+
+# ── 360° Performance (HRM module 3) — P1 routes ─────────────
+# Admin surface: cycles, assignment matrix, lifecycle. Portal surface: the
+# three /api/me/reviews* endpoints, where the assignment row is the ACL —
+# scope from the signed token only, subject ids never request parameters.
+
+@app.post("/api/performance/cycles")
+async def perf_cycle_create(request: Request):
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    cycle = await create_perf_cycle(user["user_id"], str(body.get("name", "")),
+                                    body.get("competencies"))
+    return {"success": True, "cycle": cycle}
+
+
+@app.get("/api/performance/cycles")
+async def perf_cycles_list(request: Request):
+    user = await require_admin(request)
+    return {"cycles": await list_perf_cycles(user["user_id"])}
+
+
+@app.get("/api/performance/cycles/{cycle_id}")
+async def perf_cycle_detail(request: Request, cycle_id: str):
+    user = await require_admin(request)
+    cycle = await get_perf_cycle(user["user_id"], cycle_id)
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found.")
+    return {"cycle": cycle,
+            "assignments": await list_perf_assignments(user["user_id"], cycle_id)}
+
+
+@app.post("/api/performance/cycles/{cycle_id}/assignments")
+async def perf_assignment_add(request: Request, cycle_id: str):
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    a, err = await add_perf_assignment(
+        user["user_id"], cycle_id,
+        str(body.get("subject_employee_id", "")),
+        str(body.get("reviewer_employee_id", "")),
+        str(body.get("relation", "")))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"success": True, "assignment": a}
+
+
+@app.post("/api/performance/assignments/{assignment_id}/remove")
+async def perf_assignment_remove(request: Request, assignment_id: str):
+    user = await require_admin(request)
+    if not await remove_perf_assignment(user["user_id"], assignment_id):
+        raise HTTPException(status_code=400,
+                            detail="Only assignments on a draft cycle can be removed.")
+    return {"success": True}
+
+
+@app.post("/api/performance/cycles/{cycle_id}/launch")
+async def perf_cycle_launch(request: Request, cycle_id: str):
+    user = await require_admin(request)
+    if not (await list_perf_assignments(user["user_id"], cycle_id)):
+        raise HTTPException(status_code=400, detail="Add at least one assignment before launching.")
+    if not await set_perf_cycle_status(user["user_id"], cycle_id, "active", ("draft",)):
+        raise HTTPException(status_code=400, detail="Only a draft cycle can launch.")
+    return {"success": True}
+
+
+@app.post("/api/performance/cycles/{cycle_id}/close")
+async def perf_cycle_close(request: Request, cycle_id: str):
+    user = await require_admin(request)
+    if not await set_perf_cycle_status(user["user_id"], cycle_id, "closed", ("active",)):
+        raise HTTPException(status_code=400, detail="Only an active cycle can close.")
+    return {"success": True}
+
+
+@app.post("/api/performance/cycles/{cycle_id}/delete")
+async def perf_cycle_delete(request: Request, cycle_id: str):
+    user = await require_admin(request)
+    if not await delete_perf_cycle(user["user_id"], cycle_id):
+        raise HTTPException(status_code=400,
+                            detail="Only a draft or closed cycle can be deleted.")
+    return {"success": True}
+
+
+@app.get("/api/performance/cycles/{cycle_id}/results")
+async def perf_cycle_results(request: Request, cycle_id: str):
+    """Aggregates are ADMIN-ONLY — this gate exists (and is smoke-locked)
+    from P1, before the aggregation itself lands in P4."""
+    user = await require_admin(request)
+    cycle = await get_perf_cycle(user["user_id"], cycle_id)
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found.")
+    return {"cycle": cycle, "results": None,
+            "note": "Aggregation lands in P4 — the admin-only gate is live from P1."}
+
+
+# ── Portal: the assignment row IS the ACL ──
+
+@app.get("/api/me/reviews")
+async def me_reviews_list(request: Request):
+    emp = await require_employee(request)
+    return {"reviews": await list_reviews_for_employee(emp["tenant"], emp["employee_id"])}
+
+
+@app.get("/api/me/reviews/{assignment_id}")
+async def me_review_form(request: Request, assignment_id: str):
+    emp = await require_employee(request)
+    view = await get_review_for_employee(emp["tenant"], emp["employee_id"], assignment_id)
+    if not view:
+        # Unknown, someone else's, wrong tenant, inactive cycle: identical.
+        raise HTTPException(status_code=404, detail="Review not found.")
+    return view
+
+
+@app.post("/api/me/reviews/{assignment_id}")
+async def me_review_submit(request: Request, assignment_id: str):
+    emp = await require_employee(request)
+    if not await rate_limit_allows(f"perf-submit:{emp['employee_id']}", 30, 3600):
+        raise HTTPException(status_code=429, detail="Too many submissions — try later.")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    view = await get_review_for_employee(emp["tenant"], emp["employee_id"], assignment_id)
+    if not view:
+        raise HTTPException(status_code=404, detail="Review not found.")
+    # Validate against the cycle's competency snapshot: every competency
+    # scored 0..scale_max, comments capped. Nothing else accepted.
+    comp_names = [c["name"] for c in view["competencies"]]
+    raw = {str(s.get("name", "")): s for s in (body.get("scores") or []) if isinstance(s, dict)}
+    scores = []
+    for name in comp_names:
+        s = raw.get(name)
+        if s is None:
+            raise HTTPException(status_code=400, detail=f"Missing score for '{name}'.")
+        try:
+            val = float(s.get("score"))
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Invalid score for '{name}'.")
+        if not 0 <= val <= view["scale_max"]:
+            raise HTTPException(status_code=400,
+                                detail=f"Score for '{name}' must be 0–{view['scale_max']}.")
+        scores.append({"name": name, "score": round(val, 1),
+                       "comment": str(s.get("comment", ""))[:1000]})
+    answers = {"scores": scores,
+               "overall_comment": str(body.get("overall_comment", ""))[:2000]}
+    ok, err = await submit_review_answers(emp["tenant"], emp["employee_id"],
+                                          assignment_id, answers)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err or "Could not submit.")
+    return {"success": True}
+
 
 # ── Payroll (HRM module 2) — admin-only; salary is the most sensitive data
 # in the product, so every route is owner-gated and tenant-scoped. The money

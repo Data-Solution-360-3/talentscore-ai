@@ -73,6 +73,14 @@ async def connect():
     # fetched only through owner-gated endpoints, keyed by interview token.
     await db.proctor_snapshots.create_index("expires_at", expireAfterSeconds=0)
     await db.proctor_snapshots.create_index("token")
+    # 360° performance: the assignment row is the ACL — index its two lookup
+    # paths, and keep one row per (cycle, subject, reviewer, relation).
+    await db.perf_cycles.create_index("user_id")
+    await db.perf_assignments.create_index([("user_id", 1), ("reviewer_employee_id", 1)])
+    await db.perf_assignments.create_index("cycle_id")
+    await db.perf_assignments.create_index(
+        [("cycle_id", 1), ("subject_employee_id", 1), ("reviewer_employee_id", 1), ("relation", 1)],
+        unique=True)
     await db.application_files.create_index("screening_id")
     await db.application_files.create_index("application_id")
     await db.rate_hits.create_index("expires_at", expireAfterSeconds=0)
@@ -1457,6 +1465,255 @@ async def get_admin_screenings(limit: int = 100, skip: int = 0) -> tuple[list, i
         out.append(serialize_mongo(d))
     total = await db.screenings.count_documents({})
     return out, total
+
+
+# ── 360° Performance (HRM module 3) — P1: data model + security boundary ──
+# THE SECURITY MODEL: the review_assignments row IS the ACL. Portal reads
+# take ONLY an assignment_id; the reviewer must equal the SIGNED TOKEN's
+# employee_id, tenant must match, and the subject is DERIVED from the row —
+# subject ids are never request parameters. A reviewer sees the subject's
+# name + role + department, nothing else. Aggregates are admin-only.
+
+PERF_RELATIONS = ("self", "manager", "peer", "subordinate")
+PERF_SCALE_MAX = 20                      # matches the interview scorer's 0-20
+PERF_WEIGHTS = {"manager": 0.50, "self": 0.10, "peer": 0.25, "subordinate": 0.15}
+PERF_PEER_ANON_FLOOR = 3                 # hide individual peer scores below this
+PERF_CYCLE_STATUSES = ("draft", "active", "closed")
+PERF_DEFAULT_COMPETENCIES = [
+    {"name": "Job Knowledge", "description": "Understands the work and the tools it needs."},
+    {"name": "Quality of Work", "description": "Accuracy, care, and finish of what they produce."},
+    {"name": "Communication", "description": "Clear, timely, and honest in speech and writing."},
+    {"name": "Teamwork", "description": "Works well with others; gives and accepts help."},
+    {"name": "Ownership & Reliability", "description": "Delivers what they committed to, without chasing."},
+]
+
+_PERF_SUBJECT_PROJ = {"name": 1, "role_title": 1, "department": 1}   # ALL a reviewer may see
+
+
+def _perf_subject_view(emp: dict | None) -> dict:
+    """The ONLY representation of a subject a reviewer ever receives."""
+    e = emp or {}
+    return {"name": e.get("name") or "—",
+            "role_title": e.get("role_title") or "",
+            "department": e.get("department") or ""}
+
+
+async def create_perf_cycle(user_id: str, name: str, competencies: list | None) -> dict:
+    comps = []
+    for c in (competencies or [])[:8]:
+        if isinstance(c, dict) and str(c.get("name", "")).strip():
+            comps.append({"name": str(c["name"]).strip()[:80],
+                          "description": str(c.get("description", "")).strip()[:300]})
+    if len(comps) < 2:
+        comps = [dict(c) for c in PERF_DEFAULT_COMPETENCIES]
+    doc = {"user_id": user_id, "name": (name or "Performance cycle").strip()[:80],
+           "period": "quarterly", "status": "draft",
+           "competencies": comps, "weights": dict(PERF_WEIGHTS),
+           "scale_max": PERF_SCALE_MAX, "peer_anon_floor": PERF_PEER_ANON_FLOOR,
+           "created_at": datetime.utcnow()}
+    res = await db.perf_cycles.insert_one(doc)
+    doc["_id"] = str(res.inserted_id)
+    return serialize_mongo(doc)
+
+
+async def list_perf_cycles(user_id: str) -> list:
+    out = []
+    async for c in db.perf_cycles.find(
+            user_match_field("user_id", user_id)).sort("created_at", -1).limit(40):
+        out.append(serialize_mongo(c))
+    return out
+
+
+async def get_perf_cycle(user_id: str, cycle_id: str) -> dict | None:
+    try:
+        c = await db.perf_cycles.find_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id)})
+    except Exception:
+        return None
+    return serialize_mongo(c) if c else None
+
+
+async def set_perf_cycle_status(user_id: str, cycle_id: str,
+                                to_status: str, from_statuses: tuple) -> bool:
+    try:
+        res = await db.perf_cycles.update_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
+             "status": {"$in": list(from_statuses)}},
+            {"$set": {"status": to_status, f"{to_status}_at": datetime.utcnow()}})
+        return res.modified_count == 1
+    except Exception:
+        return False
+
+
+async def delete_perf_cycle(user_id: str, cycle_id: str) -> bool:
+    """Draft or closed cycles only — an active cycle must be closed first."""
+    try:
+        res = await db.perf_cycles.delete_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
+             "status": {"$in": ["draft", "closed"]}})
+        if res.deleted_count == 1:
+            await db.perf_assignments.delete_many({"cycle_id": cycle_id})
+            return True
+        return False
+    except Exception:
+        return False
+
+
+async def add_perf_assignment(user_id: str, cycle_id: str, subject_id: str,
+                              reviewer_id: str, relation: str) -> tuple[dict | None, str | None]:
+    if relation not in PERF_RELATIONS:
+        return None, "Unknown relation."
+    if relation == "self" and subject_id != reviewer_id:
+        return None, "A self review must have the same subject and reviewer."
+    if relation != "self" and subject_id == reviewer_id:
+        return None, "Only a self review may point at yourself."
+    cycle = await get_perf_cycle(user_id, cycle_id)
+    if not cycle:
+        return None, "Cycle not found."
+    if cycle["status"] != "draft":
+        return None, "Assignments can only be edited on a draft cycle."
+    # Both people must be active employees of THIS tenant.
+    for label, eid in (("subject", subject_id), ("reviewer", reviewer_id)):
+        try:
+            emp = await db.employees.find_one(
+                {**user_match_field("user_id", user_id), "_id": ObjectId(eid),
+                 "status": {"$ne": "terminated"}})
+        except Exception:
+            emp = None
+        if not emp:
+            return None, f"The {label} is not an active employee of this account."
+    doc = {"user_id": user_id, "cycle_id": cycle_id,
+           "subject_employee_id": subject_id, "reviewer_employee_id": reviewer_id,
+           "relation": relation, "status": "pending", "answers": None,
+           "created_at": datetime.utcnow()}
+    await db.perf_assignments.update_one(
+        {"cycle_id": cycle_id, "subject_employee_id": subject_id,
+         "reviewer_employee_id": reviewer_id, "relation": relation},
+        {"$setOnInsert": doc}, upsert=True)
+    saved = await db.perf_assignments.find_one(
+        {"cycle_id": cycle_id, "subject_employee_id": subject_id,
+         "reviewer_employee_id": reviewer_id, "relation": relation})
+    return serialize_mongo(saved), None
+
+
+async def remove_perf_assignment(user_id: str, assignment_id: str) -> bool:
+    try:
+        a = await db.perf_assignments.find_one(
+            {**user_match_field("user_id", user_id), "_id": ObjectId(assignment_id)})
+    except Exception:
+        return False
+    if not a:
+        return False
+    cycle = await get_perf_cycle(user_id, a["cycle_id"])
+    if not cycle or cycle["status"] != "draft":
+        return False
+    await db.perf_assignments.delete_one({"_id": a["_id"]})
+    return True
+
+
+async def list_perf_assignments(user_id: str, cycle_id: str) -> list:
+    """Admin matrix view — names joined for readability. Admin-only caller."""
+    out = []
+    async for a in db.perf_assignments.find(
+            {**user_match_field("user_id", user_id), "cycle_id": cycle_id}):
+        out.append(serialize_mongo(a))
+    ids = set()
+    for a in out:
+        ids.add(a["subject_employee_id"])
+        ids.add(a["reviewer_employee_id"])
+    names = {}
+    oids = []
+    for i in ids:
+        try:
+            oids.append(ObjectId(i))
+        except Exception:
+            pass
+    if oids:
+        async for e in db.employees.find({"_id": {"$in": oids}}, {"name": 1}):
+            names[str(e["_id"])] = e.get("name")
+    for a in out:
+        a["subject_name"] = names.get(a["subject_employee_id"], "?")
+        a["reviewer_name"] = names.get(a["reviewer_employee_id"], "?")
+    return out
+
+
+# ── Portal side: scope comes ONLY from the signed token's claims ──
+
+async def list_reviews_for_employee(tenant: str, employee_id: str) -> list:
+    """Every assignment naming THIS employee as reviewer, on ACTIVE cycles.
+    The subject appears as the minimal projection, nothing more."""
+    out = []
+    cycles = {}
+    async for a in db.perf_assignments.find(
+            {**user_match_field("user_id", tenant),
+             "reviewer_employee_id": employee_id}).sort("created_at", 1):
+        cid = a["cycle_id"]
+        if cid not in cycles:
+            try:
+                c = await db.perf_cycles.find_one({"_id": ObjectId(cid)})
+            except Exception:
+                c = None
+            # tenant re-verified even though the assignment was tenant-filtered
+            cycles[cid] = c if (c and str(c.get("user_id")) == str(tenant)) else None
+        cycle = cycles[cid]
+        if not cycle or cycle.get("status") != "active":
+            continue
+        try:
+            subj = await db.employees.find_one(
+                {"_id": ObjectId(a["subject_employee_id"])}, _PERF_SUBJECT_PROJ)
+        except Exception:
+            subj = None
+        out.append({"assignment_id": str(a["_id"]),
+                    "relation": a["relation"], "status": a["status"],
+                    "cycle_name": cycle.get("name"),
+                    "subject": _perf_subject_view(subj)})
+    return out
+
+
+async def get_review_for_employee(tenant: str, employee_id: str,
+                                  assignment_id: str) -> dict | None:
+    """THE ACL CHECK. None for: unknown id, someone else's assignment, wrong
+    tenant, inactive cycle — all identical, probe-resistant."""
+    try:
+        a = await db.perf_assignments.find_one(
+            {**user_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
+             "reviewer_employee_id": employee_id})
+    except Exception:
+        return None
+    if not a:
+        return None
+    cycle = await db.perf_cycles.find_one({"_id": ObjectId(a["cycle_id"])})
+    if not cycle or str(cycle.get("user_id")) != str(tenant) or cycle.get("status") != "active":
+        return None
+    try:
+        subj = await db.employees.find_one(
+            {"_id": ObjectId(a["subject_employee_id"])}, _PERF_SUBJECT_PROJ)
+    except Exception:
+        subj = None
+    return {"assignment_id": str(a["_id"]), "relation": a["relation"],
+            "status": a["status"], "answers": a.get("answers"),
+            "cycle_name": cycle.get("name"),
+            "competencies": cycle.get("competencies") or [],
+            "scale_max": cycle.get("scale_max", PERF_SCALE_MAX),
+            "subject": _perf_subject_view(subj)}
+
+
+async def submit_review_answers(tenant: str, employee_id: str, assignment_id: str,
+                                answers: dict) -> tuple[bool, str]:
+    """One-shot submit on a pending assignment of an active cycle. The write
+    filter re-checks reviewer + tenant + status atomically."""
+    view = await get_review_for_employee(tenant, employee_id, assignment_id)
+    if not view:
+        return False, "Review not found."
+    if view["status"] != "pending":
+        return False, "This review was already submitted."
+    res = await db.perf_assignments.update_one(
+        {**user_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
+         "reviewer_employee_id": employee_id, "status": "pending"},
+        {"$set": {"status": "submitted", "answers": answers,
+                  "submitted_at": datetime.utcnow()}})
+    return (res.modified_count == 1,
+            "" if res.modified_count == 1 else "This review was already submitted.")
 
 
 # ── Payroll (HRM module 2) — SKELETON: structure yes, money math HELD ──

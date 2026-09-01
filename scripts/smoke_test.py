@@ -94,10 +94,13 @@ def mint_admin_token(admin_email: str):
         return None, f"mint unavailable: {str(e)[:70]}"
 
 
-def mint_employee_token():
+def mint_employee_token(employee_id="000000000000000000000000",
+                        tenant="000000000000000000000000",
+                        name="Smoke Employee"):
     """Mint a real role=employee JWT from SECRET_KEY — the same way the login
-    endpoint does. No DB needed: the boundary we test (admin/hiring endpoints
-    reject an employee token) is enforced on the role claim alone."""
+    endpoint does. With real ids (the performance-boundary fixtures) it
+    becomes a genuine employee session; with the synthetic defaults it only
+    proves role-claim rejection on admin routes."""
     try:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from dotenv import load_dotenv
@@ -105,10 +108,50 @@ def mint_employee_token():
         from auth import create_token
         return create_token({
             "role": "employee",
-            "employee_id": "000000000000000000000000",
-            "tenant": "000000000000000000000000",
-            "name": "Smoke Employee",
+            "employee_id": employee_id,
+            "tenant": tenant,
+            "name": name,
         })
+    except Exception:
+        return None
+
+
+def ensure_perf_fixtures(admin_email: str):
+    """Two throwaway employees under the admin's tenant, for the 360°
+    ACL boundary proof. Idempotent (upsert by email); returns
+    {tenant, emp_a, emp_b} or None. Direct pymongo, same pattern as
+    mint_admin_token — the smoke runs on the server with .env."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from pymongo import MongoClient
+        from datetime import datetime
+        cli = MongoClient(os.getenv("MONGO_URI"), serverSelectionTimeoutMS=15000,
+                          tlsAllowInvalidCertificates=True)
+        dbx = cli[os.getenv("DB_NAME", "talentscore")]
+        admin = dbx.users.find_one({"email": admin_email.lower()})
+        if not admin:
+            cli.close()
+            return None
+        tenant = str(admin["_id"])
+        ids = {}
+        for key, nm, em in (("emp_a", "Smoke Perf A", "smoke.perf.a@boundary.test"),
+                            ("emp_b", "Smoke Perf B", "smoke.perf.b@boundary.test")):
+            dbx.employees.update_one(
+                {"user_id": tenant, "email": em},
+                {"$set": {"user_id": tenant, "email": em, "name": nm,
+                          "status": "active", "department": "Smoke",
+                          "role_title": "Boundary Fixture",
+                          "updated_at": datetime.utcnow()},
+                 "$setOnInsert": {"created_at": datetime.utcnow(),
+                                  "leave_allowances": {"annual": 0, "sick": 0},
+                                  "source": "manual"}},
+                upsert=True)
+            ids[key] = str(dbx.employees.find_one({"user_id": tenant, "email": em})["_id"])
+        cli.close()
+        ids["tenant"] = tenant
+        return ids
     except Exception:
         return None
 
@@ -876,6 +919,112 @@ def main():
             except Exception as e:
                 line(None, "POST", path, str(e)[:60])
                 failures.append(("POST", path, "exception"))
+
+        # ── 360° PERFORMANCE BOUNDARY (P1) — the assignment row IS the ACL ──
+        # Real fixtures: two employees in the admin's tenant, a cycle, and one
+        # assignment (A reviews B, peer). Proves: A reaches ONLY their own
+        # assignment with the minimal subject view; B is refused A's; employee
+        # tokens are refused by every admin/aggregate/salary surface. Every
+        # failure is labeled PERFORMANCE DATA LEAK! so it can never pass quietly.
+        print("\n360° performance boundary — the assignment row is the ACL")
+        fx = ensure_perf_fixtures(args.admin_email)
+        if not fx:
+            line(None, "SETUP", "perf fixtures", "could not create fixtures (MONGO_URI?)")
+            failures.append(("PERF", "fixtures", "setup failed"))
+        else:
+            aid = cid = None
+            try:
+                # Clean any leftover SMOKE-PERF cycle from a previous run.
+                old = c.get("/api/performance/cycles").json().get("cycles", [])
+                for oc in old:
+                    if oc.get("name") == "SMOKE-PERF" and oc.get("status") != "active":
+                        c.post(f"/api/performance/cycles/{oc['_id']}/delete")
+                    elif oc.get("name") == "SMOKE-PERF":
+                        c.post(f"/api/performance/cycles/{oc['_id']}/close")
+                        c.post(f"/api/performance/cycles/{oc['_id']}/delete")
+                r = c.post("/api/performance/cycles", json={"name": "SMOKE-PERF"})
+                cid = r.json()["cycle"]["_id"]
+                r = c.post(f"/api/performance/cycles/{cid}/assignments", json={
+                    "subject_employee_id": fx["emp_b"],
+                    "reviewer_employee_id": fx["emp_a"], "relation": "peer"})
+                aid = r.json()["assignment"]["_id"]
+                r = c.post(f"/api/performance/cycles/{cid}/launch")
+                ok = r.status_code == 200
+                line(r.status_code, "SETUP", "cycle + assignment + launch",
+                     "fixtures live" if ok else "SETUP FAILED")
+                checked += 1
+                if not ok:
+                    failures.append(("PERF", "setup", r.status_code))
+            except Exception as e:
+                line(None, "SETUP", "perf cycle", str(e)[:60])
+                failures.append(("PERF", "setup", "exception"))
+
+            if aid and cid:
+                tok_a = mint_employee_token(fx["emp_a"], fx["tenant"], "Smoke Perf A")
+                tok_b = mint_employee_token(fx["emp_b"], fx["tenant"], "Smoke Perf B")
+
+                def emp_req(tok, method, path, body=None):
+                    with httpx.Client(base_url=base, timeout=30.0) as ec:
+                        ec.headers["Authorization"] = f"Bearer {tok}"
+                        return ec.request(method, path, json=body)
+
+                def perf_check(label, ok, status):
+                    nonlocal checked
+                    line(status, "PERF", label, "ok" if ok else "PERFORMANCE DATA LEAK!")
+                    checked += 1
+                    if not ok:
+                        failures.append(("PERF", label, status))
+
+                # A sees their own assignment — and ONLY the minimal subject view.
+                r = emp_req(tok_a, "GET", "/api/me/reviews")
+                body = r.json() if r.status_code == 200 else {}
+                mine = [x for x in body.get("reviews", []) if x.get("assignment_id") == aid]
+                subj_keys = set((mine[0].get("subject") or {}).keys()) if mine else set()
+                perf_check("A lists own review", r.status_code == 200 and len(mine) == 1,
+                           r.status_code)
+                perf_check("subject view is minimal (name/role/department only)",
+                           bool(mine) and subj_keys <= {"name", "role_title", "department"},
+                           r.status_code)
+                r = emp_req(tok_a, "GET", f"/api/me/reviews/{aid}")
+                form = r.json() if r.status_code == 200 else {}
+                perf_check("A opens own review form", r.status_code == 200
+                           and set((form.get("subject") or {}).keys()) <= {"name", "role_title", "department"}
+                           and "competencies" in form, r.status_code)
+                # B must NOT reach A's assignment — identical to nonexistent.
+                r = emp_req(tok_b, "GET", f"/api/me/reviews/{aid}")
+                perf_check("B refused A's assignment (404)", r.status_code == 404, r.status_code)
+                r = emp_req(tok_b, "GET", "/api/me/reviews")
+                b_sees = [x for x in (r.json().get("reviews", []) if r.status_code == 200 else [])
+                          if x.get("assignment_id") == aid]
+                perf_check("B's list excludes A's assignment", r.status_code == 200 and not b_sees,
+                           r.status_code)
+                # Employee tokens refused by aggregates + admin + salary surfaces.
+                for label, meth, path in (
+                        ("employee refused: cycles admin API", "GET", "/api/performance/cycles"),
+                        ("employee refused: results/aggregates", "GET", f"/api/performance/cycles/{cid}/results"),
+                        ("employee refused: assignment admin API", "POST", f"/api/performance/cycles/{cid}/assignments"),
+                        ("employee refused: payroll salaries", "GET", "/api/payroll/salaries"),
+                        ("employee refused: screenings", "GET", "/api/screenings"),
+                        ("employee refused: interview sessions", "GET", "/api/viva-live/sessions"),
+                        ("employee refused: KPI", "GET", "/api/kpi")):
+                    r = emp_req(tok_a, meth, path, {} if meth == "POST" else None)
+                    perf_check(label, r.status_code in (401, 403), r.status_code)
+                # Submit works once, exactly once.
+                answers = {"scores": [{"name": cn["name"], "score": 15, "comment": "smoke"}
+                                      for cn in form.get("competencies", [])],
+                           "overall_comment": "smoke boundary run"}
+                r = emp_req(tok_a, "POST", f"/api/me/reviews/{aid}", answers)
+                perf_check("A submits own review", r.status_code == 200, r.status_code)
+                r = emp_req(tok_a, "POST", f"/api/me/reviews/{aid}", answers)
+                perf_check("second submit refused", r.status_code == 400, r.status_code)
+                # B cannot submit into A's assignment either.
+                r = emp_req(tok_b, "POST", f"/api/me/reviews/{aid}", answers)
+                perf_check("B refused submitting A's review", r.status_code == 404, r.status_code)
+
+                # Cleanup: close + delete the smoke cycle (fixture employees stay,
+                # idempotent by email).
+                c.post(f"/api/performance/cycles/{cid}/close")
+                c.post(f"/api/performance/cycles/{cid}/delete")
 
     print(f"\n{checked} routes checked.")
     if failures:
