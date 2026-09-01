@@ -10,6 +10,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TopCandidate.pro — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Chart.js — dashboard donuts + bars (hiring dashboard only). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -174,6 +176,80 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* the reused KPI horizontal bars sit comfortably inside a soft card */
 #page-overview .rd .kpi-hlbl{flex:0 0 116px;font-size:11.5px}
 #page-overview .rd .kpi-hrow{margin:6px 0}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Hiring dashboard — mockup redesign. EVERY selector is scoped to .dashx,
+   a class that exists ONLY inside #page-overview, so nothing here can reach
+   candidates / pipeline / jobs / HRM or the shared sidebar & top bar.
+   Brand palette only (green / orange / grey / tinted white) — no navy.
+   ═══════════════════════════════════════════════════════════════════ */
+.dashx{
+  --dx-green:#639922;--dx-green-deep:#173404;--dx-green-mid:#2e5e14;
+  --dx-orange:#EF9F27;--dx-orange2:#F57C2E;--dx-ink:#1f2937;--dx-muted:#6b7280;--dx-line:#e8ece5;
+  background:
+    radial-gradient(900px 400px at 12% -10%, #dfe8d6 0%, transparent 60%),
+    radial-gradient(700px 420px at 108% 120%, #e4ecdb 0%, transparent 55%),
+    #eef1ea;
+  border:1px solid rgba(255,255,255,.65);border-radius:28px;
+  padding:22px 24px 26px;box-shadow:0 20px 50px -22px rgba(23,52,4,.22);
+  color:var(--dx-ink);font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+.dashx .dx-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.dashx .dx-hd h1{font-size:22px;font-weight:750;letter-spacing:-.4px;color:var(--dx-ink)}
+.dashx .dx-hd p{color:var(--dx-muted);font-size:13px;margin-top:3px}
+.dashx .dx-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.dashx .dx-stat{background:#fff;border-radius:16px;padding:15px 16px;box-shadow:0 2px 10px rgba(23,52,4,.05);border:1px solid var(--dx-line);display:flex;align-items:center;gap:13px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.dashx .dx-stat:hover{transform:translateY(-2px);box-shadow:0 10px 22px -10px rgba(23,52,4,.20)}
+.dashx .dx-ic{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:none}
+.dashx .dx-ic svg{width:21px;height:21px}
+.dashx .dx-ic.g{background:#e9f3dc;color:var(--dx-green)}
+.dashx .dx-ic.o{background:#fdeccf;color:var(--dx-orange2)}
+.dashx .dx-ic.gd{background:#dfeecd;color:var(--dx-green-mid)}
+.dashx .dx-n{font-size:25px;font-weight:750;line-height:1;letter-spacing:-.5px;color:var(--dx-ink)}
+.dashx .dx-l{font-size:12.5px;color:var(--dx-muted);margin-top:5px}
+.dashx .dx-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px}
+.dashx .dx-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.dashx .dx-grid2.last{margin-bottom:0}
+.dashx .dx-card{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 2px 10px rgba(23,52,4,.05);border:1px solid var(--dx-line);min-width:0}
+.dashx .dx-card h3{font-size:14px;font-weight:700;color:var(--dx-green-deep);margin-bottom:2px}
+.dashx .dx-link{float:right;font-size:12px;font-weight:600;color:var(--dx-orange2);text-decoration:none;cursor:pointer}
+.dashx .dx-donutwrap{display:flex;align-items:center;gap:16px;margin-top:12px}
+.dashx .dx-donutbox{position:relative;width:118px;height:118px;flex:none}
+.dashx .dx-donutc{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none}
+.dashx .dx-donutc b{font-size:22px;font-weight:750;letter-spacing:-.5px;display:block;line-height:1;color:var(--dx-ink)}
+.dashx .dx-donutc span{font-size:10px;color:var(--dx-muted)}
+.dashx .dx-legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px;flex:1;min-width:0}
+.dashx .dx-lrow{display:flex;align-items:center;gap:8px}
+.dashx .dx-dot{width:10px;height:10px;border-radius:3px;flex:none}
+.dashx .dx-lrow span{color:var(--dx-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dashx .dx-lrow b{margin-left:auto;font-weight:700;color:var(--dx-ink)}
+.dashx .dx-bars{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.dashx .dx-barrow{display:flex;align-items:center;gap:11px;font-size:12.5px}
+.dashx .dx-barlab{width:132px;color:var(--dx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.dashx .dx-bartrack{flex:1;height:15px;background:#eef2e8;border-radius:8px;overflow:hidden;min-width:30px}
+.dashx .dx-barfill{height:100%;border-radius:8px;background:linear-gradient(90deg,#7cb42e,#639922)}
+.dashx .dx-barval{width:30px;text-align:right;font-weight:700;flex:none;color:var(--dx-ink)}
+.dashx .dx-chartbox{margin-top:8px;height:200px}
+.dashx .dx-empty{padding:16px 6px;text-align:center;font-size:12.5px;color:var(--dx-muted)}
+.dashx .dx-act{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--dx-line);cursor:pointer}
+.dashx .dx-act:last-child{border-bottom:none}
+.dashx .dx-act:hover{background:#f3f7ee;margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:10px}
+.dashx .dx-thumb{width:32px;height:32px;border-radius:50%;background:#e9f3dc;display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--dx-green);flex:none}
+.dashx .dx-actwho{flex:1;min-width:0}
+.dashx .dx-actnm{font-size:13px;font-weight:700;color:var(--dx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dashx .dx-actrl{font-size:11px;color:var(--dx-muted)}
+.dashx .dx-pill{font-size:10px;font-weight:800;padding:3px 10px;border-radius:999px;flex:none}
+.dashx .dx-jobcard{background:linear-gradient(135deg,#e9f3dc,rgba(239,159,39,.08));border-radius:14px;padding:14px 15px;cursor:pointer}
+.dashx .dx-jobco{font-size:11px;font-weight:800;color:var(--dx-orange2);text-transform:uppercase;letter-spacing:.05em}
+.dashx .dx-jobti{font-size:15px;font-weight:800;color:var(--dx-ink);margin:3px 0 8px}
+.dashx .dx-jobmt{display:flex;gap:7px;flex-wrap:wrap}
+.dashx .dx-chip{font-size:10.5px;font-weight:700;color:var(--dx-muted);background:#fff;border-radius:999px;padding:3px 9px}
+.dashx .dx-jobr{display:flex;justify-content:space-between;align-items:center;margin-top:11px}
+.dashx .dx-jobap{font-size:12px;color:var(--dx-muted)} .dashx .dx-jobap b{color:var(--dx-green);font-size:15px}
+.dashx .dx-jobbtn{background:var(--dx-green);color:#fff;border:none;border-radius:999px;font-family:inherit;font-size:11px;font-weight:700;padding:6px 13px;cursor:pointer}
+@media(max-width:1080px){.dashx .dx-grid3{grid-template-columns:1fr}.dashx .dx-grid2{grid-template-columns:1fr}}
+@media(max-width:720px){.dashx{padding:16px 14px;border-radius:22px}.dashx .dx-stats{grid-template-columns:1fr 1fr}}
+@media(max-width:420px){.dashx .dx-stats{grid-template-columns:1fr}.dashx .dx-barlab{width:96px}}
 .rd .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
 .rd .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
 .rd .rd-bars .bar:hover i{background:var(--rg-green)}
@@ -679,79 +755,75 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
      1. OVERVIEW / DASHBOARD
 ══════════════════════════════════════════ -->
 <div class="page act" id="page-overview">
-  <div class="ph-row">
-    <div class="ph"><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
+  <div class="dashx">
+    <div class="dx-hd">
+      <div><h1>Dashboard</h1><p>Your recruitment health at a glance</p></div>
       <button class="btn btn-ghost btn-sm" onclick="exportAll()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export all</button>
     </div>
-  </div>
 
-  <!-- ══ Reference-layout dashboard (green primary · orange accent). Main
-       content area only; the labeled sidebar + top bar are unchanged. Every
-       number is populated by renderOverview() from the SAME CandidateStats /
-       real data — no computation changed. Every card is clickable. ══ -->
-  <div class="rd">
-    <div class="rd-sec">Recruitment Overview</div>
+    <!-- Stat tiles — SAME ids + SAME real values (renderOverview / CandidateStats) -->
+    <section class="dx-stats">
+      <div class="dx-stat" onclick="showPage('candidates')"><div class="dx-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.4-6 5.5-6s5.5 2.7 5.5 6"/><path d="M16 8h5M18.5 5.5v5"/></svg></div><div><div class="dx-n" id="ov-total">0</div><div class="dx-l">Total Screened</div></div></div>
+      <div class="dx-stat" onclick="filterByStage('shortlisted')"><div class="dx-ic gd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg></div><div><div class="dx-n" id="ov-shortlisted">0</div><div class="dx-l">Shortlisted</div></div></div>
+      <div class="dx-stat" onclick="filterByStage('interview')"><div class="dx-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></div><div><div class="dx-n" id="ov-interview">0</div><div class="dx-l">In Interview</div></div></div>
+      <div class="dx-stat" onclick="showPage('jobs')"><div class="dx-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div><div class="dx-n" id="ov-jobs">0</div><div class="dx-l">Active Jobs</div></div></div>
+    </section>
 
-    <!-- Row 1 — 4 compact stat cards (same data, from CandidateStats/allJobs) -->
-    <div class="rd-stats">
-      <div class="rd-stat" onclick="showPage('candidates')">
-        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-        <div class="rd-val" id="ov-total">0</div><div class="rd-lbl">Total Screened</div>
+    <!-- Donuts (Chart.js). Real data only — a 0 bucket = empty slice + 0 in the legend, never a fake hairline. -->
+    <section class="dx-grid3">
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('candidates')">Candidates →</a>
+        <h3>Pipeline by Stage</h3>
+        <div class="dx-donutwrap">
+          <div class="dx-donutbox"><canvas id="ovc-pipe"></canvas><div class="dx-donutc"><b id="ovc-pipe-total">0</b><span>candidates</span></div></div>
+          <div class="dx-legend" id="ovl-pipe"></div>
+        </div>
       </div>
-      <div class="rd-stat" onclick="filterByStage('shortlisted')">
-        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-        <div class="rd-val" id="ov-shortlisted">0</div><div class="rd-lbl">Shortlisted</div>
+      <div class="dx-card">
+        <h3>Candidates by Score</h3>
+        <div class="dx-donutwrap">
+          <div class="dx-donutbox"><canvas id="ovc-score"></canvas><div class="dx-donutc"><b id="ovc-score-total">0</b><span>scored</span></div></div>
+          <div class="dx-legend" id="ovl-score"></div>
+        </div>
       </div>
-      <div class="rd-stat" onclick="filterByStage('interview')">
-        <div class="rd-ico og"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
-        <div class="rd-val" id="ov-interview">0</div><div class="rd-lbl">In Interview</div>
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('jobs')">Jobs →</a>
+        <h3>Jobs Open / Closed</h3>
+        <div class="dx-donutwrap">
+          <div class="dx-donutbox"><canvas id="ovc-jobs"></canvas><div class="dx-donutc"><b id="ovc-jobs-total">0</b><span>jobs</span></div></div>
+          <div class="dx-legend" id="ovl-jobs"></div>
+        </div>
       </div>
-      <div class="rd-stat" onclick="showPage('jobs')">
-        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
-        <div class="rd-val" id="ov-jobs">0</div><div class="rd-lbl">Active Jobs</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- Row 2 — three rich donuts (all real data): pipeline, score bands, jobs -->
-    <div class="rd-three">
-      <div class="rd-card">
-        <div class="rd-h">Pipeline by Stage <span class="rd-see" onclick="showPage('candidates')">Candidates →</span></div>
-        <div id="ov-pipe" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
+    <!-- Applicants per Job (CSS gradient bars) + Average Score by Job (Chart.js) -->
+    <section class="dx-grid2">
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('analytics')">Analytics →</a>
+        <h3>Applicants per Job</h3>
+        <div class="dx-bars" id="ov-bars"><div class="dx-empty">Loading…</div></div>
       </div>
-      <div class="rd-card">
-        <div class="rd-h">Candidates by Score</div>
-        <div id="ov-scores" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('kpi')">KPIs →</a>
+        <h3>Average Score by Job</h3>
+        <div class="dx-chartbox"><canvas id="ovc-avg"></canvas></div>
+        <div class="dx-empty" id="ov-avg-empty" style="display:none">No scored candidates yet.</div>
       </div>
-      <div class="rd-card">
-        <div class="rd-h">Jobs Open / Closed <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
-        <div id="ov-donut" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
-      </div>
-    </div>
+    </section>
 
-    <!-- Row 3 — two crisp bar charts (real per-job data) -->
-    <div class="rd-two">
-      <div class="rd-card">
-        <div class="rd-h">Applicants per Job <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
-        <div id="ov-bars"><div class="rd-empty">Loading…</div></div>
+    <!-- Lists (real data) — kept from the previous dashboard (not in the mockup) -->
+    <section class="dx-grid2 last">
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('candidates')">View all →</a>
+        <h3>Recent Applicants</h3>
+        <div id="ov-activities"><div class="dx-empty">Loading…</div></div>
       </div>
-      <div class="rd-card">
-        <div class="rd-h">Average Score by Job <span class="rd-see" onclick="showPage('analytics')">KPIs →</span></div>
-        <div id="ov-avgscore"><div class="rd-empty">Loading…</div></div>
+      <div class="dx-card">
+        <a class="dx-link" onclick="showPage('jobs')">All jobs →</a>
+        <h3>Open Jobs Highlight</h3>
+        <div id="ov-jobhi"><div class="dx-empty">Loading…</div></div>
       </div>
-    </div>
-
-    <!-- Row 4 — lists -->
-    <div class="rd-two">
-      <div class="rd-card">
-        <div class="rd-h">Recent Applicants <span class="rd-see" onclick="showPage('candidates')">View all →</span></div>
-        <div id="ov-activities"><div class="rd-empty">Loading…</div></div>
-      </div>
-      <div class="rd-card">
-        <div class="rd-h">Open Jobs Highlight <span class="rd-see" onclick="showPage('jobs')">All jobs →</span></div>
-        <div id="ov-jobhi"><div class="rd-empty">Loading…</div></div>
-      </div>
-    </div>
+    </section>
   </div>
 </div>
 
@@ -3420,32 +3492,60 @@ function rdDonut(elId, segments, centerNum, centerLbl){
      <div class="rd-leg">${legend}</div>`;
 }
 
-// Donut — candidates by pipeline stage (real: CandidateStats.byStage). Green-forward.
+// ── Chart.js registry: destroy before re-create. renderOverview() runs on load
+//    AND on every data refresh, so stale canvases must be torn down first. ──
+let ovCharts = {pipe:null, score:null, jobs:null, avg:null};
+function ovDestroy(k){ if(ovCharts[k]){ try{ ovCharts[k].destroy(); }catch(_){}; ovCharts[k]=null; } }
+
+// Reusable Chart.js doughnut + legend. REAL data only — a 0 value draws NO slice
+// (Chart.js renders nothing for 0) and the legend shows the real 0. No hairline.
+function ovDonut(key, canvasId, totalId, legendId, segs, centerNum, centerLbl){
+  const cv = document.getElementById(canvasId); if(!cv) return;
+  const tot = document.getElementById(totalId); if(tot) tot.textContent = centerNum;
+  const leg = document.getElementById(legendId);
+  if(leg) leg.innerHTML = segs.map(sg=>{
+    const click = sg.onclick ? ` onclick="${sg.onclick}" style="cursor:pointer"` : '';
+    return `<div class="dx-lrow"${click}><i class="dx-dot" style="background:${sg.color}"></i>`+
+           `<span>${escapeHtml(sg.label)}</span><b>${sg.value}</b></div>`;
+  }).join('');
+  ovDestroy(key);
+  if(typeof Chart === 'undefined'){ return; }   // CDN blocked — legend + center still render
+  ovCharts[key] = new Chart(cv, {
+    type:'doughnut',
+    data:{ labels:segs.map(s=>s.label),
+           datasets:[{ data:segs.map(s=>s.value), backgroundColor:segs.map(s=>s.color), borderWidth:0 }] },
+    options:{ cutout:'72%', responsive:true, maintainAspectRatio:false,
+              plugins:{ legend:{display:false}, tooltip:{enabled:true} } }
+  });
+}
+
+// Donut — candidates by pipeline stage (real: CandidateStats.byStage).
 function rdPipeline(s){
   const b = s.byStage;
-  rdDonut('ov-pipe', [
-    {label:'Shortlisted', value:b.shortlisted, color:'#16A34A', onclick:"filterByStage('shortlisted')"},
-    {label:'Interview',   value:b.interview,   color:'#F57C2E', onclick:"filterByStage('interview')"},
-    {label:'Screening',   value:b.screening,   color:'#86C79E', onclick:"filterByStage('screening')"},
-    {label:'Rejected',    value:b.rejected,    color:'#93A29A', onclick:"filterByStage('rejected')"},
+  ovDonut('pipe','ovc-pipe','ovc-pipe-total','ovl-pipe', [
+    {label:'Shortlisted', value:b.shortlisted, color:'#639922', onclick:"filterByStage('shortlisted')"},
+    {label:'Interview',   value:b.interview,   color:'#EF9F27', onclick:"filterByStage('interview')"},
+    {label:'Screening',   value:b.screening,   color:'#a9d17a', onclick:"filterByStage('screening')"},
+    {label:'Rejected',    value:b.rejected,    color:'#c2c9bd', onclick:"filterByStage('rejected')"},
   ], s.total, 'candidates');
 }
 
-// Donut — candidates by score band (real: each candidate's screening score).
+// Donut — candidates by score band (real). 80+ = 0 stays a real 0: empty slice,
+// legend shows 0. No fabricated hairline.
 function rdScoreBands(s){
   const band = [0,0,0,0];   // 0–48, 48–65, 65–80, 80+
   s.rows.forEach(r=>{ const v=ovScore(r);
     if(v>=80) band[3]++; else if(v>=65) band[2]++; else if(v>=48) band[1]++; else band[0]++; });
-  rdDonut('ov-scores', [
-    {label:'80+',   value:band[3], color:'#16A34A'},
-    {label:'65–80', value:band[2], color:'#86C79E'},
-    {label:'48–65', value:band[1], color:'#F57C2E'},
-    {label:'0–48',  value:band[0], color:'#93A29A'},
+  ovDonut('score','ovc-score','ovc-score-total','ovl-score', [
+    {label:'80+',   value:band[3], color:'#639922'},
+    {label:'65–80', value:band[2], color:'#a9d17a'},
+    {label:'48–65', value:band[1], color:'#EF9F27'},
+    {label:'0–48',  value:band[0], color:'#c2c9bd'},
   ], s.total, 'scored');
 }
 
-// Bars — average screening score per job (real; scale fixed to 100). Reuses the
-// KPI horizontal-bar component so it matches the KPIs page exactly.
+// Bars — average screening score per job (real; scale fixed to 100). Chart.js
+// horizontal bar, matching the mockup.
 function rdAvgScoreByJob(){
   const rows = CandidateStats.compute(allResults).rows;
   const byJob = {};
@@ -3455,8 +3555,23 @@ function rdAvgScoreByJob(){
     return {label:(j&&j.title)||(jid==='—'?'Other':'Untitled'),
             value:Math.round(arr.reduce((a,c)=>a+c,0)/arr.length)};
   }).sort((a,b)=>b.value-a.value).slice(0,6);
-  kpiHBars('ov-avgscore', named.map(x=>({label:x.label, value:x.value, display:x.value})),
-           {max:100, empty:'No scored candidates yet.'});
+  const cv = document.getElementById('ovc-avg');
+  const emptyEl = document.getElementById('ov-avg-empty');
+  ovDestroy('avg');
+  if(!named.length || typeof Chart==='undefined'){
+    if(cv) cv.style.display='none'; if(emptyEl) emptyEl.style.display='';
+    return;
+  }
+  if(cv) cv.style.display=''; if(emptyEl) emptyEl.style.display='none';
+  ovCharts.avg = new Chart(cv, {
+    type:'bar',
+    data:{ labels:named.map(x=>x.label),
+           datasets:[{ data:named.map(x=>x.value), backgroundColor:'#639922', borderRadius:7, barThickness:18 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+              plugins:{ legend:{display:false} },
+              scales:{ x:{ beginAtZero:true, max:100, grid:{color:'#eef2e8'}, ticks:{font:{size:11}} },
+                       y:{ grid:{display:false}, ticks:{font:{size:11}} } } }
+  });
 }
 
 // Today's Interview — day strip (client-side dates; empty state stays static
@@ -3473,11 +3588,9 @@ function rdDayStrip(){
   el.innerHTML = html;
 }
 
-// Job Post Insights — applicants per job (real data, grouped from allResults).
-// Presentation only; no stat computation touched.
-// Applicants per job — solid green horizontal bars (real counts). Reuses the KPI
-// bar component so it reads crisp and labelled, not faint.
+// Applicants per job — CSS gradient bars (real counts), matching the mockup.
 function rdJobInsights(){
+  const el = document.getElementById('ov-bars'); if(!el) return;
   const rows = CandidateStats.compute(allResults).rows;
   const byJob = {};
   rows.forEach(r=>{ const k=r.job_id||'—'; byJob[k]=(byJob[k]||0)+1; });
@@ -3485,42 +3598,47 @@ function rdJobInsights(){
     const j=(allJobs||[]).find(x=>x._id===jid);
     return {label:(j&&(j.title))|| (jid==='—'?'Other':'Untitled'), value:n};
   }).sort((a,b)=>b.value-a.value).slice(0,6);
-  kpiHBars('ov-bars', named.map(x=>({label:x.label, value:x.value, display:x.value})),
-           {empty:'No applications yet.'});
+  if(!named.length){ el.innerHTML='<div class="dx-empty">No applications yet.</div>'; return; }
+  const max = Math.max(...named.map(x=>x.value), 1);
+  el.innerHTML = named.map(x=>
+    `<div class="dx-barrow"><div class="dx-barlab" title="${escapeHtml(x.label)}">${escapeHtml(x.label)}</div>`+
+    `<div class="dx-bartrack"><div class="dx-barfill" style="width:${Math.max(2,Math.round(x.value/max*100))}%"></div></div>`+
+    `<div class="dx-barval">${x.value}</div></div>`
+  ).join('');
 }
 
 // Jobs open vs closed (real: is_public governs whether the apply link resolves).
 function rdJobSummary(){
   const jobs = allJobs||[];
   const open = jobs.filter(j=>j.is_public).length;
-  const total = jobs.length, closed = total-open;
-  rdDonut('ov-donut', [
-    {label:'Open',   value:open,   color:'#16A34A'},
-    {label:'Closed', value:closed, color:'#C3CFC8'},
+  const total = jobs.length;
+  ovDonut('jobs','ovc-jobs','ovc-jobs-total','ovl-jobs', [
+    {label:'Open',   value:open,       color:'#639922'},
+    {label:'Closed', value:total-open, color:'#c2c9bd'},
   ], total, 'jobs');
 }
 
-// Recent Activities — recent candidates with colored status pills; row → report.
+// Recent Applicants — recent candidates with colored status pills; row → report.
 function rdActivities(s, rec){
   const el = document.getElementById('ov-activities'); if(!el) return;
   const recent = s.rows.slice(0, 6);
-  if(!recent.length){ el.innerHTML='<div class="rd-empty" style="padding:20px 10px"><div class="rd-empty-t">No candidates yet</div><div class="rd-empty-s">Screened applicants appear here.</div></div>'; return; }
+  if(!recent.length){ el.innerHTML='<div class="dx-empty">No candidates yet.</div>'; return; }
   const pillFor = r => {
     const st = CandidateStats.stageOf(r);
-    if(st==='shortlisted') return ['Shortlist','p-short'];
-    if(st==='rejected')    return ['Rejected','p-rej'];
-    if(st==='interview')   return ['Interview','p-int'];
-    return ['Screening','p-screen'];
+    if(st==='shortlisted') return ['Shortlisted','#639922','#e9f3dc'];
+    if(st==='rejected')    return ['Rejected','#6b7280','#eef1ea'];
+    if(st==='interview')   return ['Interview','#c26a12','#fdeccf'];
+    return ['Screening','#5f6b73','#eef2e8'];
   };
   el.innerHTML = recent.map(r=>{
-    const score=r.score||Math.round(r.overall_score||0);
-    const [lbl,cls]=pillFor(r);
+    const score=ovScore(r);
+    const [lbl,fg,bg]=pillFor(r);
     const nm=(r.candidate_name||'Unknown');
-    return `<div class="rd-act" onclick="openCandModal('${r._id}')">
-      <span class="rd-thumb">${escapeHtml(nm.trim()[0]||'?').toUpperCase()}</span>
-      <div class="rd-who"><div class="rd-nm">${escapeHtml(nm)}</div><div class="rd-rl">${escapeHtml(r.job_title||r.current_title||'—')} · score ${score}</div></div>
-      <span class="rd-pill ${cls}">${lbl}</span>
-    </div>`;
+    return `<div class="dx-act" onclick="openCandModal('${r._id}')">`+
+      `<span class="dx-thumb">${escapeHtml((nm.trim()[0]||'?').toUpperCase())}</span>`+
+      `<div class="dx-actwho"><div class="dx-actnm">${escapeHtml(nm)}</div><div class="dx-actrl">${escapeHtml(r.job_title||r.current_title||'—')} · score ${score}</div></div>`+
+      `<span class="dx-pill" style="color:${fg};background:${bg}">${lbl}</span>`+
+      `</div>`;
   }).join('');
 }
 
@@ -3535,12 +3653,12 @@ function rdJobHighlight(){
   const job = pool.slice().sort((a,b)=>count(b)-count(a))[0];
   const dept=job.dept||job.department||''; const type=job.type||'Full-time';
   const loc=job.loc||job.location||'';
-  el.innerHTML = `<div class="rd-jobcard" onclick="viewJobDetails('${job._id}')">
-    ${dept?`<div class="co">${escapeHtml(dept)}</div>`:''}
-    <div class="ti">${escapeHtml(job.title||'Untitled role')}</div>
-    <div class="mt"><span class="chip">${escapeHtml(type)}</span>${loc?`<span class="chip">${escapeHtml(loc)}</span>`:''}<span class="chip">${job.is_public?'Open':'Paused'}</span></div>
-    <div class="r"><span class="ap"><b>${count(job)}</b> applicant${count(job)===1?'':'s'}</span><button class="rd-mini" onclick="event.stopPropagation();viewJobDetails('${job._id}')">View job ↗</button></div>
-  </div>`;
+  el.innerHTML = `<div class="dx-jobcard" onclick="viewJobDetails('${job._id}')">`+
+    `${dept?`<div class="dx-jobco">${escapeHtml(dept)}</div>`:''}`+
+    `<div class="dx-jobti">${escapeHtml(job.title||'Untitled role')}</div>`+
+    `<div class="dx-jobmt"><span class="dx-chip">${escapeHtml(type)}</span>${loc?`<span class="dx-chip">${escapeHtml(loc)}</span>`:''}<span class="dx-chip">${job.is_public?'Open':'Paused'}</span></div>`+
+    `<div class="dx-jobr"><span class="dx-jobap"><b>${count(job)}</b> applicant${count(job)===1?'':'s'}</span><button class="dx-jobbtn" onclick="event.stopPropagation();viewJobDetails('${job._id}')">View job ↗</button></div>`+
+    `</div>`;
 }
 
 // HR summary — fills the Hired card (source=hired employees). Cached 15s.
