@@ -3107,23 +3107,34 @@ async def _send_demo_emails(req_id: str, doc: dict):
     except Exception as e:
         print("[DEMO] super-admin lookup failed:", e)
 
+    # "pending" (email not configured yet) is distinct from "failed" (mailer
+    # errored) — a lead is never lost either way; the admin record is truth.
+    def _status(ok, info):
+        if ok:
+            return "sent"
+        if "RESEND_API_KEY not set" in (info or ""):
+            return "pending"
+        return "failed"
+
     admin_status, admin_detail = "no_recipient", ""
     if admins:
-        results = []
+        any_ok = any_pending = False
         for ae in admins:
             try:
                 ok, info = await asyncio.to_thread(send_demo_admin_notification, ae, doc)
             except Exception as e:
                 ok, info = False, str(e)[:200]
-            results.append(ok)
             admin_detail = info
-        admin_status = "sent" if any(results) else "failed"
+            s = _status(ok, info)
+            any_ok = any_ok or (s == "sent")
+            any_pending = any_pending or (s == "pending")
+        admin_status = "sent" if any_ok else ("pending" if any_pending else "failed")
 
     try:
         ok_r, info_r = await asyncio.to_thread(send_demo_confirmation, doc.get("email", ""), doc.get("name", ""))
     except Exception as e:
         ok_r, info_r = False, str(e)[:200]
-    req_status = "sent" if ok_r else "failed"
+    req_status = _status(ok_r, info_r)
 
     try:
         await mongodb.demo_requests.update_one(
