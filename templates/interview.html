@@ -7,6 +7,8 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Bengali font — loaded only matters for Bangla (BETA) interviews; harmless otherwise -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -115,6 +117,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .typed-label{font-size:11.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);margin-bottom:.65rem}
 .typed textarea{width:100%;min-height:150px;padding:12px 14px;border:1.5px solid var(--border2);border-radius:var(--r-lg);font-family:inherit;font-size:15px;line-height:1.6;color:var(--text);resize:vertical;outline:none;transition:.15s}
 .typed textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--og)}
+/* Bangla (BETA): per-glyph fallback to Noto Sans Bengali — Latin stays Inter,
+   Bengali codepoints render properly (no mojibake) in questions + typed box. */
+body.lang-bn{font-family:'Inter','Noto Sans Bengali',system-ui,sans-serif}
+body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.lang-bn .q-label{font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif}
+.beta-note{display:none;max-width:760px;margin:10px auto 0;background:var(--og);border:1px solid var(--ob);color:#9a4a12;border-radius:12px;padding:9px 14px;font-size:12.5px;line-height:1.5;text-align:center}
+.beta-note.on{display:block}
+.beta-tag{display:inline-block;background:var(--orange);color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:1px}
 .typed-hints{display:flex;justify-content:space-between;gap:.8rem;margin-top:.55rem;font-size:12px;color:var(--t3);flex-wrap:wrap}
 .typed-submit{margin-top:.9rem;width:100%;padding:13px;border-radius:var(--r-lg);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--orange);cursor:pointer;box-shadow:0 4px 14px rgba(245,124,46,.28)}
 .typed-submit:hover{background:var(--orange2)}
@@ -167,9 +176,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <p class="sub">A short spoken conversation — {{IV_NAME}} asks, you answer in your own words. Every question is also shown as text, so you can read as well as listen.</p>
     <div class="expect">
       <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>{{MAX_TURNS}} questions</b>, around {{EST_MINUTES}} minutes</div>
-      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Answer in <b>English</b>, at your own pace</div>
+      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Answer in <b id="ans-lang">English</b>, at your own pace</div>
       <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>A short pause to think is completely fine</div>
     </div>
+    <div class="beta-note" id="beta-note"><span class="beta-tag">BETA</span><span id="beta-note-txt"></span></div>
     <div class="notice hidden" id="proc-notice"><b>Monitoring:</b> this interview records your camera<span id="proc-scr-note"> and screen</span> for the hiring team's review. It's a signal for human reviewers — never an automatic decision.</div>
     <button class="btn-begin" id="btn-begin" type="button">I'm ready — begin interview</button>
     <div class="foot">Your microphone<span id="perm-note"></span> will be requested next.</div>
@@ -238,6 +248,26 @@ const TOKEN = "{{TOKEN}}";
 const MAX_TURNS = parseInt("{{MAX_TURNS}}") || 4;
 const SCEN_Q = parseInt("{{SCEN_Q}}") || 0;   // scenario question count — for "N of 4" progress only
 const PROCTORING = "{{PROCTORING}}";      // off | S | M — disclosure, not a control
+const LANG = ("{{LANG}}" === "bn") ? "bn" : "en";   // interview language (Bangla = BETA)
+
+// Bangla (BETA): swap candidate-facing copy + font, and show the honest banner.
+// Everything else (mechanics, mint, scoring) is language-agnostic.
+function applyLang(){
+  if(LANG !== 'bn') return;
+  document.body.classList.add('lang-bn');
+  const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  set('ans-lang', 'বাংলা');
+  const ta = document.getElementById('typed-ta');
+  if(ta) ta.placeholder = 'এখানে আপনার উত্তর লিখুন…';
+  const bn = document.getElementById('beta-note');
+  const bt = document.getElementById('beta-note-txt');
+  if(bn && bt){
+    bt.textContent = 'This interview is in Bangla. Speak your answers, and TYPE the written ones in '
+      + 'Bangla — your typed answers are the exact record that is scored. The spoken transcript is '
+      + 'machine-made and can be rough, so the hiring team reads it before trusting any number.';
+    bn.classList.add('on');
+  }
+}
 const IV_NAME = "{{IV_NAME}}";
 const CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
@@ -867,6 +897,7 @@ function isInAppWebView(){
   return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|Twitter|WhatsApp|Snapchat|Pinterest|; wv\)|GSA\//i.test(ua);
 }
 window.addEventListener('load', ()=>{
+  applyLang();
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.RTCPeerConnection) || isInAppWebView()){
     view('v-blocked'); return;
   }

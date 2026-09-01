@@ -115,15 +115,45 @@ def _build_user_prompt(angle: str, job_title: str, qa_pairs: list) -> str:
     )
 
 
+# ── Bangla (BETA) scoring addenda — appended to the base prompt ONLY when the
+#    interview language is Bangla, so English scoring stays byte-identical (the
+#    fairness gate keeps passing). Same philosophy: substance over language. ──
+_BN_TEXT_ADDENDUM = (
+    "\n\nLANGUAGE — BANGLA (BETA). The candidate wrote in BANGLA (Bengali), their own "
+    "language. Read and score the Bangla directly. Every fairness rule above applies "
+    "IDENTICALLY to Bangla: you are scoring the substance and clarity of the THINKING, "
+    "never the polish of the language. Do not lower any score for regional word choice, "
+    "spelling, or grammar. Rough Bangla that makes a sharp, well-organized point must score "
+    "HIGHER than fluent Bangla that rambles or says nothing. Emptiness — fluent or not — "
+    "still scores near zero.")
+_BN_SPOKEN_ADDENDUM = (
+    "\n\nLANGUAGE — BANGLA (BETA). The candidate spoke BANGLA, and this transcript was "
+    "produced by machine speech recognition of BANGLA, which is materially LESS reliable "
+    "than English — expect more garbled phrases, wrong words, and dropped words. Treat "
+    "every garble as MACHINE error, never the candidate's fault: read past transcription "
+    "noise for the intended meaning and never lower a score because the transcript reads "
+    "rough. Score the substance of the thinking, not language polish. If a passage is too "
+    "garbled to interpret, do NOT invent a weakness — note the uncertainty and score only "
+    "what is legible. A sharp point in rough Bangla beats fluent emptiness; a genuine "
+    "non-answer still floors near zero.")
+
+
+def _sys(base: str, language: str, spoken: bool = False) -> str:
+    """Base prompt for English (unchanged); base + Bangla addendum for 'bn'."""
+    if (language or "en").lower() != "bn":
+        return base
+    return base + (_BN_SPOKEN_ADDENDUM if spoken else _BN_TEXT_ADDENDUM)
+
+
 async def _pass_call(client: AsyncOpenAI, angle: str, temperature: float,
-                     job_title: str, qa_pairs: list) -> dict:
+                     job_title: str, qa_pairs: list, language: str = "en") -> dict:
     resp = await client.chat.completions.create(
         model=SCORING_MODEL,
         temperature=temperature,
         max_tokens=2500,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _sys(SYSTEM_PROMPT, language)},
             {"role": "user", "content": _build_user_prompt(angle, job_title, qa_pairs)},
         ],
     )
@@ -157,7 +187,8 @@ def _dims_by_index(pass_result: dict, n: int) -> dict:
 
 
 async def score_written_answers(qa_pairs: list, api_key: str,
-                                job_title: str = "") -> tuple[dict | None, str | None]:
+                                job_title: str = "", language: str = "en"
+                                ) -> tuple[dict | None, str | None]:
     """Score a full written submission. Returns (result, error).
 
     The overall numbers are RECOMPUTED IN CODE from the blended per-dimension
@@ -178,8 +209,8 @@ async def score_written_answers(qa_pairs: list, api_key: str,
         sub = [qa for _, qa in live_pairs]
         try:
             strict_raw, generous_raw = await asyncio.gather(
-                _pass_call(client, STRICT_ANGLE, 0.2, job_title, sub),
-                _pass_call(client, GENEROUS_ANGLE, 0.3, job_title, sub),
+                _pass_call(client, STRICT_ANGLE, 0.2, job_title, sub, language),
+                _pass_call(client, GENEROUS_ANGLE, 0.3, job_title, sub, language),
             )
         except Exception as e:
             return None, f"Scoring call failed: {str(e)[:200]}"
@@ -304,7 +335,8 @@ def _scenario_dims(raw: dict) -> tuple[dict, list, str]:
 
 
 async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
-                                 job_title: str = "") -> tuple[dict | None, str | None]:
+                                 job_title: str = "", language: str = "en"
+                                 ) -> tuple[dict | None, str | None]:
     """Score the scenario answer SET. Returns (result, error).
 
     Same honest-architecture rules as every other scorer: strict/generous
@@ -338,7 +370,7 @@ async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
             model=SCORING_MODEL, temperature=temperature, max_tokens=1600,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": SCENARIO_SYSTEM_PROMPT},
+                {"role": "system", "content": _sys(SCENARIO_SYSTEM_PROMPT, language)},
                 {"role": "user", "content": _build_scenario_prompt(angle, job_title, scenario, qa_pairs)},
             ],
         )
@@ -452,14 +484,14 @@ def _spoken_zero(reason: str) -> dict:
 
 
 async def _spoken_pass(client: AsyncOpenAI, angle: str, temperature: float,
-                       job_title: str, convo: str) -> dict:
+                       job_title: str, convo: str, language: str = "en") -> dict:
     resp = await client.chat.completions.create(
         model=SCORING_MODEL,
         temperature=temperature,
         max_tokens=1800,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": SPOKEN_SYSTEM_PROMPT},
+            {"role": "system", "content": _sys(SPOKEN_SYSTEM_PROMPT, language, spoken=True)},
             {"role": "user", "content":
                 f"{angle}\n\nROLE BEING SCREENED FOR: {job_title or 'not specified'}\n\n"
                 f"INTERVIEW TRANSCRIPT:\n\"\"\"\n{convo}\n\"\"\"\n\n"
@@ -486,7 +518,8 @@ def _spoken_dims(raw: dict) -> dict:
 
 
 async def score_spoken_interview(transcript: list, api_key: str,
-                                 job_title: str = "") -> tuple[dict | None, str | None]:
+                                 job_title: str = "", language: str = "en"
+                                 ) -> tuple[dict | None, str | None]:
     """Score a live-interview transcript. Returns (result, error).
 
     Same honest architecture as every scorer in this product: two passes from
@@ -504,8 +537,8 @@ async def score_spoken_interview(transcript: list, api_key: str,
     client = AsyncOpenAI(api_key=api_key)
     try:
         strict_raw, generous_raw = await asyncio.gather(
-            _spoken_pass(client, STRICT_ANGLE, 0.2, job_title, convo),
-            _spoken_pass(client, GENEROUS_ANGLE, 0.3, job_title, convo),
+            _spoken_pass(client, STRICT_ANGLE, 0.2, job_title, convo, language),
+            _spoken_pass(client, GENEROUS_ANGLE, 0.3, job_title, convo, language),
         )
     except Exception as e:
         return None, f"Scoring call failed: {str(e)[:200]}"

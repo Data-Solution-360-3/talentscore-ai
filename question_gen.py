@@ -16,6 +16,25 @@ GEN_VERSION = "qgen-1.0"
 
 WRITTEN_RATIO = 0.3   # ~30% of questions answered in writing
 
+# The one language rule injected into every generation prompt. English is the
+# default and unchanged. Bangla (BETA) tells the model to write the entire set
+# in Bengali script — questions are then asked + shown in Bangla, and the
+# candidate answers in Bangla (typed answers are exact; spoken is transcript-BETA).
+LANG_RULE = {
+    "en": ("Write in simple, clear English. Many candidates speak English as a second or "
+           "third language: short sentences, no idioms, no cultural references. A question "
+           "that is hard to parse measures English, not competence."),
+    "bn": ("Write ENTIRELY in simple, clear Bangla (Bengali script). Use short sentences and "
+           "everyday words; no idioms, no cultural references, and avoid English loanwords "
+           "where a common Bangla word exists. Every piece of text you output — topics, "
+           "questions, and any scenario — must be in Bangla. A question that is hard to parse "
+           "measures language, not competence."),
+}
+
+
+def _lang(language: str) -> str:
+    return LANG_RULE.get((language or "en").lower(), LANG_RULE["en"])
+
 GENERATION_PROMPT = """You are writing screening interview questions for a specific job. You are given
 the job description. Produce exactly {n} questions.
 
@@ -23,9 +42,7 @@ RULES
 - Every question must be answerable from the candidate's own experience and
   relevant to THIS role as described. Draw on the actual skills, duties, and
   context in the description — no generic filler that fits any job.
-- Write in simple, clear English. Many candidates speak English as a second or
-  third language: short sentences, no idioms, no cultural references. A question
-  that is hard to parse measures English, not competence.
+- {lang_rule}
 - One thing per question. No two-part questions.
 - NEVER ask about, or fish for: age, religion, marital or family status,
   pregnancy or family plans, health or disability, ethnicity, political views,
@@ -81,9 +98,7 @@ STRUCTURE
 RULES
 - Every question must be answerable from the candidate's own experience and
   relevant to THIS role as described.
-- Write in simple, clear English. Many candidates speak English as a second or
-  third language: short sentences, no idioms, no cultural references. A question
-  that is hard to parse measures English, not competence.
+- {lang_rule}
 - One thing per question. No two-part questions.
 - NEVER ask about, or fish for: age, religion, marital or family status,
   pregnancy or family plans, health or disability, ethnicity, political views,
@@ -95,7 +110,8 @@ Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups"
 
 
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
-                                   n_topics: int = 2, followups: int = 3
+                                   n_topics: int = 2, followups: int = 3,
+                                   language: str = "en"
                                    ) -> tuple[list | None, str | None]:
     """The spoken part in topic clusters.
     Returns ([{"topic","main","followups"}], None) or (None, error)."""
@@ -113,7 +129,7 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
             max_tokens=1800,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": TOPIC_PROMPT.format(t=n_topics, f=followups)},
+                {"role": "system", "content": TOPIC_PROMPT.format(t=n_topics, f=followups, lang_rule=_lang(language))},
                 {"role": "user", "content":
                     f"JOB TITLE: {job_title or 'not specified'}\n\n"
                     f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
@@ -155,9 +171,7 @@ THE QUESTIONS
 - One thing per question. No two-part questions.
 
 RULES (same as all our interview material)
-- Write in simple, clear English. Many candidates speak English as a second or
-  third language: short sentences, no idioms, no cultural references. Text that
-  is hard to parse measures English, not competence.
+- {lang_rule}
 - NEVER ask about, or build the scenario around: age, religion, marital or
   family status, pregnancy or family plans, health or disability, ethnicity,
   political views, or anything else a recruiter could not lawfully ask. If the
@@ -168,7 +182,8 @@ Return JSON: {{"scenario": "...", "questions": ["...", ...]}}"""
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
-                                    k: int = 3) -> tuple[dict | None, str | None]:
+                                    k: int = 3, language: str = "en"
+                                    ) -> tuple[dict | None, str | None]:
     """One scenario + its k written questions from the JD.
     Returns ({"text", "questions"}, None) or (None, error)."""
     k = max(2, min(4, int(k)))
@@ -184,7 +199,7 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
             max_tokens=900,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": SCENARIO_PROMPT.format(k=k)},
+                {"role": "system", "content": SCENARIO_PROMPT.format(k=k, lang_rule=_lang(language))},
                 {"role": "user", "content":
                     f"JOB TITLE: {job_title or 'not specified'}\n\n"
                     f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
@@ -203,7 +218,8 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
 
 
 async def generate_interview_questions(jd_text: str, n: int, api_key: str,
-                                       job_title: str = "") -> tuple[list | None, str | None]:
+                                       job_title: str = "", language: str = "en"
+                                       ) -> tuple[list | None, str | None]:
     """Returns ([{"text","mode"}], None) or (None, error)."""
     n = max(4, min(15, int(n)))
     jd = (jd_text or "").strip()
@@ -218,7 +234,7 @@ async def generate_interview_questions(jd_text: str, n: int, api_key: str,
             max_tokens=2000,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": GENERATION_PROMPT.format(n=n)},
+                {"role": "system", "content": GENERATION_PROMPT.format(n=n, lang_rule=_lang(language))},
                 {"role": "user", "content":
                     f"JOB TITLE: {job_title or 'not specified'}\n\n"
                     f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},

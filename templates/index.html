@@ -10,6 +10,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TopCandidate.pro — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Bengali fallback so recruiters can review Bangla (BETA) interview questions with no mojibake -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Chart.js — dashboard donuts + bars (hiring dashboard only). -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -48,7 +50,7 @@
   /* Legacy aliases — kept so existing code doesn't break. Map to the new scale. */
   --r:var(--r-lg);--rs:var(--r-md);--rxs:var(--r-sm);
 }
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── TOPBAR ── */
 .topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:.75rem;box-shadow:0 1px 3px rgba(31,41,55,.04)}
@@ -1495,6 +1497,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label class="form-label">Status</label>
         <select class="form-select" id="j-status"><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select>
       </div>
+    </div>
+
+    <div class="form-group"><label class="form-label">Interview language</label>
+      <select class="form-select" id="j-ivlang">
+        <option value="en">English</option>
+        <option value="bn">Bangla (Bengali) — BETA</option>
+      </select>
+      <div class="form-hint">Bangla is a <b>BETA</b>: questions are asked in Bangla and candidates answer in Bangla. Spoken Bangla transcription is imperfect — <b>typed</b> answers are the reliable, scored record, so read the transcript before trusting the number. Regenerate the interview questions after changing this.</div>
     </div>
 
     <!-- Per-job scoring weights. Collapsed by default; recruiters who don't open it get the balanced default.
@@ -4843,6 +4853,7 @@ function openJobModal(){
   });
   const typeEl=document.getElementById('j-type');       if(typeEl)   typeEl.selectedIndex=0;
   const statusEl=document.getElementById('j-status');   if(statusEl) statusEl.value='active';
+  const ivlEl=document.getElementById('j-ivlang');      if(ivlEl)    ivlEl.value='en';
   // Build weights UI if not yet built; reset to balanced preset
   document.getElementById('j-weights-preset').value = 'balanced';
   applyWeightPreset('balanced');
@@ -4872,6 +4883,8 @@ async function editJob(id){
     }
     const statusEl=document.getElementById('j-status');
     if(statusEl&&j.status) statusEl.value=j.status;
+    const ivlEl=document.getElementById('j-ivlang');
+    if(ivlEl) ivlEl.value = (j.interview_language==='bn') ? 'bn' : 'en';
     // Load weights (if saved) into the sliders. Auto-expand the section if the job has custom weights.
     setWeightsFromJob(j.weights);
     const det = document.getElementById('j-weights-details');
@@ -4907,6 +4920,7 @@ async function saveJob(){
   fd.append('description',desc);
   fd.append('min_experience',document.getElementById('j-exp').value||'');
   fd.append('status',document.getElementById('j-status').value||'active');
+  fd.append('interview_language',(document.getElementById('j-ivlang')||{}).value||'en');
   // Only send weights if user actually customized them — null means "use defaults"
   const weights = getWeightsToSubmit();
   if(weights) fd.append('weights', JSON.stringify(weights));

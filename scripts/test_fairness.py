@@ -114,11 +114,70 @@ async def main() -> int:
 
     spoken_ok = await spoken_gate(key)
     cv_ok = await cv_gate(key)
-    if written_ok and spoken_ok and cv_ok:
-        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + cv)\033[0m\n")
+    bangla_ok = await bangla_written_gate(key)
+    if written_ok and spoken_ok and cv_ok and bangla_ok:
+        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + cv + bangla)\033[0m\n")
         return 0
     print("\n\033[31mFAIRNESS GATE FAILED\033[0m — the failing path must not touch a real candidate.\n")
     return 1
+
+
+# ── BANGLA (BETA) written gate — the same A/B/C, in Bangla, language='bn'. ──
+# Proves the Bangla path keeps the SAME fairness philosophy: a sharp, substantive
+# Bangla answer beats a fluent-but-empty one, and a one-word non-answer floors.
+BN_QUESTION = ("আপনি কর্মক্ষেত্রে সমাধান করেছেন এমন একটি কঠিন সমস্যা বর্ণনা করুন। "
+               "আপনি কীভাবে কারণটি খুঁজে পেয়েছিলেন এবং কী করেছিলেন?")
+
+# A — rough but real: a concrete bug, real diagnosis, real fix, real outcome.
+BN_ANSWER_A = (
+    "আগের চাকরিতে রিপোর্ট পেজে মাঝে মাঝে ভুল টোটাল দেখাত, প্রতিদিন না, শুধু কিছু দিন। সবাই বলত এটা "
+    "র‍্যান্ডম, কিন্তু আমি একমত ছিলাম না। প্রথমে অনেক তারিখের জন্য রিপোর্ট চালিয়ে দেখলাম কোনগুলো "
+    "ভুল, আর দেখলাম সব ভুল তারিখ মাসের শেষ দিনের। তখন কোডে মাসের সীমানার অংশ দেখলাম — কুয়েরি "
+    "সার্ভারের টাইমজোন ব্যবহার করছিল কিন্তু ডেটা UTC-তে সেভ হয়, তাই মাসের শেষ দিন পরের মাসের কিছু "
+    "রেকর্ড টেনে আনছিল। আমি সব UTC-তে রূপান্তর করে তুলনা করলাম এবং মাসের শেষ তারিখ দিয়ে একটা টেস্ট "
+    "যোগ করলাম যেন সমস্যা আর ফিরে না আসে। ফিক্সের পর ফাইন্যান্স টিম তিন মাস কোনো ভুল টোটাল পায়নি।"
+)
+
+# B — fluent, polished Bangla, zero substance: no bug, no cause, no action.
+BN_ANSWER_B = (
+    "আমার পুরো পেশাগত জীবনে আমি সবসময় নানা রকম চ্যালেঞ্জিং পরিস্থিতির মুখোমুখি হয়েছি, এবং আমি "
+    "দৃঢ়ভাবে বিশ্বাস করি যে এগুলো সামলানোর সামর্থ্য আমার নিষ্ঠা ও ধৈর্যের পরিচয় দেয়। কঠিন সমস্যা "
+    "সমাধানে আমি সর্বদা সেরা চর্চা অনুসরণ করি এবং একটি ইতিবাচক, সমাধানমুখী মানসিকতা বজায় রাখি। "
+    "সহযোগিতা অবশ্যই অপরিহার্য, এবং আমি নিশ্চিত করি যেন সব অংশীদার প্রতিটি ধাপে একমত থাকে। শেষ "
+    "পর্যন্ত আমি মনে করি চ্যালেঞ্জ হলো ছদ্মবেশে সুযোগ, আর আমি সেগুলোকে বৃদ্ধির অনুঘটক হিসেবে গ্রহণ করি।"
+)
+
+# C — the non-answer rule in Bangla: one word must land near zero.
+BN_ANSWER_C = "হ্যাঁ"
+
+
+async def bangla_written_gate(key: str) -> bool:
+    print("\n\nBANGLA GATE (BETA) — written-answer scorer, language='bn'")
+    print("Same three answers, in Bangla: A rough+substantive, B fluent+empty, C one-word.")
+    result, err = await score_written_answers(
+        [(BN_QUESTION, BN_ANSWER_A), (BN_QUESTION, BN_ANSWER_B), (BN_QUESTION, BN_ANSWER_C)],
+        api_key=key, job_title="Software Engineer", language="bn",
+    )
+    if err or not result:
+        print(f"\nBangla scoring failed: {err}")
+        return False
+    a, b, c = result["answers"][0], result["answers"][1], result["answers"][2]
+    show("A · rough Bangla, real substance ", a)
+    show("B · fluent Bangla, says nothing  ", b)
+    show("C · one-word non-answer          ", c)
+    ok_ab = a["overall"] > b["overall"]
+    ok_c = c["overall"] <= 15
+    print("\n" + "─" * 62)
+    print(f"  A vs B margin: {a['overall'] - b['overall']:+d} points "
+          f"→ {'PASS' if ok_ab else 'FAIL — Bangla fairness rule broken'}")
+    print(f"  C (non-answer) = {c['overall']}/100 "
+          f"→ {'PASS' if ok_c else 'FAIL — Bangla non-answer scored too generously'}")
+    print("─" * 62)
+    if ok_ab and ok_c:
+        print("\033[32mBANGLA GATE PASSED\033[0m — substance beat polish in Bangla; emptiness floored.")
+    else:
+        print("\033[31mBANGLA GATE FAILED\033[0m — Bangla scoring is not fair enough to trust.")
+    return ok_ab and ok_c
 
 
 # ── CV gate — the CV scorer's own A-beats-B test, plus report-format checks. ──

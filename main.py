@@ -1650,8 +1650,9 @@ async def score_written_submission(submission_id: str):
         await db.interview_written_answers.update_one(
             {"_id": _OID(submission_id)}, {"$set": {"status": "scoring"}})
         qa = [(a.get("question", ""), a.get("answer_text", "")) for a in sub.get("answers", [])]
+        _wlang = "bn" if str(iv.get("answer_language") or "en").lower() == "bn" else "en"
         result, err = await score_written_answers(qa, OPENAI_API_KEY,
-                                                  job_title=iv.get("job_title") or "")
+                                                  job_title=iv.get("job_title") or "", language=_wlang)
         if err or not result:
             await db.interview_written_answers.update_one(
                 {"_id": _OID(submission_id)},
@@ -1886,7 +1887,8 @@ _SCENARIO_RULES_TEMPLATE = (
 def _build_live_instructions(questions: list, max_turns: int,
                              interviewer_name: str = "",
                              scenario: dict | None = None,
-                             topics: list | None = None) -> str:
+                             topics: list | None = None,
+                             language: str = "en") -> str:
     """questions: normalized [{"text","mode"}] (see _normalize_questions).
     scenario: normalized {"text","questions"} or None (_normalize_scenario).
     topics: normalized topic clusters or None (_normalize_topics).
@@ -1902,6 +1904,20 @@ def _build_live_instructions(questions: list, max_turns: int,
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     name_line = (f"Your name is {interviewer_name}. Introduce yourself by that name "
                  "in your one greeting sentence. " if interviewer_name else "")
+    # Bangla (BETA): ask + converse entirely in Bangla. The questions are already
+    # generated in Bangla; here we only tell the model which language to speak.
+    lang_bn = (language or "en").lower() == "bn"
+    conduct_line = (
+        "You are conducting a live spoken screening interview, in BANGLA (Bengali) only — ask every "
+        "question and hold the whole conversation in Bangla. "
+        if lang_bn else
+        "You are conducting a live spoken screening interview, in ENGLISH only. ")
+    lang_rule_line = (
+        "- Bangla only: speak and ask only in Bangla. If the candidate switches to another language, "
+        "gently ask them to continue in Bangla. The questions below are written in Bangla — read them "
+        "as written.\n"
+        if lang_bn else
+        "- English only; if the candidate speaks another language, gently ask them to continue in English.\n")
 
     if topics:
         split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
@@ -1979,7 +1995,7 @@ def _build_live_instructions(questions: list, max_turns: int,
             "this is a phone conversation, not an essay.\n")
 
     return (
-        "You are conducting a live spoken screening interview, in ENGLISH only. "
+        conduct_line +
         f"Professional, warm, efficient. {name_line}\n\n"
         "STRUCTURE\n"
         f"- You will ask a TOTAL of {max_turns} questions across the interview, one at a time, then close.\n"
@@ -1998,7 +2014,7 @@ def _build_live_instructions(questions: list, max_turns: int,
         "candidate's final answer by thanking them warmly — for example \"Thanks, that's all my "
         "questions\" — tell them the team will review and be in touch, and end. Ask nothing further.\n\n"
         "RULES\n"
-        "- English only; if the candidate speaks another language, gently ask them to continue in English.\n"
+        + lang_rule_line +
         "- NEVER evaluate the candidate aloud, hint at how they did, or promise any outcome. "
         "No feedback, no scores, no 'great answer' judgments beyond neutral acknowledgement.\n"
         "- If you could not hear something clearly, ask them to repeat it rather than guessing."
@@ -2068,7 +2084,8 @@ _VIVA_VAD_PRESETS = {
 _VIVA_DEFAULT_VAD = "patient"
 
 
-async def _mint_realtime_secret(instructions: str, vad: str, tools: list | None = None) -> dict:
+async def _mint_realtime_secret(instructions: str, vad: str, tools: list | None = None,
+                                language: str = "en") -> dict:
     """Create an ephemeral Realtime secret with the given instructions.
 
     Degrading cascade: full config (semantic VAD + input transcription) →
@@ -2082,10 +2099,17 @@ async def _mint_realtime_secret(instructions: str, vad: str, tools: list | None 
     import httpx
     turn_detection = _VIVA_VAD_PRESETS.get(vad, _VIVA_VAD_PRESETS[_VIVA_DEFAULT_VAD])
 
+    tx_cfg = {"model": "gpt-4o-mini-transcribe"}
+    # Bangla (BETA): hint the ASR toward Bengali. It measurably helps but does NOT
+    # make Bangla transcription as reliable as English — hence typed answers are
+    # the scoring source of record and the transcript is shown flagged BETA.
+    if (language or "en").lower() == "bn":
+        tx_cfg["language"] = "bn"
+
     def session(with_td: bool, with_tx: bool, with_tools: bool = True) -> dict:
         audio_in = {}
         if with_tx:
-            audio_in["transcription"] = {"model": "gpt-4o-mini-transcribe"}
+            audio_in["transcription"] = dict(tx_cfg)
         if with_td:
             audio_in["turn_detection"] = turn_detection
         s = {"type": "realtime", "model": VIVA_LIVE_MODEL,
@@ -2179,7 +2203,8 @@ async def viva_live_token(request: Request):
         asked = 0
     vad = config.get("vad") if config.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD
 
-    instructions = _build_live_instructions(questions, max_turns)
+    instructions = _build_live_instructions(questions, max_turns,
+                                            language=config.get("language", "en"))
     recovered = False
     if transcript:
         lines = []
@@ -2195,7 +2220,8 @@ async def viva_live_token(request: Request):
             recovered = True
 
     try:
-        out = await _mint_realtime_secret(instructions, vad)
+        out = await _mint_realtime_secret(instructions, vad,
+                                          language=config.get("language", "en"))
     except HTTPException:
         raise
     except Exception as e:
@@ -2226,6 +2252,12 @@ async def score_live_session(session_id: str):
         await db.interview_sessions.update_one(
             {"_id": _OID(session_id)}, {"$set": {"score_status": "scoring"}})
         job_title = (sess.get("config") or {}).get("job_title") or ""
+        # Interview language ('en'|'bn'). For Bangla the scorers keep the SAME
+        # philosophy (substance over polish, non-answer floor) and treat garbled
+        # Bangla ASR as machine error; typed Bangla is exact.
+        lang = (sess.get("answer_language")
+                or (sess.get("config") or {}).get("language") or "en")
+        lang = "bn" if str(lang).lower() == "bn" else "en"
         full = sess.get("transcript") or []
 
         # Typed Q/A pairs: each typed answer with the nearest preceding
@@ -2247,7 +2279,7 @@ async def score_live_session(session_id: str):
                        if (t or {}).get("mode") not in ("typed", "scenario")]
 
         result, err = await score_spoken_interview(
-            spoken_only, OPENAI_API_KEY, job_title=job_title)
+            spoken_only, OPENAI_API_KEY, job_title=job_title, language=lang)
         if err or not result:
             await db.interview_sessions.update_one(
                 {"_id": _OID(session_id)},
@@ -2257,7 +2289,7 @@ async def score_live_session(session_id: str):
         written_result, written_error = None, None
         if qa_pairs:
             written_result, written_error = await score_written_answers(
-                qa_pairs, OPENAI_API_KEY, job_title=job_title)
+                qa_pairs, OPENAI_API_KEY, job_title=job_title, language=lang)
             if written_error:
                 print(f"[VIVA-LIVE] written segment scoring failed for {session_id}: {written_error}")
 
@@ -2282,7 +2314,7 @@ async def score_live_session(session_id: str):
                 scen_pairs = [((approved_qs[i] if i < len(approved_qs) else scen_pairs[i][0]),
                                scen_pairs[i][1]) for i in range(len(scen_pairs))]
             scenario_result, scenario_error = await score_scenario_answers(
-                scen_text, scen_pairs, OPENAI_API_KEY, job_title=job_title)
+                scen_text, scen_pairs, OPENAI_API_KEY, job_title=job_title, language=lang)
             if scenario_error:
                 print(f"[VIVA-LIVE] scenario scoring failed for {session_id}: {scenario_error}")
 
@@ -2386,13 +2418,14 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
 
     doc = {
         "user_id": user["user_id"],
-        "answer_language": "en",
+        "answer_language": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
         "transcript": transcript,
         "config": {
             "questions": _normalize_questions(cfg.get("questions")),
             "max_turns": _i(cfg.get("max_turns"), 1, _VIVA_MAX_TURNS_CAP),
             "vad": str(cfg.get("vad", ""))[:20],
             "job_title": str(cfg.get("job_title", ""))[:120],
+            "language": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
         },
         "questions_asked": _i(body.get("questions_asked"), 0, 20),
         "recoveries": _i(body.get("recoveries"), 0, 50),
@@ -2546,6 +2579,8 @@ def _validated_viva_config(body: dict) -> dict:
         "proctoring": body.get("proctoring") if body.get("proctoring") in ("off", "S", "M") else "off",
         "interviewer_name": str(body.get("interviewer_name", "")).strip()[:60] or "AI Interviewer",
         "job_title": str(body.get("job_title", "")).strip()[:120],
+        # Interview language (BETA for Bangla): 'en' (default) or 'bn'.
+        "language": "bn" if str(body.get("language", "en")).lower() == "bn" else "en",
     }
     scenario = _normalize_scenario(body.get("scenario"))
     if scenario:
@@ -2587,7 +2622,8 @@ async def viva_live_preview_session(request: Request):
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
     instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
                                             interviewer_name=config.get("interviewer_name", ""),
-                                            scenario=scenario, topics=topics)
+                                            scenario=scenario, topics=topics,
+                                            language=config.get("language", "en"))
     structure = None
     if topics:
         split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
@@ -2658,6 +2694,9 @@ async def candidate_interview_page(token: str):
         "{{MAX_TURNS}}": str(int(cfg.get("max_turns", 4))),
         "{{EST_MINUTES}}": str(max(4, int(cfg.get("max_turns", 4)) * 2 + 2)),
         "{{PROCTORING}}": esc(cfg.get("proctoring"), "off"),
+        # Interview language — 'en' (default) or 'bn' (Bangla, BETA). Drives the
+        # candidate-facing UI copy, Bengali font, and the BETA transcript banner.
+        "{{LANG}}": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
         # Scenario QUESTION COUNT only — for "Scenario question N of K"
         # progress. The scenario itself still never leaves the server.
         "{{SCEN_Q}}": str(len((_normalize_scenario(cfg.get("scenario")) or {"questions": []})["questions"])),
@@ -2709,7 +2748,8 @@ async def candidate_session_token(request: Request, token: str):
     asked = min(asked, max_turns)
     instructions = _build_live_instructions(questions, max_turns,
                                             interviewer_name=cfg.get("interviewer_name", ""),
-                                            scenario=scenario, topics=topics)
+                                            scenario=scenario, topics=topics,
+                                            language=cfg.get("language", "en"))
     recovered = False
     if transcript:
         lines = []
@@ -2742,7 +2782,8 @@ async def candidate_session_token(request: Request, token: str):
     if has_typed:
         tools = list(_TYPED_ANSWER_TOOL) + ([_SCENARIO_TOOL] if scenario else [])
     try:
-        out = await _mint_realtime_secret(instructions, vad, tools=tools)
+        out = await _mint_realtime_secret(instructions, vad, tools=tools,
+                                          language=cfg.get("language", "en"))
     except HTTPException:
         raise
     except Exception as e:
@@ -2806,15 +2847,16 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
             return lo
 
     cfg = live.get("config") or {}
+    _ivlang = "bn" if (cfg.get("language") or "en").lower() == "bn" else "en"
     doc = {
         "user_id": live.get("user_id"),
         "interview_token": token,
         "source": "candidate_link",
-        "answer_language": "en",
+        "answer_language": _ivlang,
         "transcript": transcript,
         "config": {"questions": cfg.get("questions"), "max_turns": cfg.get("max_turns"),
                    "vad": cfg.get("vad"), "job_title": cfg.get("job_title", ""),
-                   "interviewer_name": cfg.get("interviewer_name", ""),
+                   "interviewer_name": cfg.get("interviewer_name", ""), "language": _ivlang,
                    "scenario": _normalize_scenario(cfg.get("scenario")),
                    "topics": _normalize_topics(cfg.get("topics")) or None},
         "questions_asked": _i(body.get("questions_asked"), 0, 20),
@@ -3344,6 +3386,9 @@ async def public_apply_status(token: str, application_id: str):
         cfg = _validated_viva_config(dict(viva.get("config") or {}))
         if not cfg.get("job_title"):
             cfg["job_title"] = str(job.get("title") or "")[:120]
+        # The interview language is a JOB setting (interview_language), so carry it
+        # onto the launched interview's config regardless of the manual viva config.
+        cfg["language"] = "bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"
         # Job-based questions: the APPROVED set (and only the approved set —
         # drafts never reach a candidate) replaces the manual config's
         # questions. Turn budget: every main question plus 2 spoken adaptive
@@ -3474,14 +3519,15 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     # One click drafts the whole structured interview: the spoken topic
     # clusters AND the written scenario, from the same JD. Both go to the
     # DRAFT slot only; the scenario's failure is non-fatal and surfaced.
+    lang = (job.get("interview_language") or "en").lower()
     topics, err = await generate_topic_questions(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", n_topics=n_topics, followups=followups)
+        job_title=job.get("title") or "", n_topics=n_topics, followups=followups, language=lang)
     if err or not topics:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
     scenario, scen_err = await generate_written_scenario(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", k=scen_k)
+        job_title=job.get("title") or "", k=scen_k, language=lang)
     topics = _normalize_topics(topics)
     flat = _flatten_topics(topics)
     draft = {"topics": topics, "questions": flat, "count": len(flat),
@@ -4221,6 +4267,7 @@ async def create_job_endpoint(
     description: str = Form(""),
     min_experience: str = Form(""),
     status: str = Form("active"),
+    interview_language: str = Form("en"),   # 'en' (default) or 'bn' (Bangla, BETA)
     weights: str = Form(""),   # JSON-encoded dict of {dim_name: float}
 ):
     user = await get_current_user(request)
@@ -4241,6 +4288,7 @@ async def create_job_endpoint(
         "description": description,
         "min_experience": min_experience,
         "status": status,
+        "interview_language": "bn" if (interview_language or "en").lower() == "bn" else "en",
         "user_id": user["user_id"], "company": user["company"],
     }
     if weights_dict is not None:
@@ -4269,6 +4317,7 @@ async def update_job_endpoint(
     location: str = Form(""),
     employment_type: str = Form(""),
     min_experience: str = Form(""),
+    interview_language: str = Form(""),
     weights: str = Form(""),
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
@@ -4276,6 +4325,8 @@ async def update_job_endpoint(
     from database import db as mongodb
     from bson import ObjectId
     updates = {}
+    if interview_language:
+        updates["interview_language"] = "bn" if interview_language.lower() == "bn" else "en"
     # Only update fields that were actually submitted (non-empty).
     # Empty string means "field was not in the form", NOT "clear the field".
     if description:     updates["description"] = description
