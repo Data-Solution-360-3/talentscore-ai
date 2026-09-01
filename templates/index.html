@@ -166,6 +166,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 #page-overview .rd .rd-lbl{font-size:11.5px;margin-top:3px}
 #page-overview .rd .rd-charts{grid-template-columns:1.4fr 1fr;gap:12px}
 #page-overview .rd .rd-bars{height:116px;padding-top:6px}
+/* three rich donuts in a row */
+#page-overview .rd .rd-three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+#page-overview .rd .rd-donutwrap{gap:12px;min-height:104px;align-items:center}
+#page-overview .rd .rd-leg{font-size:11.5px;gap:7px}
+#page-overview .rd .rd-leg span{white-space:nowrap}
+/* the reused KPI horizontal bars sit comfortably inside a soft card */
+#page-overview .rd .kpi-hlbl{flex:0 0 116px;font-size:11.5px}
+#page-overview .rd .kpi-hrow{margin:6px 0}
 .rd .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
 .rd .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
 .rd .rd-bars .bar:hover i{background:var(--rg-green)}
@@ -209,6 +217,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   .rd .rd-charts{grid-template-columns:1fr}
   #page-overview .rd .rd-stats{grid-template-columns:1fr 1fr}
   #page-overview .rd .rd-two{grid-template-columns:1fr}
+  #page-overview .rd .rd-three{grid-template-columns:1fr}
 }
 @media(max-width:480px){
   .rd .rd-stats{grid-template-columns:1fr}
@@ -704,19 +713,35 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
 
-    <!-- Row 2 — funnel/insights + summary chart, side by side -->
-    <div class="rd-charts">
+    <!-- Row 2 — three rich donuts (all real data): pipeline, score bands, jobs -->
+    <div class="rd-three">
       <div class="rd-card">
-        <div class="rd-h">Job Post Insights <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
-        <div class="rd-bars" id="ov-bars"></div>
+        <div class="rd-h">Pipeline by Stage <span class="rd-see" onclick="showPage('candidates')">Candidates →</span></div>
+        <div id="ov-pipe" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
       </div>
       <div class="rd-card">
-        <div class="rd-h">Job Summary <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
-        <div id="ov-donut" class="rd-donutwrap"></div>
+        <div class="rd-h">Candidates by Score</div>
+        <div id="ov-scores" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
+      </div>
+      <div class="rd-card">
+        <div class="rd-h">Jobs Open / Closed <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
+        <div id="ov-donut" class="rd-donutwrap"><div class="rd-empty">Loading…</div></div>
       </div>
     </div>
 
-    <!-- Row 3 — recent applicants + open-jobs summary, side by side -->
+    <!-- Row 3 — two crisp bar charts (real per-job data) -->
+    <div class="rd-two">
+      <div class="rd-card">
+        <div class="rd-h">Applicants per Job <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
+        <div id="ov-bars"><div class="rd-empty">Loading…</div></div>
+      </div>
+      <div class="rd-card">
+        <div class="rd-h">Average Score by Job <span class="rd-see" onclick="showPage('analytics')">KPIs →</span></div>
+        <div id="ov-avgscore"><div class="rd-empty">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Row 4 — lists -->
     <div class="rd-two">
       <div class="rd-card">
         <div class="rd-h">Recent Applicants <span class="rd-see" onclick="showPage('candidates')">View all →</span></div>
@@ -3354,11 +3379,84 @@ function renderOverview(){
   setNum('ov-jobs', (allJobs || []).filter(j => (j.status || 'active') === 'active').length);
   loadHrSummary();                                   // harmless if the Hired tile is absent
 
-  rdDayStrip();
-  rdJobInsights();
-  rdJobSummary();
+  // Rich charts — every one reads the SAME real data (CandidateStats / allJobs).
+  rdPipeline(s);          // donut: candidates by stage
+  rdScoreBands(s);        // donut: candidates by score band
+  rdJobSummary();         // donut: jobs open vs closed
+  rdJobInsights();        // bars: applicants per job
+  rdAvgScoreByJob();      // bars: average score per job
   rdActivities(s, rec);
   rdJobHighlight();
+}
+
+// Candidate score, tolerant of either field name. Read-only; no recompute.
+function ovScore(r){ return Math.round(r.score != null ? r.score : (r.overall_score || 0)); }
+
+// Reusable multi-segment donut + colored legend (same SVG technique as the
+// existing Job Summary donut). segments: [{label, value, color, onclick?}].
+function rdDonut(elId, segments, centerNum, centerLbl){
+  const el = document.getElementById(elId); if(!el) return;
+  const total = segments.reduce((a,s)=>a+(s.value||0),0);
+  if(!total){ el.innerHTML = '<div class="kpi-empty" style="margin:auto">No data yet.</div>'; return; }
+  let acc = 0, arcs = '';
+  segments.forEach(s=>{
+    if(!(s.value>0)) return;
+    const pct = s.value/total*100;
+    arcs += `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${s.color}" stroke-width="6" `
+          + `stroke-dasharray="${pct.toFixed(2)} ${(100-pct).toFixed(2)}" stroke-dashoffset="${(25-acc).toFixed(2)}"/>`;
+    acc += pct;
+  });
+  const legend = segments.map(s=>{
+    const click = s.onclick ? ` onclick="${s.onclick}" style="cursor:pointer"` : '';
+    return `<span${click}><span class="d" style="background:${s.color}"></span>${escapeHtml(s.label)} <b>${s.value}</b></span>`;
+  }).join('');
+  el.innerHTML =
+    `<svg width="94" height="94" viewBox="0 0 42 42" style="flex-shrink:0">
+       <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--rg-line)" stroke-width="6"/>
+       ${arcs}
+       <text x="21" y="20.4" text-anchor="middle" font-size="8" font-weight="800" fill="var(--rg-ink)">${centerNum}</text>
+       <text x="21" y="26.6" text-anchor="middle" font-size="3.3" fill="var(--rg-mut)">${escapeHtml(centerLbl||'')}</text>
+     </svg>
+     <div class="rd-leg">${legend}</div>`;
+}
+
+// Donut — candidates by pipeline stage (real: CandidateStats.byStage). Green-forward.
+function rdPipeline(s){
+  const b = s.byStage;
+  rdDonut('ov-pipe', [
+    {label:'Shortlisted', value:b.shortlisted, color:'#16A34A', onclick:"filterByStage('shortlisted')"},
+    {label:'Interview',   value:b.interview,   color:'#F57C2E', onclick:"filterByStage('interview')"},
+    {label:'Screening',   value:b.screening,   color:'#86C79E', onclick:"filterByStage('screening')"},
+    {label:'Rejected',    value:b.rejected,    color:'#93A29A', onclick:"filterByStage('rejected')"},
+  ], s.total, 'candidates');
+}
+
+// Donut — candidates by score band (real: each candidate's screening score).
+function rdScoreBands(s){
+  const band = [0,0,0,0];   // 0–48, 48–65, 65–80, 80+
+  s.rows.forEach(r=>{ const v=ovScore(r);
+    if(v>=80) band[3]++; else if(v>=65) band[2]++; else if(v>=48) band[1]++; else band[0]++; });
+  rdDonut('ov-scores', [
+    {label:'80+',   value:band[3], color:'#16A34A'},
+    {label:'65–80', value:band[2], color:'#86C79E'},
+    {label:'48–65', value:band[1], color:'#F57C2E'},
+    {label:'0–48',  value:band[0], color:'#93A29A'},
+  ], s.total, 'scored');
+}
+
+// Bars — average screening score per job (real; scale fixed to 100). Reuses the
+// KPI horizontal-bar component so it matches the KPIs page exactly.
+function rdAvgScoreByJob(){
+  const rows = CandidateStats.compute(allResults).rows;
+  const byJob = {};
+  rows.forEach(r=>{ const k=r.job_id||'—'; (byJob[k]=byJob[k]||[]).push(ovScore(r)); });
+  const named = Object.entries(byJob).map(([jid,arr])=>{
+    const j=(allJobs||[]).find(x=>x._id===jid);
+    return {label:(j&&j.title)||(jid==='—'?'Other':'Untitled'),
+            value:Math.round(arr.reduce((a,c)=>a+c,0)/arr.length)};
+  }).sort((a,b)=>b.value-a.value).slice(0,6);
+  kpiHBars('ov-avgscore', named.map(x=>({label:x.label, value:x.value, display:x.value})),
+           {max:100, empty:'No scored candidates yet.'});
 }
 
 // Today's Interview — day strip (client-side dates; empty state stays static
@@ -3377,43 +3475,29 @@ function rdDayStrip(){
 
 // Job Post Insights — applicants per job (real data, grouped from allResults).
 // Presentation only; no stat computation touched.
+// Applicants per job — solid green horizontal bars (real counts). Reuses the KPI
+// bar component so it reads crisp and labelled, not faint.
 function rdJobInsights(){
-  const el = document.getElementById('ov-bars'); if(!el) return;
   const rows = CandidateStats.compute(allResults).rows;
   const byJob = {};
   rows.forEach(r=>{ const k=r.job_id||'—'; byJob[k]=(byJob[k]||0)+1; });
   const named = Object.entries(byJob).map(([jid,n])=>{
     const j=(allJobs||[]).find(x=>x._id===jid);
-    return {jid, n, name:(j&&(j.title))|| (jid==='—'?'Other':'Untitled')};
-  }).sort((a,b)=>b.n-a.n).slice(0,6);
-  if(!named.length){ el.innerHTML='<div class="rd-empty" style="margin:auto">No applications yet.</div>'; return; }
-  const max = Math.max(...named.map(x=>x.n));
-  el.innerHTML = named.map(x=>`
-    <div class="bar" title="${escapeHtml(x.name)}: ${x.n}" onclick="viewCandidatesForJob('${x.jid}')">
-      <i style="height:${Math.max(6,Math.round(x.n/max*100))}%"></i>
-      <span>${escapeHtml((x.name||'').split(' ')[0])}</span>
-    </div>`).join('');
+    return {label:(j&&(j.title))|| (jid==='—'?'Other':'Untitled'), value:n};
+  }).sort((a,b)=>b.value-a.value).slice(0,6);
+  kpiHBars('ov-bars', named.map(x=>({label:x.label, value:x.value, display:x.value})),
+           {empty:'No applications yet.'});
 }
 
-// Job Summary — open vs closed (real: is_public governs whether the link resolves).
+// Jobs open vs closed (real: is_public governs whether the apply link resolves).
 function rdJobSummary(){
-  const el = document.getElementById('ov-donut'); if(!el) return;
   const jobs = allJobs||[];
   const open = jobs.filter(j=>j.is_public).length;
   const total = jobs.length, closed = total-open;
-  const pct = total ? Math.round(open/total*100) : 0;
-  el.innerHTML = `
-    <svg width="104" height="104" viewBox="0 0 42 42">
-      <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--rg-line)" stroke-width="6"/>
-      <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--rg-green)" stroke-width="6" stroke-linecap="round"
-              stroke-dasharray="${pct} ${100-pct}" stroke-dashoffset="25"/>
-      <text x="21" y="20" text-anchor="middle" font-size="8" font-weight="800" fill="var(--rg-ink)">${total}</text>
-      <text x="21" y="27" text-anchor="middle" font-size="3.4" fill="var(--rg-mut)">jobs</text>
-    </svg>
-    <div class="rd-leg">
-      <span><span class="d" style="background:var(--rg-green)"></span>Open <b>${open}</b></span>
-      <span><span class="d" style="background:var(--rg-line)"></span>Closed <b>${closed}</b></span>
-    </div>`;
+  rdDonut('ov-donut', [
+    {label:'Open',   value:open,   color:'#16A34A'},
+    {label:'Closed', value:closed, color:'#C3CFC8'},
+  ], total, 'jobs');
 }
 
 // Recent Activities — recent candidates with colored status pills; row → report.
