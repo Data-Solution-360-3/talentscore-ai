@@ -24,142 +24,161 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --ink:#128A40;--indigo:#E16A1F;--indigo2:#128A40;--indigo-light:#EDF0F5;
-  --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
+  --green:#639922;--green-d:#547F1E;
+  --orange:#F57C2E;--orange2:#E16A1F;
   --text:#1f2937;--t2:#4B5563;--t3:#6B7280;
-  --border:#E4E8F0;--border2:#D5DCE8;--surface:#FAFBFC;
-  --green:#16A34A;--red:#DC2626;
+  --border:#E7EAEE;--field:#F6F7F8;--red:#DC2626;--ok:#16A34A;
+  --page:#F4F5F3;
 }
-body{font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
-.page{display:flex;flex:1;min-height:100vh}
+body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min-height:100vh;position:relative;overflow-x:hidden}
 
-/* LEFT PANEL */
-.left{width:480px;flex-shrink:0;background:linear-gradient(160deg,#F57C2E 0%,#E16A1F 52%,#BC5410 100%);padding:3rem;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.left::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")}
-.left-blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.3}
-.lb1{width:300px;height:300px;background:radial-gradient(circle,#FFCF95,#E16A1F);top:-50px;right:-50px}
-.lb2{width:200px;height:200px;background:#ffffff;opacity:.16;bottom:50px;left:-50px}
-.left-logo{display:flex;align-items:center;gap:10px;margin-bottom:auto;position:relative;z-index:1}
-.left-icon{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
-.left-name{font-size:18px;font-weight:800;color:#fff}
-.left-content{position:relative;z-index:1;margin-top:auto;padding-bottom:2rem}
-.left-title{font-size:2.2rem;font-weight:800;color:#fff;line-height:1.2;margin-bottom:1rem;letter-spacing:-.5px}
-.left-title span{color:#25D366}
-.left-sub{font-size:14px;color:rgba(255,255,255,.9);line-height:1.7;margin-bottom:2rem}
-.left-stats{display:flex;flex-direction:column;gap:.75rem}
-.left-stat{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.92)}
-.left-stat-dot{width:6px;height:6px;border-radius:50%;background:#25D366;flex-shrink:0}
+/* Green gradient band fading DOWN into the light page */
+.topband{position:absolute;top:0;left:0;right:0;height:200px;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,#639922 0%,rgba(99,153,34,.60) 40%,rgba(99,153,34,.16) 74%,rgba(99,153,34,0) 100%)}
 
-/* RIGHT PANEL */
-.right{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;background:#fff}
-.form-box{width:100%;max-width:420px}
+/* Top nav on the green band */
+.lp-nav{position:relative;z-index:2;display:flex;align-items:center;gap:18px;padding:20px 30px;max-width:1180px;margin:0 auto}
+.lp-logo{display:flex;align-items:center;text-decoration:none;flex-shrink:0}
+.lp-links{display:flex;gap:28px;margin:0 auto}
+.lp-links a{font-size:14px;font-weight:600;color:#fff;text-decoration:none;opacity:.95;transition:opacity .15s}
+.lp-links a:hover{opacity:.7}
+.lp-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.nav-btn{font-size:13px;font-weight:700;padding:9px 16px;border-radius:999px;text-decoration:none;cursor:pointer;border:1.5px solid transparent;transition:all .15s;white-space:nowrap}
+.nav-btn.ghost{color:#fff;border-color:rgba(255,255,255,.55)}
+.nav-btn.ghost:hover{background:rgba(255,255,255,.16)}
+.nav-btn.solid{color:var(--text);background:#fff}
+.nav-btn.solid:hover{box-shadow:0 4px 14px rgba(0,0,0,.14)}
+
+/* Centered floating card */
+.lp-main{position:relative;z-index:1;display:flex;justify-content:center;padding:52px 20px 64px}
+.card{width:100%;max-width:400px;background:#fff;border-radius:20px;padding:40px 36px;
+  box-shadow:0 18px 50px rgba(31,41,55,.12),0 3px 10px rgba(31,41,55,.05)}
+.card-badge{width:52px;height:52px;border-radius:50%;background:#EAF3DE;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+
+/* Form */
 .form-step{display:none}
 .form-step.active{display:block}
-.step-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--t3);cursor:pointer;margin-bottom:1.5rem;transition:color .15s;background:none;border:none;font-family:inherit}
+.step-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--t3);cursor:pointer;margin-bottom:1.25rem;background:none;border:none;font-family:inherit}
 .step-back:hover{color:var(--text)}
-.form-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px;letter-spacing:-.3px}
-.form-sub{font-size:14px;color:var(--t2);margin-bottom:2rem;line-height:1.6}
-.form-sub strong{color:var(--indigo)}
-.tabs{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:1.75rem;gap:4px}
-.tab{flex:1;text-align:center;padding:8px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;color:var(--t2)}
-.tab.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08)}
-.fw{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.fl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t2)}
+.form-title{font-size:21px;font-weight:800;color:var(--text);margin-bottom:6px;letter-spacing:-.3px;text-align:center}
+.form-sub{font-size:14px;color:var(--t2);margin-bottom:1.6rem;line-height:1.6;text-align:center}
+/* labels kept for screen readers, hidden visually (placeholders carry the UI) */
+.fl{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.fw{display:flex;flex-direction:column;margin-bottom:12px}
 .fi-wrap{position:relative}
-input.fi{width:100%;padding:11px 14px;background:#fff;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:all .15s}
-input.fi:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(245,124,46,.14)}
+input.fi{width:100%;padding:14px 20px;background:var(--field);border:1.5px solid var(--border);border-radius:999px;font-size:14px;font-family:inherit;color:var(--text);outline:none;transition:all .15s}
+input.fi:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(99,153,34,.15)}
 input.fi::placeholder{color:var(--t3)}
 input.fi.error{border-color:var(--red)}
-.fi-hint{font-size:11px;color:var(--t3);margin-top:4px}
-.btn-main{width:100%;padding:13px;border-radius:10px;background:var(--orange);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;box-shadow:0 4px 14px rgba(245,124,46,.30)}
-.btn-main:hover{background:var(--orange2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,124,46,.38)}
+.fi-hint{font-size:11px;color:var(--t3);margin-top:5px;padding-left:18px}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 4px 18px}
+.remember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer;user-select:none}
+.remember input{width:16px;height:16px;accent-color:var(--green);cursor:pointer}
+.forgot{font-size:13px;color:var(--orange);font-weight:600;text-decoration:none;cursor:pointer}
+.forgot:hover{text-decoration:underline}
+.btn-main{width:100%;padding:14px;border-radius:999px;background:var(--orange);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 18px rgba(245,124,46,.30)}
+.btn-main:hover{background:var(--orange2);transform:translateY(-1px);box-shadow:0 8px 22px rgba(245,124,46,.38)}
 .btn-main:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.err-box{background:#fff0f3;border:1.5px solid #fecdd3;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:14px;display:none;align-items:center;gap:8px}
-.ok-box{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:14px;display:none;align-items:center;gap:8px}
-.divider{display:flex;align-items:center;gap:10px;margin:1.25rem 0;color:var(--t3);font-size:12px}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-.switch-link{text-align:center;font-size:13px;color:var(--t3);margin-top:1.25rem}
-.switch-link a{color:var(--indigo);font-weight:600;cursor:pointer;text-decoration:none}
+.info-note{display:none;background:var(--field);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:12.5px;color:var(--t2);margin-top:12px;line-height:1.55}
+.err-box{background:#fff0f3;border:1.5px solid #fecdd3;border-radius:12px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:14px;display:none;align-items:center;gap:8px}
+.ok-box{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:10px 14px;font-size:13px;color:var(--ok);margin-bottom:14px;display:none;align-items:center;gap:8px}
+.switch-link{text-align:center;font-size:13px;color:var(--t3);margin-top:1.4rem}
+.switch-link a{color:var(--orange);font-weight:700;cursor:pointer;text-decoration:none}
 .switch-link a:hover{text-decoration:underline}
 
-/* OTP inputs */
-.otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:1.5rem}
-.otp-input{width:52px;height:60px;text-align:center;font-size:24px;font-weight:800;border:2px solid var(--border);border-radius:12px;outline:none;font-family:inherit;color:var(--text);transition:all .15s;background:#fff}
-.otp-input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(245,124,46,.14)}
-.otp-input.filled{border-color:var(--indigo);background:var(--indigo-light)}
-.resend-row{text-align:center;font-size:13px;color:var(--t3);margin-bottom:1.25rem}
-.resend-btn{color:var(--indigo);font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit;font-size:13px}
+/* OTP */
+.otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:1.4rem}
+.otp-input{width:48px;height:56px;text-align:center;font-size:22px;font-weight:800;border:1.5px solid var(--border);border-radius:14px;outline:none;font-family:inherit;color:var(--text);transition:all .15s;background:var(--field)}
+.otp-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(99,153,34,.15)}
+.otp-input.filled{border-color:var(--green);background:#fff}
+.resend-row{text-align:center;font-size:13px;color:var(--t3);margin-bottom:1.2rem}
+.resend-btn{color:var(--orange);font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit;font-size:13px}
 .resend-btn:disabled{color:var(--t3);cursor:not-allowed}
 .timer{font-weight:600;color:var(--orange)}
-.email-display{background:var(--indigo-light);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--indigo);text-align:center;margin-bottom:1.5rem}
+.email-display{background:#EAF3DE;border:1px solid #d5e8c2;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--green-d);text-align:center;margin-bottom:1.4rem}
 
-@media(max-width:860px){.left{display:none}.right{padding:2rem 1rem}}
+@media(max-width:720px){.lp-links{display:none}}
+@media(max-width:480px){
+  /* on the sign-in page the ghost "Sign in" is redundant — drop it so the
+     wordmark and "Request access" never collide */
+  .nav-btn.ghost{display:none}
+}
+@media(max-width:420px){
+  .lp-nav{padding:16px 16px;gap:10px}
+  .nav-btn{padding:8px 12px;font-size:12px}
+  .card{padding:30px 22px}
+  .lp-main{padding:34px 14px 48px}
+}
 </style>
 </head>
 <body>
-<div class="page">
-  <!-- LEFT -->
-  <div class="left">
-    <div class="left-blob lb1"></div>
-    <div class="left-blob lb2"></div>
-    <div class="left-logo">
-      <!-- White wordmark + candidate-figure mark for the green login panel.
-           Inlined so the wordmark uses the page's Inter. -->
-      <svg height="34" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
-        <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
-        <circle cx="28" cy="23" r="8.6" fill="#639922"/>
-        <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
-        <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
-        <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
-        <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#fff">TopCandidate</tspan><tspan fill="#25D366">.pro</tspan></text>
-      </svg>
-    </div>
-    <div class="left-content">
-      <h2 class="left-title">Score every CV<br><span>on the same rubric.</span></h2>
-      <p class="left-sub">Six weighted dimensions, two scoring passes, and a final score recomputed in code rather than taken from the model. Early access, built for HR teams in Bangladesh.</p>
-      <div class="left-stats">
-        <div class="left-stat"><span class="left-stat-dot"></span>Six weighted dimensions, set per role</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Every CV scored twice, from opposing angles</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Disagreement between passes lowers the recommendation</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Full report with the CV side-by-side</div>
-        <div class="left-stat"><span class="left-stat-dot"></span>Every score keeps the reasoning behind it</div>
-      </div>
-    </div>
-  </div>
+<div class="topband"></div>
 
-  <!-- RIGHT -->
-  <div class="right">
+<!-- TOP NAV (on the green band) -->
+<header class="lp-nav">
+  <a class="lp-logo" href="/" aria-label="TopCandidate.pro home">
+    <svg height="30" viewBox="0 0 372 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+      <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
+      <circle cx="28" cy="23" r="8.6" fill="#639922"/>
+      <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
+      <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
+      <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
+      <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8" fill="#ffffff">TopCandidate<tspan fill="#ffffff" opacity="0.85">.pro</tspan></text>
+    </svg>
+  </a>
+  <nav class="lp-links">
+    <a href="/#how">How it works</a>
+    <a href="/#what">What it does</a>
+    <a href="/#scoring">Scoring</a>
+    <a href="/#access">Access</a>
+  </nav>
+  <div class="lp-actions">
+    <a class="nav-btn ghost" onclick="switchTab('login')">Sign in</a>
+    <a class="nav-btn solid" onclick="switchTab('register')">Request access</a>
+  </div>
+</header>
+
+<!-- CENTERED CARD -->
+<main class="lp-main">
+  <div class="card">
     <div class="form-box">
 
-      <!-- STEP 1: Login/Register -->
+      <!-- STEP 1: Login / Register -->
       <div class="form-step active" id="step-auth">
-        <div class="tabs">
-          <div class="tab active" id="tab-login" onclick="switchTab('login')">Sign in</div>
-          <div class="tab" id="tab-reg" onclick="switchTab('register')">Create account</div>
-        </div>
 
         <!-- LOGIN -->
         <div id="login-form">
+          <div class="card-badge">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#EF9F27"/><path d="M7.4 12.4 L10.4 15.3 L16.6 8.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h2 class="form-title">Welcome back to TopCandidate</h2>
-          <p class="form-sub">Sign in to your TopCandidate dashboard</p>
+          <p class="form-sub">Sign in to your dashboard</p>
           <div class="err-box" id="login-err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="login-err-txt"></span></div>
-          <div class="fw"><label class="fl">Work email</label><input class="fi" type="email" id="l-email" placeholder="you@company.com" autocomplete="email"></div>
-          <div class="fw"><label class="fl">Password</label><input class="fi" type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
-          <button class="btn-main" onclick="login()" id="login-btn">Sign in →</button>
+          <div class="fw"><label class="fl" for="l-email">Work email</label><input class="fi" type="email" id="l-email" placeholder="Work email" autocomplete="email"></div>
+          <div class="fw"><label class="fl" for="l-pass">Password</label><input class="fi" type="password" id="l-pass" placeholder="Password" autocomplete="current-password"></div>
+          <div class="row-between">
+            <label class="remember"><input type="checkbox" id="l-remember" checked> Remember me</label>
+            <a class="forgot" onclick="forgotPass()">Forgot your password?</a>
+          </div>
+          <button class="btn-main" onclick="login()" id="login-btn">Sign in</button>
+          <div class="info-note" id="forgot-note">Password reset isn't self-serve yet. Reach out to your workspace admin, or contact TopCandidate support, and we'll reset it for you.</div>
           <div class="switch-link">Don't have an account? <a onclick="switchTab('register')">Create one free</a></div>
         </div>
 
         <!-- REGISTER -->
         <div id="reg-form" style="display:none">
+          <div class="card-badge">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#EF9F27"/><path d="M7.4 12.4 L10.4 15.3 L16.6 8.7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h2 class="form-title">Create your account</h2>
           <p class="form-sub">Find your top candidates faster — free trial, no card needed</p>
           <div class="err-box" id="reg-err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="reg-err-txt"></span></div>
-          <div class="fw"><label class="fl">Company name</label><input class="fi" type="text" id="r-company" placeholder="Acme Corp" autocomplete="organization"></div>
-          <div class="fw"><label class="fl">Work email</label><input class="fi" type="email" id="r-email" placeholder="you@company.com" autocomplete="email"></div>
-          <div class="fw"><label class="fl">Password</label><input class="fi" type="password" id="r-pass" placeholder="Min 8 characters" autocomplete="new-password"><div class="fi-hint">At least 8 characters</div></div>
-          <div class="fw"><label class="fl">Confirm password</label><input class="fi" type="password" id="r-pass2" placeholder="Repeat password"></div>
-          <button class="btn-main" onclick="register()" id="reg-btn">Create account & verify →</button>
+          <div class="fw"><label class="fl" for="r-company">Company name</label><input class="fi" type="text" id="r-company" placeholder="Company name" autocomplete="organization"></div>
+          <div class="fw"><label class="fl" for="r-email">Work email</label><input class="fi" type="email" id="r-email" placeholder="Work email" autocomplete="email"></div>
+          <div class="fw"><label class="fl" for="r-pass">Password</label><input class="fi" type="password" id="r-pass" placeholder="Password (min 8 characters)" autocomplete="new-password"></div>
+          <div class="fw"><label class="fl" for="r-pass2">Confirm password</label><input class="fi" type="password" id="r-pass2" placeholder="Confirm password"></div>
+          <button class="btn-main" onclick="register()" id="reg-btn">Create account &amp; verify</button>
           <div class="switch-link">Already have an account? <a onclick="switchTab('login')">Sign in</a></div>
         </div>
       </div>
@@ -186,24 +205,33 @@ input.fi.error{border-color:var(--red)}
             Resend in <span class="timer" id="timer-txt">60s</span>
           </button>
         </div>
-        <button class="btn-main" onclick="verifyOtp()" id="verify-btn">Verify & activate account →</button>
+        <button class="btn-main" onclick="verifyOtp()" id="verify-btn">Verify &amp; activate account →</button>
       </div>
 
     </div>
   </div>
-</div>
+</main>
 
 <script>
 let pendingEmail = '';
 let timerInterval = null;
 
 function switchTab(tab) {
-  ['login','reg'].forEach(t => {
-    document.getElementById('tab-'+t).classList.toggle('active', (t==='login'?tab==='login':tab==='register'));
-    document.getElementById(t+'-form').style.display = (t==='login'?tab==='login':tab==='register') ? 'block' : 'none';
-  });
-  document.getElementById('tab-login').classList.toggle('active', tab==='login');
-  document.getElementById('tab-reg').classList.toggle('active', tab==='register');
+  const isLogin = tab === 'login';
+  const lf = document.getElementById('login-form');
+  const rf = document.getElementById('reg-form');
+  if (lf) lf.style.display = isLogin ? 'block' : 'none';
+  if (rf) rf.style.display = isLogin ? 'none' : 'block';
+  // legacy tab pills may not exist in this layout — guard before touching
+  const t1 = document.getElementById('tab-login'), t2 = document.getElementById('tab-reg');
+  if (t1) t1.classList.toggle('active', isLogin);
+  if (t2) t2.classList.toggle('active', !isLogin);
+  showStep('auth');
+}
+
+function forgotPass() {
+  const n = document.getElementById('forgot-note');
+  if (n) n.style.display = 'block';
 }
 
 function showStep(step) {
@@ -254,7 +282,7 @@ async function login() {
     window.location.href = '/app';
   } catch(e) {
     showErr('login', e.message);
-    btn.disabled = false; btn.textContent = 'Sign in →';
+    btn.disabled = false; btn.textContent = 'Sign in';
   }
 }
 
@@ -281,7 +309,7 @@ async function register() {
     startTimer();
   } catch(e) {
     showErr('reg', e.message);
-    btn.disabled = false; btn.textContent = 'Create account & verify →';
+    btn.disabled = false; btn.textContent = 'Create account & verify';
   }
 }
 
