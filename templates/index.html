@@ -555,8 +555,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <span class="t-name">TopCandidate<span style="color:#F06000">.pro</span></span>
     <span class="t-by">by LinkX360</span>
   </a>
-  <!-- Mode toggle — swaps the sidebar rail + main dashboard. Session-remembered. -->
-  <div class="mode-toggle" role="tablist" aria-label="App mode">
+  <!-- Mode toggle — super-admin only. Hidden by default; revealed after
+       /api/auth/me confirms is_super_admin. Clients never see HRM exists. -->
+  <div class="mode-toggle" id="mode-toggle" role="tablist" aria-label="App mode" style="display:none">
     <button class="mt-btn on" id="mt-hiring" onclick="setMode('hiring')">Hiring</button>
     <button class="mt-btn" id="mt-hrm" onclick="setMode('hrm')">HRM</button>
   </div>
@@ -1445,7 +1446,11 @@ function showPage(id){
 // ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
 // dashboard. Remembered within the session so paging doesn't reset it. ──
 window.APP_MODE = 'hiring';
+window._isSuper = false;   // assume client until /api/auth/me proves otherwise
 function setMode(m){
+  // Clients are hiring-only, enforced here too: even a stale 'hrm' in
+  // sessionStorage or a direct call can never flip a non-super account.
+  if(!window._isSuper) m = 'hiring';
   m = (m === 'hrm') ? 'hrm' : 'hiring';
   window.APP_MODE = m;
   try{ sessionStorage.setItem('appmode', m); }catch(_){}
@@ -1460,6 +1465,18 @@ function initMode(){
   let m = 'hiring';
   try{ m = sessionStorage.getItem('appmode') || 'hiring'; }catch(_){}
   setMode(m);
+}
+// Called once /api/auth/me resolves: reveal HRM only for super-admin, and
+// hard-hide the HRM rail for everyone else (belt-and-braces with the toggle).
+function applyModeAccess(isSuper){
+  window._isSuper = isSuper === true;
+  const t = document.getElementById('mode-toggle');
+  if(t) t.style.display = window._isSuper ? '' : 'none';
+  if(!window._isSuper){
+    document.getElementById('rail-hrm')?.classList.add('hidden');
+    try{ sessionStorage.setItem('appmode','hiring'); }catch(_){}
+  }
+  initMode();
 }
 
 // ── MODALS ──
@@ -4885,6 +4902,8 @@ async function loadFromDB(){
     const me=await meRes.json();
     // Cache for the email composer and any other code that needs the recruiter's identity
     window._meCache = me;
+    // Gate the HRM side: reveal the toggle only for super-admin, hide for clients.
+    applyModeAccess(me.is_super_admin === true);
 
     // Fetch screenings, jobs in parallel - don't let stats failure block
     const [screenRes,jobsRes]=await Promise.all([
@@ -4992,6 +5011,8 @@ async function refreshPlan(){
     if(!r.ok) return;
     const me = await r.json();
     window._meCache = me;   // keep the cache fresh for email composer
+    // Re-apply HRM access if the super-admin flag changed since load.
+    if((me.is_super_admin === true) !== window._isSuper) applyModeAccess(me.is_super_admin === true);
     const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
     const tp = document.getElementById('t-plan');
     const prev = tp ? tp.textContent : '';

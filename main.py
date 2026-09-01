@@ -427,6 +427,22 @@ async def require_admin(request: Request) -> dict:
     return user
 
 
+async def require_super_admin(request: Request) -> dict:
+    """Gate for the entire HRM side (employees, leave, attendance, payroll,
+    performance, HR KPIs). Only accounts with is_super_admin set may reach it.
+
+    The flag is read FRESH from the DB (like require_admin reads role), so
+    granting or revoking it takes effect immediately, not on token expiry.
+    The 403 message is deliberately GENERIC ("Not available on this account")
+    so a client account cannot even learn that HRM exists by probing a URL.
+    """
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    if not db_user or not db_user.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Not available on this account.")
+    return user
+
+
 # ─────────────────────────────────────────────────────────────
 # PAGES
 # ─────────────────────────────────────────────────────────────
@@ -626,6 +642,7 @@ async def me(request: Request):
             "email": db_user.get("email", user["email"]),
             "company": db_user.get("company_name", user.get("company", "")),
             "role": db_user.get("role", "client"),
+            "is_super_admin": bool(db_user.get("is_super_admin")),
             "plan": db_user.get("plan", "trial"),
             "screening_count": db_user.get("screening_count", 0),
             "full_name": db_user.get("full_name", ""),
@@ -939,7 +956,7 @@ async def batch_screen_endpoint(
 
 @app.post("/api/performance/cycles")
 async def perf_cycle_create(request: Request):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -951,13 +968,13 @@ async def perf_cycle_create(request: Request):
 
 @app.get("/api/performance/cycles")
 async def perf_cycles_list(request: Request):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     return {"cycles": await list_perf_cycles(user["user_id"])}
 
 
 @app.get("/api/performance/cycles/{cycle_id}")
 async def perf_cycle_detail(request: Request, cycle_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     cycle = await get_perf_cycle(user["user_id"], cycle_id)
     if not cycle:
         raise HTTPException(status_code=404, detail="Cycle not found.")
@@ -967,7 +984,7 @@ async def perf_cycle_detail(request: Request, cycle_id: str):
 
 @app.post("/api/performance/cycles/{cycle_id}/assignments")
 async def perf_assignment_add(request: Request, cycle_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -984,7 +1001,7 @@ async def perf_assignment_add(request: Request, cycle_id: str):
 
 @app.post("/api/performance/assignments/{assignment_id}/remove")
 async def perf_assignment_remove(request: Request, assignment_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     if not await remove_perf_assignment(user["user_id"], assignment_id):
         raise HTTPException(status_code=400,
                             detail="Only assignments on a draft cycle can be removed.")
@@ -993,7 +1010,7 @@ async def perf_assignment_remove(request: Request, assignment_id: str):
 
 @app.post("/api/performance/cycles/{cycle_id}/launch")
 async def perf_cycle_launch(request: Request, cycle_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     if not (await list_perf_assignments(user["user_id"], cycle_id)):
         raise HTTPException(status_code=400, detail="Add at least one assignment before launching.")
     if not await set_perf_cycle_status(user["user_id"], cycle_id, "active", ("draft",)):
@@ -1003,7 +1020,7 @@ async def perf_cycle_launch(request: Request, cycle_id: str):
 
 @app.post("/api/performance/cycles/{cycle_id}/close")
 async def perf_cycle_close(request: Request, cycle_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     if not await set_perf_cycle_status(user["user_id"], cycle_id, "closed", ("active",)):
         raise HTTPException(status_code=400, detail="Only an active cycle can close.")
     return {"success": True}
@@ -1011,7 +1028,7 @@ async def perf_cycle_close(request: Request, cycle_id: str):
 
 @app.post("/api/performance/cycles/{cycle_id}/delete")
 async def perf_cycle_delete(request: Request, cycle_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     if not await delete_perf_cycle(user["user_id"], cycle_id):
         raise HTTPException(status_code=400,
                             detail="Only a draft or closed cycle can be deleted.")
@@ -1023,7 +1040,7 @@ async def perf_cycle_results(request: Request, cycle_id: str):
     """Aggregates are ADMIN-ONLY (smoke-locked since P1). Four perspectives
     separate + a weighted headline; peer/subordinate comments withheld below
     the anonymity floor."""
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     agg = await aggregate_perf_cycle(user["user_id"], cycle_id)
     if not agg:
         raise HTTPException(status_code=404, detail="Cycle not found.")
@@ -1094,7 +1111,7 @@ async def me_review_submit(request: Request, assignment_id: str):
 
 @app.get("/api/payroll/salaries")
 async def payroll_salaries(request: Request):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     structures = await get_salary_structures(user["user_id"])
     out = []
     async for e in db.employees.find(
@@ -1110,7 +1127,7 @@ async def payroll_salaries(request: Request):
 
 @app.post("/api/payroll/salaries/{employee_id}")
 async def payroll_set_salary(request: Request, employee_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     from bson import ObjectId as _OID
     try:
         emp = await db.employees.find_one(
@@ -1129,13 +1146,13 @@ async def payroll_set_salary(request: Request, employee_id: str):
 
 @app.get("/api/payroll/runs")
 async def payroll_runs_list(request: Request):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     return {"runs": await list_payroll_runs(user["user_id"]), "math_held": True}
 
 
 @app.post("/api/payroll/runs")
 async def payroll_run_create(request: Request):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
         month = str(body.get("month", "")).strip()
@@ -1152,7 +1169,7 @@ async def payroll_run_create(request: Request):
 
 @app.get("/api/payroll/runs/{run_id}")
 async def payroll_run_detail(request: Request, run_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     run, slips = await get_payroll_run(user["user_id"], run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found.")
@@ -1161,7 +1178,7 @@ async def payroll_run_detail(request: Request, run_id: str):
 
 @app.post("/api/payroll/runs/{run_id}/approve")
 async def payroll_run_approve(request: Request, run_id: str):
-    user = await require_admin(request)
+    user = await require_super_admin(request)
     if not await approve_payroll_run(user["user_id"], run_id):
         raise HTTPException(status_code=400, detail="Only a draft run can be approved.")
     return {"success": True}
@@ -1173,7 +1190,7 @@ async def payroll_run_pay(request: Request, run_id: str):
     deducted — paying against unconfirmed money math is the worst bug this
     product could ship. Unblocks only when the owner confirms BD tax slabs
     and the LWP formula."""
-    await require_admin(request)
+    await require_super_admin(request)
     raise HTTPException(status_code=400, detail=(
         "Marking a run PAID is disabled: the tax line is a placeholder and the "
         "leave-without-pay deduction is not finalized. Confirm the money math "
@@ -1187,7 +1204,7 @@ async def kpi_dashboard(request: Request, start: str = "", end: str = ""):
     volume and per-job score averages are deliberately NOT here — the page
     computes them client-side with CandidateStats over /api/screenings, so the
     definitions cannot drift from the rest of the app."""
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
 
     def _parse(s, fallback):
         try:
@@ -3476,13 +3493,13 @@ def _validated_leave(body: dict) -> dict:
 async def hr_summary(request: Request):
     """Additive dashboard counts for the HR cards. Tenant-scoped, and entirely
     separate from the hiring stats — it reads only the HRM collections."""
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     return await hr_summary_counts(user["user_id"])
 
 
 @app.get("/api/leave/requests")
 async def list_leave_requests(request: Request, status: str = "", employee_id: str = ""):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     rows = await get_leave_requests_for_user(
         user["user_id"], status=status if status in ("pending", "approved", "rejected") else "",
         employee_id=employee_id[:40])
@@ -3494,7 +3511,7 @@ async def admin_log_leave(request: Request):
     """Admin logs leave on an employee's behalf — created directly APPROVED
     (it's the admin's own decision), with the same balance check an approval
     gets."""
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -3518,7 +3535,7 @@ async def admin_log_leave(request: Request):
 
 @app.post("/api/leave/requests/{request_id}/decide")
 async def decide_leave_request(request: Request, request_id: str):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -3558,7 +3575,7 @@ async def decide_leave_request(request: Request, request_id: str):
 
 @app.get("/api/leave/balances")
 async def leave_balances(request: Request, employee_id: str = ""):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     if employee_id:
         emp = await get_employee_for_user(employee_id[:40], user["user_id"])
         if not emp:
@@ -3572,7 +3589,7 @@ async def leave_balances(request: Request, employee_id: str = ""):
 
 @app.get("/api/attendance")
 async def attendance_month(request: Request, month: str = "", employee_id: str = ""):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     month = (month or "").strip()[:7]
     if not (len(month) == 7 and _valid_ymd(month + "-01")):
         raise HTTPException(status_code=400, detail="month must be YYYY-MM.")
@@ -3582,7 +3599,7 @@ async def attendance_month(request: Request, month: str = "", employee_id: str =
 
 @app.post("/api/attendance/mark")
 async def attendance_mark(request: Request):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -3628,7 +3645,7 @@ def _safe_employee(e: dict) -> dict:
 async def employee_invite(request: Request, employee_id: str):
     """Admin generates an invite link that lets this employee set a password.
     Owner-gated; the employee must belong to this tenant."""
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     emp = await get_employee_for_user(employee_id, user["user_id"])
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found.")
@@ -3853,14 +3870,14 @@ def _validated_employee(body: dict) -> dict:
 
 @app.get("/api/employees")
 async def list_employees(request: Request):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     employees = [_safe_employee(e) for e in await get_employees_for_user(user["user_id"])]
     return {"employees": employees, "count": len(employees)}
 
 
 @app.post("/api/employees")
 async def create_employee_route(request: Request):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:
@@ -3893,7 +3910,7 @@ async def create_employee_route(request: Request):
 
 @app.put("/api/employees/{employee_id}")
 async def update_employee_route(request: Request, employee_id: str):
-    user = await get_current_user(request)
+    user = await require_super_admin(request)
     try:
         body = await request.json()
     except Exception:

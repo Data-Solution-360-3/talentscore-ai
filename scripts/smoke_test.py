@@ -175,6 +175,35 @@ def retire_perf_fixtures():
         pass
 
 
+def ensure_client_fixture():
+    """A throwaway CLIENT account (role=client, NOT super-admin) to prove the
+    HRM gate keeps clients out. Idempotent by email; returns a minted token
+    or None. Direct pymongo — server-side, like the other fixtures."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from pymongo import MongoClient
+        from auth import create_token
+        from datetime import datetime
+        cli = MongoClient(os.getenv("MONGO_URI"), serverSelectionTimeoutMS=15000,
+                          tlsAllowInvalidCertificates=True)
+        dbx = cli[os.getenv("DB_NAME", "talentscore")]
+        em = "smoke.client@boundary.test"
+        dbx.users.update_one(
+            {"email": em},
+            {"$set": {"email": em, "role": "client", "company_name": "Smoke Client Co",
+                      "is_super_admin": False, "updated_at": datetime.utcnow()},
+             "$setOnInsert": {"created_at": datetime.utcnow(), "plan": "trial"}},
+            upsert=True)
+        u = dbx.users.find_one({"email": em})
+        cli.close()
+        return create_token({"user_id": str(u["_id"]), "email": em,
+                             "company": "Smoke Client Co", "role": "client"})
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.getenv("SMOKE_BASE", DEFAULT_BASE))
@@ -1045,6 +1074,61 @@ def main():
                 c.post(f"/api/performance/cycles/{cid}/close")
                 c.post(f"/api/performance/cycles/{cid}/delete")
                 retire_perf_fixtures()
+
+        # ── SUPER-ADMIN HRM GATE — a client account must NOT reach HRM ──
+        # Every HRM endpoint must 403 a non-super-admin, while the Hiring
+        # endpoints still 200 for that same client. A leak here is labeled
+        # HRM LEAK TO CLIENT! so it can never pass silently.
+        print("\nSuper-admin HRM gate — a client token must be REFUSED by HRM, ADMITTED by hiring")
+        cli_tok = ensure_client_fixture()
+        if not cli_tok:
+            line(None, "AUTH", "client fixture", "could not mint client token (MONGO_URI?)")
+            failures.append(("HRM-GATE", "client fixture", "mint failed"))
+        else:
+            def cli_req(method, path, body=None):
+                with httpx.Client(base_url=base, timeout=30.0) as cc:
+                    cc.headers["Authorization"] = f"Bearer {cli_tok}"
+                    return cc.request(method, path, json=body)
+
+            hrm_forbidden = [
+                ("GET", "/api/employees"), ("POST", "/api/employees"),
+                ("GET", "/api/hr/summary"),
+                ("GET", "/api/leave/requests"), ("POST", "/api/leave/requests"),
+                ("GET", "/api/leave/balances"),
+                ("GET", "/api/attendance?month=2026-08"), ("POST", "/api/attendance/mark"),
+                ("GET", "/api/payroll/salaries"), ("GET", "/api/payroll/runs"),
+                ("POST", "/api/payroll/runs"),
+                ("GET", "/api/performance/cycles"), ("POST", "/api/performance/cycles"),
+                ("GET", "/api/kpi"),
+            ]
+            for method, path in hrm_forbidden:
+                try:
+                    r = cli_req(method, path, {} if method == "POST" else None)
+                    ok = r.status_code == 403
+                    line(r.status_code, method, path,
+                         "client refused" if ok else "HRM LEAK TO CLIENT!")
+                    checked += 1
+                    if not ok:
+                        failures.append(("HRM-GATE", path, r.status_code))
+                except Exception as e:
+                    line(None, method, path, str(e)[:60])
+                    failures.append(("HRM-GATE", path, "exception"))
+
+            print("\nSuper-admin HRM gate — the SAME client keeps the Hiring side (must NOT 403)")
+            hiring_ok = [("GET", "/api/screenings?limit=3"), ("GET", "/api/jobs"),
+                         ("GET", "/api/stats"), ("GET", "/api/analytics/skills-gaps")]
+            for method, path in hiring_ok:
+                try:
+                    r = cli_req(method, path)
+                    ok = r.status_code not in (401, 403)
+                    line(r.status_code, method, path,
+                         "hiring works for client" if ok else "HIRING WRONGLY BLOCKED!")
+                    checked += 1
+                    if not ok:
+                        failures.append(("HRM-GATE-HIRING", path, r.status_code))
+                except Exception as e:
+                    line(None, method, path, str(e)[:60])
+                    failures.append(("HRM-GATE-HIRING", path, "exception"))
 
     print(f"\n{checked} routes checked.")
     if failures:
