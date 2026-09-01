@@ -2107,10 +2107,16 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
                 "high_threshold": 80,
             }
 
+    # Jobs posted — tenant-scoped, all-time (total incl. deactivated + active).
+    jobs_total = await db.jobs.count_documents(user_match_field("user_id", user_id))
+    jobs_active = await db.jobs.count_documents(
+        {**user_match_field("user_id", user_id), "active": True})
+
     return {
         "range": {"start": start_s, "end": end_s},
         "hires": hires,
         "interviews": interviews,
+        "jobs": {"total": jobs_total, "active": jobs_active},
         "hr": {"headcount": headcount, "attendance": attendance,
                "leave": leave, "timeline": timeline,
                "performance": performance},

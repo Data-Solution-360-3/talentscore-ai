@@ -549,7 +549,7 @@ async function loadAll(){
       tFetch('/api/admin/users'),
       // Projected + paginated admin endpoint — ~50x lighter than pulling the
       // full cross-tenant documents, and it returns the true platform total.
-      tFetch('/api/admin/screenings?limit=100'),
+      tFetch('/api/admin/screenings?limit=500'),
       tFetch('/api/stats')
     ]);
     if([meRes,usersRes,screenRes].some(r=>r.status===401||r.status===403)){window.location.href='/login';return;}
@@ -580,7 +580,7 @@ async function loadAll(){
 }
 async function loadMoreScreenings(){
   try{
-    const r=await tFetch('/api/admin/screenings?limit=100&skip='+allScreenings.length);
+    const r=await tFetch('/api/admin/screenings?limit=500&skip='+allScreenings.length);
     if(!r.ok) throw new Error('server '+r.status);
     const d=await r.json();
     allScreenings=allScreenings.concat(d.screenings||[]);
@@ -707,7 +707,7 @@ function renderScreenings(){
   });
   document.getElementById('screen-count').textContent='Showing '+filtered.length+' of '+allScreenings.length+' loaded ('+screenTotal+' total across all companies)';
   const moreRow = allScreenings.length<screenTotal
-    ? `<tr><td colspan="7" style="text-align:center;padding:10px"><button class="btn btn-xs" onclick="loadMoreScreenings()">Load ${Math.min(100,screenTotal-allScreenings.length)} more (newest first)</button></td></tr>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:10px"><button class="btn btn-xs" onclick="loadMoreScreenings()">Load ${Math.min(500,screenTotal-allScreenings.length)} more (newest first)</button></td></tr>`
     : '';
   document.getElementById('screens-tbl').innerHTML=(filtered.map(s=>{
     const score=Math.round(s.overall_score||0);

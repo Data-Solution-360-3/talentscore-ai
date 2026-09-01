@@ -483,6 +483,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .kpi-card .kv{font-size:1.65rem;font-weight:900;color:var(--rg-ink);letter-spacing:-1px}
 .kpi-card .kl{font-size:12px;font-weight:700;color:var(--rg-mut);margin-bottom:6px}
 .kpi-card .ks{font-size:11px;color:var(--rg-mut2);margin-top:5px;line-height:1.5}
+.kpi-click{cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative}
+.kpi-click:hover{transform:translateY(-2px);box-shadow:var(--rg-sh2)}
+.kpi-click::after{content:'↗';position:absolute;top:10px;right:12px;font-size:12px;color:var(--rg-mut2);opacity:0;transition:opacity .12s}
+.kpi-click:hover::after{opacity:1}
+.kpi-funcell.kpi-click:hover{background:var(--rg-gg)}
 .kpi-lim{display:inline-block;background:rgba(217,119,6,.12);color:#B45309;border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
 .kpi-zero{display:inline-block;background:var(--rg-soft);color:var(--rg-mut);border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
 .kpi-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
@@ -942,12 +947,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <div class="kpi-sec">Hiring &amp; recruitment</div>
     <div class="kpi-cards">
-      <div class="kpi-card"><div class="kl">Total applicants</div><div class="kv" id="kpi-applicants">—</div><div class="ks" id="kpi-applicants-s"></div></div>
-      <div class="kpi-card"><div class="kl">Active candidates</div><div class="kv" id="kpi-activec">—</div><div class="ks" id="kpi-activec-s"></div></div>
-      <div class="kpi-card"><div class="kl">Open vacancies</div><div class="kv" id="kpi-vac">—</div><div class="ks" id="kpi-vac-s"></div></div>
-      <div class="kpi-card"><div class="kl">Shortlisting rate</div><div class="kv" id="kpi-short">—</div><div class="ks" id="kpi-short-s"></div></div>
-      <div class="kpi-card"><div class="kl">Interview → hire<span id="kpi-ivh-b"></span></div><div class="kv" id="kpi-ivh">—</div><div class="ks" id="kpi-ivh-s"></div></div>
-      <div class="kpi-card"><div class="kl">Hiring conversion<span id="kpi-conv-b"></span></div><div class="kv" id="kpi-conv">—</div><div class="ks" id="kpi-conv-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open all candidates"><div class="kl">Total applicants</div><div class="kv" id="kpi-applicants">—</div><div class="ks" id="kpi-applicants-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open candidates"><div class="kl">Active candidates</div><div class="kv" id="kpi-activec">—</div><div class="ks" id="kpi-activec-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('jobs')" title="Open jobs"><div class="kl">Open vacancies</div><div class="kv" id="kpi-vac">—</div><div class="ks" id="kpi-vac-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('stage','shortlisted')" title="Show shortlisted candidates"><div class="kl">Shortlisting rate</div><div class="kv" id="kpi-short">—</div><div class="ks" id="kpi-short-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('stage','interview')" title="Show candidates at interview stage"><div class="kl">Interview → hire<span id="kpi-ivh-b"></span></div><div class="kv" id="kpi-ivh">—</div><div class="ks" id="kpi-ivh-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open all candidates"><div class="kl">Hiring conversion<span id="kpi-conv-b"></span></div><div class="kv" id="kpi-conv">—</div><div class="ks" id="kpi-conv-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('jobs')" title="Open jobs"><div class="kl">Jobs posted<span id="kpi-jobs-b"></span></div><div class="kv" id="kpi-jobs">—</div><div class="ks" id="kpi-jobs-s"></div></div>
       <div class="kpi-card"><div class="kl">Cost per hire<span id="kpi-cph-b"></span></div><div class="kv" id="kpi-cph">—</div><div class="ks" id="kpi-cph-s"></div></div>
       <div class="kpi-card kpi-soon"><div class="kl">Offer acceptance rate</div><div class="kv-soon">Coming soon</div><div class="ks">No offer stage exists in the pipeline, so this can’t be measured honestly yet.</div><span class="kpi-soon-pill">needs an Offer stage</span></div>
       <div class="kpi-card kpi-soon"><div class="kl">Quality of hire</div><div class="kv-soon">Coming soon</div><div class="ks">Needs post-hire performance data to exist first.</div><span class="kpi-soon-pill">needs Performance module</span></div>
@@ -1018,7 +1024,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <div class="kpi-sec">Workforce</div>
     <div class="kpi-cards">
-      <div class="kpi-card"><div class="kl">Total headcount</div><div class="kv" id="kpi-head">—</div><div class="ks" id="kpi-head-s"></div></div>
+      <div class="kpi-card kpi-click" onclick="kpiDrill('employees')" title="Open employees"><div class="kl">Total headcount</div><div class="kv" id="kpi-head">—</div><div class="ks" id="kpi-head-s"></div></div>
       <div class="kpi-card"><div class="kl">New joiners</div><div class="kv" id="kpi-join">—</div><div class="ks" id="kpi-join-s"></div></div>
       <div class="kpi-card"><div class="kl">Turnover rate<span id="kpi-turn-b"></span></div><div class="kv" id="kpi-turn">—</div><div class="ks" id="kpi-turn-s"></div></div>
       <div class="kpi-card"><div class="kl">Retention rate<span id="kpi-ret-b"></span></div><div class="kv" id="kpi-ret">—</div><div class="ks" id="kpi-ret-s"></div></div>
@@ -2182,6 +2188,24 @@ function clearFilters(){
 // the number on the cell. An unknown key is a bug, not a reason to clear every filter
 // and show everything: the old else-branch did exactly that, so clicking "Interview 6"
 // silently displayed all 263 candidates.
+// KPI drill-through — reuse the existing page-switch + filter machinery so a
+// KPI opens exactly the records behind it. kind: 'candidates' (all),
+// 'stage' (a candidate stage), 'jobs', 'employees'.
+function kpiDrill(kind, arg){
+  if(kind==='stage'){ filterByStage(arg); return; }
+  if(kind==='jobs'){ showPage('jobs'); return; }
+  if(kind==='employees'){
+    if(window._isSuper){ setMode('hrm'); showPage('employees'); }
+    else showPage('candidates');   // clients have no HRM; fall back to candidates
+    return;
+  }
+  // default: all candidates, filters cleared
+  showPage('candidates');
+  const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
+  if(fStage) fStage.value=''; if(fResult) fResult.value='';
+  try{ applyFilters(); }catch(_){}
+}
+
 function filterByStage(stage){
   showPage('candidates');
   const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
@@ -5562,6 +5586,16 @@ function kpiRenderAll(api){
   K('kpi-vac').textContent=openJobs.length;
   K('kpi-vac-s').textContent= openJobs.length? 'Jobs with status Active — live snapshot, not range-scoped' : 'No active jobs right now';
 
+  // Jobs posted (all-time, tenant-scoped) from the server; active from live jobs.
+  const jobsInfo=(api&&api.jobs)||null;
+  if(jobsInfo){
+    K('kpi-jobs').textContent=jobsInfo.total;
+    K('kpi-jobs-s').textContent=`${jobsInfo.active} active · ${jobsInfo.total-jobsInfo.active} closed/paused — all roles you’ve posted`;
+  }else{
+    K('kpi-jobs').textContent=(allJobs||[]).length||'—';
+    K('kpi-jobs-s').textContent='Active jobs (couldn’t load the all-time total)';
+  }
+
   K('kpi-short').textContent= s.total? Math.round(s.byStage.shortlisted/s.total*100)+'%' : '—';
   K('kpi-short-s').textContent= s.total? `${s.byStage.shortlisted} shortlisted of ${s.total} screened — your decision, not the AI’s` : 'No candidates screened in this range';
 
@@ -5613,11 +5647,11 @@ function kpiRenderAll(api){
     ]);
     const pct=(a,b)=> b>0? Math.round(a/b*100)+'% of applied' : '';
     K('kpi-funcells').innerHTML=[
-      ['Applied / screened',s.total,''],
-      ['Interview +',ivPlus,pct(ivPlus,s.total)],
-      ['Shortlisted',st.shortlisted,pct(st.shortlisted,s.total)],
-      ['Hired',apiOk?hiredN:'—',apiOk?pct(hiredN,s.total):''],
-    ].map(c=>`<div class="kpi-funcell"><div class="kpi-funn">${c[1]}</div><div class="kpi-funl">${c[0]}</div><div class="kpi-funp">${c[2]}</div></div>`).join('');
+      ['Applied / screened',s.total,'',"kpiDrill('candidates')"],
+      ['Interview +',ivPlus,pct(ivPlus,s.total),"kpiDrill('stage','interview')"],
+      ['Shortlisted',st.shortlisted,pct(st.shortlisted,s.total),"kpiDrill('stage','shortlisted')"],
+      ['Hired',apiOk?hiredN:'—',apiOk?pct(hiredN,s.total):'',"kpiDrill('employees')"],
+    ].map(c=>`<div class="kpi-funcell kpi-click" onclick="${c[3]}" title="Open these records"><div class="kpi-funn">${c[1]}</div><div class="kpi-funl">${c[0]}</div><div class="kpi-funp">${c[2]}</div></div>`).join('');
     K('kpi-funnel-note').textContent='“Interview +” counts candidates currently at interview stage or beyond (shortlisted). Stages are current positions, not a history. “Hired” counts employee records created from the funnel in the range — they may have been screened earlier.';
   }
 
