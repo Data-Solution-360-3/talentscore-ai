@@ -614,6 +614,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="lb">Attendance</span></button>
     <button class="sb-item ri" id="sb-payroll" onclick="showPage('payroll')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg><span class="lb">Payroll</span></button>
+    <button class="sb-item ri" id="sb-performance" onclick="showPage('performance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M12 11v3"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M2 8h3M19 8h3"/></svg><span class="lb">Performance</span></button>
     <button class="sb-item ri" data-sb="kpi" onclick="showPage('kpi')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="lb">KPIs</span></button>
   </div>
@@ -861,6 +863,28 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- ══════════════════════════════════════════
      6. ANALYTICS
 ══════════════════════════════════════════ -->
+<div class="page" id="page-performance">
+  <div class="ph"><h1>Performance — 360°</h1><p>Quarterly cycles: self + manager + peers + subordinates, each competency 0–20, headline weighted 50/10/25/15</p></div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:800">Cycles</div>
+      <button class="btn btn-xs btn-primary" onclick="perfShowCreate()">+ New quarterly cycle</button>
+    </div>
+    <div id="perf-create" class="hidden" style="margin-top:10px;border:1px dashed var(--border);border-radius:var(--r-lg);padding:12px">
+      <input id="perf-name" placeholder="e.g. Q1 2027" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12.5px;font-weight:700;width:200px">
+      <div style="font-size:10.5px;font-weight:800;color:var(--t3);text-transform:uppercase;margin:10px 0 6px">Competencies — each scored 0–20; edit freely</div>
+      <div id="perf-comps"></div>
+      <button class="btn btn-xs" onclick="perfCompAdd()">+ Add competency</button>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-xs btn-primary" onclick="perfCreate()">Create draft cycle</button>
+        <button class="btn btn-xs" onclick="document.getElementById('perf-create').classList.add('hidden')">Cancel</button>
+      </div>
+    </div>
+    <div id="perf-cycles" style="margin-top:8px;font-size:12px;color:var(--t3)">Loading…</div>
+  </div>
+  <div class="card hidden" id="perf-detail"></div>
+</div>
+
 <div class="page" id="page-payroll">
   <div class="ph"><h1>Payroll</h1><p>Salary structures and monthly runs — the money math is held until you confirm it</p></div>
   <div style="background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:var(--r-lg);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.65">
@@ -1018,8 +1042,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="kpi-card"><div class="kl">Attendance rate<span id="kpi-att-b"></span></div><div class="kv" id="kpi-att">—</div><div class="ks" id="kpi-att-s"></div></div>
       <div class="kpi-card"><div class="kl">Absenteeism rate</div><div class="kv" id="kpi-abs">—</div><div class="ks" id="kpi-abs-s"></div></div>
       <div class="kpi-card"><div class="kl">Leave days approved</div><div class="kv" id="kpi-leave">—</div><div class="ks" id="kpi-leave-s"></div></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Avg performance rating</div><div class="kv-soon">Coming soon</div><div class="ks">No performance reviews exist in the system yet.</div><span class="kpi-soon-pill">needs Performance module</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">High performer %</div><div class="kv-soon">Coming soon</div><div class="ks">Follows the same performance review data.</div><span class="kpi-soon-pill">needs Performance module</span></div>
+      <div class="kpi-card" id="kpi-perf-card"><div class="kl">Avg performance rating</div><div class="kv">—</div></div>
+      <div class="kpi-card" id="kpi-perfhigh-card"><div class="kl">High performer %</div><div class="kv">—</div></div>
       <div class="kpi-card kpi-soon"><div class="kl">Training completion</div><div class="kv-soon">Coming soon</div><div class="ks">No training records exist in the system yet.</div><span class="kpi-soon-pill">needs Training module</span></div>
     </div>
 
@@ -1415,6 +1439,7 @@ function showPage(id){
   if(id==='hrm-dashboard')renderHrmDashboard();
   if(id==='kpi')renderKpi();
   if(id==='payroll')loadPayroll();
+  if(id==='performance')perfLoad();
 }
 
 // ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
@@ -4992,6 +5017,193 @@ async function refreshPlan(){
 }
 setInterval(refreshPlan, 60000);
 
+// ═══════ 360° PERFORMANCE (P2 admin + P4 results) ═══════
+const PERF_DEFAULT_COMPS=[
+  {name:'Job Knowledge',description:'Understands the work and the tools it needs.'},
+  {name:'Quality of Work',description:'Accuracy, care, and finish of what they produce.'},
+  {name:'Communication',description:'Clear, timely, and honest in speech and writing.'},
+  {name:'Teamwork',description:'Works well with others; gives and accepts help.'},
+  {name:'Ownership & Reliability',description:'Delivers what they committed to, without chasing.'}];
+let _perfComps=[], _perfCycleId=null;
+const PG=id=>document.getElementById(id);
+
+function perfShowCreate(){ _perfComps=PERF_DEFAULT_COMPS.map(c=>({name:c.name,description:c.description})); perfRenderComps(); PG('perf-create').classList.remove('hidden'); }
+function perfRenderComps(){
+  PG('perf-comps').innerHTML=_perfComps.map((c,i)=>`
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <input value="${escapeHtml(c.name)}" maxlength="80" oninput="_perfComps[${i}].name=this.value" style="width:190px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700">
+      <input value="${escapeHtml(c.description)}" maxlength="300" oninput="_perfComps[${i}].description=this.value" style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+      <button onclick="_perfComps.splice(${i},1);perfRenderComps()" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:15px">×</button>
+    </div>`).join('');
+}
+function perfCompAdd(){ if(_perfComps.length<8){ _perfComps.push({name:'',description:''}); perfRenderComps(); } }
+
+async function perfCreate(){
+  const name=PG('perf-name').value.trim();
+  if(!name){ toast('Name the cycle (e.g. Q1 2027).',{type:'error'}); return; }
+  const comps=_perfComps.filter(c=>c.name.trim());
+  try{
+    const r=await fetch('/api/performance/cycles',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,competencies:comps})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    PG('perf-create').classList.add('hidden');
+    toast('Draft cycle created — build the assignment matrix, then launch',{type:'success'});
+    perfLoad(); perfOpen(d.cycle._id);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+
+async function perfLoad(){
+  try{
+    const r=await fetch('/api/performance/cycles',{credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const cyc=(await r.json()).cycles||[];
+    PG('perf-cycles').innerHTML=cyc.length?cyc.map(cy=>`
+      <div onclick="perfOpen('${cy._id}')" style="display:flex;justify-content:space-between;padding:9px 6px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12.5px;align-items:center">
+        <span><b>${escapeHtml(cy.name)}</b> · ${(cy.competencies||[]).length} competencies</span>
+        <span class="badge ${cy.status==='active'?'b-green':cy.status==='draft'?'b-amber':''}" ${cy.status==='closed'?'style="background:var(--s3);color:var(--t2)"':''}>${(cy.status||'').toUpperCase()}</span>
+      </div>`).join(''):'No cycles yet — create the first quarterly cycle.';
+    if(!Array.isArray(allEmployees) || !allEmployees.length){
+      try{ const er=await fetch('/api/employees',{credentials:'include'}); if(er.ok) allEmployees=(await er.json()).employees||[]; }catch(_){}
+    }
+  }catch(e){ toast('Could not load cycles: '+e.message,{type:'error'}); }
+}
+
+async function perfOpen(id){
+  _perfCycleId=id;
+  try{
+    const r=await fetch('/api/performance/cycles/'+id,{credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    const cy=d.cycle, asg=d.assignments||[];
+    const emps=(allEmployees||[]).filter(e=>e.status!=='terminated');
+    const opts=emps.map(e=>`<option value="${e._id}">${escapeHtml(e.name||'?')}</option>`).join('');
+    const sel='padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:600';
+    let html=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:800">${escapeHtml(cy.name)}
+        <span class="badge ${cy.status==='active'?'b-green':'b-amber'}" style="margin-left:6px${cy.status==='closed'?';background:var(--s3);color:var(--t2)':''}">${cy.status.toUpperCase()}</span></div>
+      <div style="display:flex;gap:8px">
+        ${cy.status==='draft'?'<button class="btn btn-xs btn-primary" onclick="perfLaunch()">Launch cycle</button>':''}
+        ${cy.status==='active'?'<button class="btn btn-xs btn-primary" onclick="perfCloseCycle()">Close cycle</button>':''}
+        ${cy.status!=='active'?'<button class="btn btn-xs" style="color:var(--red)" onclick="perfDelete()">Delete</button>':''}
+      </div></div>`;
+    const subMap={};
+    asg.forEach(a=>{ (subMap[a.subject_employee_id]=subMap[a.subject_employee_id]||{name:a.subject_name,list:[]}).list.push(a); });
+    html+=`<div style="font-size:10.5px;font-weight:800;color:var(--t3);text-transform:uppercase;margin:12px 0 6px">Assignment matrix${cy.status==='draft'?' — you approve this before launch':''}</div>`;
+    if(cy.status==='draft'){
+      html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <select id="pa-subject" style="${sel}"><option value="">Subject…</option>${opts}</select>
+        <select id="pa-reviewer" style="${sel}"><option value="">Reviewer…</option>${opts}</select>
+        <select id="pa-relation" style="${sel}">
+          <option value="manager">Manager</option><option value="peer">Peer</option>
+          <option value="subordinate">Subordinate</option><option value="self">Self</option></select>
+        <button class="btn btn-xs btn-primary" onclick="perfAddAsg()">Add</button>
+        <button class="btn btn-xs" onclick="perfAddSelfAll()">+ Self review for everyone</button>
+      </div>`;
+    }
+    html+= Object.keys(subMap).length? Object.entries(subMap).map(([sid,g])=>`
+      <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:6px">
+        <b style="font-size:12.5px">${escapeHtml(g.name||'?')}</b>
+        ${g.list.map(a=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--t2);padding:3px 0;align-items:center">
+          <span>${a.relation==='self'?'Self-assessment':escapeHtml(a.reviewer_name||'?')+' · '+a.relation}</span>
+          <span>${a.status==='submitted'?'<span class="badge b-green">SUBMITTED</span>':'<span class="badge b-amber">PENDING</span>'}
+          ${cy.status==='draft'?` <button onclick="perfRmAsg('${a._id}')" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:14px">×</button>`:''}</span>
+        </div>`).join('')}
+      </div>`).join('') : '<div style="font-size:12px;color:var(--t3);padding:8px">No assignments yet — add subject → reviewer pairs above.</div>';
+    if(cy.status!=='draft') html+=`<div id="perf-results" style="margin-top:12px;font-size:12px;color:var(--t3)">Loading results…</div>`;
+    PG('perf-detail').innerHTML=html;
+    PG('perf-detail').classList.remove('hidden');
+    PG('perf-detail').scrollIntoView({behavior:'smooth',block:'nearest'});
+    if(cy.status!=='draft') perfResults();
+  }catch(e){ toast('Could not open cycle: '+e.message,{type:'error'}); }
+}
+
+async function perfAddAsg(){
+  const s=PG('pa-subject').value, rv=PG('pa-reviewer').value, rel=PG('pa-relation').value;
+  if(!s||!rv){ toast('Pick a subject and a reviewer.',{type:'error'}); return; }
+  try{
+    const r=await fetch('/api/performance/cycles/'+_perfCycleId+'/assignments',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subject_employee_id:s,reviewer_employee_id:rv,relation:rel})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    perfOpen(_perfCycleId);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+async function perfAddSelfAll(){
+  const emps=(allEmployees||[]).filter(e=>e.status!=='terminated');
+  for(const e of emps){
+    try{ await fetch('/api/performance/cycles/'+_perfCycleId+'/assignments',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subject_employee_id:e._id,reviewer_employee_id:e._id,relation:'self'})}); }catch(_){}
+  }
+  toast('Self reviews added for all active employees',{type:'success'});
+  perfOpen(_perfCycleId);
+}
+async function perfRmAsg(id){
+  try{ await fetch('/api/performance/assignments/'+id+'/remove',{method:'POST',credentials:'include'}); }catch(_){}
+  perfOpen(_perfCycleId);
+}
+async function perfLaunch(){
+  if(!confirm('Launch this cycle? The matrix locks and reviewers see their assignments in the employee portal.')) return;
+  try{
+    const r=await fetch('/api/performance/cycles/'+_perfCycleId+'/launch',{method:'POST',credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    toast('Cycle launched',{type:'success'}); perfLoad(); perfOpen(_perfCycleId);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+async function perfCloseCycle(){
+  if(!confirm('Close this cycle? Late submissions are blocked and results freeze.')) return;
+  try{
+    const r=await fetch('/api/performance/cycles/'+_perfCycleId+'/close',{method:'POST',credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    toast('Cycle closed',{type:'success'}); perfLoad(); perfOpen(_perfCycleId);
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+async function perfDelete(){
+  if(!confirm('Delete this cycle and all its assignments? This cannot be undone.')) return;
+  try{
+    const r=await fetch('/api/performance/cycles/'+_perfCycleId+'/delete',{method:'POST',credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    PG('perf-detail').classList.add('hidden');
+    toast('Cycle deleted',{type:'success'}); perfLoad();
+  }catch(e){ toast(''+e.message,{type:'error'}); }
+}
+
+async function perfResults(){
+  try{
+    const r=await fetch('/api/performance/cycles/'+_perfCycleId+'/results',{credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+    const el=PG('perf-results'); if(!el) return;
+    const cell=(s,label,rel)=>{
+      const p=s.per_relation[rel];
+      if(!p) return `<div style="flex:1;min-width:110px;background:var(--s2);border-radius:10px;padding:8px 10px;text-align:center;opacity:.55"><div style="font-size:1.1rem;font-weight:900">—</div><div style="font-size:10px;color:var(--t3);font-weight:700">${label} · not assigned</div></div>`;
+      return `<div style="flex:1;min-width:110px;background:var(--s2);border-radius:10px;padding:8px 10px;text-align:center">
+        <div style="font-size:1.1rem;font-weight:900;color:var(--text)">${p.avg==null?'—':p.avg+'<span style="font-size:10px;color:var(--t3)">/20</span>'}</div>
+        <div style="font-size:10px;color:var(--t3);font-weight:700">${label} · ${p.submitted}/${p.assigned} in</div>
+        ${p.individuals_hidden?`<div style="font-size:9px;color:var(--amber);font-weight:700">details hidden &lt; ${d.anon_floor} reviews</div>`:''}
+      </div>`;
+    };
+    el.innerHTML=`<div style="font-size:10.5px;font-weight:800;color:var(--t3);text-transform:uppercase;margin:4px 0 8px">Results — four perspectives separate · headline = manager 50 · peers 25 · subordinates 15 · self 10 (re-normalized when a perspective is missing)</div>`
+      +((d.subjects||[]).map(s=>`
+      <div style="border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;margin-bottom:8px;background:var(--surface)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <span><b>${escapeHtml(s.name)}</b> <span style="font-size:11px;color:var(--t3)">${escapeHtml(s.role_title||'')}</span></span>
+          <span style="font-weight:900;font-size:1.15rem;color:${s.headline!=null?gc(s.headline):'var(--t3)'}">
+            ${s.headline!=null?s.headline+'/100':'no reviews yet'}
+            ${s.limited?`<span class="kpi-lim" style="margin-left:6px">limited data · n=${s.reviewers_total}</span>`:''}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${cell(s,'Self','self')}${cell(s,'Manager','manager')}${cell(s,'Peers','peer')}${cell(s,'Subordinates','subordinate')}</div>
+        ${[['manager','Manager'],['peer','Peers (unattributed)'],['subordinate','Subordinates (unattributed)'],['self','Self']].map(([rel,label])=>{
+          const p=s.per_relation[rel];
+          if(!p||!(p.comments||[]).length) return '';
+          return `<details style="margin-top:6px"><summary style="font-size:11px;font-weight:700;color:var(--t2);cursor:pointer">${label} — comments (${p.comments.length})</summary>
+            ${p.comments.map(c=>`<div style="font-size:11.5px;color:var(--t2);padding:3px 0 3px 10px;border-left:2px solid var(--border);margin-top:4px">${escapeHtml(c)}</div>`).join('')}</details>`;
+        }).join('')}
+      </div>`).join('')||'<div style="padding:8px;color:var(--t3)">No subjects in this cycle.</div>');
+  }catch(e){ const el=PG('perf-results'); if(el) el.textContent='Could not load results: '+e.message; }
+}
+
 // ═══════════════ PAYROLL (HRM module 2) — money math held ═══════════════
 let _payRuns=[], _paySlips=[], _payRunId=null;
 
@@ -5501,7 +5713,7 @@ function kpiRenderAll(api){
     noload('kpi-turn','kpi-turn-s','kpi-turn-b'); noload('kpi-ret','kpi-ret-s','kpi-ret-b');
     noload('kpi-hgrow','kpi-hgrow-s','kpi-hgrow-b');
     noload('kpi-att','kpi-att-s','kpi-att-b'); noload('kpi-abs','kpi-abs-s'); noload('kpi-leave','kpi-leave-s');
-    ['kpi-dept','kpi-headchart','kpi-attchart','kpi-leavechart'].forEach(id=>K(id).innerHTML='<div class="kpi-empty">Couldn’t load.</div>');
+    ['kpi-dept','kpi-headchart','kpi-attchart','kpi-leavechart','kpi-perf-card','kpi-perfhigh-card'].forEach(id=>K(id).innerHTML='<div class="kpi-empty">Couldn’t load.</div>');
     K('kpi-attlegend').innerHTML=''; K('kpi-defs').innerHTML=''; return;
   }
   const hr=api.hr, tl=hr.timeline||[];
@@ -5593,6 +5805,24 @@ function kpiRenderAll(api){
       </div>`;
     }).join('');
   }else K('kpi-leavechart').innerHTML='<div class="kpi-empty">No employees with allowances yet.</div>';
+
+  // Performance KPIs — live once a 360° cycle has CLOSED; honest until then.
+  const perf=hr.performance;
+  if(perf){
+    K('kpi-perf-card').innerHTML=`<div class="kl">Avg performance rating${perf.n<3?' <span class="kpi-lim">limited data · n='+perf.n+'</span>':''}</div>
+      <div class="kv">${perf.avg_headline}</div>
+      <div class="ks">${escapeHtml(perf.cycle_name||'')} · ${perf.n} employee(s) reviewed · weighted 360° headline</div>`;
+    K('kpi-perfhigh-card').innerHTML=`<div class="kl">High performer %</div>
+      <div class="kv">${perf.high_pct}%</div>
+      <div class="ks">Headline ≥ ${perf.high_threshold} in ${escapeHtml(perf.cycle_name||'')}</div>`;
+  }else{
+    K('kpi-perf-card').innerHTML=`<div class="kl" style="color:var(--rg-mut2)">Avg performance rating</div>
+      <div class="kv-soon">Not yet</div>
+      <div class="ks">No closed 360° cycle — run one in HRM → Performance, close it, and this goes live.</div>`;
+    K('kpi-perfhigh-card').innerHTML=`<div class="kl" style="color:var(--rg-mut2)">High performer %</div>
+      <div class="kv-soon">Not yet</div>
+      <div class="ks">Follows the first closed 360° cycle.</div>`;
+  }
 
   // ═══ Definitions ═══
   K('kpi-defs').innerHTML=

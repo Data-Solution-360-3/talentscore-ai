@@ -74,7 +74,7 @@ from database import (
     create_perf_cycle, list_perf_cycles, get_perf_cycle, set_perf_cycle_status,
     delete_perf_cycle, add_perf_assignment, remove_perf_assignment,
     list_perf_assignments, list_reviews_for_employee, get_review_for_employee,
-    submit_review_answers, PERF_RELATIONS, PERF_SCALE_MAX, get_admin_screenings,
+    submit_review_answers, PERF_RELATIONS, PERF_SCALE_MAX, aggregate_perf_cycle, get_admin_screenings,
     MAX_APPLICATION_PDF_BYTES, APPLICATION_PDF_RETENTION_DAYS,
     CAP_PER_JOB, CAP_PER_DAY, CAP_PER_MONTH,
 )
@@ -1020,14 +1020,14 @@ async def perf_cycle_delete(request: Request, cycle_id: str):
 
 @app.get("/api/performance/cycles/{cycle_id}/results")
 async def perf_cycle_results(request: Request, cycle_id: str):
-    """Aggregates are ADMIN-ONLY — this gate exists (and is smoke-locked)
-    from P1, before the aggregation itself lands in P4."""
+    """Aggregates are ADMIN-ONLY (smoke-locked since P1). Four perspectives
+    separate + a weighted headline; peer/subordinate comments withheld below
+    the anonymity floor."""
     user = await require_admin(request)
-    cycle = await get_perf_cycle(user["user_id"], cycle_id)
-    if not cycle:
+    agg = await aggregate_perf_cycle(user["user_id"], cycle_id)
+    if not agg:
         raise HTTPException(status_code=404, detail="Cycle not found.")
-    return {"cycle": cycle, "results": None,
-            "note": "Aggregation lands in P4 — the admin-only gate is live from P1."}
+    return agg
 
 
 # ── Portal: the assignment row IS the ACL ──

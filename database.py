@@ -1716,6 +1716,93 @@ async def submit_review_answers(tenant: str, employee_id: str, assignment_id: st
             "" if res.modified_count == 1 else "This review was already submitted.")
 
 
+# ── P4: aggregation — separate perspectives first, weighted headline second ──
+
+async def aggregate_perf_cycle(user_id: str, cycle_id: str) -> dict | None:
+    """Per subject: each relation's averages shown SEPARATELY (n, overall avg,
+    per-competency), then a weighted headline (0-100) with weights
+    re-normalized over the relations that actually submitted. Anonymity
+    floor: below `peer_anon_floor` submitted peer/subordinate reviews, their
+    comments are withheld (attributable) and the UI is told so — the average
+    still shows. Comments that do show are sorted, never in reviewer order."""
+    cycle = await get_perf_cycle(user_id, cycle_id)
+    if not cycle:
+        return None
+    weights = cycle.get("weights") or dict(PERF_WEIGHTS)
+    floor = int(cycle.get("peer_anon_floor", PERF_PEER_ANON_FLOOR))
+    scale = int(cycle.get("scale_max", PERF_SCALE_MAX))
+
+    by_subject: dict[str, list] = {}
+    async for a in db.perf_assignments.find(
+            {**user_match_field("user_id", user_id), "cycle_id": cycle_id}):
+        by_subject.setdefault(a["subject_employee_id"], []).append(a)
+
+    names = {}
+    oids = []
+    for sid in by_subject:
+        try:
+            oids.append(ObjectId(sid))
+        except Exception:
+            pass
+    if oids:
+        async for e in db.employees.find({"_id": {"$in": oids}}, _PERF_SUBJECT_PROJ):
+            names[str(e["_id"])] = _perf_subject_view(e)
+
+    subjects = []
+    for sid, assigns in by_subject.items():
+        per_rel = {}
+        for rel in PERF_RELATIONS:
+            rel_all = [a for a in assigns if a["relation"] == rel]
+            if not rel_all:
+                continue
+            subs = [a for a in rel_all if a["status"] == "submitted" and a.get("answers")]
+            per_comp: dict[str, list] = {}
+            all_scores, comments = [], []
+            for a in subs:
+                for s in (a["answers"].get("scores") or []):
+                    try:
+                        v = float(s.get("score", 0))
+                    except Exception:
+                        continue
+                    per_comp.setdefault(str(s.get("name")), []).append(v)
+                    all_scores.append(v)
+                    if str(s.get("comment", "")).strip():
+                        comments.append(f"{s.get('name')}: {str(s['comment']).strip()}")
+                oc = str((a["answers"].get("overall_comment") or "")).strip()
+                if oc:
+                    comments.append(oc)
+            n = len(subs)
+            hidden = rel in ("peer", "subordinate") and 0 < n < floor
+            per_rel[rel] = {
+                "assigned": len(rel_all), "submitted": n,
+                "avg": round(sum(all_scores) / len(all_scores), 1) if all_scores else None,
+                "per_competency": {k: round(sum(v) / len(v), 1) for k, v in per_comp.items()},
+                "comments": [] if hidden else sorted(comments),
+                "individuals_hidden": hidden,
+            }
+        present = {r: pr for r, pr in per_rel.items() if pr["avg"] is not None}
+        headline = None
+        if present:
+            wsum = sum(weights.get(r, 0) for r in present)
+            if wsum > 0:
+                headline = round(sum(weights[r] * present[r]["avg"] for r in present)
+                                 / wsum / scale * 100)
+        submitted_total = sum(pr["submitted"] for pr in per_rel.values())
+        subjects.append({
+            "employee_id": sid,
+            **(names.get(sid) or {"name": "?", "role_title": "", "department": ""}),
+            "per_relation": per_rel,
+            "headline": headline,
+            "reviewers_total": submitted_total,
+            "limited": submitted_total < 3,
+            "completion": {"submitted": submitted_total,
+                           "assigned": sum(pr["assigned"] for pr in per_rel.values())},
+        })
+    subjects.sort(key=lambda s: (1 if s["headline"] is None else 0, -(s["headline"] or 0)))
+    return {"cycle": cycle, "subjects": subjects,
+            "weights": weights, "anon_floor": floor, "scale_max": scale}
+
+
 # ── Payroll (HRM module 2) — SKELETON: structure yes, money math HELD ──
 # The tax line is a PLACEHOLDER (0) until the owner confirms BD tax slabs,
 # LWP (leave-without-pay) is surfaced as days + a PROPOSED amount but is NOT
@@ -2002,12 +2089,31 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
         if st:
             timeline.append({"start": st, "end": en})
 
+    # Performance KPIs — the latest CLOSED cycle's headlines. None until a
+    # cycle has closed; the UI keeps its honest coming-soon state until then.
+    performance = None
+    latest_closed = await db.perf_cycles.find_one(
+        {**scope, "status": "closed"}, sort=[("closed_at", -1)])
+    if latest_closed:
+        agg = await aggregate_perf_cycle(user_id, str(latest_closed["_id"]))
+        heads = [s["headline"] for s in (agg or {}).get("subjects", [])
+                 if s.get("headline") is not None]
+        if heads:
+            performance = {
+                "cycle_name": latest_closed.get("name"),
+                "n": len(heads),
+                "avg_headline": round(sum(heads) / len(heads)),
+                "high_pct": round(sum(1 for h in heads if h >= 80) / len(heads) * 100),
+                "high_threshold": 80,
+            }
+
     return {
         "range": {"start": start_s, "end": end_s},
         "hires": hires,
         "interviews": interviews,
         "hr": {"headcount": headcount, "attendance": attendance,
-               "leave": leave, "timeline": timeline},
+               "leave": leave, "timeline": timeline,
+               "performance": performance},
     }
 
 

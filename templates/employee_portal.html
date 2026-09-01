@@ -108,6 +108,17 @@ input:focus,select:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--o
     <table class="tbl"><thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead><tbody id="req-tbl"></tbody></table>
   </div>
 
+  <!-- MY REVIEWS (360° performance) — blind: subject name + role only -->
+  <div class="card">
+    <div class="h">My reviews</div>
+    <div style="font-size:11.5px;color:var(--t3);margin-bottom:.6rem;line-height:1.55">
+      Reviews assigned to you in the current performance cycle. You see only the person's name and role —
+      your ratings are confidential and go to management only.
+    </div>
+    <div id="rev-list" style="font-size:12.5px;color:var(--t3)">Loading…</div>
+    <div id="rev-form" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:12px"></div>
+  </div>
+
   <!-- MY ATTENDANCE -->
   <div class="card">
     <div class="h" style="display:flex;justify-content:space-between;align-items:center">My attendance
@@ -183,10 +194,78 @@ async function loadAtt(){
     return `<tr><td style="font-variant-numeric:tabular-nums">${esc(a.date)}</td><td style="color:${col};font-weight:700">${lbl}</td><td>${esc(a.check_in||'—')}</td><td>${esc(a.check_out||'—')}</td></tr>`;
   }).join(''):'<tr><td colspan="4" class="empty">No attendance recorded this month.</td></tr>';
 }
+// ── 360° reviews: the server enforces the ACL; this UI shows exactly what
+// it is given — the subject's name + role, the competencies, nothing else. ──
+const REL_LBL={self:'Self-assessment',manager:'As their manager',peer:'As a peer',subordinate:'About your manager'};
+let _revForm=null;
+
+async function loadReviews(){
+  try{
+    const d=await(await api('/api/me/reviews')).json();
+    const rows=d.reviews||[];
+    $('rev-list').innerHTML=rows.length?rows.map(rv=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:.55rem .2rem;border-bottom:1px solid var(--border)">
+        <span><b>${esc(rv.subject.name)}</b>${rv.subject.role_title?' · '+esc(rv.subject.role_title):''}
+          <span style="font-size:10.5px;color:var(--t3)">· ${REL_LBL[rv.relation]||rv.relation} · ${esc(rv.cycle_name||'')}</span></span>
+        ${rv.status==='submitted'
+          ?'<span class="badge b-green">SUBMITTED</span>'
+          :`<button class="btn" style="padding:6px 14px;font-size:12px" onclick="openReview('${rv.assignment_id}')">Review</button>`}
+      </div>`).join('')
+      :'No reviews assigned to you right now.';
+  }catch(e){ if(String(e.message)!=='auth') $('rev-list').textContent='Could not load reviews.'; }
+}
+
+async function openReview(aid){
+  try{
+    const r=await api('/api/me/reviews/'+aid);
+    if(r.status===404){ $('rev-list').textContent='That review is no longer available.'; return; }
+    const f=await r.json(); _revForm=f;
+    $('rev-form').style.display='block';
+    $('rev-form').innerHTML=`
+      <div style="font-weight:800;font-size:13.5px">${f.relation==='self'?'Self-assessment':'Review: '+esc(f.subject.name)}</div>
+      <div style="font-size:11.5px;color:var(--t3);margin-bottom:.7rem">${esc(f.subject.role_title||'')}${f.subject.department?' · '+esc(f.subject.department):''} · score each 0–${f.scale_max} · be specific, give examples</div>
+      ${f.competencies.map((c,i)=>`
+        <div style="margin-bottom:.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div><b style="font-size:12.5px">${esc(c.name)}</b>
+              <div style="font-size:11px;color:var(--t3)">${esc(c.description||'')}</div></div>
+            <input type="number" min="0" max="${f.scale_max}" id="rv-s-${i}" style="width:64px;text-align:center;font-weight:800" placeholder="0–${f.scale_max}">
+          </div>
+          <input id="rv-c-${i}" placeholder="Example or evidence (optional)" style="margin-top:4px;font-size:12px">
+        </div>`).join('')}
+      <label style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase">Overall comment (optional)</label>
+      <textarea id="rv-overall" rows="2" style="width:100%;font-family:inherit;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px"></textarea>
+      <div class="msg" id="rev-msg"></div>
+      <div style="display:flex;gap:8px;margin-top:.6rem">
+        <button class="btn" onclick="submitReview('${aid}')">Submit review — final</button>
+        <button class="btn" style="background:var(--s2);color:var(--text)" onclick="$('rev-form').style.display='none'">Cancel</button>
+      </div>`;
+    $('rev-form').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){ if(String(e.message)!=='auth') flash('rev-msg','Could not open the review.',false); }
+}
+
+async function submitReview(aid){
+  const f=_revForm; if(!f) return;
+  const scores=[];
+  for(let i=0;i<f.competencies.length;i++){
+    const v=parseFloat($('rv-s-'+i).value);
+    if(isNaN(v)||v<0||v>f.scale_max){ flash('rev-msg',`Score every competency 0–${f.scale_max}.`,false); return; }
+    scores.push({name:f.competencies[i].name,score:v,comment:$('rv-c-'+i).value||''});
+  }
+  try{
+    const r=await api('/api/me/reviews/'+aid,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scores,overall_comment:$('rv-overall').value||''})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ flash('rev-msg',d.detail||'Could not submit.',false); return; }
+    $('rev-form').style.display='none';
+    loadReviews();
+  }catch(e){ if(String(e.message)!=='auth') flash('rev-msg','Could not submit.',false); }
+}
+
 async function signout(){ try{await fetch('/api/auth/employee/logout',{method:'POST',credentials:'include'});}catch(_){}
   location.href='/employee/login'; }
 (async function(){
-  try{ await loadProfile(); await loadLeave(); await loadAtt(); }
+  try{ await loadProfile(); await loadLeave(); await loadReviews(); await loadAtt(); }
   catch(e){ /* api() already redirected on auth failure */ }
 })();
 </script>
