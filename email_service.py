@@ -83,7 +83,8 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
         <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#1e1b4b,#5b5ef4);padding:32px 40px;text-align:center">
+        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:32px 40px;text-align:center">
+          <img src="{APP_URL}/static/logo-mark-512.png" width="46" height="46" alt="TopCandidate" style="display:block;margin:0 auto 12px;border:0">
           <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-.5px">
             TopCandidate<span style="color:#fb923c">.pro</span>
           </div>
@@ -91,25 +92,25 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:40px">
-          <h2 style="font-size:22px;font-weight:700;color:#0a0b1e;margin:0 0 12px">Verify your email address</h2>
-          <p style="font-size:15px;color:#4a5270;line-height:1.7;margin:0 0 28px">
+          <h2 style="font-size:22px;font-weight:700;color:#1f2937;margin:0 0 12px">Verify your email address</h2>
+          <p style="font-size:15px;color:#4B5563;line-height:1.7;margin:0 0 28px">
             Hi <strong>{company_name}</strong>, welcome to {APP_NAME}!
             Enter the verification code below to activate your account.
           </p>
           <!-- OTP Box -->
-          <div style="background:#f1f3ff;border:2px dashed #c7d2fe;border-radius:12px;padding:28px;text-align:center;margin:0 0 28px">
-            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#6366f1;margin-bottom:8px">Your verification code</div>
-            <div style="font-size:42px;font-weight:900;letter-spacing:10px;color:#1e1b4b;font-family:monospace">{otp}</div>
-            <div style="font-size:12px;color:#8892aa;margin-top:8px">This code expires in <strong>15 minutes</strong></div>
+          <div style="background:#F4FAF0;border:2px dashed #CFE3B4;border-radius:12px;padding:28px;text-align:center;margin:0 0 28px">
+            <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#547F1E;margin-bottom:8px">Your verification code</div>
+            <div style="font-size:42px;font-weight:900;letter-spacing:10px;color:#1f2937;font-family:monospace">{otp}</div>
+            <div style="font-size:12px;color:#6B7280;margin-top:8px">This code expires in <strong>15 minutes</strong></div>
           </div>
-          <p style="font-size:14px;color:#8892aa;line-height:1.6;margin:0">
+          <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0">
             If you didn't create an account on {APP_NAME}, you can safely ignore this email.
           </p>
         </td></tr>
         <!-- Footer -->
-        <tr><td style="background:#f8f9ff;padding:20px 40px;border-top:1px solid #e8eaf5">
-          <p style="font-size:12px;color:#8892aa;text-align:center;margin:0">
-            © 2026 TopCandidate by <a href="https://linkx360.com" style="color:#5b5ef4;text-decoration:none">LinkX360</a> · Dhaka, Bangladesh
+        <tr><td style="background:#F7FAF5;padding:20px 40px;border-top:1px solid #E7EAEE">
+          <p style="font-size:12px;color:#6B7280;text-align:center;margin:0">
+            © 2026 TopCandidate by <a href="https://linkx360.com" style="color:#F57C2E;text-decoration:none">LinkX360</a> · Dhaka, Bangladesh
           </p>
         </td></tr>
       </table>
@@ -137,20 +138,21 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden">
-        <tr><td style="background:linear-gradient(135deg,#1e1b4b,#5b5ef4);padding:32px 40px;text-align:center">
+        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:32px 40px;text-align:center">
+          <img src="{APP_URL}/static/logo-mark-512.png" width="46" height="46" alt="TopCandidate" style="display:block;margin:0 auto 12px;border:0">
           <div style="font-size:24px;font-weight:800;color:#ffffff">TopCandidate<span style="color:#fb923c">.pro</span></div>
         </td></tr>
         <tr><td style="padding:40px">
-          <h2 style="font-size:22px;font-weight:700;color:#0a0b1e;margin:0 0 12px">🎉 Welcome, {company_name}!</h2>
-          <p style="font-size:15px;color:#4a5270;line-height:1.7;margin:0 0 24px">
+          <h2 style="font-size:22px;font-weight:700;color:#1f2937;margin:0 0 12px">🎉 Welcome, {company_name}!</h2>
+          <p style="font-size:15px;color:#4B5563;line-height:1.7;margin:0 0 24px">
             Your account is verified and ready. Start screening candidates faster than ever with our AI-powered 3-step pipeline.
           </p>
-          <a href="{APP_URL}" style="display:inline-block;background:#5b5ef4;color:#fff;padding:13px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">
+          <a href="{APP_URL}" style="display:inline-block;background:#F57C2E;color:#fff;padding:13px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">
             Go to dashboard →
           </a>
         </td></tr>
-        <tr><td style="background:#f8f9ff;padding:20px 40px;border-top:1px solid #e8eaf5">
-          <p style="font-size:12px;color:#8892aa;text-align:center;margin:0">© 2026 TopCandidate by LinkX360</p>
+        <tr><td style="background:#F7FAF5;padding:20px 40px;border-top:1px solid #E7EAEE">
+          <p style="font-size:12px;color:#6B7280;text-align:center;margin:0">© 2026 TopCandidate by LinkX360</p>
         </td></tr>
       </table>
     </td></tr>
@@ -180,7 +182,8 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-        <tr><td style="background:linear-gradient(135deg,#5b5ef4,#fb923c);padding:28px 32px;text-align:center">
+        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:28px 32px;text-align:center">
+          <img src="{APP_URL}/static/logo-mark-512.png" width="46" height="46" alt="TopCandidate" style="display:block;margin:0 auto 10px;border:0">
           <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800">TopCandidate<span style="color:#fde68a">.pro</span></h1>
           <p style="margin:4px 0 0;color:rgba(255,255,255,.8);font-size:13px">by LinkX360</p>
         </td></tr>
@@ -193,12 +196,12 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
             {APP_NAME} uses AI to screen and rank CVs instantly — helping your team hire smarter and faster.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
-            <tr><td style="background:#5b5ef4;border-radius:8px;padding:12px 28px;text-align:center">
+            <tr><td style="background:#F57C2E;border-radius:8px;padding:12px 28px;text-align:center">
               <a href="{register_url}" style="color:#fff;font-size:15px;font-weight:700;text-decoration:none">Accept invitation →</a>
             </td></tr>
           </table>
           <p style="margin:0;font-size:12px;color:#999;text-align:center">
-            Or copy this link: <a href="{register_url}" style="color:#5b5ef4">{register_url}</a>
+            Or copy this link: <a href="{register_url}" style="color:#F57C2E">{register_url}</a>
           </p>
         </td></tr>
         <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
