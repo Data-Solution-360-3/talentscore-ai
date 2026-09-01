@@ -156,6 +156,25 @@ def ensure_perf_fixtures(admin_email: str):
         return None
 
 
+def retire_perf_fixtures():
+    """Terminate the boundary fixtures after the run, so they never appear in
+    Employees, Payroll, headcount, or perf pickers between smoke runs.
+    ensure_perf_fixtures reactivates them at the start of the next run."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from pymongo import MongoClient
+        cli = MongoClient(os.getenv("MONGO_URI"), serverSelectionTimeoutMS=15000,
+                          tlsAllowInvalidCertificates=True)
+        cli[os.getenv("DB_NAME", "talentscore")].employees.update_many(
+            {"email": {"$in": ["smoke.perf.a@boundary.test", "smoke.perf.b@boundary.test"]}},
+            {"$set": {"status": "terminated"}})
+        cli.close()
+    except Exception:
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.getenv("SMOKE_BASE", DEFAULT_BASE))
@@ -1021,10 +1040,11 @@ def main():
                 r = emp_req(tok_b, "POST", f"/api/me/reviews/{aid}", answers)
                 perf_check("B refused submitting A's review", r.status_code == 404, r.status_code)
 
-                # Cleanup: close + delete the smoke cycle (fixture employees stay,
-                # idempotent by email).
+                # Cleanup: close + delete the smoke cycle, then retire the
+                # fixture employees so no "Smoke Perf" rows linger in the UI.
                 c.post(f"/api/performance/cycles/{cid}/close")
                 c.post(f"/api/performance/cycles/{cid}/delete")
+                retire_perf_fixtures()
 
     print(f"\n{checked} routes checked.")
     if failures:

@@ -2,32 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5ef4'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F57C2E'/><polygon points='16,4 19.5,12 28,13 22,19 23.5,28 16,24 8.5,28 10,19 4,13 12.5,12' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Candidate Detail — TopCandidate</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#05070f;--surface:#0d1117;--s2:#161b27;--s3:#1e2535;
-  --border:#1e2535;--border2:#2a3347;
-  --text:#f0f2f8;--t2:#8892aa;--t3:#4a5568;
-  --accent:#5b5ef4;--ag:rgba(91,94,244,.15);--ab:rgba(91,94,244,.3);
-  --green:#10b981;--gg:rgba(16,185,129,.12);--gb:rgba(16,185,129,.3);
-  --amber:#f59e0b;--amg:rgba(245,158,11,.12);--amb:rgba(245,158,11,.3);
-  --red:#f43f5e;--rg:rgba(244,63,94,.12);--rb:rgba(244,63,94,.3);
-  --blue:#38bdf8;--blg:rgba(56,189,248,.1);--blb:rgba(56,189,248,.25);
+  --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  --border:#E4E8F0;--border2:#D5DCE8;
+  --text:#142848;--t2:#4A5970;--t3:#8593AB;
+  --accent:#F57C2E;--ag:rgba(245,124,46,.12);--ab:rgba(245,124,46,.3);
+  --green:#16A34A;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.25);
+  --amber:#D97706;--amg:rgba(217,119,6,.10);--amb:rgba(217,119,6,.3);
+  --red:#DC2626;--rg:rgba(220,38,38,.08);--rb:rgba(220,38,38,.25);
+  --blue:#2563EB;--blg:rgba(37,99,235,.08);--blb:rgba(37,99,235,.25);
   --r:14px;--rs:10px
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(5,7,15,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
 .tli{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tln{font-size:15px;font-weight:700}
 .topbar-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
 .btn-back{display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:var(--rs);background:var(--s2);border:1px solid var(--border2);color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;transition:all .15s}
 .btn-back:hover{background:var(--s3);color:var(--text)}
 .btn-primary{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-primary:hover{background:#4a4de0}
+.btn-primary:hover{background:#E16A1F}
 .layout{display:grid;grid-template-columns:1fr 400px;height:calc(100vh - 56px);margin-top:56px;overflow:hidden}
 .detail-panel{overflow-y:auto;padding:1.75rem;background:var(--bg)}
 .cv-panel{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
@@ -49,20 +49,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;margin-bottom:10px}
 .card-ttl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--border)}
 .candidate-hd{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:10px;display:flex;align-items:center;gap:1rem}
-.avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#a855f7);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0}
+.avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#E16A1F);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0}
 .cand-name{font-size:19px;font-weight:700;letter-spacing:-.3px;margin-bottom:3px}
 .cand-role{font-size:13px;color:var(--t2);margin-bottom:8px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;background:var(--s2);border:1px solid var(--border2);color:var(--t2)}
 .chip.bl{background:var(--blg);border-color:var(--blb);color:var(--blue)}
-.chip.ac{background:var(--ag);border-color:var(--ab);color:#a5b4fc}
+.chip.ac{background:var(--ag);border-color:var(--ab);color:#E16A1F}
 .score-hd{display:flex;align-items:center;gap:1.1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;margin-bottom:10px}
 .score-circle{width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;border:3px solid var(--border2)}
 .snum{font-size:24px;font-weight:800;letter-spacing:-1px}
 .sden{font-size:10px;color:var(--t3);margin-top:-1px}
 .rpill{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;border-radius:8px;display:inline-flex;align-items:center;gap:5px;margin-bottom:6px}
 .rsh{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
-.rh2{background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.2)}
+.rh2{background:rgba(22,163,74,.08);color:#16A34A;border:1px solid rgba(22,163,74,.2)}
 .rm{background:var(--amg);color:var(--amber);border:1px solid var(--amb)}
 .rr{background:var(--rg);color:var(--red);border:1px solid var(--rb)}
 .rreason{font-size:12px;color:var(--t2);line-height:1.5;max-width:180px}
@@ -105,7 +105,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .lcg .ll li::before{background:var(--green)}.lcr .ll li::before{background:var(--red)}
 .lcb .ll li::before{background:var(--blue)}.lca .ll li::before{background:var(--amber)}
 .pt{font-size:12px;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.pt:hover{color:#a5b4fc}
+.pt:hover{color:#E16A1F}
 .pb{display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:10px;margin-top:8px;font-size:11px;font-family:monospace;white-space:pre-wrap;color:#7dd3fc;max-height:200px;overflow-y:auto;line-height:1.6}
 @media(max-width:860px){.layout{grid-template-columns:1fr;height:auto}.cv-panel{height:500px;border-left:none;border-top:1px solid var(--border)}}
 @media(max-width:520px){.sgrid,.two-col{grid-template-columns:1fr}}
@@ -164,9 +164,9 @@ async function load() {
 }
 
 function gc(p){
-  if(p>=80)return{b:'#10b981',t:'#10b981',br:'rgba(16,185,129,.35)'};
-  if(p>=60)return{b:'#f59e0b',t:'#f59e0b',br:'rgba(245,158,11,.35)'};
-  return{b:'#f43f5e',t:'#f43f5e',br:'rgba(244,63,94,.35)'};
+  if(p>=80)return{b:'#16A34A',t:'#16A34A',br:'rgba(22,163,74,.35)'};
+  if(p>=60)return{b:'#D97706',t:'#D97706',br:'rgba(217,119,6,.35)'};
+  return{b:'#DC2626',t:'#DC2626',br:'rgba(220,38,38,.35)'};
 }
 function rcls(r){return{'STRONG HIRE':'rsh','HIRE':'rh2','MAYBE':'rm','REJECT':'rr'}[r]||'rm';}
 function rico(r){
@@ -273,8 +273,8 @@ function render(d){
              <span style="font-size:11.5px;color:var(--t3)">Not scored — this role has no required skills configured to compare against.</span></div>`
         : `<div class="cov-row">
              <div class="cov-lbl">Skills coverage</div>
-             <div class="cov-bg"><div class="cov-fill" id="cov-fill" style="background:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}"></div></div>
-             <div class="cov-pct" style="color:${cov>=70?'#10b981':cov>=50?'#f59e0b':'#f43f5e'}">${cov}%</div>
+             <div class="cov-bg"><div class="cov-fill" id="cov-fill" style="background:${cov>=70?'#16A34A':cov>=50?'#D97706':'#DC2626'}"></div></div>
+             <div class="cov-pct" style="color:${cov>=70?'#16A34A':cov>=50?'#D97706':'#DC2626'}">${cov}%</div>
            </div>`}
     </div>
 

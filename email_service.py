@@ -1,42 +1,75 @@
 """
-email_service.py — Gmail SMTP email service
-============================================
-Sends verification OTP emails via Gmail SMTP.
+email_service.py — transactional email via Resend (HTTPS API)
+=============================================================
+The droplet's outbound SMTP is blocked at the network level (DigitalOcean
+default), so Gmail SMTP never worked in production. All mail now goes
+through Resend's HTTPS API (port 443 — always reachable).
+
 Requires:
-  GMAIL_USER = your Gmail address
-  GMAIL_APP_PASSWORD = Gmail App Password (not your regular password)
-  
-To get Gmail App Password:
-  1. Go to Google Account → Security
-  2. Enable 2-Step Verification
-  3. Go to App Passwords → Generate
-  4. Use that 16-char password here
+  RESEND_API_KEY = re_...          (resend.com → API Keys)
+  RESEND_FROM    = optional sender, default "TopCandidate <onboarding@resend.dev>"
+
+IMPORTANT — sender domain: until topcandidate.pro is verified in Resend
+(DNS records under Domains), the onboarding@resend.dev sender can only
+deliver to the Resend account owner's own address. Verify the domain and
+set RESEND_FROM="TopCandidate <no-reply@topcandidate.pro>" to email
+candidates and team invitees.
+
+Without RESEND_API_KEY the service degrades exactly as before: OTPs are
+printed to the server log and signup proceeds (dev mode); candidate emails
+and invites report a clear "not configured" error instead of pretending.
 """
 
-import smtplib
+import os
 import random
 import string
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import os
+
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
-GMAIL_USER     = os.getenv("GMAIL_USER", "")
-GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 APP_NAME       = "TopCandidate"
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
+RESEND_FROM    = os.getenv("RESEND_FROM", f"{APP_NAME} <onboarding@resend.dev>")
 
 
 def generate_otp(length: int = 6) -> str:
     return ''.join(random.choices(string.digits, k=length))
 
 
+def _resend_send(to_email: str, subject: str, html: str | None = None,
+                 text: str | None = None, reply_to: str = "") -> tuple[bool, str]:
+    """One transport for every email. Returns (ok, resend_id_or_error).
+    The returned id is Resend's delivery id — checkable in their dashboard,
+    so 'sent' here means accepted for delivery, not merely 'no exception'."""
+    if not RESEND_API_KEY:
+        return False, "RESEND_API_KEY not set"
+    payload = {"from": RESEND_FROM, "to": [to_email], "subject": subject}
+    if html:
+        payload["html"] = html
+    if text:
+        payload["text"] = text
+    if reply_to:
+        payload["reply_to"] = reply_to
+    try:
+        r = httpx.post("https://api.resend.com/emails", json=payload,
+                       headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                       timeout=15.0)
+        if r.status_code in (200, 201):
+            eid = str((r.json() or {}).get("id", ""))
+            print(f"[EMAIL] Resend accepted for {to_email} — id {eid} — {subject[:60]}")
+            return True, eid
+        return False, f"Resend {r.status_code}: {r.text[:200]}"
+    except Exception as e:
+        return False, f"Resend request failed: {str(e)[:200]}"
+
+
 def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
     """Send OTP verification email. Returns True if sent successfully."""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        print(f"[EMAIL] SMTP not configured. OTP for {to_email}: {otp}")
+    if not RESEND_API_KEY:
+        print(f"[EMAIL] Resend not configured. OTP for {to_email}: {otp}")
         return True  # Allow development without email
 
     subject = f"Verify your {APP_NAME} account — {otp}"
@@ -60,7 +93,7 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
         <tr><td style="padding:40px">
           <h2 style="font-size:22px;font-weight:700;color:#0a0b1e;margin:0 0 12px">Verify your email address</h2>
           <p style="font-size:15px;color:#4a5270;line-height:1.7;margin:0 0 28px">
-            Hi <strong>{company_name}</strong>, welcome to {APP_NAME}! 
+            Hi <strong>{company_name}</strong>, welcome to {APP_NAME}!
             Enter the verification code below to activate your account.
           </p>
           <!-- OTP Box -->
@@ -85,26 +118,15 @@ def send_verification_email(to_email: str, company_name: str, otp: str) -> bool:
 </body>
 </html>"""
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"{APP_NAME} <{GMAIL_USER}>"
-        msg["To"]      = to_email
-        msg.attach(MIMEText(html, "html"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, to_email, msg.as_string())
-        print(f"[EMAIL] Verification sent to {to_email}")
-        return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send to {to_email}: {e}")
-        return False
+    ok, info = _resend_send(to_email, subject, html=html)
+    if not ok:
+        print(f"[EMAIL] Failed to send to {to_email}: {info}")
+    return ok
 
 
 def send_welcome_email(to_email: str, company_name: str) -> bool:
     """Send welcome email after verification."""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
+    if not RESEND_API_KEY:
         return True
 
     subject = f"Welcome to {APP_NAME} — You're all set!"
@@ -136,25 +158,16 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
 </body>
 </html>"""
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"{APP_NAME} <{GMAIL_USER}>"
-        msg["To"]      = to_email
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, to_email, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"[EMAIL] Welcome email failed: {e}")
-        return False
+    ok, info = _resend_send(to_email, subject, html=html)
+    if not ok:
+        print(f"[EMAIL] Welcome email failed: {info}")
+    return ok
 
 
 def send_team_invite_email(to_email: str, invited_by: str, company_name: str, role: str) -> bool:
     """Send team invitation email."""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        print(f"[EMAIL] SMTP not configured. Team invite for {to_email} from {company_name}")
+    if not RESEND_API_KEY:
+        print(f"[EMAIL] Resend not configured. Team invite for {to_email} from {company_name}")
         return False  # Return False so we show proper error to user
 
     subject = f"You're invited to join {company_name} on {APP_NAME}"
@@ -197,20 +210,10 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
 </body>
 </html>"""
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{APP_NAME} <{GMAIL_USER}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html, "html"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, to_email, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send invite to {to_email}: {e}")
-        return False
+    ok, info = _resend_send(to_email, subject, html=html)
+    if not ok:
+        print(f"[EMAIL] Failed to send invite to {to_email}: {info}")
+    return ok
 
 
 # ─────────────────────────────────────────────────────────────
@@ -294,14 +297,13 @@ def substitute_template(template_str: str, variables: dict) -> str:
 
 def send_candidate_email(to_email: str, subject: str, body_text: str,
                           reply_to: str = "") -> tuple[bool, str]:
-    """Send a candidate email through Gmail SMTP. Returns (success, error_message).
+    """Send a candidate email through Resend. Returns (success, error_message).
 
-    Plain text only — recruiter emails should feel personal, not marketing-y.
-    We wrap the body in a minimal HTML version too so it renders cleanly
-    in inboxes that prefer HTML."""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        return False, ("Email service not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD "
-                       "in your Render environment variables to enable candidate emails.")
+    Plain text first — recruiter emails should feel personal, not marketing-y —
+    with a minimal HTML version so inboxes that prefer HTML render cleanly."""
+    if not RESEND_API_KEY:
+        return False, ("Email service not configured. Set RESEND_API_KEY in the "
+                       "server's .env to enable candidate emails.")
     if not to_email or "@" not in to_email:
         return False, "Invalid candidate email address."
     if not subject or not subject.strip():
@@ -309,8 +311,6 @@ def send_candidate_email(to_email: str, subject: str, body_text: str,
     if not body_text or not body_text.strip():
         return False, "Email body is required."
 
-    # Plain-text MIME part (preferred for personal email) + a simple HTML fallback
-    # so inboxes that auto-prefer HTML don't show monospace.
     html_body = body_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     html_body = html_body.replace("\n", "<br>\n")
     html_wrapper = f"""<!DOCTYPE html>
@@ -318,26 +318,12 @@ def send_candidate_email(to_email: str, subject: str, body_text: str,
 {html_body}
 </body></html>"""
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"{APP_NAME} <{GMAIL_USER}>"
-        msg["To"]      = to_email
-        if reply_to:
-            # Replies from the candidate go to the recruiter's real address, not the Gmail bot.
-            msg["Reply-To"] = reply_to
-        msg.attach(MIMEText(body_text, "plain"))
-        msg.attach(MIMEText(html_wrapper, "html"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, to_email, msg.as_string())
-        print(f"[EMAIL] Candidate email sent to {to_email} — subject: {subject[:60]}")
+    ok, info = _resend_send(to_email, subject, html=html_wrapper,
+                            text=body_text, reply_to=reply_to)
+    if ok:
         return True, ""
-    except smtplib.SMTPAuthenticationError:
-        return False, ("Gmail authentication failed. The app password may be wrong "
-                       "or expired. Regenerate it at https://myaccount.google.com/apppasswords")
-    except smtplib.SMTPRecipientsRefused:
-        return False, f"Email address {to_email} was rejected by the mail server."
-    except Exception as e:
-        return False, f"Send failed: {str(e)}"
+    if "403" in info and "testing" in info.lower():
+        return False, ("Resend is in test mode: until the topcandidate.pro domain is "
+                       "verified in Resend, emails can only be sent to the account "
+                       "owner's address. Verify the domain, then set RESEND_FROM.")
+    return False, f"Send failed: {info}"
