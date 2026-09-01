@@ -11,7 +11,7 @@
   --bg:#07080f;--surface:#0f1117;--s2:#151a24;--s3:#1b2130;
   --border:#1b2130;--border2:#212840;
   --text:#eef0f8;--t2:#8b95b0;--t3:#4a5570;
-  --indigo:#5b5ef4;--ig:rgba(91,94,244,.1);--ib:rgba(91,94,244,.25);
+  --indigo:#F57C2E;--ig:rgba(245,124,46,.1);--ib:rgba(245,124,46,.25);
   --orange:#fb923c;--og:rgba(251,146,60,.1);--ob:rgba(251,146,60,.25);
   --green:#10b981;--gg:rgba(16,185,129,.1);--gb:rgba(16,185,129,.25);
   --red:#f43f5e;--rg:rgba(244,63,94,.1);--rb:rgba(244,63,94,.25);
@@ -28,7 +28,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .nav-section{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);margin:1.25rem 0 .4rem}
 .nav-item{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:var(--rs);font-size:12px;color:var(--t2);text-decoration:none;transition:all .12s;margin-bottom:1px}
 .nav-item:hover{background:var(--s2);color:var(--text)}
-.nav-item.act{background:var(--ig);color:#a5b4fc;font-weight:600}
+.nav-item.act{background:var(--ig);color:#FBBF87;font-weight:600}
 .method{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;margin-left:auto;flex-shrink:0}
 .get{background:var(--gg);color:var(--green)}
 .post{background:var(--og);color:var(--orange)}
@@ -39,7 +39,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .page-hd{margin-bottom:2.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)}
 .page-hd h1{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
 .page-hd p{font-size:14px;color:var(--t2);line-height:1.7}
-.version-badge{font-size:11px;font-weight:700;background:var(--ig);color:#a5b4fc;border:1px solid var(--ib);border-radius:20px;padding:3px 10px;margin-left:8px}
+.version-badge{font-size:11px;font-weight:700;background:var(--ig);color:#FBBF87;border:1px solid var(--ib);border-radius:20px;padding:3px 10px;margin-left:8px}
 
 /* SECTIONS */
 .section{margin-bottom:3rem;scroll-margin-top:2rem}
@@ -64,7 +64,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .code-block{background:#060810;border:1px solid var(--border2);border-radius:var(--rs);padding:1rem 1.1rem;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;overflow-x:auto;margin:.75rem 0;position:relative}
 .code-block .copy-btn{position:absolute;top:8px;right:8px;padding:3px 9px;background:var(--s3);border:1px solid var(--border2);border-radius:4px;font-size:10px;color:var(--t2);cursor:pointer;font-family:inherit;transition:all .15s}
 .code-block .copy-btn:hover{background:var(--indigo);color:#fff;border-color:var(--indigo)}
-.kw{color:#fb923c}.str{color:#a5f3fc}.num{color:#a5b4fc}.key{color:#c4b5fd}.cmnt{color:#4a5570}.url{color:#6ee7b7}
+.kw{color:#fb923c}.str{color:#a5f3fc}.num{color:#FBBF87}.key{color:#c4b5fd}.cmnt{color:#4a5570}.url{color:#6ee7b7}
 
 /* PARAMS TABLE */
 .params-table{width:100%;border-collapse:collapse;font-size:12px;margin:.75rem 0}
@@ -101,11 +101,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tab.act{background:var(--s2);color:var(--text);border-color:var(--border3)}
 
 /* CTA */
-.cta-box{background:linear-gradient(135deg,rgba(91,94,244,.15),rgba(251,146,60,.1));border:1px solid var(--ib);border-radius:var(--r);padding:1.5rem;text-align:center;margin-top:2rem}
+.cta-box{background:linear-gradient(135deg,rgba(245,124,46,.15),rgba(251,146,60,.1));border:1px solid var(--ib);border-radius:var(--r);padding:1.5rem;text-align:center;margin-top:2rem}
 .cta-box h3{font-size:16px;font-weight:700;margin-bottom:6px}
 .cta-box p{font-size:13px;color:var(--t2);margin-bottom:1rem}
 .cta-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:var(--rs);background:var(--indigo);color:#fff;font-size:13px;font-weight:600;text-decoration:none;transition:all .15s}
-.cta-btn:hover{background:var(--indigo2,#4a4de0)}
+.cta-btn:hover{background:var(--indigo2,#E16A1F)}
 
 a{color:var(--indigo);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -147,7 +147,7 @@ a:hover{text-decoration:underline}
     <p>Integrate AI-powered CV screening into your own platform. Send CVs to our API and get instant ranked results with match scores, skill gaps, interview questions and hiring recommendations.</p>
     <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
       <span style="font-size:12px;background:var(--gg);color:var(--green);border:1px solid var(--gb);border-radius:5px;padding:3px 10px">✓ REST API</span>
-      <span style="font-size:12px;background:var(--ig);color:#a5b4fc;border:1px solid var(--ib);border-radius:5px;padding:3px 10px">GPT-4o powered</span>
+      <span style="font-size:12px;background:var(--ig);color:#FBBF87;border:1px solid var(--ib);border-radius:5px;padding:3px 10px">GPT-4o powered</span>
       <span style="font-size:12px;background:var(--og);color:var(--orange);border:1px solid var(--ob);border-radius:5px;padding:3px 10px">JSON responses</span>
       <code style="font-size:12px;color:var(--t2);background:var(--s2);border:1px solid var(--border2);border-radius:5px;padding:3px 10px">Base URL: https://topcandidate.pro/api/v1</code>
     </div>

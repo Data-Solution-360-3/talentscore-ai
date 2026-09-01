@@ -51,7 +51,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
 .btn{flex:1;padding:15px;border-radius:var(--r-lg);font-size:15px;font-weight:800;font-family:inherit;border:none;cursor:pointer;transition:.15s}
 .btn-go{background:var(--orange);color:#fff;box-shadow:0 6px 18px rgba(245,124,46,.3)}
 .btn-go:hover:not(:disabled){background:var(--orange2)}
-.btn-end{background:var(--navy);color:#fff}
+.btn-end{background:var(--orange);color:#fff}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .hidden{display:none!important}
 
@@ -122,7 +122,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
           <input id="cfg-ivname" value="AI Interviewer" style="margin-left:.5rem;padding:7px 9px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:600;width:170px">
         </div>
         <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px dashed var(--border2)">
-          <button id="btn-create-link" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--navy);color:#fff;cursor:pointer">Create candidate link</button>
+          <button id="btn-create-link" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--orange);color:#fff;cursor:pointer">Create candidate link</button>
           <span style="font-size:11.5px;color:var(--t3);margin-left:.6rem">Sends this exact setup to one candidate. They see zero settings.</span>
           <div id="linkcard" class="hidden" style="margin-top:.7rem;display:flex;gap:8px;align-items:center">
             <input id="linkurl" readonly style="flex:1;padding:9px 11px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);color:var(--text)">
@@ -149,7 +149,7 @@ h1{font-size:1.3rem;font-weight:900;color:var(--navy);letter-spacing:-.5px;margi
               <input id="atj-cap" type="number" min="1" max="200" value="25" style="width:64px;margin-left:.4rem;padding:6px 8px;border:1.5px solid var(--border2);border-radius:var(--r-md);font-family:inherit;font-size:13px;font-weight:700"></label>
           </div>
           <div style="margin-top:.7rem;display:flex;align-items:center;gap:.7rem">
-            <button id="btn-atj-save" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--navy);color:#fff;cursor:pointer">Save to job</button>
+            <button id="btn-atj-save" type="button" style="padding:9px 18px;border-radius:var(--r-md);border:none;font-family:inherit;font-size:13px;font-weight:800;background:var(--orange);color:#fff;cursor:pointer">Save to job</button>
             <span id="atj-status" style="font-size:12px;color:var(--t3)">Saving snapshots the interview setup above onto the job.</span>
           </div>
         </div>

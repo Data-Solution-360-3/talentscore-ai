@@ -9,7 +9,7 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#1e1b4b;--indigo:#5b5ef4;--indigo2:#4a4de0;--ig:rgba(91,94,244,.12);--ib:rgba(91,94,244,.3);
+  --navy:#142848;--indigo:#F57C2E;--indigo2:#E16A1F;--ig:rgba(245,124,46,.12);--ib:rgba(245,124,46,.3);
   --orange:#fb923c;--og:rgba(251,146,60,.12);--ob:rgba(251,146,60,.3);
   --bg:#07080f;--surface:#0f1117;--s2:#171b26;--s3:#1e2333;--s4:#252b3b;
   --border:#1e2333;--border2:#252b3b;--border3:#2e3548;
@@ -38,12 +38,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .sb-section:first-child{margin-top:0}
 .sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;transition:all .12s;margin-bottom:1px;background:none;border:none;font-family:inherit;width:100%;text-align:left}
 .sb-item:hover{background:var(--s2);color:var(--text)}
-.sb-item.act{background:var(--ig);color:#a5b4fc;font-weight:600;position:relative}
+.sb-item.act{background:var(--ig);color:#FBBF87;font-weight:600;position:relative}
 .sb-item.act::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--indigo);border-radius:0 3px 3px 0}
 .sb-item svg{flex-shrink:0;opacity:.6}
 .sb-item.act svg{opacity:1}
 .sb-badge{margin-left:auto;font-size:10px;font-weight:700;background:var(--s3);color:var(--t3);border-radius:10px;padding:1px 7px}
-.sb-item.act .sb-badge{background:var(--ig);color:#a5b4fc}
+.sb-item.act .sb-badge{background:var(--ig);color:#FBBF87}
 .sb-footer{margin-top:auto;padding:.75rem 8px 0;border-top:1px solid var(--border);font-size:11px;color:var(--t3)}
 
 /* MAIN */
@@ -89,7 +89,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .b-green{background:var(--gg);color:var(--green);border-color:var(--gb)}
 .b-red{background:var(--rg);color:#fda4af;border-color:var(--rb)}
 .b-amber{background:var(--amg);color:var(--amber);border-color:var(--amb)}
-.b-indigo{background:var(--ig);color:#a5b4fc;border-color:var(--ib)}
+.b-indigo{background:var(--ig);color:#FBBF87;border-color:var(--ib)}
 .b-orange{background:var(--og);color:var(--orange);border-color:var(--ob)}
 
 /* TABLES */
@@ -124,7 +124,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .prog-val{font-size:11px;font-weight:700;color:var(--t3);width:28px;text-align:right}
 
 /* USER AVATAR */
-.u-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.u-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),#16A34A);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
 
 /* ALERTS */
 .alert{padding:10px 14px;border-radius:var(--rs);font-size:13px;border:1px solid;margin-bottom:12px}
@@ -406,8 +406,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="form-row">
           <div class="form-group"><label class="form-label">Primary color (Indigo)</label>
             <div style="display:flex;gap:8px;align-items:center">
-              <input type="color" id="br-color1" value="#5b5ef4" style="width:44px;height:36px;border:1px solid var(--border2);border-radius:var(--rs);background:none;cursor:pointer">
-              <input class="form-input" id="br-color1-hex" placeholder="#5b5ef4" style="font-family:monospace">
+              <input type="color" id="br-color1" value="#F57C2E" style="width:44px;height:36px;border:1px solid var(--border2);border-radius:var(--rs);background:none;cursor:pointer">
+              <input class="form-input" id="br-color1-hex" placeholder="#F57C2E" style="font-family:monospace">
             </div>
           </div>
           <div class="form-group"><label class="form-label">Accent color (Orange)</label>
