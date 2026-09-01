@@ -131,6 +131,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   --rg-pur:#7C5CD6;--rg-pg:rgba(124,92,214,.12);--rg-red:#E4544B;--rg-rd:rgba(228,84,75,.12);
   --rg-ink:#1F2A24;--rg-mut:#6B7B72;--rg-mut2:#93A29A;--rg-soft:#F4FAF6;--rg-line:#E6EFE9;
   --rg-sh:0 1px 2px rgba(24,60,40,.03),0 6px 20px rgba(24,60,40,.05);--rg-sh2:0 2px 4px rgba(24,60,40,.04),0 14px 34px rgba(24,60,40,.08)}
+/* Base .rd layout — shared by the HRM dashboard (kept as-is). */
 .rd{color:var(--rg-ink)}
 .rd .rd-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
 .rd .rd-col{display:flex;flex-direction:column;gap:18px;min-width:0}
@@ -142,11 +143,29 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .rd .rd-stat{background:var(--surface);border-radius:16px;box-shadow:var(--rg-sh);padding:16px;cursor:pointer;transition:transform .2s,box-shadow .2s}
 .rd .rd-stat:hover{transform:translateY(-3px);box-shadow:var(--rg-sh2)}
 .rd .rd-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:11px}
-.rd .rd-ico.gn{background:var(--rg-gg)} .rd .rd-ico.pu{background:var(--rg-pg)} .rd .rd-ico.rd-red{background:var(--rg-rd)}
+.rd .rd-ico.gn{background:var(--rg-gg)} .rd .rd-ico.og{background:var(--rg-og)} .rd .rd-ico.pu{background:var(--rg-pg)} .rd .rd-ico.rd-red{background:var(--rg-rd)}
 .rd .rd-val{font-size:1.9rem;font-weight:900;letter-spacing:-1px;line-height:1;color:var(--rg-ink)}
 .rd .rd-lbl{font-size:12px;color:var(--rg-mut);font-weight:600;margin-top:4px}
+.rd .rd-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .rd .rd-charts{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
 .rd .rd-bars{display:flex;align-items:flex-end;gap:12px;height:132px;padding-top:8px}
+
+/* ── COMPACT hiring dashboard — dense grid, scoped to #page-overview only.
+   4 stats → 2 panels → 2 panels, tight ~12px gaps, smaller padding. The HRM
+   dashboard above keeps the roomier base spacing. ── */
+#page-overview .rd{display:flex;flex-direction:column;gap:12px}
+#page-overview .rd .rd-sec{font-size:14px}
+#page-overview .rd .rd-card{border-radius:16px;padding:14px 15px}
+#page-overview .rd .rd-h{font-size:13.5px;margin-bottom:10px}
+#page-overview .rd .rd-see{font-size:11.5px}
+#page-overview .rd .rd-stats{grid-template-columns:repeat(4,1fr);gap:12px}
+#page-overview .rd .rd-stat{border-radius:14px;padding:13px 14px;transition:transform .18s,box-shadow .18s}
+#page-overview .rd .rd-stat:hover{transform:translateY(-2px)}
+#page-overview .rd .rd-ico{width:32px;height:32px;border-radius:10px;margin-bottom:8px}
+#page-overview .rd .rd-val{font-size:1.55rem;letter-spacing:-.8px}
+#page-overview .rd .rd-lbl{font-size:11.5px;margin-top:3px}
+#page-overview .rd .rd-charts{grid-template-columns:1.4fr 1fr;gap:12px}
+#page-overview .rd .rd-bars{height:116px;padding-top:6px}
 .rd .rd-bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;cursor:pointer}
 .rd .rd-bars .bar i{width:64%;min-height:4px;border-radius:6px 6px 0 0;background:var(--rg-gg2);transition:background .15s}
 .rd .rd-bars .bar:hover i{background:var(--rg-green)}
@@ -185,8 +204,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .rd .rd-jobcard .ap{font-size:12px;color:var(--rg-mut)} .rd .rd-jobcard .ap b{color:var(--rg-green2);font-size:15px}
 .rd .rd-mini{background:var(--rg-green);color:#fff;border:none;border-radius:9999px;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 14px;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.rd .rd-stat{transition:none}}
-@media(max-width:1000px){.rd .rd-grid{grid-template-columns:1fr}.rd .rd-charts{grid-template-columns:1fr}}
-@media(max-width:480px){.rd .rd-stats{grid-template-columns:1fr}}
+@media(max-width:1000px){
+  .rd .rd-grid{grid-template-columns:1fr}
+  .rd .rd-charts{grid-template-columns:1fr}
+  #page-overview .rd .rd-stats{grid-template-columns:1fr 1fr}
+  #page-overview .rd .rd-two{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .rd .rd-stats{grid-template-columns:1fr}
+  #page-overview .rd .rd-stats{grid-template-columns:1fr 1fr}
+}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;position:relative;overflow:hidden;transition:border-color .2s,transform .15s,box-shadow .15s}
 /* One hover rule — there used to be two, the second silently cancelling the
    first's shadow. Gentle lift on the existing shadow token. */
@@ -655,61 +682,49 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
        number is populated by renderOverview() from the SAME CandidateStats /
        real data — no computation changed. Every card is clickable. ══ -->
   <div class="rd">
-    <div class="rd-grid">
-      <!-- LEFT column -->
-      <div class="rd-col">
-        <div class="rd-sec">Recruitment Overview</div>
-        <div class="rd-stats">
-          <div class="rd-stat" onclick="showPage('candidates')">
-            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-            <div class="rd-val" id="ov-total">0</div><div class="rd-lbl">Applicants</div>
-          </div>
-          <div class="rd-stat" onclick="filterByStage('shortlisted')">
-            <div class="rd-ico pu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CD6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-            <div class="rd-val" id="ov-shortlisted">0</div><div class="rd-lbl">Shortlisted</div>
-          </div>
-          <div class="rd-stat" onclick="showPage('employees')">
-            <div class="rd-ico gn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-            <div class="rd-val" id="ov-hired">0</div><div class="rd-lbl">Hired</div>
-          </div>
-          <div class="rd-stat" onclick="filterByStage('rejected')">
-            <div class="rd-ico rd-red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E4544B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
-            <div class="rd-val" id="ov-rejected">0</div><div class="rd-lbl">Rejected</div>
-          </div>
-        </div>
+    <div class="rd-sec">Recruitment Overview</div>
 
-        <div class="rd-charts">
-          <div class="rd-card">
-            <div class="rd-h">Job Post Insights <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
-            <div class="rd-bars" id="ov-bars"></div>
-          </div>
-          <div class="rd-card">
-            <div class="rd-h">Job Summary <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
-            <div id="ov-donut" class="rd-donutwrap"></div>
-          </div>
-        </div>
-
-        <div class="rd-card">
-          <div class="rd-h">Recent Activities <span class="rd-see" onclick="showPage('candidates')">View all →</span></div>
-          <div id="ov-activities"><div class="rd-empty">Loading…</div></div>
-        </div>
+    <!-- Row 1 — 4 compact stat cards (same data, from CandidateStats/allJobs) -->
+    <div class="rd-stats">
+      <div class="rd-stat" onclick="showPage('candidates')">
+        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+        <div class="rd-val" id="ov-total">0</div><div class="rd-lbl">Total Screened</div>
       </div>
+      <div class="rd-stat" onclick="filterByStage('shortlisted')">
+        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="rd-val" id="ov-shortlisted">0</div><div class="rd-lbl">Shortlisted</div>
+      </div>
+      <div class="rd-stat" onclick="filterByStage('interview')">
+        <div class="rd-ico og"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
+        <div class="rd-val" id="ov-interview">0</div><div class="rd-lbl">In Interview</div>
+      </div>
+      <div class="rd-stat" onclick="showPage('jobs')">
+        <div class="rd-ico gn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+        <div class="rd-val" id="ov-jobs">0</div><div class="rd-lbl">Active Jobs</div>
+      </div>
+    </div>
 
-      <!-- RIGHT column -->
-      <div class="rd-col">
-        <div class="rd-card">
-          <div class="rd-h">Today's Interview</div>
-          <div class="rd-days" id="ov-daystrip"></div>
-          <div class="rd-empty" style="padding:20px 10px">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#93A29A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-            <div class="rd-empty-t">No interviews scheduled</div>
-            <div class="rd-empty-s">Live interviews are launched on demand — there's no calendar schedule yet.</div>
-          </div>
-        </div>
-        <div class="rd-card">
-          <div class="rd-h">Open Jobs Highlight <span class="rd-see" onclick="showPage('jobs')">All jobs →</span></div>
-          <div id="ov-jobhi"><div class="rd-empty">Loading…</div></div>
-        </div>
+    <!-- Row 2 — funnel/insights + summary chart, side by side -->
+    <div class="rd-charts">
+      <div class="rd-card">
+        <div class="rd-h">Job Post Insights <span class="rd-see" onclick="showPage('analytics')">Analytics →</span></div>
+        <div class="rd-bars" id="ov-bars"></div>
+      </div>
+      <div class="rd-card">
+        <div class="rd-h">Job Summary <span class="rd-see" onclick="showPage('jobs')">Jobs →</span></div>
+        <div id="ov-donut" class="rd-donutwrap"></div>
+      </div>
+    </div>
+
+    <!-- Row 3 — recent applicants + open-jobs summary, side by side -->
+    <div class="rd-two">
+      <div class="rd-card">
+        <div class="rd-h">Recent Applicants <span class="rd-see" onclick="showPage('candidates')">View all →</span></div>
+        <div id="ov-activities"><div class="rd-empty">Loading…</div></div>
+      </div>
+      <div class="rd-card">
+        <div class="rd-h">Open Jobs Highlight <span class="rd-see" onclick="showPage('jobs')">All jobs →</span></div>
+        <div id="ov-jobhi"><div class="rd-empty">Loading…</div></div>
       </div>
     </div>
   </div>
@@ -3329,12 +3344,15 @@ function renderOverview(){
   const s   = CandidateStats.compute(allResults);
   const rec = CandidateStats.rec;
 
-  // ── 4 stat cards — SAME values as before (from CandidateStats). Hired comes
-  //    from the HR summary (source=hired employees). Nothing recomputed. ──
-  setNum('ov-total', s.total);              // Applicants
-  setNum('ov-shortlisted', s.youShortlisted); // Shortlisted (= byStage.shortlisted)
-  setNum('ov-rejected', s.byStage.rejected);  // Rejected
-  loadHrSummary();                          // fills Hired (ov-hired)
+  // ── 4 stat cards — SAME values, straight from CandidateStats / allJobs.
+  //    Nothing recomputed; these are the existing figures, just surfaced here. ──
+  setNum('ov-total', s.total);                       // Total Screened
+  setNum('ov-shortlisted', s.youShortlisted);        // Shortlisted (= byStage.shortlisted)
+  setNum('ov-interview', s.byStage.interview);       // In Interview (existing byStage count)
+  // Active Jobs — count of active job posts from the already-loaded jobs list
+  // (same source the Jobs page and KPIs use); reading data, not recomputing it.
+  setNum('ov-jobs', (allJobs || []).filter(j => (j.status || 'active') === 'active').length);
+  loadHrSummary();                                   // harmless if the Hired tile is absent
 
   rdDayStrip();
   rdJobInsights();
