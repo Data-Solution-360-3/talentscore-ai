@@ -284,6 +284,72 @@ DEFAULT_TEMPLATES = {
 }
 
 
+def _esc(v: str) -> str:
+    """Minimal HTML-escape for values interpolated into email HTML."""
+    return (str(v or "")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _demo_shell(title_html: str, body_html: str) -> str:
+    """Shared green-header shell for the demo-request emails (brand-consistent)."""
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Inter',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:30px 40px;text-align:center">
+          <img src="{APP_URL}/static/logo-mark-512.png" width="44" height="44" alt="TopCandidate" style="display:block;margin:0 auto 10px;border:0">
+          <div style="font-size:22px;font-weight:800;color:#ffffff">TopCandidate<span style="color:#fb923c">.pro</span></div>
+        </td></tr>
+        <tr><td style="padding:36px 40px">
+          <h2 style="font-size:20px;font-weight:800;color:#1f2937;margin:0 0 14px">{title_html}</h2>
+          {body_html}
+        </td></tr>
+        <tr><td style="background:#F7FAF5;padding:18px 40px;border-top:1px solid #E7EAEE">
+          <p style="font-size:12px;color:#6B7280;text-align:center;margin:0">© 2026 TopCandidate by LinkX360 · Dhaka, Bangladesh</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def send_demo_admin_notification(admin_email: str, req: dict) -> tuple[bool, str]:
+    """Notify the admin (super-admin) that a new demo request arrived.
+    Returns (ok, id_or_error) — the caller records this on the lead so a failed
+    send is visibly 'pending', never silently lost."""
+    rows = ""
+    for label, key in [("Name", "name"), ("Company", "company"), ("Email", "email"),
+                       ("Phone", "phone"), ("Hires for", "roles"), ("Wants", "message")]:
+        val = _esc(req.get(key, "") or "—")
+        rows += (f'<tr><td style="padding:7px 0;font-size:13px;color:#6B7280;font-weight:700;'
+                 f'width:110px;vertical-align:top">{label}</td>'
+                 f'<td style="padding:7px 0;font-size:14px;color:#1f2937;white-space:pre-wrap">{val}</td></tr>')
+    body = (f'<p style="font-size:14px;color:#4B5563;line-height:1.7;margin:0 0 18px">'
+            f'A new demo request just came in from the landing page.</p>'
+            f'<table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #E7EAEE">{rows}</table>'
+            f'<p style="font-size:13px;color:#6B7280;margin:20px 0 0">Open your admin → Demo Requests to update its status.</p>')
+    html = _demo_shell("New demo request 🎯", body)
+    return _resend_send(admin_email, f"New demo request — {req.get('company') or req.get('name') or 'Lead'}",
+                        html=html, reply_to=(req.get("email") or ""))
+
+
+def send_demo_confirmation(to_email: str, name: str) -> tuple[bool, str]:
+    """Confirm to the requester that we received their demo request.
+    Returns (ok, id_or_error)."""
+    body = (f'<p style="font-size:15px;color:#4B5563;line-height:1.7;margin:0 0 16px">'
+            f'Hi <strong>{_esc(name) or "there"}</strong>, thanks for requesting a demo of '
+            f'<strong>TopCandidate.pro</strong>.</p>'
+            f'<p style="font-size:15px;color:#4B5563;line-height:1.7;margin:0 0 16px">'
+            f'We\'ve got your details and someone from our team will be in touch shortly to '
+            f'schedule a time that works for you.</p>'
+            f'<p style="font-size:13px;color:#6B7280;line-height:1.6;margin:18px 0 0">'
+            f'Didn\'t request this? You can safely ignore this email.</p>')
+    html = _demo_shell("Thanks — we'll be in touch 👋", body)
+    return _resend_send(to_email, "Thanks for requesting a demo — TopCandidate.pro", html=html)
+
+
 def substitute_template(template_str: str, variables: dict) -> str:
     """Replace {placeholders} in a template. Unknown placeholders are left alone
     so the recruiter notices and can correct them, rather than silently producing

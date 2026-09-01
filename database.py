@@ -86,6 +86,10 @@ async def connect():
     await db.rate_hits.create_index("expires_at", expireAfterSeconds=0)
     await db.rate_hits.create_index([("bucket", 1), ("at", 1)])
 
+    # ── Demo requests (public landing-page lead capture) ──
+    await db.demo_requests.create_index("created_at")
+    await db.demo_requests.create_index("status")
+
     # ── Video interviews (Viva) — Phase 1 ──
     await db.interviews.create_index("public_token", unique=True, sparse=True)
     await db.interviews.create_index("user_id")

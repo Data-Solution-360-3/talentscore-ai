@@ -175,6 +175,23 @@ def retire_perf_fixtures():
         pass
 
 
+def retire_demo_smoke():
+    """Delete the throwaway demo-request rows this run created, so the real
+    admin lead inbox is never polluted by smoke traffic."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from pymongo import MongoClient
+        cli = MongoClient(os.getenv("MONGO_URI"), serverSelectionTimeoutMS=15000,
+                          tlsAllowInvalidCertificates=True)
+        cli[os.getenv("DB_NAME", "talentscore")].demo_requests.delete_many(
+            {"email": {"$regex": "^smoke\\.demo\\."}})
+        cli.close()
+    except Exception:
+        pass
+
+
 def ensure_client_fixture():
     """A throwaway CLIENT account (role=client, NOT super-admin) to prove the
     HRM gate keeps clients out. Idempotent by email; returns a minted token
@@ -1100,6 +1117,9 @@ def main():
                 ("POST", "/api/payroll/runs"),
                 ("GET", "/api/performance/cycles"), ("POST", "/api/performance/cycles"),
                 ("GET", "/api/kpi"),
+                # Demo-request inbox is super-admin only, gated like HRM.
+                ("GET", "/api/admin/demo-requests"),
+                ("POST", "/api/admin/demo-requests/000000000000000000000000/status"),
             ]
             for method, path in hrm_forbidden:
                 try:
@@ -1129,6 +1149,40 @@ def main():
                 except Exception as e:
                     line(None, method, path, str(e)[:60])
                     failures.append(("HRM-GATE-HIRING", path, "exception"))
+
+    # ── Demo request — public lead capture: save works, then spam-limited ──
+    print("\nDemo request — public lead capture (save works, then rate-limited)")
+    import time as _time
+    demo_email = f"smoke.demo.{int(_time.time())}@boundary.test"
+    demo_form = {"name": "Smoke Lead", "company": "Smoke Co", "email": demo_email,
+                 "phone": "+8801000000000", "roles": "QA", "message": "smoke test — ignore"}
+    with httpx.Client(base_url=base, timeout=30.0) as dcli:
+        try:
+            r = dcli.post("/api/demo-request", data=demo_form)
+            ok = r.status_code == 200 and bool((r.json() or {}).get("success"))
+            line(r.status_code, "POST", "/api/demo-request", "lead saved" if ok else "SAVE FAILED")
+            checked += 1
+            if not ok:
+                failures.append(("DEMO", "/api/demo-request", r.status_code))
+        except Exception as e:
+            line(None, "POST", "/api/demo-request", str(e)[:60])
+            failures.append(("DEMO", "/api/demo-request", "exception"))
+        # Same email a few more times — the 3/hour email bucket must trip 429.
+        got_429 = False
+        for _ in range(5):
+            try:
+                r = dcli.post("/api/demo-request", data=demo_form)
+                if r.status_code == 429:
+                    got_429 = True
+                    break
+            except Exception:
+                pass
+        line(429 if got_429 else 200, "POST", "/api/demo-request",
+             "spam rate-limited" if got_429 else "NO RATE LIMIT!")
+        checked += 1
+        if not got_429:
+            failures.append(("DEMO-SPAM", "/api/demo-request", "no 429"))
+    retire_demo_smoke()
 
     print(f"\n{checked} routes checked.")
     if failures:

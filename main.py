@@ -25,6 +25,7 @@ from payment_service import (
 from email_service import (
     generate_otp, send_verification_email, send_welcome_email,
     send_candidate_email, substitute_template, DEFAULT_TEMPLATES, TEMPLATE_VARIABLES,
+    send_demo_admin_notification, send_demo_confirmation,
 )
 from batch import run_batch_screening, CONCURRENCY_LIMIT
 from auth import (
@@ -3084,6 +3085,150 @@ async def public_apply_submit(
     # can't be distinguished from a first one.
     return {"success": True, "message": "Application received",
             "application_id": application_id}
+
+
+# ─────────────────────────────────────────────────────────────
+# DEMO REQUESTS — public lead capture + super-admin inbox
+# ─────────────────────────────────────────────────────────────
+async def _send_demo_emails(req_id: str, doc: dict):
+    """Best-effort notifications AFTER the lead is already saved. The saved
+    record is the source of truth; email is a notification on top. Whatever
+    happens here is written back onto the lead as notify.admin / notify.requester
+    so a failed or unconfigured send shows as 'pending'/'failed', never lost."""
+    import asyncio
+    from bson import ObjectId
+    from database import db as mongodb
+
+    admins = []
+    try:
+        async for u in mongodb.users.find({"is_super_admin": True}, {"email": 1}):
+            if u.get("email"):
+                admins.append(u["email"])
+    except Exception as e:
+        print("[DEMO] super-admin lookup failed:", e)
+
+    admin_status, admin_detail = "no_recipient", ""
+    if admins:
+        results = []
+        for ae in admins:
+            try:
+                ok, info = await asyncio.to_thread(send_demo_admin_notification, ae, doc)
+            except Exception as e:
+                ok, info = False, str(e)[:200]
+            results.append(ok)
+            admin_detail = info
+        admin_status = "sent" if any(results) else "failed"
+
+    try:
+        ok_r, info_r = await asyncio.to_thread(send_demo_confirmation, doc.get("email", ""), doc.get("name", ""))
+    except Exception as e:
+        ok_r, info_r = False, str(e)[:200]
+    req_status = "sent" if ok_r else "failed"
+
+    try:
+        await mongodb.demo_requests.update_one(
+            {"_id": ObjectId(req_id)},
+            {"$set": {"notify.admin": admin_status,
+                      "notify.requester": req_status,
+                      "notify.detail": {"admin": admin_detail, "requester": info_r}}},
+        )
+    except Exception as e:
+        print("[DEMO] notify status write-back failed:", e)
+    print(f"[DEMO] {req_id} notifications — admin:{admin_status} requester:{req_status}")
+
+
+@app.post("/api/demo-request")
+async def submit_demo_request(
+    request: Request,
+    background: BackgroundTasks,
+    name: str = Form(...),
+    company: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    roles: str = Form(""),
+    message: str = Form(""),
+):
+    """Public, unauthenticated lead capture from the landing page. Same
+    discipline as the public apply endpoint: validate, sanitize, cap lengths,
+    and rate-limit by email + IP. The lead is ALWAYS saved before any email is
+    attempted, so a broken/unconfigured mailer never loses a lead."""
+    def clean(v, n):
+        return (v or "").strip()[:n]
+
+    name_c    = clean(name, 120)
+    company_c = clean(company, 160)
+    email_c   = clean(email, 200).lower()
+    phone_c   = clean(phone, 40)
+    roles_c   = clean(roles, 200)
+    message_c = clean(message, 2000)
+
+    if not (name_c and company_c and email_c and phone_c):
+        raise HTTPException(status_code=400, detail="Please fill in all required fields.")
+    dom = email_c.split("@")[-1] if "@" in email_c else ""
+    if "@" not in email_c or "." not in dom or len(email_c) < 5:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+    client_ip = (request.headers.get("x-forwarded-for", "") or "").split(",")[0].strip() \
+        or (request.client.host if request.client else "unknown")
+    iph = hash_ip(client_ip)
+    # Spam floods: a handful per email/hour, a bit more per IP/hour.
+    if not await rate_limit_allows(f"demo-email:{email_c}", 3, 3600):
+        raise HTTPException(status_code=429, detail="You've already sent a request recently — we'll be in touch soon.")
+    if not await rate_limit_allows(f"demo-ip:{iph}", 8, 3600):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again in a little while.")
+
+    from database import db as mongodb
+    from datetime import datetime, timezone
+    doc = {
+        "name": name_c, "company": company_c, "email": email_c, "phone": phone_c,
+        "roles": roles_c, "message": message_c,
+        "status": "new",
+        "created_at": datetime.now(timezone.utc),
+        "ip_hash": iph,
+        "notify": {"admin": "pending", "requester": "pending"},
+    }
+    res = await mongodb.demo_requests.insert_one(doc)
+    req_id = str(res.inserted_id)
+
+    # Emails fire after the response; the lead is already durable.
+    background.add_task(_send_demo_emails, req_id, dict(doc))
+
+    return {"success": True, "message": "Thanks — we'll be in touch to schedule your demo."}
+
+
+@app.get("/api/admin/demo-requests")
+async def admin_list_demo_requests(request: Request):
+    """Super-admin only lead inbox. Gated exactly like the HRM routes — a client
+    account gets the same generic 403 and cannot learn this exists."""
+    await require_super_admin(request)
+    from database import db as mongodb
+    items = []
+    async for d in mongodb.demo_requests.find().sort("created_at", -1).limit(300):
+        d["id"] = str(d.pop("_id"))
+        d.pop("ip_hash", None)                      # never expose the hashed IP
+        ca = d.get("created_at")
+        d["created_at"] = ca.isoformat() if hasattr(ca, "isoformat") else str(ca)
+        items.append(d)
+    new_count = sum(1 for i in items if i.get("status") == "new")
+    return {"requests": items, "new_count": new_count, "total": len(items)}
+
+
+@app.post("/api/admin/demo-requests/{req_id}/status")
+async def admin_update_demo_status(request: Request, req_id: str, status: str = Form(...)):
+    """Move a lead through new → contacted → scheduled → closed. Super-admin only."""
+    await require_super_admin(request)
+    if status not in {"new", "contacted", "scheduled", "closed"}:
+        raise HTTPException(status_code=400, detail="Invalid status.")
+    from database import db as mongodb
+    from bson import ObjectId
+    try:
+        oid = ObjectId(req_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid id.")
+    res = await mongodb.demo_requests.update_one({"_id": oid}, {"$set": {"status": status}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Not found.")
+    return {"success": True, "status": status}
 
 
 @app.get("/api/apply/{token}/status/{application_id}")

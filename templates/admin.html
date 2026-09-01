@@ -210,6 +210,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <span class="sb-badge" id="sb-screen-cnt">0</span>
     </button>
 
+    <!-- Leads — super-admin only; revealed after /api/auth/me confirms it -->
+    <div class="sb-section" id="sb-leads-section" style="display:none">Leads</div>
+    <button class="sb-item" id="sb-demos-item" onclick="nav('demos')" style="display:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>
+      Demo Requests
+      <span class="sb-badge" id="sb-demos-cnt">0</span>
+    </button>
+
     <div class="sb-section">Content Editor</div>
     <button class="sb-item" onclick="nav('edit-landing')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -266,6 +274,36 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
             <tbody id="recent-tbl"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ── DEMO REQUESTS (super-admin lead inbox) ── -->
+    <div class="page" id="page-demos">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Demo Requests</h1><p>Leads captured from the landing page — newest first</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadDemos()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">Inbox <span class="admin-badge" id="demos-new-badge" style="display:none"></span></div>
+          <span class="card-sub" id="demos-count"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Name</th><th>Company</th><th>Contact</th><th>Hires for</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <tbody id="demos-tbl"><tr><td colspan="7" class="tbl-empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo request detail (full message + notification status) -->
+    <div id="demo-detail-ov" style="display:none;position:fixed;inset:0;background:rgba(20,40,25,.5);z-index:900;align-items:flex-start;justify-content:center;overflow-y:auto;padding:6vh 16px">
+      <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(20,40,25,.3);position:relative">
+        <button onclick="closeDemoDetail()" aria-label="Close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;color:#9AA6A0;cursor:pointer;font-family:inherit">&times;</button>
+        <h3 id="dd-title" style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:2px">Demo request</h3>
+        <div id="dd-sub" style="font-size:12px;color:var(--t3);margin-bottom:14px"></div>
+        <div id="dd-body" style="font-size:13px;color:var(--t2);line-height:1.7"></div>
       </div>
     </div>
 
@@ -518,6 +556,7 @@ function nav(id){
   if(id==='edit-faq')renderFaqEditor();
   if(id==='edit-landing')loadLandingContent();
   if(id==='settings')loadSettings();
+  if(id==='demos')loadDemos();
 }
 
 // ── MODALS ──
@@ -572,6 +611,14 @@ async function loadAll(){
     document.getElementById('sb-info').textContent='Signed in as '+me.email;
     document.getElementById('sb-users-cnt').textContent=allUsers.length;
     document.getElementById('sb-screen-cnt').textContent=screenTotal;
+
+    // Demo Requests inbox — super-admin only. The data endpoint is
+    // require_super_admin server-side; this just reveals the UI for them.
+    if(me.is_super_admin){
+      document.getElementById('sb-leads-section').style.display='';
+      document.getElementById('sb-demos-item').style.display='';
+      loadDemos();
+    }
 
     renderDashboard(statsData);
     renderUsers();
@@ -987,6 +1034,75 @@ async function migrateFromUser(){
   el.textContent='✓ Moved '+data.migrated+' screenings';el.style.display='block';
   setTimeout(()=>loadAll(),1000);
 }
+
+// ── DEMO REQUESTS (super-admin lead inbox) ──
+let _demos=[];
+const DEMO_STATUSES=['new','contacted','scheduled','closed'];
+function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function demoStatusColor(s){return {new:'#F57C2E',contacted:'#D97706',scheduled:'#16A34A',closed:'#6B7280'}[s]||'#6B7280';}
+function demoNewCount(){return _demos.filter(x=>x.status==='new').length;}
+function demoRefreshBadges(){
+  const nc=demoNewCount();
+  const b=document.getElementById('sb-demos-cnt'); if(b){b.textContent=nc;b.style.background=nc>0?'var(--og)':'var(--s3)';b.style.color=nc>0?'var(--orange)':'var(--t3)';}
+  const nb=document.getElementById('demos-new-badge'); if(nb){ if(nc>0){nb.textContent=nc+' new';nb.style.display='';} else nb.style.display='none'; }
+}
+async function loadDemos(){
+  const tb=document.getElementById('demos-tbl'); if(!tb) return;
+  try{
+    const r=await tFetch('/api/admin/demo-requests');
+    if(r.status===403){ tb.innerHTML='<tr><td colspan="7" class="tbl-empty">Not available on this account.</td></tr>'; return; }
+    if(!r.ok) throw new Error('server '+r.status);
+    const data=await r.json();
+    _demos=data.requests||[];
+    renderDemos();
+    demoRefreshBadges();
+    const c=document.getElementById('demos-count'); if(c) c.textContent=(data.total||0)+' total';
+  }catch(e){ tb.innerHTML='<tr><td colspan="7" class="tbl-empty" style="color:#f43f5e">Failed to load. <button class="btn btn-xs" onclick="loadDemos()">Retry</button></td></tr>'; }
+}
+function renderDemos(){
+  const tb=document.getElementById('demos-tbl'); if(!tb) return;
+  if(!_demos.length){ tb.innerHTML='<tr><td colspan="7" class="tbl-empty">No demo requests yet.</td></tr>'; return; }
+  tb.innerHTML=_demos.map(d=>{
+    const opts=DEMO_STATUSES.map(s=>`<option value="${s}"${d.status===s?' selected':''}>${s}</option>`).join('');
+    const isNew=d.status==='new';
+    return `<tr${isNew?' style="background:rgba(245,124,46,.05)"':''}>
+      <td><b>${esc(d.name)}</b></td>
+      <td>${esc(d.company)}</td>
+      <td style="font-size:11px"><a href="mailto:${esc(d.email)}" style="color:var(--orange2);font-weight:600;text-decoration:none">${esc(d.email)}</a><br><span style="color:var(--t3)">${esc(d.phone)}</span></td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.roles)}">${esc(d.roles)||'—'}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmt(d.created_at)}</td>
+      <td><select onchange="updateDemoStatus('${d.id}',this.value)" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);font-family:inherit;font-weight:700;color:${demoStatusColor(d.status)};cursor:pointer;background:#fff">${opts}</select></td>
+      <td><button class="btn btn-xs btn-ghost" onclick="openDemoDetail('${d.id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+async function updateDemoStatus(id,status){
+  const fd=new FormData(); fd.append('status',status);
+  try{
+    const r=await fetch('/api/admin/demo-requests/'+id+'/status',{method:'POST',body:fd,credentials:'include'});
+    if(!r.ok) throw new Error();
+    const d=_demos.find(x=>x.id===id); if(d) d.status=status;
+    renderDemos(); demoRefreshBadges();
+  }catch(e){ alert('Could not update status — try again.'); loadDemos(); }
+}
+function openDemoDetail(id){
+  const d=_demos.find(x=>x.id===id); if(!d) return;
+  document.getElementById('dd-title').textContent=d.name+' · '+d.company;
+  document.getElementById('dd-sub').textContent=fmt(d.created_at)+' · status: '+d.status;
+  const n=d.notify||{};
+  const line=(who,stt)=>{const c={sent:'#16A34A',pending:'#D97706',failed:'#DC2626',no_recipient:'#6B7280'}[stt]||'#6B7280';return `<span style="color:${c};font-weight:700">${who}: ${esc(stt||'—')}</span>`;};
+  document.getElementById('dd-body').innerHTML=
+    `<div style="margin-bottom:6px"><b>Email:</b> <a href="mailto:${esc(d.email)}" style="color:var(--orange2);text-decoration:none">${esc(d.email)}</a></div>`+
+    `<div style="margin-bottom:6px"><b>Phone:</b> ${esc(d.phone)||'—'}</div>`+
+    `<div style="margin-bottom:6px"><b>Hires for:</b> ${esc(d.roles)||'—'}</div>`+
+    `<div style="margin:10px 0 4px"><b>What they want from the demo:</b></div>`+
+    `<div style="background:var(--s2);border-radius:10px;padding:10px 12px;white-space:pre-wrap">${esc(d.message)||'—'}</div>`+
+    `<div style="margin-top:14px;font-size:11px;color:var(--t3)">Notifications — ${line('admin email',n.admin)} · ${line('requester email',n.requester)}</div>`;
+  document.getElementById('demo-detail-ov').style.display='flex';
+}
+function closeDemoDetail(){ const o=document.getElementById('demo-detail-ov'); if(o) o.style.display='none'; }
+document.addEventListener('click',function(e){ if(e.target&&e.target.id==='demo-detail-ov') closeDemoDetail(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemoDetail(); });
 
 loadAll();
 </script>
