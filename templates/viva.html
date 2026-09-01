@@ -12,20 +12,20 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --navy:#142848;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
+  --ink:#128A40;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
   --og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);--ig:rgba(245,124,46,.08);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
-  --border:#E4E8F0;--border2:#D5DCE8;--text:#142848;--t2:#4A5970;--t3:#8593AB;
+  --border:#E4E8F0;--border2:#D5DCE8;--text:#1f2937;--t2:#4B5563;--t3:#6B7280;
   --green:#16A34A;--red:#DC2626;
   --r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
-  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
-  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
-  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
+  --shadow-sm:0 1px 2px rgba(31,41,55,.04);
+  --shadow-md:0 1px 3px rgba(31,41,55,.06),0 2px 6px rgba(31,41,55,.04);
+  --shadow-lg:0 4px 12px rgba(31,41,55,.06),0 8px 24px rgba(31,41,55,.06);
 }
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
-.tb-icon{width:28px;height:28px;border-radius:var(--r-md);background:var(--navy);display:grid;place-items:center;flex-shrink:0}
-.tb-name{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+.tb-icon{width:28px;height:28px;border-radius:var(--r-md);background:var(--ink);display:grid;place-items:center;flex-shrink:0}
+.tb-name{font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
 .tb-tag{margin-left:auto;font-size:11.5px;color:var(--t3);font-weight:600}
 .wrap{max-width:560px;margin:0 auto;padding:1.25rem 1.15rem 4rem}
 
@@ -34,27 +34,27 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 .q-company{font-size:12px;font-weight:700;color:var(--orange2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:.5rem}
 .q-role{font-size:12.5px;color:var(--t3);margin-bottom:.75rem}
 .q-label{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem}
-.q-text{font-size:1.15rem;font-weight:700;color:var(--navy);line-height:1.4}
+.q-text{font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1.4}
 
 .lang{padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)}
 .lang-label{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin-bottom:.6rem}
 .lang-opts{display:flex;gap:8px}
 .lang-btn{flex:1;padding:11px 10px;border-radius:var(--r-lg);border:1.5px solid var(--border2);background:var(--surface);font-family:inherit;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s}
-.lang-btn.active{border-color:var(--orange);background:var(--og);color:var(--navy)}
+.lang-btn.active{border-color:var(--orange);background:var(--og);color:var(--ink)}
 .lang-btn[disabled]{cursor:not-allowed;opacity:.55;background:var(--s2)}
 .lang-btn small{font-size:10px;font-weight:600;color:var(--t3)}
 .lang-hint{font-size:12px;color:var(--t2);margin-top:.7rem;display:flex;gap:6px;align-items:flex-start;line-height:1.5}
-.lang-hint b{color:var(--navy)}
+.lang-hint b{color:var(--ink)}
 
 .stage{padding:1.35rem}
-.viewport{position:relative;width:100%;aspect-ratio:3/4;max-height:60vh;background:#0b1a30;border-radius:var(--r-lg);overflow:hidden;display:grid;place-items:center}
+.viewport{position:relative;width:100%;aspect-ratio:3/4;max-height:60vh;background:#111827;border-radius:var(--r-lg);overflow:hidden;display:grid;place-items:center}
 .viewport video{width:100%;height:100%;object-fit:cover;display:block}
 .viewport .idle{color:rgba(255,255,255,.7);text-align:center;padding:1.5rem;font-size:13px}
-.rec-dot{position:absolute;top:12px;left:12px;display:none;align-items:center;gap:7px;background:rgba(20,40,72,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3}
+.rec-dot{position:absolute;top:12px;left:12px;display:none;align-items:center;gap:7px;background:rgba(31,41,55,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3}
 .rec-dot i{width:9px;height:9px;border-radius:50%;background:#ff4d4d;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{50%{opacity:.25}}
 .rec-dot.on{display:inline-flex}
-.countdown{position:absolute;top:12px;right:12px;background:rgba(20,40,72,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3;font-variant-numeric:tabular-nums;display:none}
+.countdown{position:absolute;top:12px;right:12px;background:rgba(31,41,55,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);z-index:3;font-variant-numeric:tabular-nums;display:none}
 .countdown.on{display:block}
 
 .bar{height:6px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden;margin-top:.9rem;display:none}
@@ -67,7 +67,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 .btn-rec{background:var(--orange);color:#fff;box-shadow:0 4px 14px rgba(245,124,46,.28)}
 .btn-rec:hover:not(:disabled){background:var(--orange2)}
 .btn-stop{background:var(--orange);color:#fff}
-.btn-ghost{background:var(--surface);color:var(--navy);border:1.5px solid var(--border2)}
+.btn-ghost{background:var(--surface);color:var(--ink);border:1.5px solid var(--border2)}
 .btn-ghost:hover{background:var(--s2)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .hidden{display:none!important}
@@ -80,15 +80,15 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 .blocker{display:none;padding:2.5rem 1.5rem;text-align:center}
 .blocker.on{display:block}
 .blocker .ic{width:56px;height:56px;border-radius:50%;background:var(--og);display:grid;place-items:center;margin:0 auto 1.15rem}
-.blocker h2{font-size:1.25rem;font-weight:800;color:var(--navy);margin-bottom:.65rem}
+.blocker h2{font-size:1.25rem;font-weight:800;color:var(--ink);margin-bottom:.65rem}
 .blocker p{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto .5rem}
 .blocker .steps{text-align:left;max-width:340px;margin:1.25rem auto 0;font-size:.9rem;color:var(--t2);line-height:1.7}
-.blocker .url{margin-top:1.25rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;font-size:12px;font-family:ui-monospace,monospace;color:var(--navy);word-break:break-all}
+.blocker .url{margin-top:1.25rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;font-size:12px;font-family:ui-monospace,monospace;color:var(--ink);word-break:break-all}
 
 .done{display:none;padding:2.25rem 1.5rem;text-align:center}
 .done.on{display:block}
 .done .ic{width:56px;height:56px;border-radius:50%;background:rgba(22,163,74,.1);display:grid;place-items:center;margin:0 auto 1.1rem}
-.done h2{font-size:1.3rem;font-weight:900;color:var(--navy);margin-bottom:.55rem}
+.done h2{font-size:1.3rem;font-weight:900;color:var(--ink);margin-bottom:.55rem}
 .done p{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto}
 .done .phase-note{margin-top:1.25rem;font-size:11.5px;color:var(--t3);background:var(--s2);border:1px dashed var(--border2);border-radius:var(--r-md);padding:8px 10px;line-height:1.5}
 </style>
@@ -96,7 +96,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 <body>
 
 <div class="topbar">
-  <div class="tb-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#142848"/><rect x="5" y="15" width="3.4" height="4.5" rx="1" fill="#fff"/><rect x="10.3" y="12.4" width="3.4" height="7.1" rx="1" fill="#F57C2E"/><rect x="15.6" y="9.7" width="3.4" height="9.8" rx="1" fill="#F57C2E"/><path d="M5.6 7.1 L9 10.5 L18.4 3" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="tb-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#1f2937"/><rect x="5" y="15" width="3.4" height="4.5" rx="1" fill="#fff"/><rect x="10.3" y="12.4" width="3.4" height="7.1" rx="1" fill="#F57C2E"/><rect x="15.6" y="9.7" width="3.4" height="9.8" rx="1" fill="#F57C2E"/><path d="M5.6 7.1 L9 10.5 L18.4 3" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
   <span class="tb-tag">Video interview</span>
 </div>
@@ -133,7 +133,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
           <button class="lang-btn" id="lang-bn" type="button" disabled aria-disabled="true">বাংলা / Bangla<small>Coming soon</small></button>
         </div>
         <div class="lang-hint">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4A5970" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4B5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <span><b>Please answer in English.</b> Speak clearly and take your time — we're listening for the substance of your answer, not perfect grammar.</span>
         </div>
       </div>
@@ -180,7 +180,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     </div>
     <div class="stage">
       <div class="lang-hint" style="margin-bottom:.8rem">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4A5970" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4B5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         <span><b>Answer in English, in your own words.</b> We read for the substance of your thinking — not perfect grammar.</span>
       </div>
       <textarea id="wq-answer" rows="7" maxlength="4000" placeholder="Type your answer here…"

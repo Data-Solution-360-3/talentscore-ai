@@ -9,10 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--navy:#142848;--orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.1);
+:root{--ink:#128A40;--orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.1);
 --green:#16A34A;--gg:rgba(22,163,74,.12);--gb:rgba(22,163,74,.3);--amber:#D97706;--amg:rgba(217,119,6,.12);--red:#DC2626;--rg:rgba(220,38,38,.1);
---bg:#F7F9FC;--surface:#fff;--s2:#F4F6FA;--border:#E4E8F0;--border2:#D5DCE8;--text:#142848;--t2:#4A5970;--t3:#8593AB;--rs:8px;--rl:14px;
---shadow-sm:0 1px 2px rgba(20,40,72,.04),0 4px 16px rgba(20,40,72,.05)}
+--bg:#F7F9FC;--surface:#fff;--s2:#F4F6FA;--border:#E4E8F0;--border2:#D5DCE8;--text:#1f2937;--t2:#4B5563;--t3:#6B7280;--rs:8px;--rl:14px;
+--shadow-sm:0 1px 2px rgba(31,41,55,.04),0 4px 16px rgba(31,41,55,.05)}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 .top{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
 .top .logo{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800}
@@ -52,7 +52,7 @@ input:focus,select:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--o
 </head>
 <body>
 <div class="top">
-  <span class="logo"><svg height="22" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#142848"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/><rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/><rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/><path d="M15 19 L24 28 L49 8" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  <span class="logo"><svg height="22" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1f2937"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/><rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/><rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/><path d="M15 19 L24 28 L49 8" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>TopCandidate<span style="color:var(--orange)">.pro</span></span>
   <span class="who" id="who">—</span>
   <button class="out" onclick="signout()">Sign out</button>
 </div>
@@ -159,7 +159,7 @@ async function loadLeave(){
   _bal=d.balances||{};
   $('bal-grid').innerHTML=['annual','sick','unpaid'].map(t=>{
     const b=_bal[t]||{}; const rem=b.remaining;
-    return `<div class="bal"><div class="bal-num" style="color:${t==='unpaid'?'var(--t2)':'var(--navy)'}">${t==='unpaid'?(b.taken||0):(rem==null?'—':rem)}</div><div class="bal-lbl">${TYPE_LBL[t]}</div><div class="bal-sub">${t==='unpaid'?'days taken':`of ${b.allowance||0} · ${b.taken||0} taken`}</div></div>`;
+    return `<div class="bal"><div class="bal-num" style="color:${t==='unpaid'?'var(--t2)':'var(--ink)'}">${t==='unpaid'?(b.taken||0):(rem==null?'—':rem)}</div><div class="bal-lbl">${TYPE_LBL[t]}</div><div class="bal-sub">${t==='unpaid'?'days taken':`of ${b.allowance||0} · ${b.taken||0} taken`}</div></div>`;
   }).join('');
   const rows=d.requests||[];
   $('req-tbl').innerHTML=rows.length?rows.map(l=>{

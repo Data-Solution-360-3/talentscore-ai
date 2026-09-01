@@ -9,12 +9,12 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  /* Logo-derived palette: orange primary, deep navy text/accents, on warm white */
-  --navy:#142848;--indigo:#E16A1F;--indigo2:#0F2540;--ig:rgba(245,124,46,.08);--ib:rgba(245,124,46,.20);
+  /* Logo-derived palette: orange primary, deep dark text/accents, on warm white */
+  --ink:#128A40;--indigo:#E16A1F;--indigo2:#128A40;--ig:rgba(245,124,46,.08);--ib:rgba(245,124,46,.20);
   --orange:#F57C2E;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
   --border:#E4E8F0;--border2:#D5DCE8;--border3:#BFC8D8;
-  --text:#142848;--t2:#4A5970;--t3:#8593AB;
+  --text:#1f2937;--t2:#4B5563;--t3:#6B7280;
   --green:#16A34A;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.25);
   --red:#DC2626;--rg:rgba(220,38,38,.08);--rb:rgba(220,38,38,.25);
   --amber:#D97706;--amg:rgba(217,119,6,.10);--amb:rgba(217,119,6,.28);
@@ -22,14 +22,14 @@
   --score-mid:#B45309; --score-mid-bg:rgba(180,83,9,.10);
   --score-bad:#BE3144; --score-bad-bg:rgba(190,49,68,.08);
   --r-xs:4px;--r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
-  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
-  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
-  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
-  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+  --shadow-sm:0 1px 2px rgba(31,41,55,.04);
+  --shadow-md:0 1px 3px rgba(31,41,55,.06),0 2px 6px rgba(31,41,55,.04);
+  --shadow-lg:0 4px 12px rgba(31,41,55,.06),0 8px 24px rgba(31,41,55,.06);
+  --shadow-xl:0 12px 32px rgba(31,41,55,.10),0 24px 60px rgba(31,41,55,.10);
   --r:var(--r-lg);--rs:var(--r-md);--rxs:var(--r-sm);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;box-shadow:0 1px 3px rgba(20,40,72,.04)}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;box-shadow:0 1px 3px rgba(31,41,55,.04)}
 .t-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
 .t-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--orange),#E16A1F);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(245,124,46,.25)}
 .t-name{font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
@@ -705,7 +705,7 @@ function toast(message, opts){
   const cfg = _TOAST_CONFIG[opts.type||'info'] || _TOAST_CONFIG.info;
   const duration = opts.duration || (opts.type==='error' ? 8000 : opts.type==='warning' ? 6000 : 4000);
   const el = document.createElement('div');
-  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(20,40,72,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
+  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(31,41,55,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
   el.innerHTML = `<span style="font-size:16px;color:${cfg.color};font-weight:700;flex-shrink:0;line-height:1.2">${cfg.icon}</span><div style="flex:1;min-width:0;word-wrap:break-word">${String(message).replace(/</g,'&lt;')}</div>`;
   _getToastContainer().appendChild(el);
   requestAnimationFrame(()=>{ el.style.transform='translateX(0)'; el.style.opacity='1'; });
@@ -718,11 +718,11 @@ function promptDialog(opts){
   opts = opts || {};
   return new Promise(resolve => {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(31,41,55,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
     const danger = !!opts.danger;
     const cClass = danger ? 'btn-red' : 'btn-primary';
     const requiredHint = opts.mustMatch ? `<div style="font-size:11px;color:var(--t3);margin-top:4px">Type <code style="background:var(--s2);padding:1px 5px;border-radius:3px;font-size:11px">${opts.mustMatch}</code> to confirm</div>` : '';
-    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Confirm').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<input type="text" class="form-input" id="_promptInput" placeholder="${opts.placeholder||''}" style="margin-bottom:4px">${requiredHint}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem"><button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button><button class="btn ${cClass} btn-sm" data-action="confirm">${opts.confirmText||'Confirm'}</button></div></div>`;
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(31,41,55,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Confirm').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<input type="text" class="form-input" id="_promptInput" placeholder="${opts.placeholder||''}" style="margin-bottom:4px">${requiredHint}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem"><button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button><button class="btn ${cClass} btn-sm" data-action="confirm">${opts.confirmText||'Confirm'}</button></div></div>`;
     document.body.appendChild(overlay);
     const dialog = overlay.firstElementChild;
     const input = dialog.querySelector('#_promptInput');
@@ -740,11 +740,11 @@ function confirmDialog(opts){
   opts = opts || {};
   return new Promise(resolve => {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(31,41,55,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
     const danger = !!opts.danger;
     const cText = opts.confirmText || (danger ? 'Delete' : 'Confirm');
     const cClass = danger ? 'btn-red' : 'btn-primary';
-    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="cancel">${opts.cancelText||'Cancel'}</button><button class="btn ${cClass} btn-sm" data-action="confirm">${cText}</button></div></div>`;
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(31,41,55,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)"><h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-action="cancel">${opts.cancelText||'Cancel'}</button><button class="btn ${cClass} btn-sm" data-action="confirm">${cText}</button></div></div>`;
     document.body.appendChild(overlay);
     const dialog = overlay.firstElementChild;
     requestAnimationFrame(()=>{ overlay.style.opacity='1'; dialog.style.transform='scale(1)'; });

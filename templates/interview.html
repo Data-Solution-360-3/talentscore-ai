@@ -10,26 +10,26 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --navy:#142848;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
+  --ink:#128A40;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
   --og:rgba(245,124,46,.1);--ob:rgba(245,124,46,.3);--ig:rgba(245,124,46,.08);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
   --border:#E4E8F0;--border2:#D5DCE8;
-  --text:#142848;--t2:#4A5970;--t3:#8593AB;--green:#16A34A;--red:#DC2626;--amber:#D97706;
+  --text:#1f2937;--t2:#4B5563;--t3:#6B7280;--green:#16A34A;--red:#DC2626;--amber:#D97706;
   --r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-pill:9999px;
-  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
-  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
-  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
-  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+  --shadow-sm:0 1px 2px rgba(31,41,55,.04);
+  --shadow-md:0 1px 3px rgba(31,41,55,.06),0 2px 6px rgba(31,41,55,.04);
+  --shadow-lg:0 4px 12px rgba(31,41,55,.06),0 8px 24px rgba(31,41,55,.06);
+  --shadow-xl:0 12px 32px rgba(31,41,55,.10),0 24px 60px rgba(31,41,55,.10);
 }
 html,body{height:100%}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5}
 .hidden{display:none!important}
 
 .top{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;padding:0 1.6rem;gap:14px;background:rgba(250,251,252,.85);backdrop-filter:blur(14px);z-index:50}
-.wordmark{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--navy)}
+.wordmark{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--ink)}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:1.1rem}
 .progress{font-size:13px;font-weight:600;color:var(--t2);font-variant-numeric:tabular-nums}
-.progress b{color:var(--navy)}
+.progress b{color:var(--ink)}
 .watch{display:none;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--t3);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);padding:5px 12px;box-shadow:var(--shadow-sm)}
 .watch.on{display:flex}
 .watch i{width:7px;height:7px;border-radius:50%;background:var(--border2)}
@@ -38,8 +38,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .stage{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:90px 2rem 120px}
 
 .ivcard{display:inline-flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:.9rem 1.4rem}
-.ivatar{width:46px;height:46px;border-radius:50%;background:var(--navy);display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0}
-.ivname{font-size:15px;font-weight:800;color:var(--navy);line-height:1.2}
+.ivatar{width:46px;height:46px;border-radius:50%;background:var(--ink);display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0}
+.ivname{font-size:15px;font-weight:800;color:var(--ink);line-height:1.2}
 .ivrole{font-size:11.5px;color:var(--t3);font-weight:600}
 .voice{display:flex;align-items:flex-end;gap:3px;height:20px;margin-left:.6rem}
 .voice i{width:3.5px;background:var(--orange);border-radius:2px;height:6px}
@@ -51,7 +51,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 @media (prefers-reduced-motion:reduce){.ivcard.speaking .voice i{animation:none;height:12px}}
 
 .q-label{font-size:11.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin:2.2rem 0 1rem}
-.question{max-width:760px;text-align:center;font-size:clamp(1.35rem,2.8vw,2.15rem);font-weight:750;letter-spacing:-.7px;line-height:1.32;color:var(--navy);min-height:2.6em}
+.question{max-width:760px;text-align:center;font-size:clamp(1.35rem,2.8vw,2.15rem);font-weight:750;letter-spacing:-.7px;line-height:1.32;color:var(--ink);min-height:2.6em}
 .question .caret{display:inline-block;width:3px;height:1em;background:var(--orange);border-radius:2px;vertical-align:-.15em;margin-left:3px;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{50%{opacity:0}}
 
@@ -65,10 +65,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 @keyframes soft{50%{box-shadow:0 0 0 6px rgba(0,0,0,.04);opacity:.75}}
 @media (prefers-reduced-motion:reduce){.presence i{animation:none}}
 
-.selfview{position:fixed;right:1.6rem;bottom:1.6rem;width:210px;aspect-ratio:4/3;border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-xl);border:1px solid var(--border);background:#0b1a30;z-index:40;display:none}
+.selfview{position:fixed;right:1.6rem;bottom:1.6rem;width:210px;aspect-ratio:4/3;border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-xl);border:1px solid var(--border);background:#111827;z-index:40;display:none}
 .selfview.on{display:block}
 .selfview video{width:100%;height:100%;object-fit:cover;display:block}
-.selfview .tag{position:absolute;left:10px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(20,40,72,.55);padding:3px 9px;border-radius:var(--r-pill)}
+.selfview .tag{position:absolute;left:10px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(31,41,55,.55);padding:3px 9px;border-radius:var(--r-pill)}
 .end{position:fixed;left:1.6rem;bottom:1.6rem;z-index:40;display:none}
 .end.on{display:block}
 .end button{font-family:inherit;font-size:13px;font-weight:700;color:var(--t2);background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--r-pill);padding:10px 20px;cursor:pointer;box-shadow:var(--shadow-sm)}
@@ -81,10 +81,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* landing + complete cards */
 .bigcard{max-width:520px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.4rem 2.2rem;text-align:center}
-.bigcard h1{font-size:1.55rem;font-weight:900;letter-spacing:-.7px;color:var(--navy);margin:.9rem 0 .6rem}
+.bigcard h1{font-size:1.55rem;font-weight:900;letter-spacing:-.7px;color:var(--ink);margin:.9rem 0 .6rem}
 .bigcard .sub{font-size:.95rem;color:var(--t2);line-height:1.65;max-width:400px;margin:0 auto}
 .expect{margin:1.5rem auto 0;max-width:380px;text-align:left;font-size:.88rem;color:var(--t2);line-height:2}
-.expect b{color:var(--navy)}
+.expect b{color:var(--ink)}
 .expect svg{vertical-align:-3px;margin-right:8px}
 .notice{margin-top:1.2rem;background:var(--og);border:1px solid rgba(245,124,46,.25);border-radius:var(--r-lg);padding:.7rem .95rem;font-size:.78rem;color:var(--t2);line-height:1.55;text-align:left}
 .btn-begin{margin-top:1.5rem;width:100%;padding:16px;border-radius:var(--r-lg);border:none;font-family:inherit;font-size:16px;font-weight:800;color:#fff;background:var(--orange);cursor:pointer;box-shadow:0 6px 20px rgba(245,124,46,.32)}
@@ -122,7 +122,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <div class="top">
   <div class="wordmark">
-    <svg height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#142848"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/><rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/><rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/><path d="M15 19 L24 28 L49 8" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1f2937"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#fff"/><rect x="27.5" y="33" width="9" height="19" rx="2" fill="#F57C2E"/><rect x="41" y="26" width="9" height="26" rx="2" fill="#F57C2E"/><path d="M15 19 L24 28 L49 8" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     TopCandidate<span style="color:var(--orange)">.pro</span>
   </div>
   <div class="top-right">
@@ -191,7 +191,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   </div>
   <div class="typed" id="typed">
     <div class="typed-label" id="typed-label">Type your answer</div>
-    <div id="typed-q" style="display:none;font-size:15px;font-weight:700;color:#142848;line-height:1.55;margin:2px 0 10px;text-align:left"></div>
+    <div id="typed-q" style="display:none;font-size:15px;font-weight:700;color:#1f2937;line-height:1.55;margin:2px 0 10px;text-align:left"></div>
     <textarea id="typed-ta" maxlength="4000" placeholder="Type your answer here…"></textarea>
     <div class="typed-hints"><span>Take your time — the interviewer will wait.</span><span>🎙 Mic paused while you type</span></div>
     <button class="typed-submit" id="typed-submit" type="button">Submit answer</button>

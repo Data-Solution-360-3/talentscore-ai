@@ -9,15 +9,15 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  /* Logo-derived palette: orange primary, deep navy text/accents, on warm white */
-  --navy:#142848;--indigo:#E16A1F;--indigo2:#0F2540;
+  /* Logo-derived palette: orange primary, deep dark text/accents, on warm white */
+  --ink:#128A40;--indigo:#E16A1F;--indigo2:#128A40;
   --ig:rgba(245,124,46,.08);--ib:rgba(245,124,46,.20);
   --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
   /* Light surfaces — bg is slightly off-white so cards (pure white) "lift" off it */
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;--s4:#E4E8F0;
   --border:#E4E8F0;--border2:#D5DCE8;--border3:#BFC8D8;
-  /* Text: deep navy primary, midtone secondary, soft tertiary */
-  --text:#142848;--t2:#4A5970;--t3:#8593AB;
+  /* Text: deep dark primary, midtone secondary, soft tertiary */
+  --text:#1f2937;--t2:#4B5563;--t3:#6B7280;
   --green:#16A34A;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.25);
   --red:#DC2626;--rg:rgba(220,38,38,.08);--rb:rgba(220,38,38,.25);
   --amber:#D97706;--amg:rgba(217,119,6,.10);--amb:rgba(217,119,6,.28);
@@ -35,17 +35,17 @@
   --r-xl:16px;  /* feature cards, big surfaces */
   --r-pill:9999px; /* full pills */
   /* Shadow scale — same idea. Pick the one that matches elevation. */
-  --shadow-sm:0 1px 2px rgba(20,40,72,.04);
-  --shadow-md:0 1px 3px rgba(20,40,72,.06),0 2px 6px rgba(20,40,72,.04);
-  --shadow-lg:0 4px 12px rgba(20,40,72,.06),0 8px 24px rgba(20,40,72,.06);
-  --shadow-xl:0 12px 32px rgba(20,40,72,.10),0 24px 60px rgba(20,40,72,.10);
+  --shadow-sm:0 1px 2px rgba(31,41,55,.04);
+  --shadow-md:0 1px 3px rgba(31,41,55,.06),0 2px 6px rgba(31,41,55,.04);
+  --shadow-lg:0 4px 12px rgba(31,41,55,.06),0 8px 24px rgba(31,41,55,.06);
+  --shadow-xl:0 12px 32px rgba(31,41,55,.10),0 24px 60px rgba(31,41,55,.10);
   /* Legacy aliases — kept so existing code doesn't break. Map to the new scale. */
   --r:var(--r-lg);--rs:var(--r-md);--rxs:var(--r-sm);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── TOPBAR ── */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:.75rem;box-shadow:0 1px 3px rgba(20,40,72,.04)}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:56px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:.75rem;box-shadow:0 1px 3px rgba(31,41,55,.04)}
 .t-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0}
 .t-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--orange),var(--orange2));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(245,124,46,.25)}
 .t-name{font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
@@ -121,7 +121,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .stats-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px}
 
 /* ── Reference-layout dashboard — SCOPED to #page-overview. Green primary,
-   orange accent, charcoal text, no navy/blue. Sidebar + top bar unaffected. ── */
+   orange accent, charcoal text, no dark/blue. Sidebar + top bar unaffected. ── */
 .rd{--rg-green:#16A34A;--rg-green2:#128A40;--rg-gg:rgba(22,163,74,.10);--rg-gg2:rgba(22,163,74,.16);
   --rg-org:#F57C2E;--rg-org2:#E16A1F;--rg-og:rgba(245,124,46,.12);
   --rg-pur:#7C5CD6;--rg-pg:rgba(124,92,214,.12);--rg-red:#E4544B;--rg-rd:rgba(228,84,75,.12);
@@ -203,8 +203,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-primary:hover{background:var(--orange2)}
 .btn-orange{background:var(--orange);color:#fff}
 .btn-orange:hover{background:var(--orange2)}
-.btn-navy{background:var(--orange);color:#fff}
-.btn-navy:hover{background:var(--indigo2)}
+.btn-ink{background:var(--orange);color:#fff}
+.btn-ink:hover{background:var(--indigo2)}
 .btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border2)}
 .btn-ghost:hover{background:var(--s3);color:var(--text)}
 .btn-sm{padding:4px 9px;font-size:11px}
@@ -252,7 +252,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .density-seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r-sm);overflow:hidden}
 .density-seg button{border:none;background:var(--surface);color:var(--t2);font-size:11px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
 .density-seg button+button{border-left:1px solid var(--border2)}
-.density-seg button.active{background:var(--ig);color:var(--navy)}
+.density-seg button.active{background:var(--ig);color:var(--ink)}
 .density-seg button:hover:not(.active){background:var(--s2)}
 .tbl-empty{text-align:center;padding:2.5rem;color:var(--t3);font-size:12px}
 .tbl-link{color:var(--indigo);font-weight:600;text-decoration:none}
@@ -342,7 +342,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── Candidates page reskin — SCOPED to #page-candidates so no other table,
    filter bar, or badge changes. Presentation only; every id/sort/filter and
    the density toggle keep working. ── */
-#page-candidates{--lift-sm:0 1px 2px rgba(20,40,72,.03),0 4px 16px rgba(20,40,72,.05)}
+#page-candidates{--lift-sm:0 1px 2px rgba(31,41,55,.03),0 4px 16px rgba(31,41,55,.05)}
 #page-candidates .card{border:none;border-radius:16px;box-shadow:var(--lift-sm)}
 #page-candidates .filters-row{margin-bottom:0}
 #page-candidates .cand-primary{gap:10px;align-items:center}
@@ -401,7 +401,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .form-hint{font-size:10px;color:var(--t3);margin-top:2px}
 
 /* ── MODAL ── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;transition:opacity .15s ease-out}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(31,41,55,.55);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;transition:opacity .15s ease-out}
 .modal-overlay.open{display:flex;opacity:1}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.35rem;width:90%;max-width:560px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-xl);transform:scale(.96);transition:transform .18s cubic-bezier(.2,.7,.3,1)}
 .modal-overlay.open .modal{transform:scale(1)}
@@ -533,17 +533,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .ctab-pane{display:none}
 .ctab-pane.act{display:block}
 #ctab-iv .turn-wrap{max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-lg);padding:.2rem .8rem .6rem;background:var(--surface);margin-top:.4rem}
-#cand-modal-body .score-big{font-size:1.55rem;font-weight:900;color:var(--navy);letter-spacing:-1px}
+#cand-modal-body .score-big{font-size:1.55rem;font-weight:900;color:var(--ink);letter-spacing:-1px}
 #cand-modal-body .dim{padding:.55rem 0;border-bottom:1px solid var(--border)}
 #cand-modal-body .dim:last-child{border-bottom:none}
-#cand-modal-body .dim-top{display:flex;justify-content:space-between;font-weight:700;font-size:.85rem;color:var(--navy)}
+#cand-modal-body .dim-top{display:flex;justify-content:space-between;font-weight:700;font-size:.85rem;color:var(--ink)}
 #cand-modal-body .dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);margin:.35rem 0;overflow:hidden}
 #cand-modal-body .dim-bar i{display:block;height:100%;background:var(--orange)}
 #cand-modal-body .dim-reason{font-size:.8rem;color:var(--t2);line-height:1.5}
 #cand-modal-body .dim-ev{font-size:.77rem;color:var(--t3);font-style:italic;margin-top:.2rem;border-left:3px solid var(--border2);padding-left:.6rem}
 #cand-modal-body .turn{margin:.5rem 0;font-size:.85rem;line-height:1.6;padding:.5rem .8rem;border-radius:12px;max-width:94%}
 #cand-modal-body .turn.ai{background:rgba(245,124,46,.07);border-left:3px solid #E16A1F;color:var(--t2);border-top-left-radius:4px}
-#cand-modal-body .turn.you{background:rgba(22,163,74,.09);border-left:3px solid var(--green);color:var(--navy);font-weight:600;margin-left:6%;border-top-left-radius:4px}
+#cand-modal-body .turn.you{background:rgba(22,163,74,.09);border-left:3px solid var(--green);color:var(--ink);font-weight:600;margin-left:6%;border-top-left-radius:4px}
 #cand-modal-body .turn .who{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px}
 #cand-modal-body .turn.ai .who{color:#E16A1F}
 #cand-modal-body .turn.you .who{color:var(--green)}
@@ -2676,7 +2676,7 @@ function toast(message, opts){
   const duration = opts.duration || (type==='error' ? 8000 : type==='warning' ? 6000 : 4000);
 
   const el = document.createElement('div');
-  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(20,40,72,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
+  el.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-left:4px solid ${cfg.color};color:var(--text);padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 24px rgba(31,41,55,.12);pointer-events:auto;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .25s cubic-bezier(.2,.7,.3,1),opacity .2s;max-width:380px;line-height:1.4`;
   el.innerHTML = `<span style="font-size:16px;color:${cfg.color};font-weight:700;flex-shrink:0;line-height:1.2">${cfg.icon}</span><div style="flex:1;min-width:0;word-wrap:break-word">${String(message).replace(/</g,'&lt;')}</div>`;
 
   _getToastContainer().appendChild(el);
@@ -3112,14 +3112,14 @@ function confirmDialog(opts){
   opts = opts || {};
   return new Promise(resolve => {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(31,41,55,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
     const danger = !!opts.danger;
     const confirmText = opts.confirmText || (danger ? 'Delete' : 'Confirm');
     const cancelText  = opts.cancelText  || 'Cancel';
     const confirmBtnClass = danger ? 'btn-red' : 'btn-primary';
 
     overlay.innerHTML = `
-      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
+      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(31,41,55,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
         <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Are you sure?').replace(/</g,'&lt;')}</h3>
         ${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1.25rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}
         <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -3161,14 +3161,14 @@ function promptDialog(opts){
   opts = opts || {};
   return new Promise(resolve => {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,40,72,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(31,41,55,.55);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);opacity:0;transition:opacity .15s';
     const danger = !!opts.danger;
     const confirmText = opts.confirmText || 'Confirm';
     const confirmBtnClass = danger ? 'btn-red' : 'btn-primary';
     const requiredHint = opts.mustMatch ? `<div style="font-size:11px;color:var(--t3);margin-top:4px">Type <code style="background:var(--s2);padding:1px 5px;border-radius:3px;font-size:11px">${opts.mustMatch}</code> to confirm</div>` : '';
 
     overlay.innerHTML = `
-      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(20,40,72,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
+      <div role="dialog" aria-modal="true" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:440px;width:90%;box-shadow:0 24px 60px rgba(31,41,55,.25);transform:scale(.96);transition:transform .15s cubic-bezier(.2,.7,.3,1)">
         <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.2px">${(opts.title||'Confirm').replace(/</g,'&lt;')}</h3>
         ${opts.body ? `<p style="font-size:13px;color:var(--t2);line-height:1.55;margin:0 0 1rem">${String(opts.body).replace(/</g,'&lt;')}</p>` : ''}
         <input type="text" class="form-input" id="_promptInput" placeholder="${opts.placeholder||''}" style="margin-bottom:4px">
@@ -5377,10 +5377,10 @@ function payPrintSlip(id){
   const w=window.open('','_blank','width=680,height=760');
   const money=n=>Number(n||0).toLocaleString();
   w.document.write(`<html><head><title>Payslip ${escapeHtml(p.employee_name||'')} — ${p.month}</title>
-  <style>body{font-family:Arial,sans-serif;padding:28px;color:#142848;max-width:560px;margin:0 auto}
-  h2{margin:0}.mut{color:#8593AB;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#1f2937;max-width:560px;margin:0 auto}
+  h2{margin:0}.mut{color:#6B7280;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
   td{padding:7px 4px;border-bottom:1px solid #E4E8F0}.r{text-align:right}.warn{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:9px 12px;font-size:11px;color:#9A3412;margin-top:14px;line-height:1.5}
-  .tot{font-weight:800;border-top:2px solid #142848}</style></head><body>
+  .tot{font-weight:800;border-top:2px solid #1f2937}</style></head><body>
   <h2>Payslip — ${p.month}</h2>
   <div class="mut">${escapeHtml(p.employee_name||'')}${p.department?' · '+escapeHtml(p.department):''} · BDT · DRAFT (money math held)</div>
   <table>
