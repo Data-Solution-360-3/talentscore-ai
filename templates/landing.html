@@ -37,7 +37,9 @@
   --navy:#142848;   /* text + dark panels only — never an accent */
   --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
   --green:#16A34A;--green2:#128A40;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.28);
-  --bg:#F7F9FC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  --bg:#FBFAF7;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
+  /* very-light section tints — warm + green, never loud */
+  --tint-green:#F4FAF6;--tint-orange:#FEF8F2;
   --border:#E4E8F0;--border2:#D5DCE8;--border3:#BFC8D8;
   --text:#142848;--t2:#4A5970;--t3:#8593AB;
   --r-xs:4px;--r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-xxl:22px;--r-pill:9999px;
@@ -65,8 +67,8 @@ a{color:inherit}
 
 /* ── shared section furniture ── */
 .wrap{max-width:1140px;margin:0 auto;padding:0 var(--sp-3)}
-.sec{padding:var(--sp-11) 0}
-.sec-alt{background:var(--surface)}
+.sec{padding:var(--sp-11) 0;background:var(--tint-green)}
+.sec-alt{background:var(--tint-orange)}
 .sec-head{max-width:680px;margin:0 auto var(--sp-6);text-align:center}
 .sec-eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--orange2);margin-bottom:var(--sp-2)}
 .sec-title{font-size:clamp(1.8rem,3.6vw,2.55rem);font-weight:900;letter-spacing:-.03em;color:var(--navy);line-height:1.12;margin-bottom:var(--sp-2)}
@@ -85,7 +87,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .btn-orange-sm:hover{background:var(--orange2);transform:translateY(-1px)}
 
 /* ── 1. HERO ── */
-.hero{position:relative;overflow:hidden;padding:var(--sp-11) var(--sp-3) var(--sp-8);background:var(--surface)}
+.hero{position:relative;overflow:hidden;padding:var(--sp-11) var(--sp-3) var(--sp-8);background:linear-gradient(168deg,#FFFFFF 0%,#FCFBF7 55%,#F5FAF6 100%)}
 .hero::before{content:'';position:absolute;top:-340px;left:62%;width:1100px;height:660px;background:radial-gradient(ellipse at center,rgba(245,124,46,.055),transparent 66%);pointer-events:none}
 .hero-grid{position:relative;max-width:1140px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:var(--sp-8);align-items:center}
 .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:7px 15px;margin-bottom:var(--sp-3)}
@@ -108,24 +110,31 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .frame-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;background:var(--s2);border-bottom:1px solid var(--border)}
 .frame-bar .d{width:11px;height:11px;border-radius:50%}
 .frame-url{margin-left:10px;flex:1;background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);font-size:11px;color:var(--t3);padding:4px 12px}
-.ph{aspect-ratio:16/10.5;background:linear-gradient(160deg,#fff,var(--s2));display:grid;place-items:center;position:relative}
-.ph-note{position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:11px;color:var(--t3);font-weight:600}
-.sketch{width:86%;display:flex;flex-direction:column;gap:12px;opacity:.92}
-.sk-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-.sk-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:11px;box-shadow:var(--shadow-sm)}
-.sk-card .n{height:16px;width:60%;border-radius:4px;background:var(--s3);margin-bottom:6px}
-.sk-card .l{height:7px;width:85%;border-radius:4px;background:var(--s2)}
-.sk-card:nth-child(2) .n{background:rgba(245,124,46,.22)}
-.sk-card:nth-child(3) .n{background:rgba(22,163,74,.22)}
-.sk-table{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-sm)}
-.sk-tr{display:grid;grid-template-columns:26px 1.4fr .8fr .6fr;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border)}
-.sk-tr:last-child{border-bottom:none}
-.ring{width:22px;height:22px;border-radius:50%;border:3px solid var(--green)}
-.ring.a{border-color:var(--orange)}.ring.r{border-color:#BE3144}
-.sk-tr .a1{height:8px;border-radius:4px;background:var(--s3)}
-.sk-tr .a2{height:8px;border-radius:4px;background:var(--s2)}
-.sk-pill{height:16px;border-radius:9px;background:var(--gg)}
-.sk-pill.o{background:rgba(245,124,46,.16)}
+/* Hero dashboard mockup — populated with the product's real figures */
+.dash{padding:14px;background:linear-gradient(165deg,#FFFFFF,#F5FAF7)}
+.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:11px}
+.ds{background:#fff;border-radius:11px;padding:11px 12px;box-shadow:var(--shadow-sm);border-top:2.5px solid var(--green)}
+.ds:nth-child(2){border-top-color:var(--orange)}
+.ds:nth-child(4){border-top-color:var(--orange)}
+.ds-n{font-size:1.55rem;font-weight:900;color:var(--navy);letter-spacing:-1px;line-height:1}
+.ds-n.o{color:var(--orange2)}.ds-n.g{color:var(--green2)}
+.ds-l{font-size:10px;font-weight:700;color:var(--t3);margin-top:4px;letter-spacing:.02em}
+.dash-tbl{background:#fff;border-radius:11px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.dr{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px 13px;border-bottom:1px solid var(--border)}
+.dr:last-child{border-bottom:none}
+.dr-h{background:var(--s2);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);padding-top:7px;padding-bottom:7px}
+.dr-h span:last-child{text-align:right}
+.dr-c{display:flex;align-items:center;gap:10px;min-width:0}
+.dring{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex-shrink:0}
+.dring.g{border:2.5px solid var(--green);color:var(--green2)}
+.dring.o{border:2.5px solid var(--orange);color:var(--orange2)}
+.dring.r{border:2.5px solid #DC2626;color:#DC2626}
+.dr-nm{font-size:12.5px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:10px;font-weight:800;padding:3px 11px;border-radius:9999px;white-space:nowrap}
+.pill.g{background:var(--gg);color:var(--green2)}
+.pill.o{background:var(--og);color:var(--orange2)}
+.pill.r{background:rgba(220,38,38,.10);color:#DC2626}
+.pill.n{background:var(--s2);color:var(--t3)}
 
 /* ── 2. HOW IT WORKS — Part A steps ── */
 .part-label{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:var(--sp-3)}
@@ -259,8 +268,11 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .faq-a{padding:0 1.35rem 1.25rem;font-size:.93rem;color:var(--t2);line-height:1.68}
 
 /* ── FOOTER ── */
-footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 var(--sp-4)}
-.foot-grid{display:flex;justify-content:space-between;gap:var(--sp-6);flex-wrap:wrap;padding-bottom:var(--sp-4);border-bottom:1px solid rgba(255,255,255,.12)}
+footer{position:relative;background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 var(--sp-4);border-top:4px solid var(--orange)}
+footer::before{content:'';position:absolute;top:-4px;left:0;width:38%;height:4px;background:var(--green)}
+footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height:280px;background:radial-gradient(ellipse at center,rgba(245,124,46,.16),transparent 68%);pointer-events:none}
+.foot-grid{position:relative;z-index:1;display:flex;justify-content:space-between;gap:var(--sp-6);flex-wrap:wrap;padding-bottom:var(--sp-4);border-bottom:1px solid rgba(255,255,255,.12)}
+.foot-bot{position:relative;z-index:1}
 .foot-brand{max-width:320px}
 .foot-logo{display:flex;align-items:center;gap:9px;margin-bottom:.9rem}
 .foot-col-title{font-size:12px;font-weight:800;color:#fff;letter-spacing:.09em;text-transform:uppercase;margin-bottom:.9rem}
@@ -340,7 +352,6 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
 <section class="hero">
   <div class="hero-grid">
     <div class="hero-copy">
-      <div class="hero-eyebrow rv">🇧🇩 Built for Bangladesh's HR teams</div>
       <h1 class="hero-h1 rv" style="--d:.06s">Every candidate,<br>scored on <span class="o">your&nbsp;rubric.</span></h1>
       <p class="hero-lead rv" style="--d:.12s">One link: CV screening, then a live AI interview. Every score recomputed in code.</p>
       <div class="hero-actions rv" style="--d:.18s">
@@ -362,28 +373,23 @@ footer{background:var(--navy);color:rgba(255,255,255,.62);padding:var(--sp-6) 0 
           <span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span>
           <span class="frame-url">topcandidate.pro/app</span>
         </div>
-        <!-- Real dashboard screenshot. The placeholder sketch shows by default;
-             it's hidden the moment the real image loads, and if static/dashboard.png
-             is missing the image hides itself and the placeholder stays. -->
-        <img src="/static/dashboard.png" alt="TopCandidate dashboard — ranked candidates, pipeline, and the scoring funnel"
-             onload="var p=document.getElementById('shot-ph');if(p)p.style.display='none';"
-             onerror="this.style.display='none';">
-        <div class="ph" id="shot-ph">
-          <div class="sketch">
-            <div class="sk-row">
-              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
-              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
-              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
-              <div class="sk-card"><div class="n"></div><div class="l"></div></div>
-            </div>
-            <div class="sk-table">
-              <div class="sk-tr"><div class="ring"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill"></div></div>
-              <div class="sk-tr"><div class="ring a"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill o"></div></div>
-              <div class="sk-tr"><div class="ring"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill"></div></div>
-              <div class="sk-tr"><div class="ring r"></div><div class="a1"></div><div class="a2"></div><div class="sk-pill o"></div></div>
-            </div>
+        <!-- A styled mockup (not a live screenshot) populated with the product's
+             genuine figures — real scale, honest score range, no inflated stats. -->
+        <div class="dash">
+          <div class="dash-stats">
+            <div class="ds"><div class="ds-n">141</div><div class="ds-l">Candidates</div></div>
+            <div class="ds"><div class="ds-n o">10</div><div class="ds-l">Active roles</div></div>
+            <div class="ds"><div class="ds-n g">36</div><div class="ds-l">Avg score</div></div>
+            <div class="ds"><div class="ds-n">12</div><div class="ds-l">Shortlisted</div></div>
           </div>
-          <div class="ph-note">Dashboard preview</div>
+          <div class="dash-tbl">
+            <div class="dr dr-h"><span>Candidate</span><span>Status</span></div>
+            <div class="dr"><div class="dr-c"><span class="dring g">72</span><span class="dr-nm">Rahim Uddin</span></div><span class="pill g">Shortlist</span></div>
+            <div class="dr"><div class="dr-c"><span class="dring o">58</span><span class="dr-nm">Nusrat Jahan</span></div><span class="pill o">Interview</span></div>
+            <div class="dr"><div class="dr-c"><span class="dring g">67</span><span class="dr-nm">Karima Begum</span></div><span class="pill g">Shortlist</span></div>
+            <div class="dr"><div class="dr-c"><span class="dring o">44</span><span class="dr-nm">Tanvir Ahmed</span></div><span class="pill n">Screening</span></div>
+            <div class="dr"><div class="dr-c"><span class="dring r">29</span><span class="dr-nm">Arif Hossain</span></div><span class="pill r">Reject</span></div>
+          </div>
         </div>
       </div>
     </div>
