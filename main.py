@@ -3197,10 +3197,10 @@ async def submit_demo_request(
 
 
 @app.get("/api/admin/demo-requests")
-async def admin_list_demo_requests(request: Request):
+async def admin_list_demo_requests(request: Request, _admin: dict = Depends(require_super_admin)):
     """Super-admin only lead inbox. Gated exactly like the HRM routes — a client
-    account gets the same generic 403 and cannot learn this exists."""
-    await require_super_admin(request)
+    account gets the same generic 403 and cannot learn this exists. Auth is a
+    dependency so it runs BEFORE any body/param validation (no 422 leak)."""
     from database import db as mongodb
     items = []
     async for d in mongodb.demo_requests.find().sort("created_at", -1).limit(300):
@@ -3214,9 +3214,11 @@ async def admin_list_demo_requests(request: Request):
 
 
 @app.post("/api/admin/demo-requests/{req_id}/status")
-async def admin_update_demo_status(request: Request, req_id: str, status: str = Form(...)):
-    """Move a lead through new → contacted → scheduled → closed. Super-admin only."""
-    await require_super_admin(request)
+async def admin_update_demo_status(req_id: str, status: str = Form(...),
+                                   _admin: dict = Depends(require_super_admin)):
+    """Move a lead through new → contacted → scheduled → closed. Super-admin only.
+    Auth is a dependency so an unauthorized caller is refused (403) before the
+    form is even validated — never a 422 that reveals the endpoint's shape."""
     if status not in {"new", "contacted", "scheduled", "closed"}:
         raise HTTPException(status_code=400, detail="Invalid status.")
     from database import db as mongodb
