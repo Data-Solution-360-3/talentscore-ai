@@ -286,6 +286,25 @@ let transcript=[], aiBuf='';
 let questionsAsked=0, skipNextCount=false, closing=false, closingDone=false;
 let aiSpeaking=false, bargeIns=0, recoveries=0, recoveryStart=0;
 let sessionSaved=false, startedAtMs=0;
+// Owner-only cost telemetry: sum token usage from every response.done (audio
+// dominates the bill; cached input is the prompt-cache discount). Posted with
+// the session on save. Measurement only — never gates scoring or the flow.
+let usageAcc={resp:0, inTok:0, outTok:0, cachedTok:0,
+              inAudio:0, inText:0, cachedAudio:0, cachedText:0, outAudio:0, outText:0};
+function accumulateUsage(u){
+  if(!u || typeof u!=='object') return;
+  const id=u.input_token_details||{}, od=u.output_token_details||{}, cd=id.cached_tokens_details||{};
+  usageAcc.resp        += 1;
+  usageAcc.inTok       += (+u.input_tokens||0);
+  usageAcc.outTok      += (+u.output_tokens||0);
+  usageAcc.cachedTok   += (+id.cached_tokens||0);
+  usageAcc.inAudio     += (+id.audio_tokens||0);
+  usageAcc.inText      += (+id.text_tokens||0);
+  usageAcc.cachedAudio += (+cd.audio_tokens||0);
+  usageAcc.cachedText  += (+cd.text_tokens||0);
+  usageAcc.outAudio    += (+od.audio_tokens||0);
+  usageAcc.outText     += (+od.text_tokens||0);
+}
 let started=false;
 // mixed spoken/typed — the model flips the mode by calling begin_typed_answer
 let typing=false, typedCallId=null, typedQuestion='', restoreTD=null;
@@ -656,6 +675,7 @@ function onEvent(ev){
     setPresence('ai', IV_NAME+' is speaking');
   }else if(t.includes('response.done')){
     aiSpeaking = false;
+    accumulateUsage(msg.response && msg.response.usage);  // count every billed response, incl. barge-ins
     const status = (msg.response && msg.response.status) || 'completed';
     if(status !== 'completed') return;          // barge-in: not an asked question
     if(closing){
@@ -1001,7 +1021,8 @@ async function saveSession(status){
         transcript, status,
         questions_asked: questionsAsked, recoveries, barge_ins: bargeIns,
         duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000):0,
-        proctoring: window._procSummary || {enabled:false}
+        proctoring: window._procSummary || {enabled:false},
+        usage: usageAcc
       })});
   }catch(e){ log('save failed', e); }
 }

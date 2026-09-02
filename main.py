@@ -119,6 +119,54 @@ APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 # Stable alias is "gpt-realtime"; "gpt-realtime-2.1" is the current snapshot.
 VIVA_LIVE_MODEL = os.getenv("VIVA_LIVE_MODEL", "gpt-realtime-2.1")
 
+# ── Realtime usage → estimated cost (owner-only telemetry) ──────────────
+# Published gpt-realtime pricing, USD per 1M tokens. These are ESTIMATES and
+# are surfaced as such in the UI; OpenAI can change them, so bump the version
+# tag when you edit a rate. Prompt caching bills the reused input prefix at the
+# cached rate — a steep discount — which is the whole reason the instruction
+# prefix is kept byte-identical across turns and drop-recovery re-mints.
+VIVA_RATES_VERSION = "gpt-realtime-2.1@2026-09"
+_RT_RATE = {
+    "audio_in": 32.0, "audio_cached_in": 0.40, "audio_out": 64.0,
+    "text_in": 4.0,   "text_cached_in": 0.40,  "text_out": 16.0,
+}
+
+
+def _summarize_usage(u: dict) -> dict:
+    """Fold the client-accumulated Realtime token usage (summed from every
+    response.done in the session) into a stored, owner-only cost summary. Every
+    value is clamped to a sane int; the USD figure is ESTIMATED from _RT_RATE
+    and labelled "estimated" wherever it is shown. No behaviour depends on this
+    — it is pure measurement."""
+    def _n(v):
+        try:
+            return max(0, min(2_000_000_000, int(v)))
+        except Exception:
+            return 0
+    resp       = _n(u.get("resp"))
+    in_tok     = _n(u.get("inTok"))
+    out_tok    = _n(u.get("outTok"))
+    cached_tok = _n(u.get("cachedTok"))
+    in_audio   = _n(u.get("inAudio"))
+    in_text    = _n(u.get("inText"))
+    cached_aud = min(_n(u.get("cachedAudio")), in_audio)
+    cached_txt = min(_n(u.get("cachedText")), in_text)
+    out_audio  = _n(u.get("outAudio"))
+    out_text   = _n(u.get("outText"))
+    unc_aud = max(0, in_audio - cached_aud)
+    unc_txt = max(0, in_text - cached_txt)
+    R = _RT_RATE
+    usd = (unc_aud * R["audio_in"] + cached_aud * R["audio_cached_in"]
+           + unc_txt * R["text_in"] + cached_txt * R["text_cached_in"]
+           + out_audio * R["audio_out"] + out_text * R["text_out"]) / 1_000_000.0
+    hit = round(100.0 * cached_tok / in_tok, 1) if in_tok else 0.0
+    return {"responses": resp, "input": in_tok, "cached_input": cached_tok,
+            "output": out_tok, "in_audio": in_audio, "in_text": in_text,
+            "cached_audio": cached_aud, "cached_text": cached_txt,
+            "out_audio": out_audio, "out_text": out_text,
+            "est_usd": round(usd, 4), "cache_hit_pct": hit,
+            "rates_version": VIVA_RATES_VERSION}
+
 
 # ─────────────────────────────────────────────────────────────
 # Standalone admin UI for manual payment review.
@@ -2215,6 +2263,13 @@ async def viva_live_token(request: Request):
                 lines.append(f"{role}: {text[:400]}")
         joined = "\n".join(lines)[-_MAX_RECOVERY_CHARS:]
         if joined:
+            # PROMPT-CACHE LOCK: `instructions` above is the byte-identical
+            # stable prefix from _build_live_instructions (same for every
+            # candidate, turn, and re-mint of this job). All dynamic content —
+            # the running transcript, "asked K of N", scenario/typed state —
+            # MUST be APPENDED here, never prepended or interleaved, or the
+            # Realtime prefix cache stops matching and the interview gets more
+            # expensive. Keep every mutation below as `instructions += ...`.
             instructions += _VIVA_RECOVERY_TEMPLATE.format(
                 lines=joined, asked=asked, max_turns=max_turns)
             recovered = True
@@ -2794,6 +2849,13 @@ async def candidate_session_token(request: Request, token: str):
                 lines.append(f"{role}: {text[:400]}")
         joined = "\n".join(lines)[-_MAX_RECOVERY_CHARS:]
         if joined:
+            # PROMPT-CACHE LOCK: `instructions` above is the byte-identical
+            # stable prefix from _build_live_instructions (same for every
+            # candidate, turn, and re-mint of this job). All dynamic content —
+            # the running transcript, "asked K of N", scenario/typed state —
+            # MUST be APPENDED here, never prepended or interleaved, or the
+            # Realtime prefix cache stops matching and the interview gets more
+            # expensive. Keep every mutation below as `instructions += ...`.
             instructions += _VIVA_RECOVERY_TEMPLATE.format(
                 lines=joined, asked=asked, max_turns=max_turns)
             recovered = True
@@ -2922,6 +2984,16 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
                              "final_scr": str(p.get("final_scr", ""))[:20]}
     else:
         doc["proctoring"] = {"enabled": False}
+
+    # Owner-only cost telemetry: client sums response.usage across the session
+    # and posts it here. Pure measurement — nothing about scoring or the flow
+    # touches it; malformed usage is simply dropped.
+    u = body.get("usage")
+    if isinstance(u, dict):
+        try:
+            doc["usage"] = _summarize_usage(u)
+        except Exception:
+            pass
 
     session_id = await save_interview_session(doc)
     if doc["status"] == "completed":

@@ -90,7 +90,25 @@ window.SessionRender = (function(){
       <span>${s.recoveries||0} network drop(s) survived</span>
       <span>${s.barge_ins||0} barge-in(s)</span>
       <span>patience: ${esc((s.config&&s.config.vad)||'—')}</span>
-      <span>${esc(s.status||'')}</span></div>`;
+      <span>${esc(s.status||'')}</span></div>` + costHTML(s);
+  }
+
+  // ── Owner-only cost telemetry. Both surfaces that call this (recruiter
+  //    results + candidate report) are recruiter-facing; candidates never see
+  //    it. USD is an estimate from the server's named rate constants. ──
+  function costHTML(s){
+    const u = s.usage;
+    if(!u || typeof u!=='object') return '';
+    const usd = (typeof u.est_usd==='number') ? u.est_usd : 0;
+    const hit = (typeof u.cache_hit_pct==='number') ? u.cache_hit_pct : 0;
+    const k = n => (Math.abs(+n||0)>=1000 ? ((+n||0)/1000).toFixed(1)+'k' : String(+n||0));
+    const tip = `input ${k(u.input)} tok (cached ${k(u.cached_input)}) · output ${k(u.output)} tok`
+              + ` · audio in/out ${k(u.in_audio)}/${k(u.out_audio)} · ${u.responses||0} responses`
+              + ` · rates ${u.rates_version||'—'}`;
+    return `<div class="evrow" style="margin:-.3rem 0 .6rem;font-size:11px;color:var(--t3)" title="${esc(tip)}">
+      <span>💵 Est. cost <b>$${usd.toFixed(2)}</b></span>
+      <span>cache hit ${hit}%</span>
+      <span style="opacity:.65">estimated · owner only</span></div>`;
   }
 
   // ── Color-coded transcript: navy interviewer bubbles, green candidate ──
@@ -167,5 +185,5 @@ window.SessionRender = (function(){
     }catch(_){ wrap.textContent = 'Could not load stored frames.'; }
   }
 
-  return {scoresHTML, statsHTML, transcriptHTML, proctoringHTML, loadSnapshots, esc};
+  return {scoresHTML, statsHTML, costHTML, transcriptHTML, proctoringHTML, loadSnapshots, esc};
 })();
