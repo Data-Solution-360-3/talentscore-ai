@@ -405,12 +405,15 @@ async def sitemap_xml():
     return Response(content=_SITEMAP_XML, media_type="application/xml")
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+# GET + HEAD: crawlers and some browsers probe favicons with HEAD first, and a
+# GET-only route answered those with 405. FileResponse handles HEAD natively.
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
 async def favicon_ico():
     path = Path(__file__).parent / "static" / "favicon.ico"
     if not path.exists():
         raise HTTPException(status_code=404, detail="favicon not found")
-    return FileResponse(path, media_type="image/x-icon")
+    return FileResponse(path, media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ─────────────────────────────────────────────────────────────
