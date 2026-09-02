@@ -2446,6 +2446,31 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
                 segs.append({"t": _i(s.get("t"), 0, 86400),
                              "change": str(s.get("change", ""))[:80],
                              "reason": str(s.get("reason", ""))[:200]})
+        # Anti-cheat review flags (allow-but-flag-with-count). Validated + capped;
+        # the client already bounds these, the server bounds them again.
+        _FLAG_TYPES = {"camera_off", "tab_switch", "paste", "copy", "cut",
+                       "no_face", "multi_face", "look_away", "partial_share", "share_stopped"}
+        flags = []
+        for f in (p.get("flags") or [])[:200]:
+            if isinstance(f, dict) and str(f.get("type", "")) in _FLAG_TYPES:
+                fl = {"t": _i(f.get("t"), 0, 86400),
+                      "type": str(f.get("type"))[:20],
+                      "reason": str(f.get("reason", ""))[:160]}
+                if f.get("dur") is not None:
+                    fl["dur"] = _i(f.get("dur"), 0, 86400)
+                flags.append(fl)
+        counts = {}
+        raw_counts = p.get("counts") if isinstance(p.get("counts"), dict) else {}
+        for k in _FLAG_TYPES:
+            v = _i(raw_counts.get(k, 0), 0, 100000)
+            if v:
+                counts[k] = v
+        durations = {}
+        raw_dur = p.get("durations") if isinstance(p.get("durations"), dict) else {}
+        for k in ("camera_off", "tab_away", "look_away"):
+            v = _i(raw_dur.get(k, 0), 0, 86400)
+            if v:
+                durations[k] = v
         doc["proctoring"] = {
             "enabled": True,
             "start_tier": str(p.get("start_tier", ""))[:4],
@@ -2455,6 +2480,12 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
             "snapshots": _i(p.get("snapshots"), 0, 10000),
             "final_cam": str(p.get("final_cam", ""))[:20],
             "final_scr": str(p.get("final_scr", ""))[:20],
+            "flags": flags,
+            "counts": counts,
+            "durations": durations,
+            "cam_on_seconds": _i(p.get("cam_on_seconds"), 0, 86400),
+            "scr_on_seconds": _i(p.get("scr_on_seconds"), 0, 86400),
+            "total_seconds": _i(p.get("total_seconds"), 0, 86400),
         }
     else:
         doc["proctoring"] = {"enabled": False}
@@ -2503,6 +2534,7 @@ async def candidate_snapshot_upload(request: Request, token: str):
         body = await request.json()
         img = str(body.get("img", ""))
         kind = "scr" if body.get("kind") == "scr" else "cam"
+        label = str(body.get("label", ""))[:40]
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid request body.")
     prefix = "data:image/jpeg;base64,"
@@ -2519,7 +2551,7 @@ async def candidate_snapshot_upload(request: Request, token: str):
         # Cap reached: acknowledged, not stored. The page stops trying.
         return {"stored": False, "cap_reached": True}
     await save_proctor_snapshot(token, str(live.get("user_id") or ""),
-                                str(live.get("application_id") or "") or None, kind, data)
+                                str(live.get("application_id") or "") or None, kind, data, label)
     return {"stored": True}
 
 
@@ -2535,6 +2567,7 @@ async def viva_live_session_snapshots(request: Request, session_id: str):
     snaps = await get_snapshots_for_token(sess["interview_token"])
     return {"snapshots": [
         {"kind": s["kind"],
+         "label": s.get("label", ""),
          "created_at": s["created_at"].isoformat() if s.get("created_at") else None,
          "img": "data:image/jpeg;base64," + base64.b64encode(s["data"]).decode()}
         for s in snaps if s.get("data")]}

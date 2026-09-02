@@ -98,7 +98,7 @@ window.SessionRender = (function(){
     let html = `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
     html += (s.transcript||[]).map(t => `
       <div class="turn ${t.role==='ai'?'ai':'you'}">
-        <span class="who">${t.role==='ai'?('🤖 '+esc((s.config&&s.config.interviewer_name)||'AI Interviewer')):'🗣 Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ scenario answer':' · ⌨ typed answer'):''}${t.mode==='scenario'?' · 📋 scenario shown':''}</span>${esc(t.text)}
+        <span class="who">${t.role==='ai'?('🤖 '+esc((s.config&&s.config.interviewer_name)||'AI Interviewer')):'🗣 Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ scenario answer':' · ⌨ typed answer'):''}${t.mode==='scenario'?' · 📋 scenario shown':''}${t.pasted?' · <b style="color:var(--orange2,#E16A1F)">📋 contains pasted content</b>':''}</span>${esc(t.text)}
       </div>`).join('') || '<div class="notice">No transcript captured.</div>';
     return html;
   }
@@ -110,6 +110,28 @@ window.SessionRender = (function(){
     let html = '';
     if(pr && pr.enabled){
       const mmss = t => Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
+      // ── Anti-cheat review flags: counts + coverage numbers, honest labels. ──
+      const c = pr.counts||{}, du = pr.durations||{};
+      const flagChips = [
+        ['camera_off','Camera off', du.camera_off],
+        ['tab_switch','Tab switch / focus lost', du.tab_away],
+        ['paste','Pasted into answer'], ['copy','Copied'], ['cut','Cut'],
+        ['no_face','No face detected'], ['multi_face','Multiple faces'],
+        ['look_away','Look-away', du.look_away],
+        ['partial_share','Partial screen share'], ['share_stopped','Screen share stopped'],
+      ].filter(([k])=> (c[k]||0) > 0).map(([k,label,dur])=>
+        `<span style="display:inline-block;background:var(--og);color:var(--orange2);border:1px solid var(--ob);border-radius:9999px;padding:2px 10px;font-size:11.5px;font-weight:700;margin:0 4px 4px 0">${esc(label)} ×${c[k]}${dur?` · ${dur}s`:''}</span>`
+      ).join('');
+      const camCov = (pr.cam_on_seconds!=null && pr.total_seconds) ? `camera on <b>${mmss(pr.cam_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
+      const scrCov = (pr.scr_on_seconds!=null && pr.total_seconds && pr.final_scr && pr.final_scr!=='unavailable') ? `screen shared <b>${mmss(pr.scr_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
+      const cov = [camCov, scrCov].filter(Boolean).join(' · ');
+      const flagsBlock = `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .3rem">Review flags <span style="text-transform:none;letter-spacing:0;font-weight:500">— monitored + flagged, never blocked; expect false positives, read the transcript &amp; frames</span></div>
+        <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg,12px);padding:.7rem .9rem;font-size:.83rem;color:var(--t2);line-height:1.7">
+          ${cov?`<div style="margin-bottom:.45rem">${cov}</div>`:''}
+          ${flagChips || '<span style="color:var(--t3)">No review flags raised.</span>'}
+          <div style="font-size:11px;color:var(--t3);margin-top:.5rem;line-height:1.5">Browser proctoring cannot see a second device, a second monitor, or the candidate&rsquo;s other tabs — these flags raise the cost of casual cheating and catch obvious cases; they are not proof.</div>
+        </div>`;
+      html += flagsBlock;
       html += `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Proctoring coverage</div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg,12px);padding:.7rem .9rem;font-size:.83rem;color:var(--t2);line-height:1.7">`;
       html += (pr.coverage_segments||[]).map(cs =>
@@ -139,7 +161,7 @@ window.SessionRender = (function(){
       wrap.innerHTML = snaps.length
         ? snaps.map(sn => `<figure style="margin:0">
             <img src="${sn.img}" style="height:96px;border-radius:8px;border:1px solid var(--border);display:block" alt="proctoring frame">
-            <figcaption style="font-size:9.5px;color:var(--t3);margin-top:2px">${esc((sn.created_at||'').replace('T',' ').slice(5,16))} · ${sn.kind==='scr'?'screen':'camera'}</figcaption>
+            <figcaption style="font-size:9.5px;color:var(--t3);margin-top:2px">${esc((sn.created_at||'').replace('T',' ').slice(5,16))} · ${sn.kind==='scr'?'screen':'camera'}${sn.label?` · <b style="color:var(--orange2)">${esc(String(sn.label).replace('_',' '))}</b>`:''}</figcaption>
           </figure>`).join('')
         : '⚠ Proctoring was ON but no frames are stored — either the camera was denied, this session predates frame storage (before Sep 1), or capture failed. For a fresh session this is a bug worth reporting.';
     }catch(_){ wrap.textContent = 'Could not load stored frames.'; }

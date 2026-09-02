@@ -1162,13 +1162,14 @@ async def reserve_snapshot_slot(token: str) -> bool:
 
 
 async def save_proctor_snapshot(token: str, user_id: str, application_id: str | None,
-                                kind: str, data: bytes) -> None:
+                                kind: str, data: bytes, label: str = "") -> None:
     now = datetime.utcnow()
     await db.proctor_snapshots.insert_one({
         "token": token,
         "user_id": user_id,
         "application_id": application_id,
         "kind": kind if kind in ("cam", "scr") else "cam",
+        "label": (str(label) or "")[:40],   # e.g. "paste", "look_away" — why this frame was grabbed
         "data": Binary(data),
         "size": len(data),
         "created_at": now,
@@ -1181,6 +1182,7 @@ async def get_snapshots_for_token(token: str, limit: int = 20) -> list:
     cursor = db.proctor_snapshots.find({"token": token}).sort("created_at", 1).limit(limit)
     async for doc in cursor:
         out.append({"kind": doc.get("kind", "cam"),
+                    "label": doc.get("label", ""),
                     "created_at": doc.get("created_at"),
                     "data": bytes(doc.get("data") or b"")})
     return out

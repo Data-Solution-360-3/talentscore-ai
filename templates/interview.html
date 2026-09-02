@@ -124,6 +124,9 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
 .beta-note{display:none;max-width:760px;margin:10px auto 0;background:var(--og);border:1px solid var(--ob);color:#9a4a12;border-radius:12px;padding:9px 14px;font-size:12.5px;line-height:1.5;text-align:center}
 .beta-note.on{display:block}
 .beta-tag{display:inline-block;background:var(--orange);color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:1px}
+/* On-screen proctoring nudge — gentle, never blocks; most-recent message wins. */
+#proctor-prompt{position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:60;display:none;max-width:90vw;background:#FEF3E2;border:1.5px solid var(--ob);color:#9a4a12;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.10);text-align:center}
+#proctor-prompt.on{display:block}
 .typed-hints{display:flex;justify-content:space-between;gap:.8rem;margin-top:.55rem;font-size:12px;color:var(--t3);flex-wrap:wrap}
 .typed-submit{margin-top:.9rem;width:100%;padding:13px;border-radius:var(--r-lg);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--orange);cursor:pointer;box-shadow:0 4px 14px rgba(245,124,46,.28)}
 .typed-submit:hover{background:var(--orange2)}
@@ -153,6 +156,7 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
 </div>
 
 <div class="recon" id="recon"><span class="spin"></span><span id="recon-msg">Connection dropped — reconnecting…</span></div>
+<div id="proctor-prompt" role="status" aria-live="polite"></div>
 
 <!-- unsupported browser -->
 <section class="stage hidden" id="v-blocked">
@@ -553,8 +557,12 @@ function submitTyped(){
   const ta = $('typed-ta');
   const text = ta.value.trim();
   if(!text){ ta.focus(); return; }
-  transcript.push(scenActive ? {role:'you', text, mode:'typed', scen:1}
-                             : {role:'you', text, mode:'typed'});
+  const _pasted = !!(proc && proc.typedPasted);
+  const _entry = scenActive ? {role:'you', text, mode:'typed', scen:1}
+                            : {role:'you', text, mode:'typed'};
+  if(_pasted) _entry.pasted = true;   // recruiter metadata; NOT a scoring rule
+  transcript.push(_entry);
+  if(proc) proc.typedPasted = false;
   try{ sessionStorage.removeItem(TYPED_KEY); }catch(_){}
   ta.value='';
   typing = false; awaitingQ = false;
@@ -690,18 +698,44 @@ async function procStart(mode){
     camRec:null, scrRec:null, camBytes:0, scrBytes:0, snapshots:0, scrSnaps:0,
     camLastSlice:0, scrLastSlice:0, camMaxGap:0, scrMaxGap:0, camBad:[], scrBad:[],
     camGrace:0, scrGrace:0, snapTimer:null, scrSnapTimer:null, watchTimer:null,
-    coverage:[], startMs:Date.now(), concealPrev:0, samplesPrev:0, concealPct:0, pcRef:null};
+    coverage:[], startMs:Date.now(), concealPrev:0, samplesPrev:0, concealPct:0, pcRef:null,
+    // ── anti-cheat flags: allow-but-flag-with-count (review signals, never blocks) ──
+    flags:[], counts:{}, durations:{},
+    camOnMs:0, camOnSince:0, scrOnMs:0, scrOnSince:0,
+    camOff:false, awaySince:0, focusArmed:false, typedPasted:false,
+    prompts:{}, face:{state:'ok', pend:'ok', pendSince:0, enteredAt:0}, faceDet:null, faceLoop:null};
   try{
     proc.camStream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:15}}});
     $('proc-cam').srcObject = proc.camStream;
     $('selfview').classList.add('on');
-  }catch(e){ covPush('camera unavailable','permission denied'); proc.camMode='unavailable'; return; }
+    proc.camOnSince = Date.now();
+    const _ct = proc.camStream.getVideoTracks()[0];
+    if(_ct){
+      _ct.addEventListener('ended', ()=>onCamOff('camera turned off'));
+      _ct.addEventListener('mute',  ()=>onCamOff('camera muted'));
+      _ct.addEventListener('unmute',()=>onCamBack());
+    }
+  }catch(e){ covPush('camera unavailable','permission denied'); proc.camMode='unavailable';
+    flag('camera_off','camera denied or unavailable at start');
+    showProctorPrompt('cam','Your camera is off — please enable it. The interview is not blocked, but the hiring team sees a camera-off flag.');
+    return; }
   if(mode==='S'){
     try{
-      proc.scrStream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:5}}});
+      proc.scrStream = await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'monitor', frameRate:{ideal:5}}});
       $('proc-scr-hidden').srcObject = proc.scrStream;
-      proc.scrStream.getVideoTracks()[0].addEventListener('ended', ()=>{
-        if(proc && proc.scrMode!=='off'){ proc.scrMode='unavailable'; covPush('screen share stopped','stopped by candidate'); }
+      proc.scrOnSince = Date.now();
+      const _st = proc.scrStream.getVideoTracks()[0];
+      // Force FULL monitor: a window/tab share is ALLOWED, but flagged + prompted once.
+      const _surf = (_st.getSettings && _st.getSettings().displaySurface) || '';
+      if(_surf && _surf !== 'monitor'){
+        flag('partial_share','shared a '+_surf+', not the full monitor');
+        showProctorPrompt('scr','Please share your ENTIRE screen (full monitor), not a window or a single tab. The interview continues either way.');
+      }
+      _st.addEventListener('ended', ()=>{
+        if(proc && proc.scrMode!=='off'){
+          if(proc.scrOnSince){ proc.scrOnMs += Date.now()-proc.scrOnSince; proc.scrOnSince=0; }
+          proc.scrMode='unavailable'; flag('share_stopped','screen share stopped'); covPush('screen share stopped','stopped by candidate');
+        }
       });
     }catch(e){ covPush('screen declined','continuing without screen'); }
   }
@@ -733,6 +767,10 @@ async function procStart(mode){
   // Server enforces its own atomic cap + rate limit + byte cap.
   proc.upTimer = setInterval(upSnap, 90000);
   setTimeout(upSnap, 8000);
+  // Face/eye monitoring (BETA, review signal) + arm tab/focus tracking after the
+  // permission prompts have settled (so the picker's own blur isn't counted).
+  startFace();
+  setTimeout(()=>{ if(proc) proc.focusArmed = true; }, 1800);
 }
 async function upSnap(){
   if(!proc || (proc.upCount||0) >= 12) return;
@@ -760,6 +798,119 @@ async function upSnap(){
 function grab(v){ const c=$('proc-canvas'); if(!v.videoWidth) return null;
   c.width=320; c.height=Math.round(320*v.videoHeight/v.videoWidth);
   c.getContext('2d').drawImage(v,0,0,c.width,c.height); return c.toDataURL('image/jpeg',0.6); }
+
+// ══ ANTI-CHEAT FLAGS — allow-but-flag-with-count. Every one is a REVIEW SIGNAL
+//    (with false positives), never a block. Logged with a timestamp + running
+//    count, and a labeled snapshot when a camera frame is available. ══
+function nowT(){ return proc ? Math.round((Date.now()-proc.startMs)/1000) : 0; }
+function flag(type, reason, dur){
+  if(!proc) return;
+  proc.counts[type] = (proc.counts[type]||0) + 1;
+  const f = {t: nowT(), type, reason};
+  if(dur != null) f.dur = Math.round(dur);
+  proc.flags.push(f);
+  if(proc.flags.length > 120) proc.flags.shift();   // bounded; server caps again
+  log('FLAG', type, reason, dur!=null?('('+Math.round(dur)+'s)'):'');
+}
+async function flagSnap(label){
+  // Opportunistic labeled frame at flag time — shares the ≤12 cap + server caps.
+  if(!proc || (proc.upCount||0) >= 12) return;
+  if(proc.camMode === 'off' || proc.camMode === 'unavailable') return;
+  const d = grab($('proc-cam')); if(!d) return;
+  try{
+    const r = await fetch('/api/interview/'+TOKEN+'/snapshot', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({img:d, kind:'cam', label})});
+    if(r.ok){ const j = await r.json().catch(()=>({})); if(j.stored) proc.upCount=(proc.upCount||0)+1; else if(j.cap_reached) proc.upCount=12; }
+  }catch(_){}
+}
+// On-screen candidate prompt (a gentle nudge; never blocks). Most-recent wins.
+function renderPrompts(){
+  const el=$('proctor-prompt'); if(!el) return;
+  const keys=Object.keys((proc&&proc.prompts)||{});
+  if(!keys.length){ el.classList.remove('on'); return; }
+  el.textContent = proc.prompts[keys[keys.length-1]];
+  el.classList.add('on');
+}
+function showProctorPrompt(key,msg){ if(!proc) return; proc.prompts[key]=msg; renderPrompts(); }
+function hideProctorPrompt(key){ if(!proc) return; delete proc.prompts[key]; renderPrompts(); }
+
+// Camera on/off (start-deny handled in procStart; here is mid-interview drop).
+function onCamOff(reason){
+  if(!proc || proc.camOff) return;
+  proc.camOff = true;
+  if(proc.camOnSince){ proc.camOnMs += Date.now()-proc.camOnSince; proc.camOnSince = 0; }
+  proc.camOffSince = Date.now(); proc.camMode = 'off';
+  covPush('camera off', reason);
+  showProctorPrompt('cam','Your camera turned off — please turn it back on. This is recorded for the hiring team.');
+}
+function onCamBack(){
+  if(!proc || !proc.camOff) return;
+  proc.camOff = false;
+  const dur = proc.camOffSince ? (Date.now()-proc.camOffSince)/1000 : 0;
+  proc.durations.camera_off = (proc.durations.camera_off||0) + dur;
+  flag('camera_off','camera off then restored', dur);
+  proc.camOffSince = 0; proc.camOnSince = Date.now(); proc.camMode = 'snapshots';
+  covPush('camera restored','candidate re-enabled camera');
+  hideProctorPrompt('cam');
+}
+// Tab switch / focus loss. NOTE: JS sees only THIS tab losing visibility/focus —
+// it cannot enumerate the candidate's other tabs.
+function onAway(reason){
+  if(!proc || !proc.focusArmed || proc.awaySince) return;
+  proc.awaySince = Date.now();
+  showProctorPrompt('tab','Please stay on this interview tab — leaving it is recorded for the hiring team.');
+}
+function onBack(){
+  if(!proc || !proc.awaySince) return;
+  const dur = (Date.now()-proc.awaySince)/1000; proc.awaySince = 0;
+  proc.durations.tab_away = (proc.durations.tab_away||0) + dur;
+  flag('tab_switch','left the interview tab / window lost focus', dur);
+  hideProctorPrompt('tab');
+}
+// Face/eye monitoring (BETA review signal, false positives expected). ~8 FPS.
+async function startFace(){
+  if(!proc || proc.camMode === 'off' || proc.camMode === 'unavailable') return;
+  try{
+    const mp = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
+    const vision = await mp.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
+    if(!proc) return;
+    proc.faceDet = await mp.FaceDetector.createFromOptions(vision, {
+      baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'},
+      runningMode:'VIDEO'});
+    if(!proc) return;
+    proc.faceLoop = setInterval(faceTick, 130);   // ~8 FPS — proven not to starve the audio pipeline
+    log('face monitor loaded');
+  }catch(e){ log('face monitor unavailable — continuing without it', e && e.message); }
+}
+function faceTick(){
+  if(!proc || !proc.faceDet) return;
+  const v = $('proc-cam'); if(!v || !v.videoWidth) return;
+  let res; try{ res = proc.faceDet.detectForVideo(v, performance.now()); }catch(_){ return; }
+  const dets = (res && res.detections) || [];
+  const n = dets.length;
+  let cur = 'ok';
+  if(n === 0) cur = 'no_face';
+  else if(n > 1) cur = 'multi_face';
+  else { const b = dets[0].boundingBox;
+    if(b){ const cx = (b.originX + b.width/2)/v.videoWidth; if(Math.abs(cx-0.5) > 0.30) cur = 'look_away'; } }
+  const F = proc.face, t = Date.now();
+  if(cur !== F.pend){ F.pend = cur; F.pendSince = t; }
+  // Enter an anomalous state only after it PERSISTS ~1.2s (a glance to think is not a flag).
+  if(cur !== 'ok' && F.state === 'ok' && (t - F.pendSince) >= 1200){
+    F.state = cur; F.enteredAt = t;
+    proc.counts[cur] = (proc.counts[cur]||0) + 1;
+    flag(cur, cur.replace('_',' '));
+    if(cur !== 'no_face') flagSnap(cur);   // no_face → no useful frame to store
+    showProctorPrompt('face',
+      cur === 'no_face' ? 'No face detected — please stay on camera.' :
+      cur === 'multi_face' ? 'More than one person is visible to the camera.' :
+      'Please look at the screen.');
+  }
+  if(cur === 'ok' && F.state !== 'ok' && (t - F.pendSince) >= 800){
+    if(F.state === 'look_away') proc.durations.look_away = (proc.durations.look_away||0) + (t - F.enteredAt)/1000;
+    F.state = 'ok'; hideProctorPrompt('face');
+  }
+}
 function startCamSnaps(){ proc.snapTimer=setInterval(()=>{ if(grab($('proc-cam'))) proc.snapshots++; },15000); }
 function startScrSnaps(){ proc.scrSnapTimer=setInterval(()=>{ if(grab($('proc-scr-hidden'))) proc.scrSnaps++; },20000); }
 function downScr(reason){ if(proc.scrMode!=='continuous') return;
@@ -790,6 +941,14 @@ function gapCheck(which){
 async function watchdog(){
   if(!proc) return;
   gapCheck('scr'); gapCheck('cam');
+  // Camera-drop safety net: some browsers don't fire 'ended'/'mute' on the track.
+  try{
+    const ct = proc.camStream && proc.camStream.getVideoTracks()[0];
+    if(ct){
+      if((ct.readyState === 'ended' || ct.muted) && !proc.camOff) onCamOff('camera track ended/muted');
+      else if(ct.readyState === 'live' && !ct.muted && proc.camOff) onCamBack();
+    }
+  }catch(_){}
   if(pc && pc.connectionState==='connected'){
     if(proc.pcRef!==pc){ proc.pcRef=pc; proc.concealPrev=0; proc.samplesPrev=0; }
     try{
@@ -808,15 +967,26 @@ async function watchdog(){
 function procStop(){
   if(!proc) return null;
   clearInterval(proc.watchTimer); clearInterval(proc.snapTimer); clearInterval(proc.scrSnapTimer);
-  clearInterval(proc.upTimer);
+  clearInterval(proc.upTimer); clearInterval(proc.faceLoop);
   try{ proc.camRec&&proc.camRec.state!=='inactive'&&proc.camRec.stop(); }catch(_){}
   try{ proc.scrRec&&proc.scrRec.state!=='inactive'&&proc.scrRec.stop(); }catch(_){}
   try{ proc.camStream&&proc.camStream.getTracks().forEach(t=>t.stop()); }catch(_){}
   try{ proc.scrStream&&proc.scrStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+  try{ if(proc.faceDet && proc.faceDet.close) proc.faceDet.close(); }catch(_){}
+  // Close any open duration windows so coverage numbers are final.
+  if(proc.camOnSince){ proc.camOnMs += Date.now()-proc.camOnSince; proc.camOnSince=0; }
+  if(proc.scrOnSince){ proc.scrOnMs += Date.now()-proc.scrOnSince; proc.scrOnSince=0; }
+  if(proc.awaySince){ proc.durations.tab_away=(proc.durations.tab_away||0)+(Date.now()-proc.awaySince)/1000; proc.awaySince=0; }
+  if(proc.camOff && proc.camOffSince){ proc.durations.camera_off=(proc.durations.camera_off||0)+(Date.now()-proc.camOffSince)/1000; }
+  const rd = o => { const out={}; for(const k in o) out[k]=Math.round(o[k]); return out; };
   const s={enabled:true, start_tier:proc.mode, coverage_segments:proc.coverage,
     cam_bytes:proc.camBytes, scr_bytes:proc.scrBytes, snapshots:proc.snapshots+proc.scrSnaps,
-    final_cam:proc.camMode, final_scr:proc.scrMode};
-  proc=null; $('selfview').classList.remove('on');
+    final_cam:proc.camMode, final_scr:proc.scrMode,
+    // ── anti-cheat review signals ──
+    flags:proc.flags, counts:proc.counts, durations:rd(proc.durations),
+    cam_on_seconds:Math.round(proc.camOnMs/1000), scr_on_seconds:Math.round(proc.scrOnMs/1000),
+    total_seconds:Math.round((Date.now()-proc.startMs)/1000)};
+  proc=null; $('selfview').classList.remove('on'); renderPrompts();
   return s;
 }
 
@@ -915,6 +1085,15 @@ window.addEventListener('load', ()=>{
   $('typed-ta').addEventListener('input', ()=>{
     try{ sessionStorage.setItem(TYPED_KEY, $('typed-ta').value); }catch(_){}
   });
+  // Copy/paste — ALLOWED, but flagged + counted. Paste also tags the answer.
+  $('typed-ta').addEventListener('paste', ()=>{ if(proc){ proc.typedPasted = true; flag('paste','pasted into the answer box'); flagSnap('paste'); showProctorPrompt('paste','Pasted content is allowed but flagged for the hiring team.'); setTimeout(()=>hideProctorPrompt('paste'), 4000); } });
+  $('typed-ta').addEventListener('copy', ()=>{ if(proc) flag('copy','copied from the answer box'); });
+  $('typed-ta').addEventListener('cut',  ()=>{ if(proc) flag('cut','cut from the answer box'); });
+  // Tab switch / focus loss — allowed, counted with duration. (We can only see
+  // THIS tab losing visibility/focus, never the candidate's other tabs.)
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) onAway('tab hidden'); else onBack(); });
+  window.addEventListener('blur',  ()=>onAway('window lost focus'));
+  window.addEventListener('focus', ()=>onBack());
 });
 window.addEventListener('online', ()=>{ if(started && !manualStop && !resuming && (!pc || pc.connectionState!=='connected')) resume('online'); });
 window.addEventListener('pagehide', ()=>{ procStop(); cleanup(); });
