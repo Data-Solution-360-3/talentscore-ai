@@ -115,6 +115,92 @@ def normalize_skill_list(skills: list) -> set:
 
 
 # ─────────────────────────────────────────────────────────────
+# SKILL IMPLICATION (T3) — curated, ONE-DIRECTIONAL child → parents
+# ─────────────────────────────────────────────────────────────
+# Knowing a specific tool implies its general capability: a candidate who
+# lists Power BI IS a dashboarding candidate. Applied ONLY to the CANDIDATE's
+# skill set before the required-skills intersection — never to the JD side —
+# so it can only REMOVE false gaps, never satisfy a specific-tool requirement
+# with a generic claim ("dashboarding" on a CV does not satisfy a Power BI
+# requirement). Safety by construction: expansion only adds to the candidate
+# side, so every gap flagged after this map existed was also flagged before.
+#
+# Keys and values are CANONICAL forms (i.e. post-SKILL_SYNONYMS): aws is
+# "amazon web services", git is "version control", k8s is "kubernetes".
+SKILL_IMPLICATIONS = {
+    # BI / data tooling
+    "power bi": {"dashboarding", "data visualization", "reporting", "business intelligence"},
+    "tableau": {"dashboarding", "data visualization", "reporting", "business intelligence"},
+    "looker": {"dashboarding", "data visualization", "reporting", "business intelligence"},
+    "looker studio": {"dashboarding", "data visualization", "reporting", "business intelligence"},
+    "dax": {"power bi"},
+    "excel": {"spreadsheets", "data analysis"},
+    "google sheets": {"spreadsheets"},
+    # databases
+    "sql": {"querying", "databases", "data extraction"},
+    "mysql": {"sql"},
+    "postgresql": {"sql"},
+    "sql server": {"sql"},
+    "oracle": {"sql"},
+    "mongodb": {"databases", "nosql"},
+    # programming
+    "pandas": {"python", "data analysis"},
+    "numpy": {"python"},
+    "python": {"scripting", "programming"},
+    "react": {"javascript", "frontend development"},
+    "vue": {"javascript", "frontend development"},
+    "angular": {"javascript", "frontend development"},
+    "django": {"python", "backend development"},
+    "flask": {"python", "backend development"},
+    "fastapi": {"python", "backend development"},
+    "node.js": {"javascript", "backend development"},
+    # cloud / devops
+    "amazon web services": {"cloud computing"},
+    "google cloud platform": {"cloud computing"},
+    "microsoft azure": {"cloud computing"},
+    "docker": {"containerization", "devops"},
+    "kubernetes": {"containerization", "devops"},
+    # design / marketing / finance
+    "photoshop": {"image editing", "graphic design"},
+    "illustrator": {"graphic design"},
+    "figma": {"ui design", "prototyping"},
+    "seo": {"digital marketing"},
+    "google ads": {"digital marketing"},
+    "facebook ads": {"digital marketing"},
+    "quickbooks": {"accounting software", "bookkeeping"},
+    "tally": {"accounting software", "bookkeeping"},
+}
+
+
+def _close_implications(m: dict) -> dict:
+    """Transitive closure, computed once at import: mysql → sql → querying
+    means mysql also implies querying. Small fixpoint over a small map."""
+    closed = {k: set(v) for k, v in m.items()}
+    changed = True
+    while changed:
+        changed = False
+        for parents in closed.values():
+            extra = set()
+            for p in parents:
+                extra |= closed.get(p, set())
+            if not extra <= parents:
+                parents |= extra
+                changed = True
+    return closed
+
+
+_IMPLICATIONS_CLOSED = _close_implications(SKILL_IMPLICATIONS)
+
+
+def expand_with_implications(skills: set) -> set:
+    """Candidate-side only. Returns the skill set plus everything it implies."""
+    out = set(skills)
+    for s in skills:
+        out |= _IMPLICATIONS_CLOSED.get(s, set())
+    return out
+
+
+# ─────────────────────────────────────────────────────────────
 # DIMENSION WEIGHTS
 # ─────────────────────────────────────────────────────────────
 # The six scoring dimensions. Weights must sum to 1.0 — we normalize on read.
@@ -501,7 +587,11 @@ def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
     # Also pick up tech mentioned per role — many CVs only list tech inside role descriptions
     for r in cv_profile.get("work_experience", []) or []:
         cv_skills.extend(r.get("technologies", []) or [])
-    cv_skills_norm = normalize_skill_list(cv_skills)
+    # (T3) Candidate-side implication expansion: a listed tool covers the
+    # capability it implies (Power BI -> dashboarding), so those stop counting
+    # as missing. Required side is NEVER expanded — a generic claim can't
+    # satisfy a specific-tool requirement.
+    cv_skills_norm = expand_with_implications(normalize_skill_list(cv_skills))
 
     all_required = req_skills_norm | req_tech_norm
     if all_required:
@@ -748,6 +838,10 @@ DIMENSION CRITERIA (each 0-20). Note the weight percentages — for THIS role th
 what the hiring team has prioritized. A high-weight dimension deserves extra scrutiny:
 - Skills Match ({pct("Skills Match")}): How many of jd.required_skills + jd.required_technologies are found in the CV?
   20 = ALL required matched with evidence. 15 = 80% matched. 10 = ~50%. 5 = <30%. 0 = none.
+  Count a required skill as matched when a tool the candidate lists clearly implies it
+  (e.g. Power BI implies dashboarding and data visualization; SQL implies querying) — and name
+  the substitution in the feedback. This works ONE way only: a specific required tool is NOT
+  satisfied by a generic claim ("dashboarding" on a CV does not satisfy a Power BI requirement).
 - Experience Relevance ({pct("Experience Relevance")}): Years AND domain relevance vs jd.required_experience_years.
   20 = meets/exceeds years AND domain matches. 10 = close on years OR adjacent domain. 0 = neither.
 - Education & Certifications ({pct("Education & Certifications")}): Compare cv.education + cv.certifications vs jd.required_education + jd.required_certifications.
