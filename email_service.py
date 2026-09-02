@@ -230,7 +230,7 @@ TEMPLATE_VARIABLES = [
     ("{job_title}",      "The job they applied for"),
     ("{company_name}",   "Your company name"),
     ("{recruiter_name}", "Your name (the sender)"),
-    ("{score}",          "Their AI match score (0-100)"),
+    ("{score}",          "Their CV score (0-100) — the CV screening only, not the combined overall"),
 ]
 
 DEFAULT_TEMPLATES = {

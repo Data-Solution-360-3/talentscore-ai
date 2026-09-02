@@ -146,7 +146,9 @@ async def get_screening_stats() -> dict:
             "$group": {
                 "_id": None,
                 "total": {"$sum": 1},
-                "avg_score": {"$avg": "$overall_score"},
+                # (T2) Avg OVERALL: combined where an interview exists, CV
+                # until then — same rule as ovOf() in the UI.
+                "avg_score": {"$avg": {"$ifNull": ["$overall_combined", "$overall_score"]}},
                 "avg_coverage": {"$avg": "$skills_coverage_pct"},
                 "strong_hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "STRONG HIRE"]}, 1, 0]}},
                 "hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "HIRE"]}, 1, 0]}},
@@ -454,7 +456,9 @@ async def get_stats_for_user(user_id: str) -> dict:
             "$group": {
                 "_id": None,
                 "total": {"$sum": 1},
-                "avg_score": {"$avg": "$overall_score"},
+                # (T2) Avg OVERALL: combined where an interview exists, CV
+                # until then — same rule as ovOf() in the UI.
+                "avg_score": {"$avg": {"$ifNull": ["$overall_combined", "$overall_score"]}},
                 "avg_coverage": {"$avg": "$skills_coverage_pct"},
                 "strong_hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "STRONG HIRE"]}, 1, 0]}},
                 "hires": {"$sum": {"$cond": [{"$eq": ["$recommendation", "HIRE"]}, 1, 0]}},

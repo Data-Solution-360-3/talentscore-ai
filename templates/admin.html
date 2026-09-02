@@ -254,7 +254,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="stat"><div style="height:2px;background:var(--indigo);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total users</div><div class="stat-val" id="ov-users">—</div><div class="stat-sub">registered companies</div></div>
         <div class="stat"><div style="height:2px;background:var(--orange);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total screenings</div><div class="stat-val" id="ov-screens">—</div><div class="stat-sub">all time</div></div>
         <div class="stat"><div style="height:2px;background:var(--green);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Active accounts</div><div class="stat-val" id="ov-active">—</div><div class="stat-sub">not suspended</div></div>
-        <div class="stat"><div style="height:2px;background:var(--amber);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Avg score</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">across all screenings</div></div>
+        <div class="stat"><div style="height:2px;background:var(--amber);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Avg overall</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">combined where an interview exists, else CV</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="card">
@@ -337,8 +337,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Candidate</th><th>Company</th><th>Score</th><th>Recommendation</th><th>Skills match</th><th>Experience</th><th>Date</th></tr></thead>
-            <tbody id="screens-tbl"><tr><td colspan="7" class="tbl-empty">Loading...</td></tr></tbody>
+            <thead><tr><th>Candidate</th><th>Company</th><th>CV score</th><th>Interview</th><th>Overall</th><th>Recommendation</th><th>Skills match</th><th>Experience</th><th>Date</th></tr></thead>
+            <tbody id="screens-tbl"><tr><td colspan="9" class="tbl-empty">Loading...</td></tr></tbody>
           </table>
         </div>
         <div style="font-size:12px;color:var(--t3);margin-top:8px" id="screen-count"></div>
@@ -758,21 +758,28 @@ function renderScreenings(){
   });
   document.getElementById('screen-count').textContent='Showing '+filtered.length+' of '+allScreenings.length+' loaded ('+screenTotal+' total across all companies)';
   const moreRow = allScreenings.length<screenTotal
-    ? `<tr><td colspan="7" style="text-align:center;padding:10px"><button class="btn btn-xs" onclick="loadMoreScreenings()">Load ${Math.min(500,screenTotal-allScreenings.length)} more (newest first)</button></td></tr>`
+    ? `<tr><td colspan="9" style="text-align:center;padding:10px"><button class="btn btn-xs" onclick="loadMoreScreenings()">Load ${Math.min(500,screenTotal-allScreenings.length)} more (newest first)</button></td></tr>`
     : '';
   document.getElementById('screens-tbl').innerHTML=(filtered.map(s=>{
-    const score=Math.round(s.overall_score||0);
+    // (T2) CV, interview, and overall side by side — never one number silently
+    // standing in for another. Overall = CV when no interview exists yet.
+    const cv=Math.round(s.overall_score||0);
+    const hasIv=s.interview_score!=null && s.overall_combined!=null;
+    const iv=hasIv?Math.round(s.interview_score):null;
+    const overall=hasIv?Math.round(s.overall_combined):cv;
     const rec=(s.recommendation||'MAYBE').toUpperCase();
     return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer">
       <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}</td>
       <td>${s.company||'—'}</td>
-      <td style="font-weight:700;color:${gc(score)}">${score}</td>
+      <td style="font-weight:700;color:${gc(cv)}">${cv}</td>
+      <td>${hasIv?`<span style="font-weight:700;color:${gc(iv)}">${iv}</span>`:'<span style="color:var(--t3);font-size:11px">pending</span>'}</td>
+      <td style="font-weight:800;color:${gc(overall)}">${overall}${hasIv?'':'<span style="font-size:9px;color:var(--t3);font-weight:600"> CV only</span>'}</td>
       <td><span class="badge ${tbcls(rec)}">${rec}</span></td>
       <td>${s.skills_coverage_pct||0}%</td>
       <td>${s.years_experience||'?'} yrs</td>
       <td>${fmt(s.created_at)}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="7" class="tbl-empty">No screenings found</td></tr>')+moreRow;
+  }).join('')||'<tr><td colspan="9" class="tbl-empty">No screenings found</td></tr>')+moreRow;
 }
 function filterScreenings(){renderScreenings();}
 
