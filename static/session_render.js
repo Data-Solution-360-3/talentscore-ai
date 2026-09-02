@@ -143,10 +143,17 @@ window.SessionRender = (function(){
       const camCov = (pr.cam_on_seconds!=null && pr.total_seconds) ? `camera on <b>${mmss(pr.cam_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
       const scrCov = (pr.scr_on_seconds!=null && pr.total_seconds && pr.final_scr && pr.final_scr!=='unavailable') ? `screen shared <b>${mmss(pr.scr_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
       const cov = [camCov, scrCov].filter(Boolean).join(' · ');
+      // Three states, honestly distinguished (T1): flags recorded and none
+      // raised != flags never stored. Sessions saved before the candidate
+      // path persisted flags (flags_schema absent) must NEVER read as clean.
+      const flagsStored = pr.flags_schema != null || pr.flags != null;
+      const flagsEmptyMsg = flagsStored
+        ? '<span style="color:var(--t3)">No review flags raised.</span>'
+        : '<span style="color:var(--t3)"><b>Flag capture wasn’t stored for sessions recorded before 3 Sep 2026</b> — the absence of flags here is a storage gap, not a clean signal. Read the transcript and frames.</span>';
       const flagsBlock = `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .3rem">Review flags <span style="text-transform:none;letter-spacing:0;font-weight:500">— monitored + flagged, never blocked; expect false positives, read the transcript &amp; frames</span></div>
         <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg,12px);padding:.7rem .9rem;font-size:.83rem;color:var(--t2);line-height:1.7">
           ${cov?`<div style="margin-bottom:.45rem">${cov}</div>`:''}
-          ${flagChips || '<span style="color:var(--t3)">No review flags raised.</span>'}
+          ${flagChips || flagsEmptyMsg}
           <div style="font-size:11px;color:var(--t3);margin-top:.5rem;line-height:1.5">Browser proctoring cannot see a second device, a second monitor, or the candidate&rsquo;s other tabs — these flags raise the cost of casual cheating and catch obvious cases; they are not proof.</div>
         </div>`;
       html += flagsBlock;
@@ -155,7 +162,7 @@ window.SessionRender = (function(){
       html += (pr.coverage_segments||[]).map(cs =>
         `<div><b style="font-variant-numeric:tabular-nums">${mmss(cs.t)}</b> — ${esc(cs.change)}<span style="color:var(--t3)"> · ${esc(cs.reason)}</span></div>`).join('')
         || '<div>No coverage events recorded.</div>';
-      html += `<div style="margin-top:.4rem;color:var(--t3)">ended: camera ${esc(pr.final_cam||'—')}, screen ${esc(pr.final_scr||'—')} · ${pr.snapshots||0} snapshot(s) · ${(((pr.cam_bytes||0)+(pr.scr_bytes||0))/1048576).toFixed(1)} MB streamed for the watchdog</div>
+      html += `<div style="margin-top:.4rem;color:var(--t3)">ended: camera ${esc(pr.final_cam||'—')}, screen ${esc(pr.final_scr||'—')} · ${pr.snapshots||0} watchdog frame grab(s) (not stored — the stored review frames are counted below) · ${(((pr.cam_bytes||0)+(pr.scr_bytes||0))/1048576).toFixed(1)} MB streamed for the watchdog</div>
       <div style="font-size:11px;color:var(--t3);margin-top:.35rem;line-height:1.5">Continuous camera/screen streams run in-browser to drive the watchdog and are <b>not persisted</b> — full video storage needs the object-storage phase. The frames stored for review load below.</div>
       <div id="${snapsId}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:.5rem;font-size:11.5px;color:var(--t3)">Loading stored frames…</div>
       </div>`;

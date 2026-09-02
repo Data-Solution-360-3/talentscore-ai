@@ -2483,6 +2483,74 @@ async def score_live_session(session_id: str):
             pass
 
 
+def _clampi(v, lo, hi):
+    try:
+        return max(lo, min(hi, int(v)))
+    except Exception:
+        return lo
+
+
+_PROCTOR_FLAG_TYPES = {"camera_off", "tab_switch", "paste", "copy", "cut",
+                       "no_face", "multi_face", "look_away", "partial_share", "share_stopped"}
+
+
+def _validate_proctoring(p) -> dict:
+    """The ONE proctoring validator, used by BOTH session save paths (owner
+    console and candidate link). Coverage segments are the honesty artifact;
+    flags/counts/durations are the anti-cheat review signals — allow-but-flag,
+    validated and capped, the client's bounds re-bounded here.
+
+    flags_schema stamps the stored shape so the renderer can distinguish "no
+    flags raised" (schema present, empty flags) from "flags were never stored"
+    (pre-fix sessions) — the latter must NEVER render as a clean result."""
+    if not (isinstance(p, dict) and p.get("enabled")):
+        return {"enabled": False, "flags_schema": 1}
+    segs = []
+    for s in (p.get("coverage_segments") or [])[:50]:
+        if isinstance(s, dict):
+            segs.append({"t": _clampi(s.get("t"), 0, 86400),
+                         "change": str(s.get("change", ""))[:80],
+                         "reason": str(s.get("reason", ""))[:200]})
+    flags = []
+    for f in (p.get("flags") or [])[:200]:
+        if isinstance(f, dict) and str(f.get("type", "")) in _PROCTOR_FLAG_TYPES:
+            fl = {"t": _clampi(f.get("t"), 0, 86400),
+                  "type": str(f.get("type"))[:20],
+                  "reason": str(f.get("reason", ""))[:160]}
+            if f.get("dur") is not None:
+                fl["dur"] = _clampi(f.get("dur"), 0, 86400)
+            flags.append(fl)
+    counts = {}
+    raw_counts = p.get("counts") if isinstance(p.get("counts"), dict) else {}
+    for k in _PROCTOR_FLAG_TYPES:
+        v = _clampi(raw_counts.get(k, 0), 0, 100000)
+        if v:
+            counts[k] = v
+    durations = {}
+    raw_dur = p.get("durations") if isinstance(p.get("durations"), dict) else {}
+    for k in ("camera_off", "tab_away", "look_away"):
+        v = _clampi(raw_dur.get(k, 0), 0, 86400)
+        if v:
+            durations[k] = v
+    return {
+        "enabled": True,
+        "flags_schema": 1,
+        "start_tier": str(p.get("start_tier", ""))[:4],
+        "coverage_segments": segs,
+        "cam_bytes": _clampi(p.get("cam_bytes"), 0, 2_000_000_000),
+        "scr_bytes": _clampi(p.get("scr_bytes"), 0, 2_000_000_000),
+        "snapshots": _clampi(p.get("snapshots"), 0, 10000),
+        "final_cam": str(p.get("final_cam", ""))[:20],
+        "final_scr": str(p.get("final_scr", ""))[:20],
+        "flags": flags,
+        "counts": counts,
+        "durations": durations,
+        "cam_on_seconds": _clampi(p.get("cam_on_seconds"), 0, 86400),
+        "scr_on_seconds": _clampi(p.get("scr_on_seconds"), 0, 86400),
+        "total_seconds": _clampi(p.get("total_seconds"), 0, 86400),
+    }
+
+
 @app.post("/api/viva-live/session")
 async def viva_live_save_session(request: Request, background: BackgroundTasks):
     """Owner-gated: persist a finished live interview and queue scoring.
@@ -2533,60 +2601,11 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
         "score_status": "pending",
     }
 
-    # Proctoring summary (phase 2) — coverage segments are the honesty artifact:
-    # every mid-interview downgrade with timestamp + measured reason, so reduced
-    # coverage is never mistaken for a clean result. Validated and capped.
-    p = body.get("proctoring")
-    if isinstance(p, dict) and p.get("enabled"):
-        segs = []
-        for s in (p.get("coverage_segments") or [])[:50]:
-            if isinstance(s, dict):
-                segs.append({"t": _i(s.get("t"), 0, 86400),
-                             "change": str(s.get("change", ""))[:80],
-                             "reason": str(s.get("reason", ""))[:200]})
-        # Anti-cheat review flags (allow-but-flag-with-count). Validated + capped;
-        # the client already bounds these, the server bounds them again.
-        _FLAG_TYPES = {"camera_off", "tab_switch", "paste", "copy", "cut",
-                       "no_face", "multi_face", "look_away", "partial_share", "share_stopped"}
-        flags = []
-        for f in (p.get("flags") or [])[:200]:
-            if isinstance(f, dict) and str(f.get("type", "")) in _FLAG_TYPES:
-                fl = {"t": _i(f.get("t"), 0, 86400),
-                      "type": str(f.get("type"))[:20],
-                      "reason": str(f.get("reason", ""))[:160]}
-                if f.get("dur") is not None:
-                    fl["dur"] = _i(f.get("dur"), 0, 86400)
-                flags.append(fl)
-        counts = {}
-        raw_counts = p.get("counts") if isinstance(p.get("counts"), dict) else {}
-        for k in _FLAG_TYPES:
-            v = _i(raw_counts.get(k, 0), 0, 100000)
-            if v:
-                counts[k] = v
-        durations = {}
-        raw_dur = p.get("durations") if isinstance(p.get("durations"), dict) else {}
-        for k in ("camera_off", "tab_away", "look_away"):
-            v = _i(raw_dur.get(k, 0), 0, 86400)
-            if v:
-                durations[k] = v
-        doc["proctoring"] = {
-            "enabled": True,
-            "start_tier": str(p.get("start_tier", ""))[:4],
-            "coverage_segments": segs,
-            "cam_bytes": _i(p.get("cam_bytes"), 0, 2_000_000_000),
-            "scr_bytes": _i(p.get("scr_bytes"), 0, 2_000_000_000),
-            "snapshots": _i(p.get("snapshots"), 0, 10000),
-            "final_cam": str(p.get("final_cam", ""))[:20],
-            "final_scr": str(p.get("final_scr", ""))[:20],
-            "flags": flags,
-            "counts": counts,
-            "durations": durations,
-            "cam_on_seconds": _i(p.get("cam_on_seconds"), 0, 86400),
-            "scr_on_seconds": _i(p.get("scr_on_seconds"), 0, 86400),
-            "total_seconds": _i(p.get("total_seconds"), 0, 86400),
-        }
-    else:
-        doc["proctoring"] = {"enabled": False}
+    # Proctoring summary — ONE validator for both save paths (see
+    # _validate_proctoring). This used to be inlined here, which is exactly how
+    # the candidate path ended up with a 7-field subset that silently dropped
+    # every anti-cheat flag (T1).
+    doc["proctoring"] = _validate_proctoring(body.get("proctoring"))
     session_id = await save_interview_session(doc)
     background.add_task(score_live_session, session_id)
     return {"success": True, "session_id": session_id}
@@ -3010,23 +3029,11 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
     for k in ("application_id", "job_id"):
         if live.get(k):
             doc[k] = str(live[k])
-    p = body.get("proctoring")
-    if isinstance(p, dict) and p.get("enabled"):
-        segs = []
-        for s in (p.get("coverage_segments") or [])[:50]:
-            if isinstance(s, dict):
-                segs.append({"t": _i(s.get("t"), 0, 86400),
-                             "change": str(s.get("change", ""))[:80],
-                             "reason": str(s.get("reason", ""))[:200]})
-        doc["proctoring"] = {"enabled": True, "start_tier": str(p.get("start_tier", ""))[:4],
-                             "coverage_segments": segs,
-                             "cam_bytes": _i(p.get("cam_bytes"), 0, 2_000_000_000),
-                             "scr_bytes": _i(p.get("scr_bytes"), 0, 2_000_000_000),
-                             "snapshots": _i(p.get("snapshots"), 0, 10000),
-                             "final_cam": str(p.get("final_cam", ""))[:20],
-                             "final_scr": str(p.get("final_scr", ""))[:20]}
-    else:
-        doc["proctoring"] = {"enabled": False}
+    # (T1 fix) This block used to whitelist a 7-field subset, silently dropping
+    # every anti-cheat flag the candidate page recorded — the recruiter view
+    # then rendered "No review flags raised" for every real interview. Both
+    # save paths now share the ONE validator.
+    doc["proctoring"] = _validate_proctoring(body.get("proctoring"))
 
     # Owner-only cost telemetry: client sums response.usage across the session
     # and posts it here. Pure measurement — nothing about scoring or the flow
