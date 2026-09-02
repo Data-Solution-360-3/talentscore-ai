@@ -89,6 +89,16 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
    only after the server answers. */
 #proc-view{display:none}
 .procspin{width:34px;height:34px;border:3px solid var(--s3);border-top-color:var(--orange);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 1.25rem}
+/* Duplicate-application popup — generic, on-brand (green/orange/white, no navy). */
+.dup-ov{position:fixed;inset:0;background:rgba(20,40,25,.5);backdrop-filter:blur(3px);z-index:1000;display:none;align-items:center;justify-content:center;padding:5vh 16px}
+.dup-ov.on{display:flex}
+.dup-card{background:#fff;border-radius:18px;max-width:420px;width:100%;padding:28px 26px 24px;text-align:center;box-shadow:0 24px 60px rgba(20,40,25,.28);animation:dupRise .28s ease}
+@keyframes dupRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.dup-ico{width:58px;height:58px;border-radius:50%;background:var(--og);display:grid;place-items:center;margin:0 auto 14px}
+.dup-card h3{font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px}
+.dup-card p{font-size:14px;color:var(--t2);line-height:1.6;max-width:320px;margin:0 auto 18px}
+.dup-card button{padding:11px 28px;border:none;border-radius:11px;background:var(--orange);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.dup-card button:hover{background:var(--orange2)}
 
 @media(min-width:768px){
   .wrap{padding:2.25rem 1.5rem 5rem}
@@ -188,6 +198,16 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 
 </div>
 
+<!-- Duplicate-application popup (generic; never reveals email vs CV match) -->
+<div class="dup-ov" id="dup-modal" role="dialog" aria-modal="true" aria-labelledby="dup-title">
+  <div class="dup-card">
+    <div class="dup-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+    <h3 id="dup-title">You have already applied</h3>
+    <p>Our records show an application for this job under your details. You only need to apply once — the hiring team already has your CV.</p>
+    <button type="button" onclick="closeDupModal()">Got it</button>
+  </div>
+</div>
+
 <script>
 const TOKEN = "{{TOKEN}}";
 const MAX_BYTES = {{MAX_MB}} * 1024 * 1024;
@@ -195,6 +215,9 @@ let picked = null;
 
 function showErr(m){const e=document.getElementById('err');e.textContent=m;e.style.display='block';e.scrollIntoView({behavior:'smooth',block:'center'});}
 function hideErr(){document.getElementById('err').style.display='none';}
+function showDupModal(){const m=document.getElementById('dup-modal'); if(m) m.classList.add('on');}
+function closeDupModal(){const m=document.getElementById('dup-modal'); if(m) m.classList.remove('on');}
+document.addEventListener('click',function(e){ if(e.target && e.target.id==='dup-modal') closeDupModal(); });
 
 function toggleJD(){
   const jd=document.getElementById('jd'), b=document.getElementById('jd-more');
@@ -258,6 +281,8 @@ async function submitApp(e){
     const res=await fetch('/api/apply/'+TOKEN,{method:'POST',body:fd});
     let data={};
     try{ data=await res.json(); }catch(_){}
+    // Duplicate application — generic, on-brand popup (never says email vs CV).
+    if(res.status===409){ showDupModal(); btn.disabled=false; btn.textContent='Submit application'; return false; }
     if(!res.ok) throw new Error(data.detail||'Something went wrong. Please try again.');
     if(data.application_id){
       try{ sessionStorage.setItem(PENDING_KEY, data.application_id); }catch(_){}

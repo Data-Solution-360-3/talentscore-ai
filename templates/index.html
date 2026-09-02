@@ -3924,6 +3924,21 @@ function renderJobs(){
 // Show job description + key stats + candidates list in a modal.
 // Hiring managers asked for this — they want to see the JD they wrote without going into edit mode,
 // and get a quick read on how the role is performing without leaving the Jobs tab.
+async function allowReapply(jobId){
+  const el = document.getElementById('reapply-email');
+  const msg = document.getElementById('reapply-msg');
+  const email = (el?.value||'').trim();
+  if(!email || email.indexOf('@')<1){ if(msg){ msg.style.color='var(--red)'; msg.textContent='Enter a valid email.'; } return; }
+  try{
+    const fd = new FormData(); fd.append('email', email);
+    const r = await fetch('/api/jobs/'+jobId+'/reapply-allow', {method:'POST', body:fd, credentials:'include'});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||'Could not set the exception.');
+    if(msg){ msg.style.color='var(--green)'; msg.textContent='✓ '+(d.email||email)+' may re-apply once to this job.'; }
+    if(el) el.value='';
+  }catch(e){ if(msg){ msg.style.color='var(--red)'; msg.textContent=e.message; } }
+}
+
 async function viewJobDetails(jobId){
   const j = allJobs.find(x=>x._id===jobId);
   if(!j){ toast('Job not found — please refresh the page', {type:'error'}); return; }
@@ -4035,6 +4050,19 @@ async function viewJobDetails(jobId){
             body: 'Use the Screen CVs button (top right) to evaluate CVs against this role.',
           })}
     </div>
+
+    <!-- Duplicate-application guard: grant a candidate ONE re-apply on this job -->
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
+      <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span style="font-weight:400;color:var(--t3);font-size:11px">— candidates can normally apply only once per job</span></summary>
+      <div style="padding:4px 12px 12px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
+          <button class="btn btn-ghost btn-sm" onclick="allowReapply('${jobId}')">Allow re-apply</button>
+        </div>
+        <div id="reapply-msg" style="font-size:11.5px;margin-top:7px"></div>
+      </div>
+    </details>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
       <button class="btn btn-ghost" onclick="closeModal('job-detail-modal')">Close</button>

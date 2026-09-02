@@ -61,6 +61,8 @@ async def connect():
     await db.jobs.create_index("public_token", unique=True, sparse=True)
     await db.applications.create_index("job_id")
     await db.applications.create_index([("job_id", 1), ("email", 1)])
+    # Duplicate-application guard: fast per-job lookup by CV file hash.
+    await db.applications.create_index([("job_id", 1), ("cv_hash", 1)], sparse=True)
     await db.applications.create_index("status")
     await db.applications.create_index("submitted_at")
 
@@ -865,7 +867,8 @@ async def rate_limit_allows(bucket: str, limit: int, window_seconds: int) -> boo
 # ── Applications ─────────────────────────────────────────────
 
 async def upsert_application(job: dict, name: str, email: str, phone: str,
-                             filename: str, ip_hash: str) -> tuple[str, bool]:
+                             filename: str, ip_hash: str,
+                             cv_hash: str = "") -> tuple[str, bool]:
     """Create or replace a pending application. Returns (application_id, replaced).
 
     job_id and user_id come off the job document, which was itself resolved from
@@ -885,6 +888,7 @@ async def upsert_application(job: dict, name: str, email: str, phone: str,
         "email": email,
         "phone": (phone or "").strip(),
         "cv_filename": filename,
+        "cv_hash": cv_hash,   # sha256 of the PDF bytes — powers the duplicate guard
         "status": "pending",
         "submitted_at": now,
         "submitted_ip_hash": ip_hash,

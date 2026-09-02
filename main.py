@@ -3137,9 +3137,33 @@ async def public_apply_submit(
         raise HTTPException(status_code=429, detail="Too many attempts. Please try again in an hour.")
 
     job_id = str(job["_id"])
+
+    # ── DUPLICATE-APPLICATION GUARD (per job) — runs BEFORE the spend reservation
+    #    and BEFORE any GPT scoring, so a repeat costs $0. A duplicate is the same
+    #    EMAIL or the identical CV file (sha256 of the PDF bytes) on THIS job. The
+    #    candidate message is deliberately GENERIC — it never says which matched.
+    #    A job owner can grant a one-time re-apply via the job's reapply_once list. ──
+    import hashlib as _hashlib
+    from bson import ObjectId as _OID2
+    cv_hash = _hashlib.sha256(data).hexdigest()
+    allow_list = [str(e).strip().lower() for e in (job.get("reapply_once") or [])]
+    reapply_allowed = email_norm in allow_list
+    if not reapply_allowed:
+        dup = await db.applications.find_one(
+            {"job_id": job_id, "$or": [{"email": email_norm}, {"cv_hash": cv_hash}]},
+            {"_id": 1})
+        if dup:
+            raise HTTPException(status_code=409, detail="You have already applied to this job.")
+
     application_id, replaced = await upsert_application(
-        job, name, email_norm, phone, cv_file.filename or "cv.pdf", iph
+        job, name, email_norm, phone, cv_file.filename or "cv.pdf", iph, cv_hash
     )
+    # One-time exception consumed: the next application from this email is blocked again.
+    if reapply_allowed:
+        try:
+            await db.jobs.update_one({"_id": _OID2(job_id)}, {"$pull": {"reapply_once": email_norm}})
+        except Exception:
+            pass
     await db.application_files.delete_many({"application_id": application_id})
     await store_application_pdf(application_id, job_id, str(job.get("user_id") or ""),
                                 data, cv_file.filename or "cv.pdf")
@@ -3635,6 +3659,24 @@ async def toggle_job_public(request: Request, job_id: str, is_public: bool = For
         "public_token": job.get("public_token"),
         "url": f"{APP_URL}/apply/{job.get('public_token')}" if job.get("public_token") else None,
     }
+
+
+@app.post("/api/jobs/{job_id}/reapply-allow")
+async def job_reapply_allow(request: Request, job_id: str, email: str = Form(...)):
+    """Owner/tenant-gated: grant a ONE-TIME re-apply to a specific email on this
+    job. The next application from that email is allowed + scored normally, then
+    the exception is consumed (the duplicate block returns). Per-job only."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)   # 404s for other tenants — enforces ownership
+    email_norm = (email or "").strip().lower()
+    if "@" not in email_norm or len(email_norm) < 5:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    from database import db as mongodb
+    from bson import ObjectId as _OID3
+    await mongodb.jobs.update_one({"_id": _OID3(str(job["_id"]))},
+                                  {"$addToSet": {"reapply_once": email_norm}})
+    return {"success": True, "email": email_norm,
+            "message": f"{email_norm} may re-apply once to this job."}
 
 
 @app.post("/api/jobs/{job_id}/rotate-token")
