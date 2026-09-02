@@ -1303,6 +1303,46 @@ async def list_screenings(request: Request, limit: int = 2000):
     }
 
 
+@app.get("/api/screenings/{screening_id}/attempts")
+async def get_screening_attempts(request: Request, screening_id: str):
+    """All attempts by the same candidate on the same job — sibling screenings
+    sharing (job_id, applicant_email), oldest first, so the report card can
+    label 'Attempt 1 / Attempt 2' and let the owner compare. Same ownership
+    gate as the screening itself. No schema: an attempt IS a screening row
+    (a granted re-apply inserts a new application + screening; the old ones
+    are never touched)."""
+    user = await get_current_user(request)
+    doc = await get_screening_by_id(screening_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found.")
+    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    email = str(doc.get("applicant_email") or "").strip().lower()
+    job_id = doc.get("job_id")
+    if not email or not job_id:
+        # Batch uploads carry no submitted email — nothing to key siblings on.
+        return {"attempts": [{"_id": str(doc.get("_id")), "current": True}],
+                "count": 1, "keyed": False}
+
+    attempts = []
+    cursor = db.screenings.find(
+        {"job_id": job_id, "applicant_email": email},
+        {"created_at": 1, "overall_score": 1, "interview_score": 1,
+         "overall_combined": 1, "recommendation": 1}).sort("created_at", 1)
+    async for s in cursor:
+        attempts.append({
+            "_id": str(s["_id"]),
+            "created_at": s.get("created_at"),
+            "cv_score": s.get("overall_score"),
+            "interview_score": s.get("interview_score"),
+            "overall_combined": s.get("overall_combined"),
+            "recommendation": s.get("recommendation"),
+            "current": str(s["_id"]) == str(doc.get("_id")),
+        })
+    return {"attempts": serialize_mongo(attempts), "count": len(attempts), "keyed": True}
+
+
 @app.get("/api/screenings/{screening_id}")
 async def get_screening(request: Request, screening_id: str):
     user = await get_current_user(request)
@@ -3750,7 +3790,12 @@ async def job_reapply_allow(request: Request, job_id: str, email: str = Form(...
     from bson import ObjectId as _OID3
     await mongodb.jobs.update_one({"_id": _OID3(str(job["_id"]))},
                                   {"$addToSet": {"reapply_once": email_norm}})
-    return {"success": True, "email": email_norm,
+    # The apply URL rides back so the granting UI can offer it for copying —
+    # delivery is the job's existing public link; the guard now admits this
+    # email once. No link exists while the job's public link is paused/off.
+    apply_url = (f"{APP_URL}/apply/{job.get('public_token')}"
+                 if job.get("is_public") and job.get("public_token") else None)
+    return {"success": True, "email": email_norm, "apply_url": apply_url,
             "message": f"{email_norm} may re-apply once to this job."}
 
 

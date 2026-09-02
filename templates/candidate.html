@@ -160,6 +160,7 @@ async function load() {
     if (!res.ok) throw new Error('Not found');
     data = await res.json();
     render(data);
+    loadAttempts(data);
     buildCVText(data);
     tryLoadPDF(data);
   } catch(e) {
@@ -205,6 +206,63 @@ function buildReportClient(d){
     interviewQuestions:clean(d.interview_questions,5), hiringRisks:clean(d.hiring_risks,3)};
 }
 
+// ── Attempts + the re-apply grant. An attempt IS a screening row: siblings
+// share (job_id, applicant_email). Old attempts are never hidden or replaced;
+// each pill opens that attempt's full card. Batch uploads have no submitted
+// email, so they can't be keyed or granted — the strip stays hidden there.
+// The API behind the button re-checks ownership; a candidate can never reach it.
+async function loadAttempts(d){
+  if(!d.applicant_email || !d.job_id) return;
+  const strip=document.getElementById('attempts-strip'); if(!strip) return;
+  let at={attempts:[],count:1};
+  try{
+    const r=await fetch('/api/screenings/'+id+'/attempts',{credentials:'include'});
+    if(r.ok) at=await r.json();
+  }catch(_){}
+  const n=at.count||1;
+  const pills=(at.attempts||[]).map((a,i)=>{
+    const label='Attempt '+(i+1)+' of '+n+(i===n-1&&n>1?' · latest':'');
+    const s=(a.overall_combined!=null?Math.round(a.overall_combined):(a.cv_score!=null?Math.round(a.cv_score):'—'));
+    return a.current
+      ? `<span style="background:var(--accent);color:#fff;border-radius:9999px;padding:4px 12px;font-size:11.5px;font-weight:800">${label} · ${s} — viewing</span>`
+      : `<a href="/candidate?id=${a._id}" style="background:var(--s2,#f4f6fa);color:var(--text);border:1px solid var(--border);border-radius:9999px;padding:4px 12px;font-size:11.5px;font-weight:700;text-decoration:none">${label} · ${s}</a>`;
+  }).join('');
+  strip.innerHTML=`
+    <span style="font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)">Attempts</span>
+    ${pills}
+    <span style="flex:1"></span>
+    <button id="btn-reapply" type="button" style="border:1.5px solid var(--border);background:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-size:12px;font-weight:700;color:var(--text);cursor:pointer" title="Let this candidate submit a fresh CV + interview for this job, once">Allow re-apply</button>
+    <span id="reapply-note" style="font-size:11.5px;color:var(--t3);flex-basis:100%"></span>`;
+  strip.style.display='flex';
+  document.getElementById('btn-reapply').onclick=()=>grantReapply(d);
+}
+
+async function grantReapply(d){
+  if(!confirm('Allow this candidate to submit a new CV and interview for this job? Their current attempt will be kept for comparison.')) return;
+  const note=document.getElementById('reapply-note');
+  const btn=document.getElementById('btn-reapply');
+  btn.disabled=true;
+  try{
+    const fd=new FormData(); fd.append('email', d.applicant_email);
+    const r=await fetch('/api/jobs/'+d.job_id+'/reapply-allow',{method:'POST',body:fd,credentials:'include'});
+    const res=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(res.detail||('HTTP '+r.status));
+    btn.textContent='Re-apply granted ✓';
+    if(res.apply_url){
+      note.innerHTML='One re-apply granted to <b>'+d.applicant_email+'</b>. Send them the apply link: '
+        +'<a href="'+res.apply_url+'" style="color:var(--accent)">'+res.apply_url+'</a> '
+        +'<button id="cp-apply" type="button" style="border:none;background:var(--s2,#eef1f5);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Copy</button>'
+        +' — their new CV + interview will appear as a separate attempt.';
+      note.style.color='var(--t2,#4b5563)';
+      const cp=document.getElementById('cp-apply');
+      cp.onclick=()=>{navigator.clipboard.writeText(res.apply_url).catch(()=>{});cp.textContent='Copied';};
+    }else{
+      note.textContent='Granted — but this job\'s public apply link is currently OFF. Turn it on (Jobs page) so the candidate can use it.';
+      note.style.color='var(--amber,#d97706)';
+    }
+  }catch(e){ note.textContent='Could not grant: '+e.message; note.style.color='var(--red,#dc2626)'; btn.disabled=false; }
+}
+
 function render(d){
   const rep=d.report||buildReportClient(d);
   const score=rep.overallScore||Math.round(d.overall_score||0);
@@ -232,6 +290,8 @@ function render(d){
         </div>
       </div>
     </div>
+
+    <div id="attempts-strip" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.65rem 1rem;margin-bottom:10px;display:none;align-items:center;gap:10px;flex-wrap:wrap"></div>
 
     <div class="score-hd">
       <div class="score-circle" style="border-color:${col.br}">

@@ -593,6 +593,17 @@ def main():
             line(None, "GET", "/api/kpi", str(e)[:60]); failures.append(("GET", "/api/kpi", "exception"))
         try:
             with httpx.Client(base_url=base, timeout=30.0) as unauth:
+                r = unauth.get("/api/screenings/000000000000000000000000/attempts")
+            gated = r.status_code in (401, 403)
+            line(r.status_code, "GET", "/api/screenings/{id}/attempts",
+                 "gated (owner-only)" if gated else "NOT GATED — attempt history leak!")
+            checked += 1
+            if not gated:
+                failures.append(("GET", "/api/screenings/{id}/attempts", r.status_code))
+        except Exception as e:
+            line(None, "GET", "/api/screenings/{id}/attempts", str(e)[:60]); failures.append(("GET", "/api/screenings/{id}/attempts", "exception"))
+        try:
+            with httpx.Client(base_url=base, timeout=30.0) as unauth:
                 r = unauth.get("/api/admin/screenings")
             gated = r.status_code in (401, 403)
             line(r.status_code, "GET", "/api/admin/screenings",
