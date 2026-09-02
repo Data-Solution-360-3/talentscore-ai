@@ -975,7 +975,7 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
   <div class="card">
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead id="jobs-thead"><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg score</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead id="jobs-thead"><tr><th>Job title</th><th>Department</th><th>Location</th><th>Type</th><th>Applicants</th><th>Avg overall</th><th>Shortlisted</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="jobs-tbl"><tr><td colspan="9" style="padding:0;border:none"><div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="es-title">No job postings yet</div><div class="es-body">Create a job to set required skills, custom scoring weights, and organize candidates by role.</div><div class="es-actions"><button class="btn btn-primary btn-sm" onclick="openJobModal()">+ Create your first job</button></div></div></td></tr></tbody>
       </table>
       <div id="jobs-foot"></div>
@@ -1211,7 +1211,7 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
   <!-- Headline numbers — kept because hiring managers always want these at a glance -->
   <div class="stats-grid">
     <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Total screened</div><div class="stat-val" id="an-total">0</div></div>
-    <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Avg match score</div><div class="stat-val" id="an-avg">—</div></div>
+    <div class="stat"><div class="stat-bar" style="background:var(--green)"></div><div class="stat-lbl">Avg overall score</div><div class="stat-val" id="an-avg">—</div></div>
     <div class="stat"><div class="stat-bar" style="background:var(--orange)"></div><div class="stat-lbl">Shortlist rate</div><div class="stat-val" id="an-rate">—</div></div>
     <div class="stat"><div class="stat-bar" style="background:var(--amber)"></div><div class="stat-lbl">Time saved</div><div class="stat-val" id="an-time">—</div><div class="stat-sub">vs manual review</div></div>
   </div>
@@ -1227,7 +1227,7 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
         <thead id="job-perf-thead"><tr>
           <th>Job title</th>
           <th>Screened</th>
-          <th>Avg score</th>
+          <th>Avg overall</th>
           <th>Shortlisted</th>
           <th>Interview</th>
           <th>Rejected</th>
@@ -1249,7 +1249,7 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
   <div class="card">
     <div class="tbl-wrap">
       <table class="tbl">
-        <thead><tr><th>Candidate</th><th>Screened at</th><th>AI confidence</th><th>Run 1</th><th>Run 2</th><th>Δ Variance</th><th>Final score</th><th>Result</th><th>JD used</th></tr></thead>
+        <thead><tr><th>Candidate</th><th>Screened at</th><th>AI confidence</th><th>Run 1</th><th>Run 2</th><th>Δ Variance</th><th>Final CV score</th><th>Result</th><th>JD used</th></tr></thead>
         <tbody id="audit-tbl"><tr><td colspan="9" style="padding:0;border:none"><div class="empty-state compact"><div class="es-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><div class="es-title">No screening history yet</div><div class="es-body">Every CV you screen will be logged here for traceability.</div></div></td></tr></tbody>
       </table>
     </div>
@@ -2153,7 +2153,15 @@ function ivCell(r){
     return `<a class="tbl-link" href="/viva-live/sessions#${r.interview_session_id}" onclick="event.stopPropagation()" title="Open the full interview report (transcript, scores, stored frames)" style="font-weight:800;color:${gc(r.interview_score)}">${Math.round(r.interview_score)}</a>`;
   const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
   if(!iv) return '<span style="font-size:10px;color:var(--t3)" title="No live interview recorded for this candidate">not taken</span>';
-  if(iv.overall==null) return `<span class="badge b-amber" style="font-size:9px">${iv.done?'scoring…':'in progress'}</span>`;
+  if(iv.overall==null){
+    // Truthful states, matching viva_sessions.html: a failed scoring and an
+    // abandoned interview must never masquerade as work-in-progress.
+    if(iv.score_status==='failed')
+      return `<span class="badge" style="font-size:9px;background:rgba(220,38,38,.1);color:var(--red)" title="Scoring failed — open the session for the error">scoring failed</span>`;
+    if(!iv.done)
+      return `<span class="badge b-amber" style="font-size:9px" title="The candidate did not finish this interview">ended early</span>`;
+    return `<span class="badge b-amber" style="font-size:9px">scoring…</span>`;
+  }
   return `<a class="tbl-link" href="/viva-live/sessions#${iv.id}" onclick="event.stopPropagation()" title="Open the full interview report" style="font-weight:800;color:${gc(iv.overall)}">${iv.overall}</a>`;
 }
 
@@ -2273,7 +2281,7 @@ function applyFilters(){
   // Dedup is all-or-nothing across pages — same rule the Dashboard funnel uses.
   const base=CandidateStats.compute(allResults).rows;
   let filtered=base.filter(r=>{
-    const score=r.score||Math.round(r.overall_score||0);
+    const score=ovOf(r).s;   // (T2) filter on the same number the column shows
     const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const exp=parseInt(r.years_experience)||0;
     const matchQ=!q||(r.candidate_name||'').toLowerCase().includes(q)||(r.current_title||'').toLowerCase().includes(q)||((r.critical_gaps||[]).join(' ')).toLowerCase().includes(q)||((r.dimensions||[]).flatMap(d=>d.matched_skills||[]).join(' ')).toLowerCase().includes(q);
@@ -2289,7 +2297,7 @@ function applyFilters(){
     return matchQ&&matchJ&&matchR&&matchStage&&matchS&&matchE&&matchDF&&matchDT;
   });
 
-  if(sort==='score')filtered.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0));
+  if(sort==='score')filtered.sort((a,b)=>ovOf(b).s-ovOf(a).s);   // (T2) order matches the visible column
   else if(sort==='newest')filtered.sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
   // Job name A–Z — same localeCompare pattern as the name sort, on job_title.
   else if(sort==='job')filtered.sort((a,b)=>(a.job_title||a.company||'').localeCompare(b.job_title||b.company||''));
@@ -2698,7 +2706,10 @@ function applyEmailTemplate(kind){
     job_title:      r.job_title || r.parsed_jd?.role_title || 'the role',
     company_name:   (window._meCache && window._meCache.company) || '[your company]',
     recruiter_name: (window._meCache && window._meCache.company) || '[your name]',
-    score:          r.score || Math.round(r.overall_score || 0),
+    // (T2) {score} in candidate emails is the CV score — the template-variable
+    // hint says so, and we never send an unlabeled number that might read as
+    // the combined overall.
+    score:          ovOf(r).cv,
   };
 
   if(kind === 'custom'){
@@ -3409,7 +3420,7 @@ const CandidateStats = (() => {
       byStage[stageOf(r)]++;
       const v = rec(r); if (v in byRec) byRec[v]++;
       if (needsReview(r)) reviewNeeded++;
-      scoreSum += (r.score || r.overall_score || 0);
+      scoreSum += ovOf(r).s;   // (T2) overall when it exists, CV until then
     });
 
     const total = set.length;
@@ -3470,8 +3481,10 @@ function renderOverview(){
   rdJobHighlight();
 }
 
-// Candidate score, tolerant of either field name. Read-only; no recompute.
-function ovScore(r){ return Math.round(r.score != null ? r.score : (r.overall_score || 0)); }
+// (T2) ovScore() — the CV-only twin of ovOf() — is gone. Every ranking
+// surface routes through ovOf(), which prefers overall_combined and reports
+// the "interview pending" distinction. CV-only numbers are shown only where
+// explicitly labeled "CV score".
 
 // Reusable multi-segment donut + colored legend (same SVG technique as the
 // existing Job Summary donut). segments: [{label, value, color, onclick?}].
@@ -3543,7 +3556,7 @@ function rdPipeline(s){
 // legend shows 0. No fabricated hairline.
 function rdScoreBands(s){
   const band = [0,0,0,0];   // 0–48, 48–65, 65–80, 80+
-  s.rows.forEach(r=>{ const v=ovScore(r);
+  s.rows.forEach(r=>{ const v=ovOf(r).s;
     if(v>=80) band[3]++; else if(v>=65) band[2]++; else if(v>=48) band[1]++; else band[0]++; });
   ovDonut('score','ovc-score','ovc-score-total','ovl-score', [
     {label:'80+',   value:band[3], color:'#639922'},
@@ -3558,7 +3571,7 @@ function rdScoreBands(s){
 function rdAvgScoreByJob(){
   const rows = CandidateStats.compute(allResults).rows;
   const byJob = {};
-  rows.forEach(r=>{ const k=r.job_id||'—'; (byJob[k]=byJob[k]||[]).push(ovScore(r)); });
+  rows.forEach(r=>{ const k=r.job_id||'—'; (byJob[k]=byJob[k]||[]).push(ovOf(r).s); });
   const named = Object.entries(byJob).map(([jid,arr])=>{
     const j=(allJobs||[]).find(x=>x._id===jid);
     return {label:(j&&j.title)||(jid==='—'?'Other':'Untitled'),
@@ -3640,12 +3653,12 @@ function rdActivities(s, rec){
     return ['Screening','#5f6b73','#eef2e8'];
   };
   el.innerHTML = recent.map(r=>{
-    const score=ovScore(r);
+    const _ov=ovOf(r); const score=_ov.s;
     const [lbl,fg,bg]=pillFor(r);
     const nm=(r.candidate_name||'Unknown');
     return `<div class="dx-act" onclick="openCandModal('${r._id}')">`+
       `<span class="dx-thumb">${escapeHtml((nm.trim()[0]||'?').toUpperCase())}</span>`+
-      `<div class="dx-actwho"><div class="dx-actnm">${escapeHtml(nm)}</div><div class="dx-actrl">${escapeHtml(r.job_title||r.current_title||'—')} · score ${score}</div></div>`+
+      `<div class="dx-actwho"><div class="dx-actnm">${escapeHtml(nm)}</div><div class="dx-actrl">${escapeHtml(r.job_title||r.current_title||'—')} · ${_ov.pending?'CV score '+score+' · IV pending':'overall '+score}</div></div>`+
       `<span class="dx-pill" style="color:${fg};background:${bg}">${lbl}</span>`+
       `</div>`;
   }).join('');
@@ -3761,7 +3774,7 @@ function renderPipeline(){
   const colOf={screening:0, interview:1, shortlisted:2, rejected:3};
   const cols=[[],[],[],[]];
   unique.forEach(r=>{ cols[colOf[CandidateStats.stageOf(r)]].push(r); });
-  cols.forEach(col=>col.sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)));
+  cols.forEach(col=>col.sort((a,b)=>ovOf(b).s-ovOf(a).s));   // (T2) cards ordered by the ring they show
 
   for(let i=0;i<4;i++){
     document.getElementById('kb-cnt-'+i).textContent=cols[i].length;
@@ -3863,7 +3876,7 @@ function renderJobs(){
       sortableHeader('jobs-tbl', 'Location', 'loc', 'asc') +
       '<th>Type</th>' +
       sortableHeader('jobs-tbl', 'Applicants', '_applicants', 'desc') +
-      sortableHeader('jobs-tbl', 'Avg score', '_avg', 'desc') +
+      sortableHeader('jobs-tbl', 'Avg overall', '_avg', 'desc') +
       sortableHeader('jobs-tbl', 'Shortlisted', '_shl', 'desc') +
       sortableHeader('jobs-tbl', 'Status', 'status', 'asc') +
       '<th>Actions</th></tr>';
@@ -3975,7 +3988,7 @@ async function viewJobDetails(jobId){
         <div style="font-size:22px;font-weight:800;color:var(--text)">${st.total}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg score</div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg overall</div>
         <div style="font-size:22px;font-weight:800;color:${gc(st.avgScore)}">${st.avgScore||'—'}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
@@ -5051,7 +5064,7 @@ function renderAnalytics(){
     thead.innerHTML = '<tr>' +
       sortableHeader('job-perf-tbl', 'Job title', 'title', 'asc') +
       sortableHeader('job-perf-tbl', 'Screened', 'screened', 'desc') +
-      sortableHeader('job-perf-tbl', 'Avg score', '_avgScore', 'desc') +
+      sortableHeader('job-perf-tbl', 'Avg overall', '_avgScore', 'desc') +
       sortableHeader('job-perf-tbl', 'Shortlisted', 'shortlisted', 'desc') +
       sortableHeader('job-perf-tbl', 'Interview', 'interview', 'desc') +
       sortableHeader('job-perf-tbl', 'Rejected', 'rejected', 'desc') +
@@ -5145,8 +5158,13 @@ function renderActivity(){ /* removed from dashboard */ }
 
 // ── EXPORT ──
 function exportCandidates(){
-  const h=['Name','Title','Score','Skills%','Recommendation','Experience','Date'];
-  const rows=(filteredResults.length?filteredResults:allResults).map(r=>[r.candidate_name,r.current_title,r.score||r.overall_score,r.skills_coverage_pct,r.recommendation,r.years_experience,fmt(r.created_at)]);
+  // (T2) Both numbers side by side, never one silently standing in for the
+  // other — anyone ranking in Excel can see exactly what they're ranking on.
+  const h=['Name','Title','CV score','Interview score','Overall','Interview status','Skills%','Recommendation','Experience','Date'];
+  const rows=(filteredResults.length?filteredResults:allResults).map(r=>{
+    const ov=ovOf(r);
+    return [r.candidate_name,r.current_title,ov.cv,ov.pending?'':ov.iv,ov.s,ov.pending?'pending':'scored',r.skills_coverage_pct,r.recommendation,r.years_experience,fmt(r.created_at)];
+  });
   const csv=[h,...rows].map(r=>r.map(v=>'"'+(v||'')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='topcandidate-candidates.csv';a.click();
 }
@@ -5282,13 +5300,9 @@ async function loadFromDB(){
     updateAll();
     addActivity('Dashboard loaded — '+allResults.length+' candidates','var(--indigo)');
     fixCountOnLoad();
-    // Show debug info on screen if 0 results
-    if(allResults.length===0){
-      const dbg=document.createElement('div');
-      dbg.style.cssText='position:fixed;bottom:10px;right:10px;background:#1e2333;border:1px solid #E16A1F;border-radius:8px;padding:12px 16px;font-size:11px;color:#8b95b0;z-index:9999;max-width:400px';
-      dbg.innerHTML='<strong style="color:var(--orange)">Debug info</strong><br>Email: '+me.email+'<br>Role: '+me.role+'<br>User ID: '+me.user_id+'<br>Screenings from API: '+(screenData.screenings?.length||0)+'<br><button onclick="fetch(\'/api/screenings?limit=3\',{credentials:\'include\'}).then(r=>r.text()).then(t=>alert(t.slice(0,500)))" style="margin-top:6px;padding:3px 8px;background:#E16A1F;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px">Test API</button>';
-      document.body.appendChild(dbg);
-    }
+    // (T7) The on-screen debug box that used to appear here for 0-result
+    // accounts leaked email/role/user_id to every new client — removed. The
+    // real empty state in renderCandidates() covers the zero-candidate case.
   }catch(e){console.error('[DB]',e);}
 }
 
