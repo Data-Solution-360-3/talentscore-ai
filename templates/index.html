@@ -3935,8 +3935,9 @@ async function viewJobDetails(jobId){
   }catch(_){}
   const st = CandidateStats.compute(CandidateStats.forJob(allResults, jobId));
   const related = st.rows;
-  // Top 5 candidates by score for a quick "who's the best fit" snapshot
-  const top = [...related].sort((a,b)=>(b.score||b.overall_score||0)-(a.score||a.overall_score||0)).slice(0,5);
+  // Top 5 by the HEADLINE overall (CV 35% + interview 65% once scored, else CV
+  // with pending) — same ranking basis as every other candidate list.
+  const top = [...related].sort((a,b)=>ovOf(b).s-ovOf(a).s).slice(0,5);
 
   const html = `
     <div class="modal-hd">
@@ -4015,13 +4016,16 @@ async function viewJobDetails(jobId){
       </div>
       ${top.length
         ? top.map(r=>{
-            const s = r.score || Math.round(r.overall_score||0);
+            const ov = ovOf(r);   // headline: overall if the interview is scored, else CV + pending
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;cursor:pointer" onclick="closeModal('job-detail-modal');openCandModal('${r._id}')">
               <div>
                 <div style="font-size:13px;font-weight:600;color:var(--text)">${r.candidate_name||'Unknown'}</div>
                 <div style="font-size:11px;color:var(--t3)">${r.current_title||'—'}</div>
+                ${ov.pending
+                  ? '<div style="font-size:10px;color:var(--amber);font-weight:700;margin-top:2px">Interview pending · CV only</div>'
+                  : '<div style="font-size:10px;color:var(--t3);font-weight:600;margin-top:2px">Overall · CV '+ov.cv+' · IV '+ov.iv+'</div>'}
               </div>
-              ${scoreRing(s, 'sm')}
+              ${scoreRing(ov.s, 'sm')}
             </div>`;
           }).join('')
         : emptyState({

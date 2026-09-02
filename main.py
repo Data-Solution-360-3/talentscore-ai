@@ -2725,7 +2725,8 @@ async def candidate_interview_page(token: str):
         "{{IV_INITIAL}}": esc((cfg.get("interviewer_name") or "A").strip()[:1].upper(), "A"),
         "{{JOB_TITLE}}": esc(cfg.get("job_title"), ""),
         "{{MAX_TURNS}}": str(int(cfg.get("max_turns", 4))),
-        "{{EST_MINUTES}}": str(max(4, int(cfg.get("max_turns", 4)) * 2 + 2)),
+        # Duration estimate is derived client-side from the 12-minute auto-end
+        # constant (TOTAL_SECS) so the shown minutes can't drift from the cap.
         "{{PROCTORING}}": esc(cfg.get("proctoring"), "off"),
         # Interview language — 'en' (default) or 'bn' (Bangla, BETA). Drives the
         # candidate-facing UI copy, Bengali font, and the BETA transcript banner.

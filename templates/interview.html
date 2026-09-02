@@ -179,7 +179,7 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
     <h1>Ready for your interview?</h1>
     <p class="sub">A short spoken conversation — {{IV_NAME}} asks, you answer in your own words. Every question is also shown as text, so you can read as well as listen.</p>
     <div class="expect">
-      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>{{MAX_TURNS}} questions</b>, around {{EST_MINUTES}} minutes</div>
+      <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>{{MAX_TURNS}} questions</b>, about <span id="est-min">12</span> minutes</div>
       <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Answer in <b id="ans-lang">English</b>, at your own pace</div>
       <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>A short pause to think is completely fine</div>
     </div>
@@ -1068,6 +1068,9 @@ function isInAppWebView(){
 }
 window.addEventListener('load', ()=>{
   applyLang();
+  // Tie the ready-screen estimate to the SAME constant that auto-ends the
+  // interview (TOTAL_SECS), so the shown minutes can never drift from the cap.
+  { const em = $('est-min'); if(em) em.textContent = String(Math.round(TOTAL_SECS/60)); }
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.RTCPeerConnection) || isInAppWebView()){
     view('v-blocked'); return;
   }
