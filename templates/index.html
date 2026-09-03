@@ -951,7 +951,7 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
     <!-- Kept for logic (hidden): dashboard funnel/stat clicks set f-stage;
          applyFilters/clearFilters reference all of these. Not shown in the bar. -->
     <div id="cand-hidden-filters" style="display:none">
-      <select id="f-stage"><option value="">All stages</option><option value="screening">Screening</option><option value="review">— needs review</option><option value="interview">Interview</option><option value="shortlisted">Shortlisted</option><option value="rejected">Rejected</option></select>
+      <select id="f-stage"><option value="">All stages</option><option value="screening">Screening</option><option value="review">— needs review</option><option value="interview">Interview</option><option value="shortlisted">Shortlisted</option><option value="hire">Hire</option><option value="rejected">Rejected</option></select>
       <select id="f-score"><option value="">Any score</option><option value="80">80+</option><option value="60">60+</option><option value="40">40+</option><option value="0">Below 40</option></select>
       <select id="f-exp"><option value="">Any experience</option><option value="0">0–2</option><option value="3">3–5</option><option value="6">6+</option></select>
       <input type="date" id="f-date-from"><input type="date" id="f-date-to">
@@ -981,11 +981,12 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
     <span class="badge b-red">REJECT → Rejected</span>
     <span style="font-size:11px;color:var(--t3);margin-left:auto" id="pipeline-notice"></span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="kb-grid">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="kb-grid">
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-0"></div></div>
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-1"></div></div>
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Shortlisted</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Rejected</span><span class="badge b-red" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Hire</span><span class="badge b-green" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Rejected</span><span class="badge b-red" id="kb-cnt-4">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-4"></div></div>
   </div>
 </div>
 
@@ -2122,6 +2123,7 @@ function resetScreen(){
 // ── CANDIDATES TABLE ──
 function stageBadge(stage){
   // Small visual indicator next to the actions so you can see current decision at a glance
+  if(stage==='hire')         return '<span class="badge b-green" style="font-size:9px;margin-right:4px">★ Hire</span>';
   if(stage==='shortlisted')  return '<span class="badge b-green" style="font-size:9px;margin-right:4px">✓ Shortlisted</span>';
   if(stage==='rejected')     return '<span class="badge b-red"   style="font-size:9px;margin-right:4px">✕ Rejected</span>';
   if(stage==='interview')    return '<span class="badge b-amber" style="font-size:9px;margin-right:4px">→ Interview</span>';
@@ -3392,7 +3394,7 @@ const CandidateStats = (() => {
   const stageOf = r => {
     const v = r.stage || 'pending';
     if (v === 'pending') return 'screening';
-    if (v === 'interview' || v === 'shortlisted' || v === 'rejected') return v;
+    if (v === 'interview' || v === 'shortlisted' || v === 'hire' || v === 'rejected') return v;
     console.warn('CandidateStats: unrecognised stage', v, 'on', r._id);
     return 'screening';
   };
@@ -3434,7 +3436,7 @@ const CandidateStats = (() => {
   function compute(rows, opts){
     const on  = (opts && 'dedupe' in opts) ? opts.dedupe : DEDUPE_ON;
     const set = on ? dedupe(rows) : rows.slice();
-    const byStage = {screening:0, interview:0, shortlisted:0, rejected:0};
+    const byStage = {screening:0, interview:0, shortlisted:0, hire:0, rejected:0};
     const byRec   = {'STRONG HIRE':0, 'HIRE':0, 'MAYBE':0, 'REJECT':0};
     let reviewNeeded = 0, scoreSum = 0;
 
@@ -3567,6 +3569,7 @@ function ovDonut(key, canvasId, totalId, legendId, segs, centerNum, centerLbl){
 function rdPipeline(s){
   const b = s.byStage;
   ovDonut('pipe','ovc-pipe','ovc-pipe-total','ovl-pipe', [
+    {label:'Hire',        value:b.hire,        color:'#173404', onclick:"filterByStage('hire')"},
     {label:'Shortlisted', value:b.shortlisted, color:'#639922', onclick:"filterByStage('shortlisted')"},
     {label:'Interview',   value:b.interview,   color:'#EF9F27', onclick:"filterByStage('interview')"},
     {label:'Screening',   value:b.screening,   color:'#a9d17a', onclick:"filterByStage('screening')"},
@@ -3792,13 +3795,15 @@ function renderPipeline(){
   // Interview and untriaged REJECT into Rejected, which put the AI's opinion inside
   // columns that are meant to show your decisions. Untriaged candidates now sit in
   // Screening, where they actually are.
-  //   col 0: Screening   col 1: Interview   col 2: Shortlisted   col 3: Rejected
-  const colOf={screening:0, interview:1, shortlisted:2, rejected:3};
-  const cols=[[],[],[],[]];
+  //   col 0: Screening  col 1: Interview  col 2: Shortlisted  col 3: Hire  col 4: Rejected
+  // Hire is a pure MANUAL stage — nothing routes into it automatically, and
+  // it never creates an employee record (that stays a separate HRM action).
+  const colOf={screening:0, interview:1, shortlisted:2, hire:3, rejected:4};
+  const cols=[[],[],[],[],[]];
   unique.forEach(r=>{ cols[colOf[CandidateStats.stageOf(r)]].push(r); });
   cols.forEach(col=>col.sort((a,b)=>ovOf(b).s-ovOf(a).s));   // (T2) cards ordered by the ring they show
 
-  for(let i=0;i<4;i++){
+  for(let i=0;i<5;i++){
     document.getElementById('kb-cnt-'+i).textContent=cols[i].length;
     document.getElementById('kb-'+i).innerHTML=cols[i].length
       ?cols[i].map(r=>{
@@ -3817,9 +3822,14 @@ function renderPipeline(){
           actions=`
             <button class="pb-act" title="Shortlist for offer" onclick="event.stopPropagation();pipelineMove('${r._id}','shortlisted')" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)">✓</button>
             <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:var(--red);border:1px solid var(--rb)">✕</button>`;
-        } else if(i===2){ // Shortlisted → can reject or send back to interview
+        } else if(i===2){ // Shortlisted → hire, back to interview, or reject
           actions=`
+            <button class="pb-act" title="Move to Hire" onclick="event.stopPropagation();pipelineMove('${r._id}','hire')" style="background:var(--gg);color:var(--green);border:1px solid var(--gb)">★</button>
             <button class="pb-act" title="Back to interview" onclick="event.stopPropagation();pipelineMove('${r._id}','interview')" style="background:var(--og);color:var(--orange);border:1px solid var(--ob)">←</button>
+            <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:var(--red);border:1px solid var(--rb)">✕</button>`;
+        } else if(i===3){ // Hire → back to shortlisted, or reject
+          actions=`
+            <button class="pb-act" title="Back to shortlisted" onclick="event.stopPropagation();pipelineMove('${r._id}','shortlisted')" style="background:var(--og);color:var(--orange);border:1px solid var(--ob)">←</button>
             <button class="pb-act" title="Reject" onclick="event.stopPropagation();pipelineMove('${r._id}','rejected')" style="background:var(--rg);color:var(--red);border:1px solid var(--rb)">✕</button>`;
         } else { // Rejected → can un-reject (move back to screening)
           actions=`<button class="pb-act" title="Move back to screening" onclick="event.stopPropagation();pipelineMove('${r._id}','pending')" style="background:var(--s2);color:var(--t2);border:1px solid var(--border)">↩</button>`;
@@ -3839,10 +3849,10 @@ function renderPipeline(){
         </div>`;}).join('')
       // Per-column empty hint — short, contextual, no CTA (the global CTA is at the top)
       : emptyState({
-          icon: ['candidates','pipeline','candidates','candidates'][i] || 'candidates',
+          icon: ['candidates','pipeline','candidates','candidates','candidates'][i] || 'candidates',
           size: 'tiny',
-          title: ['No candidates','No interviews','No offers yet','None rejected'][i] || 'Empty',
-          body: ['Use the arrow buttons to move candidates here','Move candidates to interview from the Screening column','Shortlist top candidates from interviews','Reject candidates by clicking ✕'][i] || '',
+          title: ['No candidates','No interviews','No offers yet','No hires yet','None rejected'][i] || 'Empty',
+          body: ['Use the arrow buttons to move candidates here','Move candidates to interview from the Screening column','Shortlist top candidates from interviews','Move a shortlisted candidate here with ★ when you decide to hire — manual only','Reject candidates by clicking ✕'][i] || '',
         });
   }
   // Reflects the Dashboard toggle: 0 when merging is off, so the notice never claims
@@ -3862,8 +3872,8 @@ async function pipelineMove(id, stage){
   try{ renderCandidates(allResults); }catch(_){}
   try{ renderOverview(); }catch(_){}
 
-  const stageLabels = {shortlisted:'shortlisted for offer', interview:'moved to interview', rejected:'rejected', pending:'moved back to screening'};
-  const stageColor  = {shortlisted:'var(--green)', interview:'var(--orange)', rejected:'var(--red)', pending:'var(--indigo)'};
+  const stageLabels = {shortlisted:'shortlisted for offer', interview:'moved to interview', hire:'moved to Hire', rejected:'rejected', pending:'moved back to screening'};
+  const stageColor  = {shortlisted:'var(--green)', interview:'var(--orange)', hire:'var(--green)', rejected:'var(--red)', pending:'var(--indigo)'};
   addActivity('Candidate '+stageLabels[stage]+': '+(cand.candidate_name||'Unknown'), stageColor[stage]||'var(--indigo)');
 
   try{
@@ -5883,7 +5893,7 @@ function kpiRenderAll(api){
   K('kpi-applicants').textContent=s.total.toLocaleString();
   K('kpi-applicants-s').textContent= s.hidden? `${s.hidden} duplicate(s) merged — dedupe follows the Dashboard toggle` : 'Candidates screened in this range';
 
-  const activeC=s.byStage.screening+s.byStage.interview+s.byStage.shortlisted;
+  const activeC=s.byStage.screening+s.byStage.interview+s.byStage.shortlisted+s.byStage.hire;   // active = in the pipeline, not rejected (Hire included — owner's call)
   K('kpi-activec').textContent=activeC.toLocaleString();
   K('kpi-activec-s').textContent= s.total? `In the pipeline (not rejected) · ${s.reviewNeeded} awaiting first review` : 'No candidates in this range';
 
@@ -5904,7 +5914,7 @@ function kpiRenderAll(api){
   K('kpi-short').textContent= s.total? Math.round(s.byStage.shortlisted/s.total*100)+'%' : '—';
   K('kpi-short-s').textContent= s.total? `${s.byStage.shortlisted} shortlisted of ${s.total} screened — your decision, not the AI’s` : 'No candidates screened in this range';
 
-  const ivPlus=s.byStage.interview+s.byStage.shortlisted;
+  const ivPlus=s.byStage.interview+s.byStage.shortlisted+s.byStage.hire;   // at interview or beyond
   if(!apiOk){ noload('kpi-ivh','kpi-ivh-s','kpi-ivh-b'); }
   else if(ivPlus>0&&hiredN<=ivPlus){
     K('kpi-ivh').textContent=Math.round(hiredN/ivPlus*100)+'%';
@@ -5948,6 +5958,7 @@ function kpiRenderAll(api){
       {label:'Screening',value:st.screening,display:st.screening},
       {label:'Interview',value:st.interview,display:st.interview},
       {label:'Shortlisted',value:st.shortlisted,display:st.shortlisted},
+      {label:'Hire (stage)',value:st.hire,display:st.hire},
       {label:'Rejected',value:st.rejected,display:st.rejected},
     ]);
     const pct=(a,b)=> b>0? Math.round(a/b*100)+'% of applied' : '';
@@ -5957,7 +5968,7 @@ function kpiRenderAll(api){
       ['Shortlisted',st.shortlisted,pct(st.shortlisted,s.total),"kpiDrill('stage','shortlisted')"],
       ['Hired',apiOk?hiredN:'—',apiOk?pct(hiredN,s.total):'',"kpiDrill('employees')"],
     ].map(c=>`<div class="kpi-funcell kpi-click" onclick="${c[3]}" title="Open these records"><div class="kpi-funn">${c[1]}</div><div class="kpi-funl">${c[0]}</div><div class="kpi-funp">${c[2]}</div></div>`).join('');
-    K('kpi-funnel-note').textContent='“Interview +” counts candidates currently at interview stage or beyond (shortlisted). Stages are current positions, not a history. “Hired” counts employee records created from the funnel in the range — they may have been screened earlier.';
+    K('kpi-funnel-note').textContent='“Interview +” counts candidates currently at interview stage or beyond (shortlisted or Hire). Stages are current positions, not a history. “Hire (stage)” is the manual pipeline column; “Hired” counts employee records created from the funnel in the range — they may have been screened earlier.';
   }
 
   const bk=kpiMakeBuckets(s.rows.map(r=>(r.created_at||'').slice(0,10)));
@@ -6043,7 +6054,7 @@ function kpiRenderAll(api){
   }).sort((a,b)=>b.value-a.value).slice(0,8),{empty:'No open jobs right now.'});
 
   // Days to reach current stage — only what stage_updated_at honestly supports.
-  const stAgg={screening:[],interview:[],shortlisted:[],rejected:[]};
+  const stAgg={screening:[],interview:[],shortlisted:[],hire:[],rejected:[]};
   s.rows.forEach(r=>{
     if(!r.stage_updated_at||!r.created_at) return;
     const d=(new Date(r.stage_updated_at)-new Date(r.created_at))/86400000;

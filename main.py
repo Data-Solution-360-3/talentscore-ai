@@ -1383,8 +1383,11 @@ async def update_screening_stage(
     from database import db as mongodb
     from bson import ObjectId
     from datetime import datetime as _dt
-    if stage not in ("pending", "shortlisted", "interview", "rejected"):
-        raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: pending, shortlisted, interview, rejected.")
+    # "hire" is a pure pipeline stage (a column candidates sit in) — it does
+    # NOT create an employee record or touch HRM, and nothing moves candidates
+    # into it automatically.
+    if stage not in ("pending", "shortlisted", "interview", "hire", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid stage. Must be one of: pending, shortlisted, interview, hire, rejected.")
     user = await get_current_user(request)
     try:
         oid = ObjectId(screening_id)
