@@ -329,6 +329,16 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
 .btn-xs{padding:3px 7px;font-size:10px;border-radius:var(--r-xs)}
 .pb-act{padding:3px 8px;font-size:11px;font-weight:700;border-radius:var(--r-xs);cursor:pointer;font-family:inherit;transition:transform .1s,filter .1s}
 .pb-act:hover{transform:scale(1.1);filter:brightness(.95)}
+/* ── Pipeline board: 5 equal tracks + uniform cards + brand stage colors ──
+   1fr alone means minmax(auto,1fr): tracks can't shrink below their content's
+   min-width, so columns with 3 action buttons stole width from the rest.
+   minmax(0,1fr) + min-width:0 makes the five tracks mathematically equal. */
+#kb-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;overflow-x:auto}
+#kb-grid>div{min-width:0}
+@media(max-width:950px){#kb-grid{grid-template-columns:repeat(5,minmax(190px,1fr))}}
+/* Stage badge tints matching the Pipeline-by-Stage donut palette */
+.b-stage-scr{background:rgba(169,209,122,.22);color:#4F7C1B;border-color:rgba(169,209,122,.55)}
+.b-stage-hire{background:rgba(23,52,4,.10);color:#173404;border-color:rgba(23,52,4,.28)}
 .btn-green{background:var(--gg);color:var(--green);border:1px solid var(--gb)}
 .btn-green:hover{background:rgba(22,163,74,.18);border-color:var(--green)}
 .btn-red{background:var(--rg);color:var(--red);border:1px solid var(--rb)}
@@ -981,11 +991,11 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
     <span class="badge b-red">REJECT → Rejected</span>
     <span style="font-size:11px;color:var(--t3);margin-left:auto" id="pipeline-notice"></span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="kb-grid">
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Screening</span><span class="badge b-indigo" id="kb-cnt-0">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-0"></div></div>
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Interview</span><span class="badge b-amber" id="kb-cnt-1">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-1"></div></div>
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Shortlisted</span><span class="badge b-orange" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
-    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Hire</span><span class="badge b-green" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
+  <div id="kb-grid">
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Screening</span><span class="badge b-stage-scr" id="kb-cnt-0">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-0"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Interview</span><span class="badge b-orange" id="kb-cnt-1">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-1"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Shortlisted</span><span class="badge b-green" id="kb-cnt-2">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-2"></div></div>
+    <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Hire</span><span class="badge b-stage-hire" id="kb-cnt-3">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-3"></div></div>
     <div><div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs) var(--rs) 0 0;padding:8px 10px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700">Rejected</span><span class="badge b-red" id="kb-cnt-4">0</span></div><div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rs) var(--rs);padding:6px;min-height:200px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="kb-4"></div></div>
   </div>
 </div>
@@ -3834,7 +3844,7 @@ function renderPipeline(){
         } else { // Rejected → can un-reject (move back to screening)
           actions=`<button class="pb-act" title="Move back to screening" onclick="event.stopPropagation();pipelineMove('${r._id}','pending')" style="background:var(--s2);color:var(--t2);border:1px solid var(--border)">↩</button>`;
         }
-        return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s;margin-bottom:6px" onmouseover="this.style.borderColor='var(--indigo)'" onmouseout="this.style.borderColor='var(--border)'">
+        return`<div onclick="openCandModal('${r._id}')" style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem;cursor:pointer;transition:all .12s;margin-bottom:6px" onmouseover="this.style.borderColor='var(--orange2)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             ${scoreRing(ovOf(r).s, 'sm')}
             <div style="min-width:0;flex:1">
@@ -3845,7 +3855,7 @@ function renderPipeline(){
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <span class="badge ${tbcls(rec)}" style="font-size:9px">${rec}</span>
           </div>
-          <div style="display:flex;gap:3px;justify-content:flex-end">${actions}</div>
+          <div style="display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap">${actions}</div>
         </div>`;}).join('')
       // Per-column empty hint — short, contextual, no CTA (the global CTA is at the top)
       : emptyState({
