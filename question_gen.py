@@ -186,7 +186,7 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
                                     ) -> tuple[dict | None, str | None]:
     """One scenario + its k written questions from the JD.
     Returns ({"text", "questions"}, None) or (None, error)."""
-    k = max(2, min(4, int(k)))
+    k = max(2, min(8, int(k)))
     jd = (jd_text or "").strip()
     if len(jd) < 40:
         return None, "The job description is too short to generate a scenario from."

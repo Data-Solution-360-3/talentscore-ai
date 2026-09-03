@@ -207,17 +207,17 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
   <div class="q-label" id="q-label">Getting ready…</div>
   <div class="question" id="question"><span class="caret"></span></div>
   <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
-  <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:14px 16px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08)">
+  <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:12px 14px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08);max-height:34vh;overflow:hidden">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="background:#16A34A;color:#fff;border-radius:9999px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.6px">📋 CASE STUDY</span>
       <span id="scen-prog" style="font-size:11px;font-weight:800;color:#3C7A5A"></span>
     </div>
-    <div id="scen-text" style="font-size:14.5px;line-height:1.7;color:#1F2A24;white-space:pre-wrap"></div>
+    <div id="scen-text" style="font-size:13px;line-height:1.65;color:#1F2A24;white-space:pre-wrap;overflow-y:auto;max-height:21vh"></div>
     <div style="font-size:11.5px;color:#6B7B72;margin-top:8px">This case study stays on screen — every question below is about it.</div>
   </div>
   <div class="typed" id="typed">
     <div class="typed-label" id="typed-label">Type your answer</div>
-    <div id="typed-q" style="display:none;font-size:15px;font-weight:700;color:#1f2937;line-height:1.55;margin:2px 0 10px;text-align:left"></div>
+    <div id="typed-q" style="display:none;font-size:13px;font-weight:700;color:#1f2937;line-height:1.6;margin:2px 0 10px;text-align:left"></div>
     <textarea id="typed-ta" maxlength="4000" placeholder="Type your answer here…"></textarea>
     <div class="typed-hints"><span>Take your time — the interviewer will wait.</span><span>🎙 Mic paused while you type</span></div>
     <button class="typed-submit" id="typed-submit" type="button">Submit answer</button>
@@ -324,25 +324,43 @@ const SCEN_KEY='tc-scen-'+TOKEN;
 // sessionStorage so a full reload resumes where it left off, not at 12:00.
 const TOTAL_SECS = 12*60;
 const TIMER_KEY = 'tc-timer-'+TOKEN;
-let timerElapsed = 0, timerInt = null, timedOut = false;
+// (Bug 1 fix) WALL-CLOCK timer. The old version accumulated setInterval
+// ticks and skipped the increment while "not connected" — background-tab
+// throttling (~1 tick/min) froze it while the interview kept talking, and a
+// stuck pause condition froze it permanently. Now elapsed = accumulated
+// active milliseconds measured from Date.now() spans: a missed tick can't
+// lose time, returning to the tab catches up instantly, and the 12-minute
+// auto-end fires on REAL elapsed time. The one deliberate pause — genuine
+// network drops don't consume interview time — is kept as a measured span.
+let timerActiveMs = 0, timerAnchor = null, timerInt = null, timedOut = false;
+function timerNowMs(){ return timerActiveMs + (timerAnchor ? Date.now() - timerAnchor : 0); }
+function timerTick(){
+  if(manualStop || timedOut || closing || closingDone) return;   // wrapping up — freeze display
+  const connected = pc && pc.connectionState==='connected' && !resuming;
+  const now = Date.now();
+  if(connected){ if(!timerAnchor) timerAnchor = now; }
+  else if(timerAnchor){ timerActiveMs += now - timerAnchor; timerAnchor = null; }  // drop: stop the span
+  const elapsedS = Math.floor(timerNowMs()/1000);
+  try{ sessionStorage.setItem(TIMER_KEY, String(Math.round(timerNowMs()))); }catch(_){}
+  renderTimer(elapsedS);
+  if(elapsedS >= TOTAL_SECS) timeUp();
+}
 function startTimer(){
   if(timerInt) return;
-  try{ timerElapsed = parseInt(sessionStorage.getItem(TIMER_KEY),10) || 0; }catch(_){}
+  try{
+    const v = parseInt(sessionStorage.getItem(TIMER_KEY),10) || 0;
+    // Legacy key stored seconds (max 720); the new key stores ms (≥1000 within a second).
+    timerActiveMs = v > 1000 ? v : v*1000;
+  }catch(_){}
   $('timer').classList.add('on');
-  renderTimer();
-  timerInt = setInterval(()=>{
-    if(manualStop || timedOut || closing || closingDone) return;   // wrapping up — freeze
-    const connected = pc && pc.connectionState==='connected' && !resuming;
-    if(!connected) return;                                          // PAUSE while dropped/reconnecting
-    timerElapsed++;
-    try{ sessionStorage.setItem(TIMER_KEY, String(timerElapsed)); }catch(_){}
-    renderTimer();
-    if(timerElapsed >= TOTAL_SECS) timeUp();
-  }, 1000);
+  renderTimer(Math.floor(timerNowMs()/1000));
+  timerInt = setInterval(timerTick, 1000);
+  document.addEventListener('visibilitychange', timerTick);   // instant catch-up on tab return
 }
-function renderTimer(){
+function renderTimer(elapsedS){
   const el = $('timer'); if(!el) return;
-  const rem = Math.max(0, TOTAL_SECS - timerElapsed);
+  if(elapsedS==null) elapsedS = Math.floor(timerNowMs()/1000);
+  const rem = Math.max(0, TOTAL_SECS - elapsedS);
   const m = Math.floor(rem/60), s = rem%60;
   $('timer-txt').textContent = m+':'+String(s).padStart(2,'0');
   el.classList.toggle('warn', rem<=120 && rem>30);   // under 2:00 — gentle amber
@@ -831,6 +849,60 @@ function flag(type, reason, dur){
   proc.flags.push(f);
   if(proc.flags.length > 120) proc.flags.shift();   // bounded; server caps again
   log('FLAG', type, reason, dur!=null?('('+Math.round(dur)+'s)'):'');
+  policyCheck();
+}
+
+// ── Policy ejection: CLEAR, REPEATED, DELIBERATE cheating ends the interview
+// (and stops Realtime token spend). Conservative by design:
+//  · only deterministic browser events count — tab/focus loss ≥5s and pastes.
+//    Face/camera signals NEVER eject (false-positive prone; camera-denied is
+//    flag-not-block per policy). Network drops NEVER count — drop-recovery
+//    handles those and cannot eject.
+//  · one warning first, then ejection if it continues.
+//  · an ejected session gets NO score — stored as a policy violation.
+const EJECT_RULES = {tabWarnEvents:3, tabEjectEvents:5, tabMinAwayS:5,
+                     tabWarnAwayS:45, tabEjectAwayS:90,
+                     pasteWarn:2, pasteEject:4};
+let policyWarned=false, ejected=false;
+function policyCounts(){
+  const c=(proc&&proc.counts)||{}, du=(proc&&proc.durations)||{};
+  // Tab events: only stays-away of ≥5s count (a <5s blip is never cheating).
+  const tabEvents=((proc&&proc.flags)||[]).filter(f=>f.type==='tab_switch'&&(f.dur||0)>=EJECT_RULES.tabMinAwayS).length;
+  return {tab_switch:tabEvents, tab_away_seconds:Math.round(du.tab_away||0), paste:c.paste||0};
+}
+function policyCheck(){
+  if(ejected || manualStop || timedOut || !proc) return;
+  const v=policyCounts();
+  const ejectNow = v.tab_switch>=EJECT_RULES.tabEjectEvents || v.tab_away_seconds>=EJECT_RULES.tabEjectAwayS
+                || v.paste>=EJECT_RULES.pasteEject;
+  const warnNow  = v.tab_switch>=EJECT_RULES.tabWarnEvents || v.tab_away_seconds>=EJECT_RULES.tabWarnAwayS
+                || v.paste>=EJECT_RULES.pasteWarn;
+  if(ejectNow){ ejectInterview(v); return; }
+  if(warnNow && !policyWarned){
+    policyWarned=true;
+    flagLessWarn();
+  }
+}
+function flagLessWarn(){
+  // The one warning before ejection — loud, honest, and recorded.
+  try{ proc.flags.push({t:nowT(), type:'policy_warning', reason:'threshold warning shown'}); }catch(_){}
+  showProctorPrompt('policy','⚠ Final warning: repeated tab switching or pasting will END this interview without a score.');
+  log('POLICY WARNING shown', JSON.stringify(policyCounts()));
+}
+function ejectInterview(violations){
+  if(ejected) return;
+  ejected=true; manualStop=true;
+  log('POLICY EJECTION', JSON.stringify(violations));
+  try{ clearInterval(timerInt); timerInt=null; }catch(_){}
+  window._procSummary = procStop();
+  saveSession('policy_violation', violations);   // recorded with WHY; server skips scoring
+  cleanup(); recon(false);                        // closes the peer connection — token spend stops here
+  try{ sessionStorage.removeItem(TIMER_KEY); sessionStorage.removeItem(TYPED_KEY); }catch(_){}
+  // Clear, honest end screen — no score, and we say so.
+  view('v-done');
+  const dt=document.querySelector('#v-done h1'), dp=document.querySelector('#v-done .sub');
+  if(dt) dt.textContent='Interview ended';
+  if(dp) dp.textContent='This interview was ended because of repeated policy violations (leaving the interview tab or pasting answers) after a warning. It will not receive a score. If you believe this was a mistake, contact the hiring team.';
 }
 async function flagSnap(label){
   // Opportunistic labeled frame at flag time — shares the ≤12 cap + server caps.
@@ -1011,8 +1083,10 @@ function procStop(){
 }
 
 // ── lifecycle ────────────────────────────────────────────────
-async function saveSession(status){
-  if(sessionSaved || !transcript.length || questionsAsked===0) return;
+async function saveSession(status, violations){
+  // A policy ejection is ALWAYS recorded, even before the first completed
+  // question — the recruiter must see why the link died.
+  if(sessionSaved || (status!=='policy_violation' && (!transcript.length || questionsAsked===0))) return;
   sessionSaved = true;
   try{
     await fetch('/api/interview/'+TOKEN+'/session', {
@@ -1022,6 +1096,7 @@ async function saveSession(status){
         questions_asked: questionsAsked, recoveries, barge_ins: bargeIns,
         duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000):0,
         proctoring: window._procSummary || {enabled:false},
+        violations: violations || undefined,
         usage: usageAcc
       })});
   }catch(e){ log('save failed', e); }

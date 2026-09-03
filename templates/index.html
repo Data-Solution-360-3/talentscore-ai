@@ -2193,6 +2193,8 @@ function ivCell(r){
   if(iv.overall==null){
     // Truthful states, matching viva_sessions.html: a failed scoring and an
     // abandoned interview must never masquerade as work-in-progress.
+    if(iv.score_status==='not_scored_policy')
+      return `<span class="badge" style="font-size:9px;background:rgba(220,38,38,.1);color:var(--red)" title="Interview ended for repeated policy violations — no score computed">policy violation</span>`;
     if(iv.score_status==='failed')
       return `<span class="badge" style="font-size:9px;background:rgba(220,38,38,.1);color:var(--red)" title="Scoring failed — open the session for the error">scoring failed</span>`;
     if(!iv.done)
@@ -4364,7 +4366,7 @@ function iqScenSet(o){ const st=window._iqState; if(st.editing) st.scenWork=o; e
 function iqScenText(v){ const s=iqScen(); if(s) s.text=v; }
 function iqScenQ(i,v){ const s=iqScen(); if(s) s.questions[i]=v; }
 function iqScenQDel(i){ const s=iqScen(); if(s){ s.questions.splice(i,1); iqRender(); } }
-function iqScenQAdd(){ const s=iqScen(); if(s && s.questions.length<4){ s.questions.push(''); iqRender(); } }
+function iqScenQAdd(){ const s=iqScen(); if(s && s.questions.length<8){ s.questions.push(''); iqRender(); } }
 function iqScenAdd(){ iqScenSet({text:'', questions:['','']}); iqRender(); }
 function iqScenRemove(){ if(confirm('Remove the written scenario from this set?')){ iqScenSet(null); iqRender(); } }
 function iqScenPayload(){
@@ -4392,9 +4394,9 @@ function iqScenEditor(){
         <button onclick="iqScenQDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
       </div>`).join('')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${(s.questions||[]).length<4?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add scenario question</button>':''}
+      ${(s.questions||[]).length<8?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add scenario question</button>':''}
       <button class="btn btn-xs" onclick="iqScenRemove()" style="color:var(--t3)">Remove scenario</button>
-      <span style="font-size:10.5px;color:var(--t3)">2–4 questions about this exact situation.</span>
+      <span style="font-size:10.5px;color:var(--t3)">2–8 questions about this exact situation.</span>
     </div></div>`;
 }
 
@@ -4471,7 +4473,7 @@ function iqRender(){
           <input id="iq-followups" type="number" min="1" max="5" value="3"
                  style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
         <label style="font-size:11px;font-weight:600;color:var(--t2)">Scenario questions
-          <input id="iq-scenq" type="number" min="2" max="4" value="4"
+          <input id="iq-scenq" type="number" min="2" max="8" value="4"
                  style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
         <button class="btn btn-xs btn-primary" id="iq-gen" onclick="iqGenerate()">Generate from job description</button>
       </div>
@@ -4508,7 +4510,7 @@ async function iqGenerate(){
   const st = window._iqState;
   const nt = Math.max(1, Math.min(4, parseInt(document.getElementById('iq-topics')?.value)||2));
   const nf = Math.max(1, Math.min(5, parseInt(document.getElementById('iq-followups')?.value)||3));
-  const ns = Math.max(2, Math.min(4, parseInt(document.getElementById('iq-scenq')?.value)||4));
+  const ns = Math.max(2, Math.min(8, parseInt(document.getElementById('iq-scenq')?.value)||4));
   const btn = document.getElementById('iq-gen');
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
   try{

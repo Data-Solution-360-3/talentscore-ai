@@ -1933,7 +1933,7 @@ def _normalize_scenario(raw) -> dict | None:
         return None
     text = str(raw.get("text", "")).strip()[:900]
     questions = [str(q).strip()[:300] for q in (raw.get("questions") or [])
-                 if str(q).strip()][:4]
+                 if str(q).strip()][:8]
     if not text or len(questions) < 2:
         return None
     return {"text": text, "questions": questions}
@@ -2976,7 +2976,11 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         raise HTTPException(status_code=400, detail="Invalid request body.")
 
     transcript = body.get("transcript")
-    if not isinstance(transcript, list) or not transcript:
+    if not isinstance(transcript, list):
+        transcript = []
+    # An early policy ejection can legitimately have an empty transcript —
+    # the violation record still must land. Everything else needs one.
+    if not transcript and body.get("status") != "policy_violation":
         raise HTTPException(status_code=400, detail="A transcript is required.")
     clean = []
     for t in transcript[:120]:
@@ -3024,9 +3028,20 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "recoveries": _i(body.get("recoveries"), 0, 50),
         "barge_ins": _i(body.get("barge_ins"), 0, 200),
         "duration_seconds": _i(body.get("duration_seconds"), 0, 7200),
-        "status": body.get("status") if body.get("status") in ("completed", "abandoned") else "abandoned",
+        # policy_violation: the page ejected the candidate for repeated,
+        # deliberate violations (thresholds enforced client-side, recorded
+        # below). Such a session is NEVER scored — no fabricated numbers.
+        "status": body.get("status") if body.get("status") in ("completed", "abandoned", "policy_violation") else "abandoned",
         "score_status": "pending",
     }
+    if doc["status"] == "policy_violation":
+        doc["score_status"] = "not_scored_policy"
+        v = body.get("violations") if isinstance(body.get("violations"), dict) else {}
+        doc["policy_violations"] = {
+            "tab_switch": _i(v.get("tab_switch"), 0, 1000),
+            "tab_away_seconds": _i(v.get("tab_away_seconds"), 0, 86400),
+            "paste": _i(v.get("paste"), 0, 1000),
+        }
     # One-link flow: carry the application binding through so the results view
     # can show the CV score and the interview for the same person.
     for k in ("application_id", "job_id"):
@@ -3049,9 +3064,12 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
             pass
 
     session_id = await save_interview_session(doc)
-    if doc["status"] == "completed":
-        await complete_live_interview(token)   # single-use: the link dies here
-    background.add_task(score_live_session, session_id)
+    if doc["status"] in ("completed", "policy_violation"):
+        # single-use either way: a normal finish OR an ejection kills the link
+        # (an ejected candidate doesn't get a free retry on the same token).
+        await complete_live_interview(token)
+    if doc["status"] != "policy_violation":
+        background.add_task(score_live_session, session_id)
     return {"success": True}
 
 
@@ -3695,7 +3713,7 @@ async def job_interview_questions_generate(request: Request, job_id: str):
             return default
     n_topics = _clamp("topics", 2, 1, 4)
     followups = _clamp("followups", 3, 1, 5)
-    scen_k = _clamp("scenario_questions", 4, 2, 4)
+    scen_k = _clamp("scenario_questions", 4, 2, 8)
     if not await rate_limit_allows(f"iqgen:{job_id}", 10, 86400):
         raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
 

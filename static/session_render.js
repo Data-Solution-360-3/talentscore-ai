@@ -79,7 +79,15 @@ window.SessionRender = (function(){
         html += `<div class="notice">Scenario segment scoring failed: ${esc(s.scenario_error)}</div>`;
       }
     }else{
-      html += `<div class="notice">Scoring: ${esc(s.score_status||'pending')}${s.score_error?' — '+esc(s.score_error):''}. Reload in a moment.</div>`;
+      if(s.status==='policy_violation'){
+        const pv=s.policy_violations||{};
+        html += `<div class="notice" style="color:var(--red,#DC2626);font-weight:600">Ended — policy violation. `
+          +`The interview was ended after a warning for repeated violations: ${pv.tab_switch||0}× tab switch (${pv.tab_away_seconds||0}s away total), ${pv.paste||0}× paste. `
+          +`No score was computed — an ejected session is never given a number. `
+          +`<span style="font-weight:400;color:var(--t3)">Note: ejection is client-side deterrence; the transcript and frames below show what was captured. The candidate link was consumed.</span></div>`;
+      }else{
+        html += `<div class="notice">Scoring: ${esc(s.score_status||'pending')}${s.score_error?' — '+esc(s.score_error):''}. Reload in a moment.</div>`;
+      }
     }
     return html;
   }

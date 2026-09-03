@@ -99,7 +99,9 @@ async function loadList(){
     $('list').innerHTML = d.sessions.map(s => {
       const sc = s.score_status==='scored'
         ? (s.interview_score!=null ? s.interview_score : (s.score_result? s.score_result.overall : '—')) : null;
-      const b = s.score_status==='scored' ? 'b-scored' : (s.score_status==='failed' ? 'b-failed' : 'b-pending');
+      const b = s.score_status==='scored' ? 'b-scored'
+              : (s.score_status==='failed' || s.score_status==='not_scored_policy') ? 'b-failed' : 'b-pending';
+      const badgeTxt = s.score_status==='not_scored_policy' ? 'ended — policy violation' : (s.score_status||'pending');
       const title = s.candidate_name
         ? s.candidate_name
         : (qText(s.config&&s.config.questions&&s.config.questions[0])||'Interview');
@@ -110,7 +112,7 @@ async function loadList(){
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           ${sc!==null?`<span style="font-weight:900;font-size:1.2rem">${sc}</span>`:''}
-          <span class="badge ${b}">${esc(s.score_status||'pending')}</span>
+          <span class="badge ${b}">${esc(badgeTxt)}</span>
         </div>
       </div>`;
     }).join('');
