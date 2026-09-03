@@ -667,6 +667,31 @@ body{font-family:'Inter','Noto Sans Bengali',sans-serif;background:var(--bg);col
 #cand-modal-body .turn.you .who{color:var(--green)}
 #cand-modal-body .evrow{display:flex;gap:1.1rem;font-size:11.5px;color:var(--t3);margin-top:.4rem;flex-wrap:wrap}
 #cand-modal-body .notice{padding:1.1rem;text-align:center;color:var(--t2);font-size:.88rem}
+/* ── Candidate card redesign — all scoped to the modal, brand green/orange only ── */
+#cand-modal-body .cdx-banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border-radius:14px;margin-bottom:10px;background:linear-gradient(105deg,rgba(99,153,34,.13),rgba(239,159,39,.13));border:1px solid rgba(99,153,34,.25)}
+#cand-modal-body .cdx-chip{width:76px;height:76px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 10px rgba(23,52,4,.12)}
+#cand-modal-body .cdx-chip b{font-size:24px;font-weight:900;letter-spacing:-1px;line-height:1}
+#cand-modal-body .cdx-chip span{font-size:8.5px;font-weight:800;letter-spacing:.06em;color:var(--t3);margin-top:2px}
+#cand-modal-body .cdx-name{font-size:16px;font-weight:800;color:#173404;letter-spacing:-.2px}
+#cand-modal-body .cdx-role{font-size:11.5px;color:var(--t2);margin:1px 0 6px}
+#cand-modal-body .cdx-verdict{display:inline-flex;align-items:center;gap:6px;border-radius:9999px;padding:4px 12px;font-size:11px;font-weight:800}
+#cand-modal-body .cdx-split{margin-left:auto;text-align:right;font-size:11px;line-height:1.6;color:var(--t2)}
+#cand-modal-body .cdx-split b{font-variant-numeric:tabular-nums}
+#cand-modal-body .cdx-cov{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:9px 12px;margin-bottom:10px}
+#cand-modal-body .cdx-panel{border-radius:12px;padding:9px 12px}
+#cand-modal-body .cdx-good{background:rgba(99,153,34,.08);border:1px solid rgba(99,153,34,.28)}
+#cand-modal-body .cdx-bad{background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.2)}
+#cand-modal-body .cdx-risk{background:rgba(239,159,39,.10);border:1px solid rgba(239,159,39,.35);border-radius:12px;padding:9px 12px;margin-top:8px}
+#cand-modal-body .cdx-bar{height:6px;background:var(--s3);border-radius:4px;overflow:hidden}
+#cand-modal-body .cdx-bar i{display:block;height:100%;border-radius:0 4px 4px 0}
+@media(max-width:640px){#cand-modal-body .cdx-split{margin-left:0;text-align:left;flex-basis:100%}}
+/* footer button treatment: Reject muted red · Move to interview orange primary · Shortlist green · rest ghost */
+#cand-modal .modal-footer .btn-red{background:rgba(220,38,38,.08);color:#B91C1C;border:1px solid rgba(220,38,38,.28)}
+#cand-modal .modal-footer .btn-red:hover{background:rgba(220,38,38,.15)}
+#cand-modal .modal-footer .btn-amber{background:#F57C2E;color:#fff;border:none;box-shadow:0 2px 8px rgba(245,124,46,.3)}
+#cand-modal .modal-footer .btn-amber:hover{background:#E16A1F}
+#cand-modal .modal-footer .btn-green{background:#639922;color:#fff;border:none}
+#cand-modal .modal-footer .btn-green:hover{background:#4F7C1B}
 </style>
 </head>
 <body>
@@ -2376,14 +2401,26 @@ function openCandModal(id){
   const r=allResults.find(x=>x._id===id);
   if(!r)return;
   currentCandId=id;
-  const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();const cov=r.skills_coverage_pct||0;const sc=r.score_consistency||{};
-  const auth = r.authenticity || {};
-  const bd   = r.score_breakdown || null;
-
-  // ── Authenticity badge color (matches likelihood %) ──
-  const authPct = auth.ai_likelihood_pct || 0;
-  const authColor = authPct >= 50 ? 'var(--red)' : authPct >= 25 ? 'var(--amber)' : 'var(--green)';
-  const authCls   = authPct >= 50 ? 'b-red'      : authPct >= 25 ? 'b-amber'      : 'b-green';
+  // (restyle) Authenticity is still COMPUTED server-side and still feeds
+  // hiring_risks when strongly flagged — only its dedicated display rows were
+  // removed from this card. AI-confidence stays internal to the scoring gate;
+  // no confidence tokens render here.
+  const ov=ovOf(r);
+  const score=ov.s;const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
+  const rep=r.report||null;
+  const cov=rep?rep.skillsCoveragePercent:(r.skills_coverage_pct??0);   // null = not scored
+  const bd =r.score_breakdown||null;
+  // Brand band colors for this card: strong green / mid orange / weak red.
+  const cdxc=p=>p>=70?'#639922':p>=45?'#EF9F27':'#DC2626';
+  const col=cdxc(score);
+  const verdict=(rep&&rep.verdict)||({'STRONG HIRE':'hire','HIRE':'hire','MAYBE':'maybe','REJECT':'reject'}[rec]||'maybe');
+  const vd={hire:['Strong match — hire','#639922','rgba(99,153,34,.12)'],
+            maybe:['Borderline — review','#B45309','rgba(239,159,39,.14)'],
+            reject:['Not a match','#B91C1C','rgba(220,38,38,.08)']}[verdict];
+  const strengths=(rep&&rep.keyStrengths&&rep.keyStrengths.length?rep.keyStrengths:(r.key_strengths||[]));
+  const gaps=(rep&&rep.criticalGaps&&rep.criticalGaps.length?rep.criticalGaps:(r.critical_gaps||[]));
+  const questions=(rep&&rep.interviewQuestions&&rep.interviewQuestions.length?rep.interviewQuestions:(r.interview_questions||[]));
+  const risks=(rep&&rep.hiringRisks)?rep.hiringRisks:(r.hiring_risks||[]).filter(x=>String(x).toLowerCase()!=='none identified');
 
   document.getElementById('cand-modal-name').textContent=(r.candidate_name||'Candidate')+' — AI Report';
   document.getElementById('open-full-report').onclick=()=>{window.location.href='/candidate?id='+id;};
@@ -2396,23 +2433,21 @@ function openCandModal(id){
     ${r.recommendation_note ? `
     <div style="background:var(--amg);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px;flex-shrink:0">⚠</span>
-      <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Confidence flag:</strong> ${escapeHtml(r.recommendation_note)}</div>
+      <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Review note:</strong> ${escapeHtml(r.recommendation_note)}</div>
     </div>` : ''}
-    <!-- Header: true regardless of tab — always visible above the tabs -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-      ${(()=>{const ov=ovOf(r);return scoreRing(ov.s,'lg')+
-        '<div style="min-width:74px">'+(ov.pending
-          ?'<div style="font-size:9px;font-weight:800;color:var(--amber)">CV ONLY</div><div style="font-size:8.5px;color:var(--t3)">interview pending</div>'
-          :'<div style="font-size:9px;font-weight:800;color:var(--green)">OVERALL</div><div style="font-size:8.5px;color:var(--t3)">CV '+ov.cv+' ×0.35<br>IV '+ov.iv+' ×0.65'+(r.interview_status==='abandoned'?'<br><span style="color:var(--amber);font-weight:700">interview ended early</span>':'')+'</div>')+'</div>';})()}
-      <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:700;margin-bottom:2px">${r.candidate_name||'Unknown'}</div>
-        <div style="font-size:11px;color:var(--t2);margin-bottom:5px">${r.current_title||'—'} · ${r.years_experience||'?'} yrs</div>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <span class="badge ${tbcls(rec)}">${rec}</span>
-          ${auth.is_flagged
-            ? `<span class="badge ${authCls}" title="${escapeHtml(auth.notes||'')}" style="display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>${authPct}% AI-likelihood</span>`
-            : (authPct > 0 ? `<span class="badge b-green" title="${escapeHtml(auth.notes||'')}">✓ Authentic</span>` : '')}
-        </div>
+    <!-- Banner: soft transparent green→orange wash — always visible above the tabs.
+         Every value below is real scorer output; nothing hardcoded. -->
+    <div class="cdx-banner">
+      <div class="cdx-chip" style="border:3px solid ${col}"><b style="color:${col}">${score}</b><span>${ov.pending?'CV ONLY':'OVERALL'}</span></div>
+      <div style="min-width:0">
+        <div class="cdx-name">${r.candidate_name||'Unknown'}</div>
+        <div class="cdx-role">${r.current_title||'—'} · ${r.years_experience||'?'} yrs experience</div>
+        <span class="cdx-verdict" style="color:${vd[1]};background:${vd[2]};border:1px solid ${vd[1]}44">${vd[0]}</span>
+      </div>
+      <div class="cdx-split">
+        ${ov.pending
+          ? `CV score <b>${ov.cv}</b><br><span style="color:#B45309;font-weight:700">Interview pending</span><br><span style="font-size:10px;color:var(--t3)">overall = CV until an interview is scored</span>`
+          : `CV <b>${ov.cv}</b> × 0.35<br>Interview <b>${ov.iv}</b> × 0.65${r.interview_status==='abandoned'?'<br><span style="color:#B45309;font-weight:700">interview ended early</span>':''}`}
       </div>
     </div>
 
@@ -2426,45 +2461,49 @@ function openCandModal(id){
     <div class="cand-detail-grid">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">AI Summary</div>
-        <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">${r.summary||'—'}</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:10px;color:var(--t3);width:90px">Skills coverage</span>
-          <div style="flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${cov}%;background:${gc(cov)};border-radius:3px"></div></div>
-          <span style="font-size:11px;font-weight:700;color:${gc(cov)}">${cov}%</span>
+        <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">${(rep&&rep.aiSummary)||r.summary||'—'}</div>
+        <div class="cdx-cov">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px">Skills coverage</div>
+          ${cov===null||cov===undefined
+            ? '<div style="font-size:11px;color:var(--t3)">Not scored — this role has no required skills configured to compare against.</div>'
+            : `<div style="display:flex;align-items:center;gap:8px">
+                 <div class="cdx-bar" style="flex:1"><i style="width:${cov}%;background:${cdxc(cov)}"></i></div>
+                 <span style="font-size:12px;font-weight:800;color:${cdxc(cov)}">${cov}%</span>
+               </div>`}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:10px;color:var(--t3);width:90px">AI Confidence</span>
-          <span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span>
-          <span style="font-size:10px;color:var(--t3)">Strict: ${sc.strict_pass||'—'} · Upside: ${sc.upside_pass||'—'} · Δ${sc.difference||0}</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="background:var(--gg);border:1px solid var(--gb);border-radius:var(--rs);padding:.6rem">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--green);margin-bottom:4px">Key strengths</div>
-            ${(r.key_strengths||[]).slice(0,3).map(s=>`<div style="font-size:10px;color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:var(--green)">✓</span>${s}</div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+          <div class="cdx-panel cdx-good">
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#4F7C1B;margin-bottom:4px">Key strengths</div>
+            ${strengths.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#639922;flex-shrink:0">✓</span><span>${s}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
           </div>
-          <div style="background:var(--rg);border:1px solid var(--rb);border-radius:var(--rs);padding:.6rem">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin-bottom:4px">Critical gaps</div>
-            ${(r.critical_gaps||[]).slice(0,3).map(s=>`<div style="font-size:10px;color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:var(--red)">✗</span>${s}</div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+          <div class="cdx-panel cdx-bad">
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#B91C1C;margin-bottom:4px">Critical gaps</div>
+            ${gaps.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#DC2626;flex-shrink:0">✗</span><span>${s}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
           </div>
         </div>
       </div>
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px">Score breakdown</div>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-          ${(r.dimensions||[]).map(d=>{const p=Math.round((d.score/20)*100);const c=gc(p);return`
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">
+          ${(rep&&rep.breakdown?Object.values(rep.breakdown):(r.dimensions||[])).map(d=>{
+            const p=Math.round(((d.score||0)/20)*100);const c=cdxc(p);
+            const wt=d.weight>1?Math.round(d.weight):Math.round((d.weight||0)*100);
+            return`
             <div>
               <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
-                <span style="color:var(--t2)">${d.name}</span>
-                <span style="font-weight:700;color:${c}">${d.score.toFixed(1)}/20</span>
+                <span style="color:var(--t2)">${d.name}${wt?` <span style="color:var(--t3)">· ${wt}%</span>`:''}</span>
+                <span style="font-weight:800;color:${c}">${(+d.score).toFixed(1)}/20</span>
               </div>
-              <div style="height:4px;background:var(--border2);border-radius:2px;overflow:hidden"><div style="height:100%;width:${p}%;background:${c};border-radius:2px"></div></div>
+              <div class="cdx-bar"><i style="width:${p}%;background:${c}"></i></div>
             </div>`;}).join('')}
         </div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Interview questions</div>
-        ${(r.interview_questions||[]).slice(0,3).map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:var(--orange);font-weight:700;flex-shrink:0">${i+1}.</span>${q}</div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
-        ${r.hiring_risks&&r.hiring_risks.length?`
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber);margin-top:8px;margin-bottom:5px;display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Hiring risks</div>
-        ${r.hiring_risks.slice(0,3).map(risk=>`<div style="font-size:11px;color:var(--amber);padding:3px 0">${risk}</div>`).join('')}`:''}
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Suggested interview questions</div>
+        ${questions.map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:7px;line-height:1.55"><span style="color:#F57C2E;font-weight:800;flex-shrink:0">${i+1}</span><span>${q}</span></div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
+        ${risks&&risks.length?`
+        <div class="cdx-risk">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#B45309;margin-bottom:4px;display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Hiring risks</div>
+          ${risks.map(risk=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;line-height:1.5">${risk}</div>`).join('')}
+        </div>`:''}
       </div>
     </div>
 
@@ -2490,32 +2529,15 @@ function openCandModal(id){
           <span style="font-weight:700">−${bd.hard_gap_penalty}</span>
         </div>` : ''}
         <div style="border-top:2px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;color:var(--text);font-weight:800">
-          <span>Final score</span>
+          <span>Final CV score</span>
           <span style="color:${col}">${bd.final}/100</span>
         </div>
-      </div>
-    </details>` : ''}
-
-    ${auth && auth.signals && auth.signals.length ? `
-    <!-- Authenticity details (always collapsed; opens if the user wants to inspect) -->
-    <details style="margin-top:8px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs)">
-      <summary style="padding:8px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);user-select:none">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>CV authenticity check — ${authPct}% AI-likelihood (${auth.confidence||'Low'} confidence)
-      </summary>
-      <div style="padding:4px 12px 12px;font-size:11px;line-height:1.6">
-        <div style="color:var(--t2);margin-bottom:6px">${escapeHtml(auth.notes||'')}</div>
-        ${auth.signals.length ? `
-          <div style="color:var(--t3);font-size:10px;text-transform:uppercase;font-weight:700;margin-bottom:4px">Signals detected</div>
-          ${auth.signals.map(s=>`<div style="color:var(--t2);padding:2px 0;display:flex;gap:5px"><span style="color:${authColor}">•</span>${escapeHtml(s)}</div>`).join('')}
-        ` : '<div style="color:var(--t3);font-style:italic">No suspicious patterns detected.</div>'}
-        <div style="margin-top:8px;font-size:10px;color:var(--t3);font-style:italic">
-          This score does NOT affect the candidate's match score. AI-polished CVs are common and not disqualifying — but flagged candidates may deserve closer interview verification.
-        </div>
+        <div style="margin-top:6px;font-family:inherit;font-size:10px;color:var(--t3)">Verdict bands: hire ≥75 · borderline 50–74 · not a match &lt;50 · engine recommendation: ${rec}</div>
       </div>
     </details>` : ''}
 
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:8px">
-      <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · Confidence: ${sc.confidence||'High'} · Variance: ${sc.difference||0} pts · 2 AI runs averaged
+      <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · 2 AI runs averaged · final score recomputed in code
     </div>
     </div>
 
