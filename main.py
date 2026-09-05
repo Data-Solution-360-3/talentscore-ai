@@ -116,20 +116,28 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 
 # Viva Live (L0) — OpenAI Realtime model for the turn-taking proving ground.
-# Stable alias is "gpt-realtime"; "gpt-realtime-2.1" is the current snapshot.
-VIVA_LIVE_MODEL = os.getenv("VIVA_LIVE_MODEL", "gpt-realtime-2.1")
+# Stable alias is "gpt-realtime"; mini is the cost pick (~3x cheaper audio):
+# measured 34.6c/interview on the 2.1 flagship vs a ~18c total-per-candidate
+# target. Instruction-following is weaker on mini — the typed/scenario tool
+# calls and phase discipline must be re-verified on any model change.
+VIVA_LIVE_MODEL = os.getenv("VIVA_LIVE_MODEL", "gpt-realtime-2.1-mini")
 
 # ── Realtime usage → estimated cost (owner-only telemetry) ──────────────
-# Published gpt-realtime pricing, USD per 1M tokens. These are ESTIMATES and
-# are surfaced as such in the UI; OpenAI can change them, so bump the version
-# tag when you edit a rate. Prompt caching bills the reused input prefix at the
-# cached rate — a steep discount — which is the whole reason the instruction
-# prefix is kept byte-identical across turns and drop-recovery re-mints.
-VIVA_RATES_VERSION = "gpt-realtime-2.1@2026-09-05"
-_RT_RATE = {
-    "audio_in": 32.0, "audio_cached_in": 0.40, "audio_out": 64.0,
-    "text_in": 4.0,   "text_cached_in": 0.40,  "text_out": 24.0,
+# Published gpt-realtime pricing, USD per 1M tokens, keyed by model family so
+# the estimate follows VIVA_LIVE_MODEL (incl. an env override). These are
+# ESTIMATES and are surfaced as such in the UI; OpenAI changes rates, so bump
+# the date in VIVA_RATES_VERSION when you edit one. Prompt caching bills the
+# reused input prefix at the cached rate — a steep discount — which is the
+# whole reason the instruction prefix is kept byte-identical across turns and
+# drop-recovery re-mints. Rates verified 2026-09-05.
+_RT_RATES_BY_FAMILY = {
+    "mini":     {"audio_in": 10.0, "audio_cached_in": 0.30, "audio_out": 20.0,
+                 "text_in": 0.60,  "text_cached_in": 0.06,  "text_out": 2.40},
+    "flagship": {"audio_in": 32.0, "audio_cached_in": 0.40, "audio_out": 64.0,
+                 "text_in": 4.0,   "text_cached_in": 0.40,  "text_out": 24.0},
 }
+_RT_RATE = _RT_RATES_BY_FAMILY["mini" if "mini" in VIVA_LIVE_MODEL else "flagship"]
+VIVA_RATES_VERSION = f"{VIVA_LIVE_MODEL}@2026-09-05"
 
 
 def _summarize_usage(u: dict) -> dict:
