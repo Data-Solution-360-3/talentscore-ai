@@ -125,10 +125,10 @@ VIVA_LIVE_MODEL = os.getenv("VIVA_LIVE_MODEL", "gpt-realtime-2.1")
 # tag when you edit a rate. Prompt caching bills the reused input prefix at the
 # cached rate — a steep discount — which is the whole reason the instruction
 # prefix is kept byte-identical across turns and drop-recovery re-mints.
-VIVA_RATES_VERSION = "gpt-realtime-2.1@2026-09"
+VIVA_RATES_VERSION = "gpt-realtime-2.1@2026-09-05"
 _RT_RATE = {
     "audio_in": 32.0, "audio_cached_in": 0.40, "audio_out": 64.0,
-    "text_in": 4.0,   "text_cached_in": 0.40,  "text_out": 16.0,
+    "text_in": 4.0,   "text_cached_in": 0.40,  "text_out": 24.0,
 }
 
 
