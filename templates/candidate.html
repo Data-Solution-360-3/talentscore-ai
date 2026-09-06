@@ -23,7 +23,9 @@
   --blue:#16A34A;--blg:rgba(22,163,74,.08);--blb:rgba(22,163,74,.25);
   --r:14px;--rs:10px
 }
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+html{overflow-x:hidden;max-width:100vw}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;max-width:100vw}
+img,video{max-width:100%}
 .topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
 .tli{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tln{font-size:15px;font-weight:700}
@@ -112,7 +114,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .pt:hover{color:#E16A1F}
 .pb{display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:10px;margin-top:8px;font-size:11px;font-family:monospace;white-space:pre-wrap;color:#7dd3fc;max-height:200px;overflow-y:auto;line-height:1.6}
 @media(max-width:860px){.layout{grid-template-columns:1fr;height:auto}.cv-panel{height:500px;border-left:none;border-top:1px solid var(--border)}}
-@media(max-width:520px){.sgrid,.two-col{grid-template-columns:1fr}}
+@media(max-width:520px){
+  .sgrid,.two-col{grid-template-columns:1fr}
+  /* scoring header stacks instead of squeezing into a corner */
+  .score-hd,.conf-strip,.candidate-hd{flex-wrap:wrap}
+  .rreason{max-width:none}
+  .cmeta{margin-left:0;flex-basis:100%}
+}
 </style>
 </head>
 <body>

@@ -23,7 +23,11 @@
   --amber:#f59e0b;--amg:rgba(245,158,11,.1);--amb:rgba(245,158,11,.3);
   --r:12px;--rs:8px;--rxs:6px;
 }
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+html{overflow-x:hidden;max-width:100vw}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;max-width:100vw}
+img,video{max-width:100%}
+/* Mobile-only hamburger — desktop untouched */
+#mobnav{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--border2);background:var(--s2);color:var(--orange);font-size:19px;cursor:pointer;flex-shrink:0;font-family:inherit}
 
 /* TOPBAR */
 .topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;background:rgba(15,17,23,.95);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem}
@@ -170,13 +174,22 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .toggle input:checked~.toggle-thumb{transform:translateX(18px)}
 
-@media(max-width:860px){.stats-grid{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}}
+@media(max-width:860px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .main{margin-left:0}
+  #mobnav{display:inline-flex}
+  .sidebar.mob-open{display:flex;z-index:600;box-shadow:8px 0 28px rgba(0,0,0,.4)}
+  .t-btn,.sb-item{min-height:40px}
+}
 </style>
 </head>
 <body>
 
 <!-- TOPBAR -->
 <header class="topbar">
+  <button id="mobnav" type="button" aria-label="Menu" onclick="document.querySelector('.sidebar').classList.toggle('mob-open')">☰</button>
   <a href="/app" class="t-logo">
     <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" style="flex-shrink:0"><rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/><circle cx="28" cy="23" r="8.6" fill="#639922"/><path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/><circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/><circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/><path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span class="t-name">TopCandidate<span style="color:#fb923c">.pro</span></span>
@@ -191,7 +204,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="shell">
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" onclick="if(window.innerWidth<=860)this.classList.remove('mob-open')">
     <div class="sb-section">Overview</div>
     <button class="sb-item act" onclick="nav('dashboard')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>

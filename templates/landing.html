@@ -52,8 +52,15 @@
   /* 8px spacing scale — every gap on the page is one of these */
   --sp-1:.5rem;--sp-2:1rem;--sp-3:1.5rem;--sp-4:2rem;--sp-6:3rem;--sp-8:4rem;--sp-11:5.5rem;
 }
-html{scroll-behavior:smooth}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* overflow-x on html too: iOS Safari ignores it on body alone, which let the
+   decorative glow blobs (hero/cap-feat/footer pseudo-elements) pan the page
+   sideways on phones. Blobs are additionally hidden ≤640px below. */
+html{scroll-behavior:smooth;overflow-x:hidden;max-width:100vw}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;max-width:100vw;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img,svg,video{max-width:100%}
+@media(max-width:640px){
+  .hero::before,.cap-feat::before,.cap-feat::after,footer::after{display:none}
+}
 a{color:inherit}
 ::selection{background:var(--og);color:var(--ink)}
 
