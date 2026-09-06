@@ -113,13 +113,73 @@ async def main() -> int:
         print("\n\033[31mWRITTEN GATE FAILED\033[0m — do NOT put this scorer in front of a real candidate.")
 
     spoken_ok = await spoken_gate(key)
+    scenario_ok = await scenario_gate(key)
     cv_ok = await cv_gate(key)
     bangla_ok = await bangla_written_gate(key)
-    if written_ok and spoken_ok and cv_ok and bangla_ok:
-        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + cv + bangla)\033[0m\n")
+    if written_ok and spoken_ok and scenario_ok and cv_ok and bangla_ok:
+        print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + scenario + cv + bangla)\033[0m\n")
         return 0
     print("\n\033[31mFAIRNESS GATE FAILED\033[0m — the failing path must not touch a real candidate.\n")
     return 1
+
+
+# ── SCENARIO gate — the set-level case-study scorer. Thoughtful-but-imperfect
+#    must clearly beat near-empty: the floor rewards thinking, not polish. ──
+
+SCEN_TEXT = """You are the new data analyst at a retail company. The sales director
+says the numbers in last month's dashboard 'look wrong' — regional totals do
+not match what her managers report. The dashboard pulls from the sales mart,
+which is loaded nightly from three store systems. She needs an answer before
+the board meeting in two days."""
+SCEN_QS = [
+    "What would you check first, and why?",
+    "How would you find out whether the problem is in the data load or the dashboard?",
+    "What do you tell the sales director if you cannot fully fix it before the meeting?",
+]
+SCEN_A = [  # rough English, real diagnostic thinking
+    "First I check the date filter of dashboard, because many times 'wrong numbers' is only that "
+    "dashboard shows different date range than manager report. Also I ask one manager for his number "
+    "for one region, so I have example to compare. Better to reproduce the problem before touch anything.",
+    "I take that one region example and go step by step backward. Dashboard total -> query the sales "
+    "mart directly with SQL for same region and date. If mart is also wrong, then problem is the "
+    "nightly load, so I check if all three store systems loaded that night, maybe one failed. If mart "
+    "is correct but dashboard is wrong, then problem is in dashboard measure or filter.",
+    "I tell her honestly what I confirmed and what is not confirmed yet. I give her corrected number "
+    "for what I verified, and I do not give guarantee for numbers I did not verify. Better she goes "
+    "to board with partial correct than full maybe-wrong.",
+]
+SCEN_C = ["I will check the dashboard.", "I will check the data.", "ok"]
+
+
+async def scenario_gate(key) -> bool:
+    from interview_scorer import score_scenario_answers
+    print("\n\nSCENARIO GATE — case-study set scorer, thoughtful (A) vs near-empty (C)")
+    res_a, err_a = await score_scenario_answers(SCEN_TEXT, list(zip(SCEN_QS, SCEN_A)), key,
+                                               job_title="Data Analyst")
+    res_c, err_c = await score_scenario_answers(SCEN_TEXT, list(zip(SCEN_QS, SCEN_C)), key,
+                                               job_title="Data Analyst")
+    if err_a or err_c or not res_a or not res_c:
+        print(f"Scoring failed: {err_a or err_c}")
+        return False
+    oa, oc = res_a.get("overall", 0), res_c.get("overall", 0)
+    print(f"  A · rough English, real diagnostic thinking  overall {oa:>3}/100  {bar(oa)}")
+    for d in res_a.get("dimensions", []):
+        print(f"      {d['name']:<32} {d['score']:>4.1f}/20\n        └ {str(d.get('reason',''))[:110]}")
+    print(f"  C · near-empty answers                       overall {oc:>3}/100  {bar(oc)}")
+    margin = oa - oc
+    ok_margin = margin >= 30
+    ok_floor = oc <= 15
+    print("\n" + "─" * 62)
+    print(f"  A vs C margin: {'+' if margin >= 0 else ''}{margin} points "
+          f"→ {'PASS' if ok_margin else 'FAIL — thinking not rewarded over emptiness'}")
+    print(f"  C (near-empty set) = {oc}/100 "
+          f"→ {'PASS' if ok_floor else 'FAIL — empty set scored too generously'}")
+    print("─" * 62)
+    if ok_margin and ok_floor:
+        print("\033[32mSCENARIO GATE PASSED\033[0m — thinking beat emptiness; floor held.")
+        return True
+    print("\033[31mSCENARIO GATE FAILED\033[0m — scenario scoring is not fair enough to trust.")
+    return False
 
 
 # ── BANGLA (BETA) written gate — the same A/B/C, in Bangla, language='bn'. ──
