@@ -184,6 +184,7 @@ img,video{max-width:100%}
   .t-btn,.sb-item{min-height:40px}
 }
 </style>
+<script src="/static/score_core.js"></script>
 </head>
 <body>
 
@@ -775,11 +776,10 @@ function renderScreenings(){
     : '';
   document.getElementById('screens-tbl').innerHTML=(filtered.map(s=>{
     // (T2) CV, interview, and overall side by side — never one number silently
-    // standing in for another. Overall = CV when no interview exists yet.
-    const cv=Math.round(s.overall_score||0);
-    const hasIv=s.interview_score!=null && s.overall_combined!=null;
-    const iv=hasIv?Math.round(s.interview_score):null;
-    const overall=hasIv?Math.round(s.overall_combined):cv;
+    // standing in for another. The shared rule in /static/score_core.js
+    // decides which is the headline; this page only lays the three out.
+    const _ov=ovOf(s);
+    const cv=_ov.cv, hasIv=!_ov.pending, iv=_ov.iv, overall=_ov.s;
     const rec=(s.recommendation||'MAYBE').toUpperCase();
     return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer">
       <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}</td>

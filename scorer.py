@@ -1302,6 +1302,30 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # ── Validate score range ──
         final["overall_score"] = max(0, min(100, int(final["overall_score"])))
 
+        # ── Honest-uncertainty flags (display metadata, NOT score math) ──
+        # The card no longer shows an AI-confidence number, but the system must
+        # still KNOW when a score is shaky and say "review recommended" instead
+        # of presenting a weak number as solid. Purely additive: no dimension,
+        # blend, penalty, or recommendation changes here.
+        review_flags = []
+        if len(cv_text.strip()) < 600:
+            review_flags.append(
+                f"CV text is very short ({len(cv_text.strip())} characters) — "
+                "little evidence to score against")
+        _diff = (final.get("score_consistency") or {}).get("difference")
+        if _diff is not None and _diff > 12:
+            review_flags.append(
+                f"The two scoring passes disagreed by {_diff:.0f} points — "
+                "the score is less certain than usual")
+        _fs = final["overall_score"]
+        for _b, _lbl in ((48, "the interview-gate threshold"), (75, "the hire verdict line")):
+            if abs(_fs - _b) <= 3:
+                review_flags.append(
+                    f"Score {_fs} sits within 3 points of {_lbl} ({_b}) — "
+                    "small scoring noise could flip the outcome")
+                break
+        final["review_flags"] = review_flags
+
         # ── Reference-format report — a formatting pass over the final result;
         #    built LAST so it sees the validated score, merged risks, and
         #    parsed JD (for nullable coverage) ──

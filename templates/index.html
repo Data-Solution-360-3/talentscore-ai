@@ -1845,16 +1845,9 @@ const _RING_SIZES = {
   lg: {box: 60, r: 24, stroke: 4,  fontSize: 17},   // modal hero
 };
 
-// The candidate's HEADLINE number: overall (CV 35% + interview 65%) once the
-// interview is scored, else the CV score alone with pending=true. The
-// combined value is computed server-side when the session scores and stored
-// on the screening — this helper only chooses which stored number to show.
-function ovOf(r){
-  const cv = r.score||Math.round(r.overall_score||0);
-  if(r.overall_combined!=null && r.interview_score!=null)
-    return {s:Math.round(r.overall_combined), cv, iv:Math.round(r.interview_score), pending:false};
-  return {s:cv, cv, iv:null, pending:true};
-}
+// ovOf() now lives in /static/score_core.js — the ONE shared helper every
+// page uses (this page, candidate.html, admin.html), so two screens cannot
+// disagree about which number is the headline. Do not redefine it here.
 
 function scoreRing(score, size, opts){
   opts = opts || {};
@@ -2300,7 +2293,8 @@ function renderCandidates(results){
     return`<tr class="row-click" onclick="openCandModal('${r._id}')">
       <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${r.candidate_name||'Unknown'}</a></td>
       <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
-      <td>${(()=>{const ov=ovOf(r);return scoreRing(ov.s,'sm')+
+      <td>${(()=>{const ov=ovOf(r);const rf=reviewFlagsOf(r);return scoreRing(ov.s,'sm')+
+        (rf.length?`<span style="color:var(--amber);font-size:11px;margin-left:2px;cursor:help" title="Review recommended — ${escapeHtml(rf.join(' · '))}">⚑</span>`:'')+
         (ov.pending
           ?'<div style="font-size:8.5px;color:var(--amber);font-weight:700;margin-top:2px">IV pending · CV only</div>'
           :'<div style="font-size:8.5px;color:var(--t3);font-weight:600;margin-top:2px">CV '+ov.cv+' · IV '+ov.iv+(r.interview_status==='abandoned'?' <span style="color:var(--amber)">partial</span>':'')+'</div>');})()}</td>
@@ -2472,6 +2466,12 @@ function openCandModal(id){
       <span style="font-size:14px;flex-shrink:0">⚠</span>
       <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Review note:</strong> ${escapeHtml(r.recommendation_note)}</div>
     </div>` : ''}
+    ${(()=>{const rf=reviewFlagsOf(r); return rf.length ? `
+    <div style="background:var(--amg);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start">
+      <span style="font-size:14px;flex-shrink:0">⚑</span>
+      <div style="font-size:11px;color:var(--text);line-height:1.5"><strong>Review recommended</strong> — this score rests on weaker evidence than usual:
+        ${rf.map(f=>`<div>· ${escapeHtml(f)}</div>`).join('')}</div>
+    </div>` : '';})()}
     <!-- Banner: soft transparent green→orange wash — always visible above the tabs.
          Every value below is real scorer output; nothing hardcoded. -->
     <div class="cdx-banner">
@@ -6247,6 +6247,7 @@ window.addEventListener('resize',()=>{ clearTimeout(_kpiRz); _kpiRz=setTimeout((
   if(document.getElementById('page-kpi')?.classList.contains('act')) renderKpi();
 },250); });
 </script>
+<script src="/static/score_core.js"></script>
 <script src="/static/session_render.js"></script>
 </body>
 </html>

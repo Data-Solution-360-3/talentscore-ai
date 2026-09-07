@@ -154,6 +154,7 @@ img,video{max-width:100%}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script src="/static/score_core.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -230,7 +231,9 @@ async function loadAttempts(d){
   const n=at.count||1;
   const pills=(at.attempts||[]).map((a,i)=>{
     const label='Attempt '+(i+1)+' of '+n+(i===n-1&&n>1?' · latest':'');
-    const s=(a.overall_combined!=null?Math.round(a.overall_combined):(a.cv_score!=null?Math.round(a.cv_score):'—'));
+    // shared rule (score_core.js): overall once the interview scored, else CV — marked
+    const ov=ovOf(a);
+    const s=(a.cv_score==null&&a.overall_combined==null)?'—':(ov.pending?ov.cv+' cv':ov.s);
     return a.current
       ? `<span style="background:var(--accent);color:#fff;border-radius:9999px;padding:4px 12px;font-size:11.5px;font-weight:800">${label} · ${s} — viewing</span>`
       : `<a href="/candidate?id=${a._id}" style="background:var(--s2,#f4f6fa);color:var(--text);border:1px solid var(--border);border-radius:9999px;padding:4px 12px;font-size:11.5px;font-weight:700;text-decoration:none">${label} · ${s}</a>`;
@@ -274,8 +277,10 @@ async function grantReapply(d){
 function render(d){
   const rep=d.report||buildReportClient(d);
   const score=rep.overallScore||Math.round(d.overall_score||0);
-  const hasIv = d.interview_score!=null && d.overall_combined!=null;
-  const headline = hasIv ? Math.round(d.overall_combined) : score;
+  // Shared rule (score_core.js) decides the headline — same as every surface.
+  const _ov = ovOf(d);
+  const hasIv = !_ov.pending;
+  const headline = hasIv ? _ov.s : score;
   const ivp = d.interview_parts||{};
   const col=gc(headline);
   const rec=(d.recommendation||'MAYBE').toUpperCase();
@@ -392,9 +397,12 @@ function render(d){
   document.getElementById('strl').innerHTML=(rep.keyStrengths||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
   document.getElementById('gapl').innerHTML=(rep.criticalGaps||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
   document.getElementById('ql').innerHTML=(rep.interviewQuestions||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">—</li>';
-  document.getElementById('rl').innerHTML=(rep.hiringRisks||[]).length
+  // Honest-uncertainty flags lead the risks list: a shaky score must not read
+  // as solid on this page while the report card flags it. (score_core.js)
+  const _rf=reviewFlagsOf(d).map(s=>'<li style="color:var(--amber)"><b>Review recommended:</b> '+s+'</li>').join('');
+  document.getElementById('rl').innerHTML=_rf+((rep.hiringRisks||[]).length
     ? rep.hiringRisks.map(s=>'<li>'+s+'</li>').join('')
-    : '<li style="color:var(--t3)">None identified — no concrete evidence-based risks flagged.</li>';
+    : (_rf?'':'<li style="color:var(--t3)">None identified — no concrete evidence-based risks flagged.</li>'));
   document.getElementById('pd-cv').textContent=JSON.stringify(d.parsed_cv||{},null,2);
   document.getElementById('pd-jd').textContent=JSON.stringify(d.parsed_jd||{},null,2);
 }

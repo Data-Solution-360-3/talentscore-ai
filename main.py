@@ -2474,11 +2474,20 @@ async def score_live_session(session_id: str):
                         existing = scr.get("interview_status")
                         if incoming == "completed" or existing != "completed":
                             cv = int(scr.get("overall_score") or 0)
+                            # Honest-uncertainty flag (display metadata only): a
+                            # spoken score built on a handful of turns is weaker
+                            # evidence than a full conversation — say so instead
+                            # of presenting it as solid. Cleared (None) otherwise.
+                            iv_flag = None
+                            if len(spoken_only) < 6:
+                                iv_flag = (f"Spoken transcript has only {len(spoken_only)} turns — "
+                                           "the interview score rests on very little conversation")
                             await db.screenings.update_one({"_id": scr["_id"]}, {"$set": {
                                 "interview_score": interview_score,
                                 "interview_parts": interview_parts,
                                 "interview_session_id": session_id,
                                 "interview_status": incoming,
+                                "interview_review_flag": iv_flag,
                                 "overall_combined": round(OV_W_CV * cv + OV_W_IV * interview_score),
                                 "overall_weights": {"cv": OV_W_CV, "interview": OV_W_IV},
                                 "interview_scored_at": _dt.utcnow()}})
