@@ -615,8 +615,21 @@ function submitTyped(){
     $('scen').style.display = 'none';
     log('scenario section complete — card unpinned, returning to spoken');
   }
-  setMic(true);
-  if(restoreTD) sendVad(restoreTD);
+  // Written-section mic policy: while the scenario section still has typed
+  // questions left, the mic STAYS muted and turn detection stays off between
+  // questions — the candidate answers by typing, and an open mic here let
+  // room noise be transcribed into the spoken record (seen in real sessions:
+  // ambient Bangla/Urdu fragments attributed to the candidate). The mic
+  // re-opens the moment the section completes (scenActive just flipped false
+  // above) — and in non-scenario mixed mode, where a spoken answer may
+  // legitimately come next, behavior is unchanged. If SCEN_Q is unknown the
+  // section end can't be detected, so we fall back to re-opening (safe).
+  if(!scenActive){
+    setMic(true);
+    if(restoreTD) sendVad(restoreTD);
+  }else{
+    log('scenario continues — mic stays muted between typed questions');
+  }
   if(dc && dc.readyState==='open'){
     if(typedCallId){
       dc.send(JSON.stringify({type:'conversation.item.create',
