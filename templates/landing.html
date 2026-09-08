@@ -101,10 +101,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
    the old 1.5rem so phones are unchanged (<=768px rule still overrides). */
 .hero{position:relative;overflow:hidden;padding:var(--sp-11) clamp(1.5rem,4.5vw,4rem) var(--sp-8);background:linear-gradient(168deg,#FFFFFF 0%,#FCFBF7 55%,#F5FAF6 100%)}
 .hero::before{content:'';position:absolute;top:-340px;left:62%;width:1100px;height:660px;background:radial-gradient(ellipse at center,rgba(245,124,46,.055),transparent 66%);pointer-events:none}
-.hero-grid{position:relative;max-width:1140px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:var(--sp-8);align-items:center}
+/* 1220px cap + mock-dominant split: the paneled mockup is the centerpiece */
+.hero-grid{position:relative;max-width:1220px;margin:0 auto;display:grid;grid-template-columns:1fr 1.12fr;gap:var(--sp-8);align-items:center}
 .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:7px 15px;margin-bottom:var(--sp-3)}
 .hero-h1{font-size:clamp(2.5rem,5.3vw,4rem);font-weight:900;line-height:1.04;letter-spacing:-.035em;color:var(--ink);margin-bottom:var(--sp-3)}
 .hero-h1 .o{color:var(--orange2)}
+/* green rounded underline accent under one keyword — brand green, text unchanged */
+.u-green{position:relative;white-space:nowrap}
+.u-green::after{content:'';position:absolute;left:-1%;right:-1%;bottom:.015em;height:.13em;border-radius:99px;background:linear-gradient(90deg,#639922,#7cb42e);opacity:.9}
 .hero-lead{font-size:clamp(1.04rem,1.5vw,1.19rem);color:var(--t2);line-height:1.6;max-width:520px;margin-bottom:var(--sp-4)}
 .hero-lead b{color:var(--ink);font-weight:700}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:var(--sp-4)}
@@ -118,8 +122,14 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 /* The mock collapses on its CONTAINER's width, not the viewport — between
    ~861-1050px the hero column is narrower than a phone while the viewport
    isn't, so viewport queries never fired and .frame's overflow:hidden chopped
-   100px off the mock. inline-size containment + @container fixes any squeeze. */
-.shot{position:relative;container-type:inline-size}
+   100px off the mock. inline-size containment + @container fixes any squeeze.
+   The .shot is also the soft rounded gradient BACKDROP PANEL the frame floats
+   in — brand tints only (green -> warm white -> orange), no navy. */
+.shot{position:relative;container-type:inline-size;
+  background:linear-gradient(135deg,rgba(99,153,34,.10) 0%,#FDFBF7 45%,rgba(239,159,39,.10) 100%);
+  border:1px solid rgba(99,153,34,.14);border-radius:28px;
+  padding:clamp(1rem,2.2vw,2rem);
+  box-shadow:0 10px 40px rgba(23,52,4,.07)}
 .frame{border-radius:var(--r-xxl);background:var(--surface);box-shadow:var(--shadow-xl);overflow:hidden;transition:transform .3s cubic-bezier(.2,.6,.2,1)}
 .frame:hover{transform:translateY(-4px)}
 .frame img{display:block;width:100%;height:auto}
@@ -401,7 +411,7 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
 <section class="hero">
   <div class="hero-grid">
     <div class="hero-copy">
-      <h1 class="hero-h1 rv" style="--d:.06s">Every candidate,<br>scored on <span class="o">your&nbsp;rubric.</span></h1>
+      <h1 class="hero-h1 rv" style="--d:.06s">Every candidate,<br><span class="u-green">scored</span> on <span class="o">your&nbsp;rubric.</span></h1>
       <p class="hero-lead rv" style="--d:.12s">One link: CV screening, then a live AI interview. Every score recomputed in code.</p>
       <div class="hero-actions rv" style="--d:.18s">
         <a class="btn-hero" onclick="openDemoModal()" style="cursor:pointer">Request demo
