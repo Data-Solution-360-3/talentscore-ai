@@ -94,7 +94,12 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .btn-orange-sm:hover{background:var(--orange2);transform:translateY(-1px)}
 
 /* ── 1. HERO ── */
-.hero{position:relative;overflow:hidden;padding:var(--sp-11) var(--sp-3) var(--sp-8);background:linear-gradient(168deg,#FFFFFF 0%,#FCFBF7 55%,#F5FAF6 100%)}
+/* Fluid side padding: below the 1140px grid cap the old 1.5rem left the
+   mockup (and its shadow) 24px from the page edge on laptop widths — reads
+   as jammed/clipped. clamp gives ~45-50px at 1000-1100px, caps at 4rem on
+   wide screens (where max-width centering dominates anyway), and floors at
+   the old 1.5rem so phones are unchanged (<=768px rule still overrides). */
+.hero{position:relative;overflow:hidden;padding:var(--sp-11) clamp(1.5rem,4.5vw,4rem) var(--sp-8);background:linear-gradient(168deg,#FFFFFF 0%,#FCFBF7 55%,#F5FAF6 100%)}
 .hero::before{content:'';position:absolute;top:-340px;left:62%;width:1100px;height:660px;background:radial-gradient(ellipse at center,rgba(245,124,46,.055),transparent 66%);pointer-events:none}
 .hero-grid{position:relative;max-width:1140px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr;gap:var(--sp-8);align-items:center}
 .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:7px 15px;margin-bottom:var(--sp-3)}
