@@ -27,380 +27,170 @@
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+/* ═══ NOCTURNE (serif) — dark midnight-emerald landing. Fully self-contained:
+   inline styles + page-local font links, so nothing leaks into the app. ═══ */
 :root{
-  /* THREE colors, three roles — dark structures, orange acts, green confirms.
-     Same tokens as index.html; green #16A34A is the product's success color
-     everywhere, promoted here to a deliberate secondary accent. */
-  --ink:#128A40;   /* text + dark panels only — never an accent */
-  --orange:#F57C2E;--orange2:#E16A1F;--og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);
-  --green:#16A34A;--green2:#128A40;--gg:rgba(22,163,74,.10);--gb:rgba(22,163,74,.28);
-  --bg:#FBFAF7;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
-  /* very-light section tints — warm + green, never loud */
-  --tint-green:#F4FAF6;--tint-orange:#FEF8F2;
-  --border:#E4E8F0;--border2:#D5DCE8;--border3:#BFC8D8;
-  --text:#1f2937;--t2:#4B5563;--t3:#6B7280;
-  --r-xs:4px;--r-sm:6px;--r-md:8px;--r-lg:12px;--r-xl:16px;--r-xxl:22px;--r-pill:9999px;
-  /* soft layered shadows — a tight contact shadow + a wide ambient one.
-     Cards lift, never outline: no hard borders anywhere on the card layer. */
-  --shadow-sm:0 1px 2px rgba(31,41,55,.03),0 4px 16px rgba(31,41,55,.05);
-  --shadow-md:0 2px 4px rgba(31,41,55,.04),0 12px 32px rgba(31,41,55,.07);
-  --shadow-lg:0 4px 8px rgba(31,41,55,.04),0 24px 56px rgba(31,41,55,.09);
-  --shadow-xl:0 4px 8px rgba(31,41,55,.04),0 32px 72px rgba(31,41,55,.11);
-  /* 8px spacing scale — every gap on the page is one of these */
-  --sp-1:.5rem;--sp-2:1rem;--sp-3:1.5rem;--sp-4:2rem;--sp-6:3rem;--sp-8:4rem;--sp-11:5.5rem;
+  --green:#3ddc84;--green-b:#22b866;--green-deep:#03130b;
+  --orange:#ffab4a;--orange-2:#ff7a35;--amber:#EF9F27;
+  --ink:#e7f2ea;--muted:#8fa89a;--faint:#5f7568;
+  --gline:rgba(61,220,132,.16);
+  --serif:'Fraunces',Georgia,'Times New Roman',serif;
+  --sans:'Inter','Segoe UI',system-ui,sans-serif;
+  --ease:cubic-bezier(.2,.7,.2,1);
 }
-/* overflow-x on html too: iOS Safari ignores it on body alone, which let the
-   decorative glow blobs (hero/cap-feat/footer pseudo-elements) pan the page
-   sideways on phones. Blobs are additionally hidden ≤640px below. */
+*{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;overflow-x:hidden;max-width:100vw}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;max-width:100vw;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{font-family:var(--sans);color:var(--ink);background:#020a06;-webkit-font-smoothing:antialiased;line-height:1.55;overflow-x:hidden;max-width:100vw}
+a{color:inherit;text-decoration:none}
 img,svg,video{max-width:100%}
-@media(max-width:640px){
-  .hero::before,.cap-feat::before,.cap-feat::after,footer::after{display:none}
-}
-a{color:inherit}
-::selection{background:var(--og);color:var(--ink)}
+.brand svg,nav svg{max-width:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 34px;position:relative;z-index:3}
+h1,h2,h3,.serif{font-family:var(--serif)}
+.bg{position:fixed;inset:0;z-index:0;background:radial-gradient(900px 700px at 80% -6%, rgba(34,184,102,.18), transparent 58%),radial-gradient(760px 620px at 6% 100%, rgba(255,122,53,.14), transparent 60%),#020a06}
+.gridlines{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.4;background-image:linear-gradient(rgba(61,220,132,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(61,220,132,.05) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(1000px 700px at 50% 20%,#000,transparent 80%)}
+.conic{position:fixed;width:900px;height:900px;top:-260px;right:-260px;z-index:0;border-radius:50%;background:conic-gradient(from 0deg,transparent,rgba(61,220,132,.14),transparent 40%,rgba(255,171,74,.12),transparent 70%);filter:blur(30px);animation:spin 30s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spot{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(360px 360px at var(--mx,50%) var(--my,30%),rgba(61,220,132,.08),transparent 70%)}
+@media(prefers-reduced-motion:reduce){.conic{animation:none}}
 
-/* ── scroll reveal — calm: 14px rise + fade, one gentle curve, fires once ── */
-.rv{opacity:0;transform:translateY(14px);transition:opacity .55s cubic-bezier(.2,.6,.2,1),transform .55s cubic-bezier(.2,.6,.2,1);transition-delay:var(--d,0s)}
-.rv.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){
-  .rv{opacity:1;transform:none;transition:none}
-  *{animation:none!important}
-}
+.btn{border:0;border-radius:12px;font-weight:600;cursor:pointer;font-family:var(--sans);font-size:15px;padding:13px 26px;transition:transform .18s var(--ease),box-shadow .25s,filter .2s;position:relative}
+.btn-neon{background:linear-gradient(135deg,#3ddc84,#22b866);color:#02160c;box-shadow:0 0 0 1px rgba(61,220,132,.4),0 16px 40px -12px rgba(61,220,132,.55),inset 0 1px 0 rgba(255,255,255,.4)}
+.btn-neon:hover{filter:brightness(1.08);box-shadow:0 0 24px 2px rgba(61,220,132,.5),0 18px 44px -12px rgba(61,220,132,.7)}
+.btn-out{background:rgba(61,220,132,.06);color:#c9f5db;border:1px solid rgba(61,220,132,.35)}.btn-out:hover{background:rgba(61,220,132,.12);box-shadow:0 0 18px -2px rgba(61,220,132,.4)}
+.btn-sm{padding:10px 18px;font-size:14px}
+.rv{opacity:0;transform:translateY(22px);transition:.8s var(--ease)}.rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}}
 
-/* ── shared section furniture ── */
-.wrap{max-width:1140px;margin:0 auto;padding:0 var(--sp-3)}
-.sec{padding:var(--sp-11) 0;background:var(--tint-green)}
-.sec-alt{background:var(--tint-orange)}
-.sec-head{max-width:680px;margin:0 auto var(--sp-6);text-align:center}
-.sec-eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--orange2);margin-bottom:var(--sp-2)}
-.sec-title{font-size:clamp(1.8rem,3.6vw,2.55rem);font-weight:900;letter-spacing:-.03em;color:var(--ink);line-height:1.12;margin-bottom:var(--sp-2)}
-.sec-sub{font-size:1.04rem;color:var(--t2);line-height:1.65}
+nav{position:fixed;top:0;left:0;right:0;z-index:60;height:74px;display:flex;align-items:center}
+.nav-glass{position:absolute;inset:0;background:rgba(2,10,6,.55);backdrop-filter:blur(14px);border-bottom:1px solid var(--gline)}
+nav .wrap{display:flex;align-items:center;gap:30px}
+.brand{display:flex;align-items:center;gap:10px}
+.nav-links{display:flex;gap:26px;margin-left:6px}.nav-links a{font-size:14.5px;color:var(--muted);font-weight:500}.nav-links a:hover{color:#fff}
+.nav-r{margin-left:auto;display:flex;gap:13px;align-items:center}.nav-r .si{font-size:14.5px;font-weight:600;color:#fff}
 
-/* ── NAV ── */
-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);height:66px;display:flex;align-items:center;padding:0 var(--sp-3);gap:var(--sp-2)}
-.nav-logo{display:flex;align-items:center;gap:9px;text-decoration:none}
-.nav-links{display:flex;align-items:center;gap:2px;margin-left:var(--sp-3)}
-.nav-link{font-size:14px;font-weight:500;color:var(--t2);padding:6px 12px;border-radius:var(--r-sm);text-decoration:none;transition:.15s}
-.nav-link:hover{background:var(--s2);color:var(--ink)}
-.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.btn-ghost-sm{padding:8px 17px;border-radius:var(--r-md);font-size:14px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--border2);text-decoration:none;transition:.18s}
-.btn-ghost-sm:hover{border-color:var(--orange);color:var(--orange2)}
-.btn-orange-sm{padding:9px 19px;border-radius:var(--r-md);font-size:14px;font-weight:700;color:#fff;background:var(--orange);border:none;text-decoration:none;transition:.18s;box-shadow:0 2px 8px rgba(245,124,46,.28)}
-.btn-orange-sm:hover{background:var(--orange2);transform:translateY(-1px)}
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:150px 0 90px}
+.hero-grid{display:grid;grid-template-columns:1fr 1.08fr;gap:52px;align-items:center}
+.kick{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:600;font-family:var(--sans);color:#9ff0c2;margin-bottom:24px;padding:7px 15px 7px 8px;border-radius:999px;background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.28);backdrop-filter:blur(8px)}
+.kick .d{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 14px 3px rgba(61,220,132,.9);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 14px 3px rgba(61,220,132,.9)}50%{box-shadow:0 0 22px 6px rgba(61,220,132,.4)}}
+@media(prefers-reduced-motion:reduce){.kick .d{animation:none}}
+h1.hh{font-size:clamp(42px,5.6vw,72px);line-height:1.02;letter-spacing:-1.5px;font-weight:600;color:#fff}
+h1.hh .g{background:linear-gradient(120deg,#3ddc84,#ffab4a);-webkit-background-clip:text;background-clip:text;color:transparent;font-style:italic}
+.hsub{font-family:var(--sans);font-size:19px;color:var(--muted);margin-top:24px;max-width:33ch;line-height:1.6}
+.hcta{display:flex;gap:14px;margin-top:36px;flex-wrap:wrap}.hnote{font-family:var(--sans);margin-top:22px;font-size:13.5px;color:var(--faint)}
 
-/* ── 1. HERO ── */
-/* Fluid side padding: below the 1140px grid cap the old 1.5rem left the
-   mockup (and its shadow) 24px from the page edge on laptop widths — reads
-   as jammed/clipped. clamp gives ~45-50px at 1000-1100px, caps at 4rem on
-   wide screens (where max-width centering dominates anyway), and floors at
-   the old 1.5rem so phones are unchanged (<=768px rule still overrides). */
-.hero{position:relative;overflow:hidden;padding:var(--sp-11) clamp(1.5rem,4.5vw,4rem) var(--sp-8);background:linear-gradient(168deg,#FFFFFF 0%,#FCFBF7 55%,#F5FAF6 100%)}
-.hero::before{content:'';position:absolute;top:-340px;left:62%;width:1100px;height:660px;background:radial-gradient(ellipse at center,rgba(245,124,46,.055),transparent 66%);pointer-events:none}
-/* 1220px cap + mock-dominant split: the paneled mockup is the centerpiece */
-.hero-grid{position:relative;max-width:1220px;margin:0 auto;display:grid;grid-template-columns:1fr 1.12fr;gap:var(--sp-8);align-items:center}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--orange2);background:var(--og);border:1px solid var(--ob);border-radius:var(--r-pill);padding:7px 15px;margin-bottom:var(--sp-3)}
-.hero-h1{font-size:clamp(2.5rem,5.3vw,4rem);font-weight:900;line-height:1.04;letter-spacing:-.035em;color:var(--ink);margin-bottom:var(--sp-3)}
-.hero-h1 .o{color:var(--orange2)}
-/* green rounded underline accent under one keyword — brand green, text unchanged */
-.u-green{position:relative;white-space:nowrap}
-.u-green::after{content:'';position:absolute;left:-1%;right:-1%;bottom:.015em;height:.13em;border-radius:99px;background:linear-gradient(90deg,#639922,#7cb42e);opacity:.9}
+/* Hero dashboard mock in neon glass — REPRESENTATIVE preview, captioned below. */
+.stage{position:relative;perspective:1500px}
+.dash{transform-style:preserve-3d;transform:rotateY(-6deg) rotateX(4deg);transition:transform .25s var(--ease);background:linear-gradient(155deg,rgba(61,220,132,.1),rgba(255,255,255,.03));border:1px solid rgba(61,220,132,.22);border-radius:20px;box-shadow:0 50px 100px -34px rgba(0,0,0,.8),0 0 40px -12px rgba(61,220,132,.25),inset 0 1px 0 rgba(255,255,255,.16);backdrop-filter:blur(18px);overflow:hidden;font-family:var(--sans)}
+.db-top{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.db-top i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18)}
+.db-top .u{margin-left:auto;font-size:11px;color:var(--muted)}
+.db-body{padding:18px}
+.db-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}
+.st{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:11px;padding:11px 12px}
+.st .n{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.5px}.st .l{font-size:9.5px;color:var(--muted);margin-top:2px}
+.db-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.db-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:13px}
+.db-card h5{font-size:10.5px;color:var(--muted);font-weight:600;margin-bottom:10px}
+.donutwrap{display:flex;align-items:center;gap:12px}
+.donut{width:66px;height:66px;border-radius:50%;flex:none;position:relative}
+.donut::after{content:'';position:absolute;inset:18%;border-radius:50%;background:#071a10}
+.dleg{font-size:9.5px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.dleg .lr{display:flex;align-items:center;gap:6px}.dleg .dt{width:7px;height:7px;border-radius:2px}.dleg b{color:#fff;margin-left:auto}
+.mini{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--ink);margin-bottom:7px}.mini:last-child{margin-bottom:0}.mini .lb{width:70px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini .tk{flex:1;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden}.mini .tk span{display:block;height:100%;border-radius:3px}.mini .v{width:20px;text-align:right;font-weight:700;color:#fff}
+.dash-cap{font-family:var(--sans);font-size:11.5px;color:var(--faint);text-align:center;margin-top:14px}
+.floatpill{position:absolute;background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(10px);border-radius:13px;padding:8px 12px;font-size:11px;font-weight:700;color:#fff;box-shadow:0 20px 40px -18px rgba(0,0,0,.6);font-family:var(--sans)}
+.floatpill.p1{top:-20px;right:24px;animation:fl 5s ease-in-out infinite}
+.floatpill.p2{bottom:20px;left:-28px;animation:fl 6.4s ease-in-out infinite reverse}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+@media(prefers-reduced-motion:reduce){.floatpill{animation:none}}
 
-/* ── 1b. WITHOUT vs WITH comparison — muted red pain / brand-green gain ── */
-.vs-sec{padding:var(--sp-8) clamp(1.5rem,4.5vw,4rem)}
-.vs-grid{max-width:980px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
-.vs-card{border-radius:var(--r-xxl);padding:var(--sp-4) var(--sp-3);border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow-sm)}
-.vs-card.vs-with{background:linear-gradient(160deg,rgba(99,153,34,.08),#fff 70%);border-color:var(--gb)}
-.vs-card.vs-without{background:#FBFAF8}
-.vs-tag{font-size:11.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1rem}
-.vs-without .vs-tag{color:#B4232A}
-.vs-with .vs-tag{color:var(--green2)}
-.vs-card ul{list-style:none;margin:0;padding:0}
-.vs-card li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--t2);line-height:1.55;padding:7px 0}
-.vs-card li i{font-style:normal;font-weight:800;flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;margin-top:2px}
-.vs-without li i{background:rgba(220,38,38,.10);color:#B4232A}
-.vs-with li i{background:var(--gg);color:var(--green2)}
-.vs-with li{color:var(--text);font-weight:500}
-@media(max-width:768px){.vs-grid{grid-template-columns:1fr}}
-.hero-lead{font-size:clamp(1.04rem,1.5vw,1.19rem);color:var(--t2);line-height:1.6;max-width:520px;margin-bottom:var(--sp-4)}
-.hero-lead b{color:var(--ink);font-weight:700}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:var(--sp-4)}
-.btn-hero{padding:15px 30px;border-radius:var(--r-lg);font-size:16px;font-weight:700;color:#fff;background:var(--orange);border:none;text-decoration:none;display:inline-flex;align-items:center;gap:9px;transition:.2s cubic-bezier(.2,.6,.2,1);box-shadow:0 8px 24px rgba(245,124,46,.30)}
-.btn-hero:hover{background:var(--orange2);transform:translateY(-2px);box-shadow:0 12px 30px rgba(245,124,46,.38)}
-.btn-outline{padding:15px 26px;border-radius:var(--r-lg);font-size:16px;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--border2);text-decoration:none;transition:.2s}
-.btn-outline:hover{border-color:var(--ink);background:var(--s2)}
-.trust{display:flex;flex-wrap:wrap;gap:.6rem 1.5rem}
-.trust span{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--t2)}
-.tick{width:19px;height:19px;border-radius:50%;background:var(--gg);display:grid;place-items:center;flex-shrink:0}
-/* The mock collapses on its CONTAINER's width, not the viewport — between
-   ~861-1050px the hero column is narrower than a phone while the viewport
-   isn't, so viewport queries never fired and .frame's overflow:hidden chopped
-   100px off the mock. inline-size containment + @container fixes any squeeze.
-   The .shot is also the soft rounded gradient BACKDROP PANEL the frame floats
-   in — brand tints only (green -> warm white -> orange), no navy. */
-.shot{position:relative;container-type:inline-size;
-  background:linear-gradient(135deg,rgba(99,153,34,.10) 0%,#FDFBF7 45%,rgba(239,159,39,.10) 100%);
-  border:1px solid rgba(99,153,34,.14);border-radius:28px;
-  padding:clamp(1rem,2.2vw,2rem);
-  box-shadow:0 10px 40px rgba(23,52,4,.07)}
-.frame{border-radius:var(--r-xxl);background:var(--surface);box-shadow:var(--shadow-xl);overflow:hidden;transition:transform .3s cubic-bezier(.2,.6,.2,1)}
-.frame:hover{transform:translateY(-4px)}
-.frame img{display:block;width:100%;height:auto}
-.frame-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;background:var(--s2);border-bottom:1px solid var(--border)}
-.frame-bar .d{width:11px;height:11px;border-radius:50%}
-.frame-url{margin-left:10px;flex:1;background:#fff;border:1px solid var(--border);border-radius:var(--r-pill);font-size:11px;color:var(--t3);padding:4px 12px}
-/* ═══ Hero dashboard mockup — a STATIC product preview (representative numbers),
-   matching the redesigned Hiring Dashboard. Every selector scoped to .lpdash so
-   nothing leaks into the rest of the landing page. Brand palette only, no navy. ═══ */
-.lpdash{display:grid;grid-template-columns:60px 1fr;background:
-  radial-gradient(600px 300px at 10% -20%, #e2ebd8 0%, transparent 60%), #eef1ea;
-  font-family:'Inter',system-ui,sans-serif}
-/* soft transparent green wash instead of the old solid dark slab */
-.lpdash .lpd-side{background:linear-gradient(180deg,rgba(99,153,34,.16) 0%,rgba(99,153,34,.10) 100%);border-right:1px solid rgba(99,153,34,.22);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0}
-.lpdash .lpd-mark{width:30px;height:30px;border-radius:9px;background:#eaf4dd;display:grid;place-items:center;margin-bottom:8px}
-.lpdash .lpd-mark svg{width:19px;height:19px;display:block}
-.lpdash .lpd-nav{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#4F7C1B}
-.lpdash .lpd-nav svg{width:17px;height:17px}
-.lpdash .lpd-nav.on{background:#fff;color:#2e5e14;box-shadow:0 1px 4px rgba(23,52,4,.10)}
-.lpdash .lpd-main{padding:13px 15px 15px;min-width:0}
-.lpdash .lpd-hd{margin-bottom:11px}
-.lpdash .lpd-hd b{display:block;font-size:14px;font-weight:800;color:#173404;letter-spacing:-.2px}
-.lpdash .lpd-hd span{font-size:10.5px;color:#6b7280}
-.lpdash .lpd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.lpdash .lpd-tile{background:#fff;border:1px solid #e8ece5;border-radius:12px;padding:9px 10px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 6px rgba(23,52,4,.04)}
-.lpdash .lpd-chip{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none}
-.lpdash .lpd-chip svg{width:14px;height:14px}
-.lpdash .lpd-chip.g{background:#e9f3dc;color:#639922}
-.lpdash .lpd-chip.o{background:#fdeccf;color:#F57C2E}
-.lpdash .lpd-chip.gd{background:#dfeecd;color:#2e5e14}
-.lpdash .lpd-tn{font-size:16px;font-weight:800;color:#1f2937;line-height:1;letter-spacing:-.5px}
-.lpdash .lpd-tl{font-size:8.5px;font-weight:700;color:#6b7280;margin-top:2px;letter-spacing:.01em}
-.lpdash .lpd-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-.lpdash .lpd-card{background:#fff;border:1px solid #e8ece5;border-radius:12px;padding:10px 12px;box-shadow:0 2px 6px rgba(23,52,4,.04);min-width:0}
-.lpdash .lpd-ct{font-size:11px;font-weight:800;color:#173404;margin-bottom:7px}
-.lpdash .lpd-donutwrap{display:flex;align-items:center;gap:10px}
-.lpdash .lpd-donut{width:66px;height:66px;flex:none;position:relative}
-.lpdash .lpd-donut .lpd-dc{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
-.lpdash .lpd-donut .lpd-dc b{font-size:14px;font-weight:800;color:#1f2937;line-height:1;display:block}
-.lpdash .lpd-donut .lpd-dc span{font-size:7px;color:#6b7280}
-.lpdash .lpd-leg{display:flex;flex-direction:column;gap:4px;font-size:9.5px;flex:1;min-width:0}
-.lpdash .lpd-lr{display:flex;align-items:center;gap:6px}
-.lpdash .lpd-lr i{width:8px;height:8px;border-radius:2px;flex:none}
-.lpdash .lpd-lr span{color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lpdash .lpd-lr b{margin-left:auto;font-weight:800;color:#1f2937}
-.lpdash .lpd-bars{display:flex;flex-direction:column;gap:6px}
-.lpdash .lpd-br{display:flex;align-items:center;gap:8px;font-size:9.5px}
-.lpdash .lpd-br .lpd-bl{width:92px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
-.lpdash .lpd-bt{flex:1;height:11px;background:#eef2e8;border-radius:6px;overflow:hidden;min-width:20px}
-.lpdash .lpd-bf{height:100%;border-radius:6px;background:linear-gradient(90deg,#7cb42e,#639922)}
-.lpdash .lpd-bv{width:20px;text-align:right;font-weight:800;color:#1f2937;flex:none}
-@media(max-width:520px){
-  .lpdash .lpd-stats{grid-template-columns:1fr 1fr}
-  .lpdash .lpd-cards{grid-template-columns:1fr}
-}
-/* container-width collapse — fires whenever the hero column itself is narrow,
-   regardless of viewport (the 861-1050px clip band). The viewport rules above
-   stay as a fallback for browsers without container-query support. */
-@container (max-width: 480px){
-  .lpdash .lpd-stats{grid-template-columns:1fr 1fr}
-  .lpdash .lpd-cards{grid-template-columns:1fr}
-  .lpdash .lpd-br .lpd-bl{width:72px}
-}
+section{position:relative;padding:100px 0}
+.eyebrow{font-family:var(--sans);font-size:13px;font-weight:700;color:var(--green);margin-bottom:14px;letter-spacing:.3px}
+.stitle{font-size:clamp(28px,3.6vw,42px);line-height:1.1;letter-spacing:-.8px;font-weight:600;max-width:16ch;color:#fff}
+.slead{font-family:var(--sans);font-size:17px;color:var(--muted);margin-top:16px;max-width:44ch;line-height:1.6}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:54px}
+.gp{background:linear-gradient(160deg,rgba(61,220,132,.07),rgba(255,255,255,.02));border:1px solid var(--gline);border-radius:18px;padding:28px;backdrop-filter:blur(12px);transition:transform .35s var(--ease),border-color .3s,box-shadow .35s}
+.gp:hover{transform:translateY(-6px);border-color:rgba(61,220,132,.5);box-shadow:0 0 30px -8px rgba(61,220,132,.4)}
+.step .n{font-family:var(--serif);font-style:italic;color:var(--green);font-weight:600;font-size:16px;margin-bottom:12px}
+.step h3{font-size:21px;font-weight:600;letter-spacing:-.3px;margin-bottom:9px;color:#fff}.step p{font-family:var(--sans);font-size:14.5px;color:var(--muted);line-height:1.6}
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:50px}
+.dcell{background:linear-gradient(155deg,rgba(61,220,132,.06),rgba(255,255,255,.02));border:1px solid var(--gline);border-radius:16px;padding:24px;backdrop-filter:blur(10px);transition:transform .3s,box-shadow .3s}
+.dcell:hover{transform:translateY(-4px);box-shadow:0 0 26px -8px rgba(255,171,74,.4)}
+.dcell .w{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-1px;background:linear-gradient(120deg,#ffab4a,#ff7a35);-webkit-background-clip:text;background-clip:text;color:transparent}
+.dcell h4{font-size:16px;font-weight:600;color:#fff;margin:8px 0 6px;font-family:var(--serif)}.dcell p{font-family:var(--sans);font-size:13px;color:var(--muted);line-height:1.55}
+.tcards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:50px}
+.tcard .ic{width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,rgba(61,220,132,.2),rgba(34,184,102,.08));border:1px solid rgba(61,220,132,.3);display:grid;place-items:center;margin-bottom:16px;box-shadow:0 0 18px -6px rgba(61,220,132,.5)}.tcard .ic svg{width:23px;height:23px;color:#9ff0c2}
+.tcard h4{font-size:19px;font-weight:600;letter-spacing:-.3px;margin-bottom:8px;color:#fff;font-family:var(--serif)}.tcard p{font-family:var(--sans);font-size:14.5px;color:var(--muted);line-height:1.6}
+.cta{text-align:center;padding:120px 0}
+.cta h2{font-size:clamp(34px,5vw,56px);letter-spacing:-1px;font-weight:600;line-height:1.06;max-width:15ch;margin:0 auto;color:#fff}
+.cta p{font-family:var(--sans);font-size:19px;color:var(--muted);margin:22px auto 36px;max-width:36ch}.cta .row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.strip{border-top:1px solid var(--gline);border-bottom:1px solid var(--gline);background:rgba(61,220,132,.03);backdrop-filter:blur(8px)}
+.strip-in{display:flex;align-items:center;gap:38px;padding:20px 0;flex-wrap:wrap;justify-content:center;font-size:13px;font-family:var(--sans)}.strip-in b{font-weight:600;color:#fff}.strip-in .lbl{color:var(--faint)}
 
-/* ── 2. HOW IT WORKS — Part A steps ── */
-.part-label{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:var(--sp-3)}
-.part-label b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r-md);background:var(--orange);color:#fff;font-size:12.5px;letter-spacing:0}
-.part-label.gn b{background:var(--gg);color:var(--green2);border:1px solid var(--gb)}
-.steps-3{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3)}
-.step3{position:relative;background:var(--surface);border-radius:var(--r-xxl);padding:var(--sp-4) 1.75rem;box-shadow:var(--shadow-sm);transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s}
-.step3:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
-.step3-n{position:absolute;top:1.7rem;right:1.8rem;font-size:2.6rem;font-weight:900;color:var(--s3);line-height:1}
-.step3-ico{width:52px;height:52px;border-radius:15px;background:var(--og);display:grid;place-items:center;margin-bottom:var(--sp-2)}
-.step3-t{font-size:1.1rem;font-weight:800;color:var(--ink);margin-bottom:.55rem;letter-spacing:-.015em;line-height:1.3}
-.step3-d{font-size:.94rem;color:var(--t2);line-height:1.62}
+/* Without / With — ported from the light design, restyled to dark glass.
+   Every WITH line is a shipped capability; WITHOUT stays honest old-way pain. */
+.vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
+.vs-card{border-radius:18px;padding:28px;backdrop-filter:blur(12px);font-family:var(--sans)}
+.vs-without{background:linear-gradient(160deg,rgba(255,107,107,.06),rgba(255,255,255,.02));border:1px solid rgba(255,107,107,.22)}
+.vs-with{background:linear-gradient(160deg,rgba(61,220,132,.09),rgba(255,255,255,.02));border:1px solid rgba(61,220,132,.3)}
+.vs-tag{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;margin-bottom:16px}
+.vs-without .vs-tag{color:#ff8f8f}
+.vs-with .vs-tag{color:#9ff0c2}
+.vs-card ul{list-style:none}
+.vs-card li{display:flex;gap:11px;align-items:flex-start;font-size:14.5px;line-height:1.55;padding:8px 0;color:var(--muted)}
+.vs-with li{color:var(--ink)}
+.vs-card li i{font-style:normal;font-weight:800;flex:none;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-size:11px;margin-top:1px}
+.vs-without li i{background:rgba(255,107,107,.14);color:#ff8f8f}
+.vs-with li i{background:rgba(61,220,132,.16);color:var(--green)}
 
-/* ── 2b. Part B — the live interview showcase ── */
-.iv-show{max-width:1140px;margin:var(--sp-8) auto 0;display:grid;grid-template-columns:1fr 1.05fr;gap:var(--sp-8);align-items:center}
-.iv-points{display:flex;flex-direction:column;gap:var(--sp-2)}
-.iv-point{display:flex;gap:12px;align-items:flex-start}
-.iv-point .tick{margin-top:2px}
-.iv-point-t{font-size:.98rem;font-weight:700;color:var(--ink);line-height:1.45}
-.iv-point-d{font-size:.9rem;color:var(--t2);line-height:1.6;margin-top:2px}
-.iv-title{font-size:clamp(1.5rem,2.8vw,2rem);font-weight:900;letter-spacing:-.025em;color:var(--ink);line-height:1.15;margin-bottom:var(--sp-2)}
-.iv-title .o{color:var(--orange2)}
-.iv-sub{font-size:1rem;color:var(--t2);line-height:1.65;margin-bottom:var(--sp-3);max-width:460px}
-/* the mock — styled like the real candidate interview page */
-.iv-mock{background:var(--surface);border-radius:var(--r-xxl);box-shadow:var(--shadow-xl);padding:var(--sp-4) var(--sp-3);text-align:center;transition:transform .3s cubic-bezier(.2,.6,.2,1)}
-.iv-mock:hover{transform:translateY(-4px)}
-.ivcard{display:inline-flex;align-items:center;gap:13px;background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:.85rem 1.3rem;text-align:left}
-.ivatar{width:44px;height:44px;border-radius:50%;background:var(--orange);display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;flex-shrink:0}
-.ivname{font-size:14.5px;font-weight:800;color:var(--ink);line-height:1.2}
-.ivrole{font-size:11px;color:var(--t3);font-weight:600}
-.voice{display:flex;align-items:flex-end;gap:3px;height:18px;margin-left:.5rem}
-.voice i{width:3.5px;background:var(--orange);border-radius:2px;height:6px;animation:eq 1.1s ease-in-out infinite}
-.voice i:nth-child(2){animation-delay:.15s}
-.voice i:nth-child(3){animation-delay:.3s}
-.voice i:nth-child(4){animation-delay:.45s}
-@keyframes eq{0%,100%{height:6px}50%{height:16px}}
-.iv-q-label{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--t3);margin:var(--sp-3) 0 var(--sp-1)}
-.iv-q{font-size:clamp(1.05rem,1.8vw,1.3rem);font-weight:750;letter-spacing:-.015em;line-height:1.35;color:var(--ink);max-width:420px;margin:0 auto}
-.iv-q .caret{display:inline-block;width:2.5px;height:1em;background:var(--orange);border-radius:2px;vertical-align:-.14em;margin-left:3px;animation:blink 1s steps(2,start) infinite}
-@keyframes blink{50%{opacity:0}}
-.iv-presence{margin-top:var(--sp-3);display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:700;padding:9px 18px;border-radius:var(--r-pill);border:1px solid var(--gb);background:var(--gg);color:var(--green2)}
-.iv-presence i{width:8px;height:8px;border-radius:50%;background:var(--green)}
-.iv-typed{margin:var(--sp-3) auto 0;max-width:420px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-2);text-align:left}
-.iv-typed-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:.5rem}
-.iv-typed-box{background:#fff;border:1.5px solid var(--border2);border-radius:var(--r-md);padding:.7rem .8rem;font-size:12.5px;color:var(--t3);line-height:1.5}
-.iv-typed-foot{display:flex;justify-content:space-between;gap:.8rem;margin-top:.5rem;font-size:10.5px;color:var(--t3);flex-wrap:wrap}
+footer{border-top:1px solid var(--gline);padding:44px 0;color:var(--muted);font-size:13.5px;position:relative;z-index:3;font-family:var(--sans)}.fin{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+footer a{cursor:pointer}footer a:hover{color:#fff}
 
-/* ── 3. CAPABILITY CARDS ── */
-.caps{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3)}
-.cap{background:var(--surface);border-radius:var(--r-xxl);padding:2.1rem 1.9rem;box-shadow:var(--shadow-sm);transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s;display:flex;flex-direction:column}
-.cap:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
-.cap-ico{width:50px;height:50px;border-radius:15px;background:var(--og);display:grid;place-items:center;margin-bottom:1.15rem}
-.cap-ico.gn{background:var(--gg)}
-.cap-t{font-size:1.06rem;font-weight:800;color:var(--ink);letter-spacing:-.015em;margin-bottom:.55rem;line-height:1.3}
-.cap-d{font-size:.925rem;color:var(--t2);line-height:1.62}
-.cap-feat{grid-column:1/-1;background:var(--ink);display:grid;grid-template-columns:auto 1fr;gap:var(--sp-3);align-items:flex-start;padding:var(--sp-4) 2.4rem;position:relative;overflow:hidden}
-.cap-feat::before{content:'';position:absolute;top:-140px;right:-100px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(22,163,74,.16),transparent 62%)}
-.cap-feat::after{content:'';position:absolute;bottom:-180px;left:-80px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(245,124,46,.12),transparent 62%)}
-.cap-feat .cap-ico{background:var(--gg);border:1px solid var(--gb);color:var(--green2);margin:0;position:relative;z-index:1}
-.cap-feat>div:last-child{position:relative;z-index:1}
-.cap-feat .cap-t{color:#fff;font-size:1.28rem}
-.cap-feat .cap-d{color:rgba(255,255,255,.80);font-size:.99rem;max-width:780px}
-.cap-feat .cap-d b{color:#fff}
-.cap-feat .rule{display:inline-flex;align-items:center;gap:8px;margin-top:var(--sp-2);background:rgba(22,163,74,.14);border:1px solid rgba(22,163,74,.35);color:#6EE7A0;border-radius:var(--r-pill);padding:6px 14px;font-size:12.5px;font-weight:700}
-.cap-feat:hover{transform:none;box-shadow:var(--shadow-sm)}
+/* Demo-request modal — same ids/flow as before (POST /api/demo-request),
+   restyled to dark glass so the working conversion path survives the theme. */
+.demo-ov{position:fixed;inset:0;background:rgba(2,10,6,.72);backdrop-filter:blur(6px);z-index:1000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 16px}
+.demo-ov.on{display:flex}
+.demo-card{background:linear-gradient(165deg,#0a2415,#04150c);border:1px solid rgba(61,220,132,.3);border-radius:20px;width:100%;max-width:480px;padding:26px 26px 24px;box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 40px -10px rgba(61,220,132,.3);position:relative;animation:demoRise .28s ease;font-family:var(--sans)}
+@keyframes demoRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.demo-card{animation:none}}
+.demo-x{position:absolute;top:14px;right:16px;background:none;border:none;font-size:24px;line-height:1;color:var(--muted);cursor:pointer;font-family:inherit}
+.demo-x:hover{color:#fff}
+.demo-head{text-align:center;margin-bottom:16px}
+.demo-badge{width:46px;height:46px;margin:0 auto 10px}
+.demo-head h3{font-size:20px;font-weight:600;color:#fff;letter-spacing:-.3px;font-family:var(--serif)}
+.demo-head p{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5}
+.demo-field{margin-bottom:11px}
+.demo-field label{display:block;font-size:12px;font-weight:600;color:#c9f5db;margin-bottom:5px}
+.demo-field input,.demo-field textarea{width:100%;padding:11px 13px;border:1px solid rgba(61,220,132,.25);border-radius:11px;font-family:inherit;font-size:14px;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s;background:rgba(255,255,255,.05);resize:vertical}
+.demo-field input:focus,.demo-field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(61,220,132,.16)}
+.demo-field input::placeholder,.demo-field textarea::placeholder{color:var(--faint)}
+.demo-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+@media(max-width:440px){.demo-row{grid-template-columns:1fr}}
+.demo-err{display:none;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ff8f8f;font-size:13px;border-radius:10px;padding:9px 12px;margin-bottom:12px}
+.demo-submit{width:100%;margin-top:6px;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#ffab4a,#ff7a35);color:#241102;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 26px -8px rgba(255,171,74,.5);transition:filter .15s,transform .12s}
+.demo-submit:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.demo-submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.demo-ok{text-align:center;padding:14px 6px 6px}
+.demo-ok .ic{width:58px;height:58px;border-radius:50%;background:rgba(61,220,132,.14);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.demo-ok h3{font-size:19px;font-weight:600;color:#fff;margin-bottom:8px;font-family:var(--serif)}
+.demo-ok p{font-size:14px;color:var(--muted);line-height:1.6;max-width:320px;margin:0 auto 18px}
+.demo-ok button{padding:11px 26px;border:none;border-radius:10px;background:linear-gradient(135deg,#3ddc84,#22b866);color:#02160c;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
 
-/* ── 4. SCORING FLOW — soft step-flow, not a wired diagram ── */
-.flow{max-width:820px;margin:0 auto;background:var(--surface);border-radius:var(--r-xxl);box-shadow:var(--shadow-md);padding:var(--sp-6) var(--sp-4)}
-.f-caption{text-align:center;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--t3);margin-bottom:1.1rem}
-.f-row{display:grid;gap:1.1rem}
-.f-row.two{grid-template-columns:1fr 1fr;max-width:640px;margin:0 auto}
-.f-card{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow-sm);padding:1.35rem 1.4rem;display:flex;gap:1rem;align-items:center;transition:transform .25s,box-shadow .25s}
-.f-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
-.f-ico{width:44px;height:44px;border-radius:13px;background:var(--gg);display:grid;place-items:center;flex-shrink:0}
-.f-t{font-size:.98rem;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
-.f-s{font-size:.82rem;color:var(--t3);margin-top:2px}
-.f-conn{display:flex;justify-content:center;padding:.9rem 0}
-.f-conn i{width:30px;height:30px;border-radius:50%;background:var(--gg);display:grid;place-items:center}
-.f-group{background:var(--s2);border-radius:var(--r-xl);padding:var(--sp-3);max-width:640px;margin:0 auto}
-.f-group .f-caption{margin-bottom:1rem}
-.f-blend{display:flex;justify-content:center;margin-top:1.1rem}
-.f-chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border-radius:var(--r-pill);box-shadow:var(--shadow-sm);padding:9px 18px;font-size:13px;font-weight:800;color:var(--ink)}
-.f-chip small{font-weight:600;color:var(--t3)}
-.f-final{max-width:640px;margin:0 auto;background:linear-gradient(135deg,rgba(245,124,46,.12),rgba(245,124,46,.05));border-radius:var(--r-xl);padding:1.6rem 1.7rem;display:flex;gap:1.1rem;align-items:center}
-.f-final .f-ico{background:var(--orange);width:50px;height:50px;border-radius:15px}
-.f-final .f-t{font-size:1.08rem;color:var(--orange2)}
-.f-final .f-s{color:var(--t2)}
-.flow-foot{max-width:820px;margin:var(--sp-3) auto 0;font-size:13px;color:var(--t3);text-align:center;line-height:1.6}
-
-/* ── 5. DIMENSIONS ── */
-.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-2)}
-.dim{background:var(--surface);border-radius:var(--r-xl);padding:var(--sp-3) 1.5rem;box-shadow:var(--shadow-sm);transition:.25s}
-.dim:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
-.dim-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.6rem}
-.dim-name{font-size:.98rem;font-weight:800;color:var(--ink);letter-spacing:-.01em}
-.dim-w{font-size:.8rem;font-weight:800;color:var(--orange2);background:var(--og);border-radius:var(--r-pill);padding:3px 10px;white-space:nowrap}
-.dim-top{margin-bottom:.9rem}
-.dim-bar{height:5px;border-radius:var(--r-pill);background:var(--s3);overflow:hidden}
-.dim-bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--orange)}
-.dims-note{text-align:center;font-size:.9rem;color:var(--t3);margin-top:var(--sp-3);line-height:1.6}
-
-/* ── 6. INTERNAL USE — lightened: big dark numbers, small grey labels ── */
-.use{background:var(--surface);border-radius:var(--r-xxl);box-shadow:var(--shadow-md);padding:var(--sp-6) var(--sp-4)}
-.use-pill{display:inline-flex;align-items:center;gap:8px;background:var(--gg);color:var(--green2);border-radius:var(--r-pill);padding:7px 15px;font-size:12.5px;font-weight:700;margin-bottom:var(--sp-2)}
-.use-title{font-size:clamp(1.5rem,3vw,2rem);font-weight:900;letter-spacing:-.025em;line-height:1.18;color:var(--ink);margin-bottom:.7rem}
-.use-body{font-size:1rem;color:var(--t2);line-height:1.65;max-width:560px;margin-bottom:var(--sp-4)}
-.use-body strong{color:var(--ink);font-weight:700}
-.use-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem}
-.stat{background:var(--s2);border-radius:var(--r-xl);padding:var(--sp-3) 1.4rem}
-.stat-num{font-size:2.3rem;font-weight:900;letter-spacing:-.03em;line-height:1;color:var(--ink);margin-bottom:.5rem}
-.stat-lbl{font-size:12.5px;font-weight:600;color:var(--t3);line-height:1.45}
-.use-caveat{margin-top:var(--sp-3);font-size:12.5px;color:var(--t3);line-height:1.6}
-
-/* ── 7. ACCESS ── */
-.access{max-width:620px;margin:0 auto;background:var(--surface);border-radius:var(--r-xxl);box-shadow:var(--shadow-md);padding:var(--sp-6) var(--sp-4);text-align:center}
-.access-title{font-size:1.5rem;font-weight:900;color:var(--ink);letter-spacing:-.025em;margin-bottom:.85rem}
-.access-body{font-size:1rem;color:var(--t2);line-height:1.65;margin-bottom:var(--sp-3)}
-.access-list{text-align:left;max-width:440px;margin:0 auto var(--sp-4);display:flex;flex-direction:column;gap:.75rem}
-.access-item{display:flex;gap:.75rem;align-items:flex-start;font-size:.93rem;color:var(--t2);line-height:1.55}
-.access-item .tick{margin-top:1px}
-.access-note{font-size:13px;color:var(--t3);margin-top:var(--sp-2);line-height:1.6}
-
-/* ── 8. FAQ ── */
-.faq{max-width:800px;margin:0 auto;display:flex;flex-direction:column;gap:.7rem}
-.faq-item{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow-sm);overflow:hidden;transition:.25s}
-.faq-item[open]{box-shadow:var(--shadow-md)}
-.faq-q{padding:1.1rem 1.35rem;font-size:.98rem;font-weight:700;color:var(--ink);cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.faq-q::-webkit-details-marker{display:none}
-.faq-q::after{content:'+';font-size:1.35rem;font-weight:400;color:var(--orange2);flex-shrink:0;line-height:1;transition:transform .2s}
-.faq-item[open] .faq-q::after{transform:rotate(45deg)}
-.faq-a{padding:0 1.35rem 1.25rem;font-size:.93rem;color:var(--t2);line-height:1.68}
-
-/* ── FOOTER — light, green + orange accents (no dark) ── */
-footer{position:relative;background:#F1F8F3;color:var(--t2);padding:var(--sp-6) 0 var(--sp-4);border-top:4px solid var(--orange)}
-footer::before{content:'';position:absolute;top:-4px;left:0;width:38%;height:4px;background:linear-gradient(90deg,rgba(22,163,74,.45),rgba(22,163,74,0))}
-footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height:280px;background:radial-gradient(ellipse at center,rgba(245,124,46,.10),transparent 68%);pointer-events:none}
-.foot-grid{position:relative;z-index:1;display:flex;justify-content:space-between;gap:var(--sp-6);flex-wrap:wrap;padding-bottom:var(--sp-4);border-bottom:1px solid var(--gb)}
-.foot-bot{position:relative;z-index:1;color:var(--t3)}
-.foot-brand{max-width:320px}
-.foot-logo{display:flex;align-items:center;gap:9px;margin-bottom:.9rem}
-.foot-col-title{font-size:12px;font-weight:800;color:var(--green2);letter-spacing:.09em;text-transform:uppercase;margin-bottom:.9rem}
-.foot-link{display:block;font-size:.9rem;color:var(--t2);text-decoration:none;margin-bottom:.6rem;transition:.15s}
-.foot-link:hover{color:var(--orange2)}
-.foot-tag{font-size:.88rem;line-height:1.62}
-.foot-bot{padding-top:var(--sp-3);display:flex;justify-content:space-between;gap:var(--sp-2);flex-wrap:wrap;font-size:.83rem}
-
-/* ── RESPONSIVE — sharp at 380px ── */
-@media(max-width:960px){
-  .caps{grid-template-columns:1fr 1fr}
-  .dims{grid-template-columns:repeat(2,1fr)}
-  .iv-show{grid-template-columns:1fr;gap:var(--sp-6)}
-}
-@media(max-width:860px){
-  .hero-grid{grid-template-columns:1fr;gap:var(--sp-6)}
-  .shot{order:2}
-  .steps-3{grid-template-columns:1fr;gap:var(--sp-2)}
-}
-@media(max-width:768px){
-  .nav-links{display:none}
-  nav{padding:0 var(--sp-2)}
-  .wrap{padding:0 1.15rem}
-  .sec{padding:var(--sp-8) 0}
-  .sec-head{margin-bottom:var(--sp-4)}
-  .hero{padding:var(--sp-8) 1.15rem var(--sp-6)}
-  .flow{padding:var(--sp-4) var(--sp-2)}
-  .f-row.two{grid-template-columns:1fr}
-  .dims{grid-template-columns:1fr}
-  .use{padding:var(--sp-4) var(--sp-3)}
-  .use-stats{grid-template-columns:1fr 1fr;gap:1rem}
-  .access{padding:var(--sp-4) 1.35rem;border-radius:var(--r-lg)}
-  .foot-grid{flex-direction:column;gap:var(--sp-3)}
-}
-@media(max-width:640px){
-  .caps{grid-template-columns:1fr}
-  .cap-feat{grid-template-columns:1fr;padding:var(--sp-3)}
-}
-@media(max-width:400px){
-  .hero-actions{flex-direction:column}
-  .hero-actions .btn-hero,.hero-actions .btn-outline{justify-content:center;text-align:center}
-  .stat-num{font-size:1.8rem}
-}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:48px}.steps,.dgrid,.tcards,.vs-grid{grid-template-columns:1fr}.nav-links{display:none}.floatpill{display:none}.dash{transform:none}.hero{padding:120px 0 70px;min-height:0}}
+@media(max-width:520px){.wrap{padding:0 20px}.db-stats{grid-template-columns:1fr 1fr}section{padding:70px 0}}
 </style>
 <noscript><style>.rv{opacity:1;transform:none}</style></noscript>
 </head>
 <body>
+<div class="bg"></div><div class="conic"></div><div class="gridlines"></div><div class="spot" id="spot"></div>
 
-<nav>
-  <a href="/" class="nav-logo" aria-label="TopCandidate.pro home">
-    <!-- Inlined (not <img>) so the wordmark uses the page's Inter — an SVG
-         loaded via <img> can't see webfonts. Mark: candidate figure (green)
-         + orange verified check on a soft light-green tile. -->
+<nav><div class="nav-glass"></div><div class="wrap">
+  <a href="/" class="brand" aria-label="TopCandidate.pro home">
+    <!-- Real brand mark + wordmark (inline so it uses page fonts); wordmark
+         flipped to white for the dark theme, mark itself unchanged. -->
     <svg height="30" viewBox="0 0 352 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
       <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
       <circle cx="28" cy="23" r="8.6" fill="#639922"/>
@@ -408,135 +198,77 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
       <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
       <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
       <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#1f2937">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
+      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#ffffff">TopCandidate</tspan><tspan fill="#ffab4a">.pro</tspan></text>
     </svg>
   </a>
-  <div class="nav-links">
-    <a href="#how" class="nav-link">How it works</a>
-    <a href="#what" class="nav-link">What it does</a>
-    <a href="#scoring" class="nav-link">Scoring</a>
-    <a href="#dimensions" class="nav-link">Dimensions</a>
-    <a href="#access" class="nav-link">Access</a>
-  </div>
-  <div class="nav-right">
-    <a href="/login" class="btn-ghost-sm">Sign in</a>
-    <a onclick="openDemoModal()" class="btn-orange-sm" style="cursor:pointer">Request demo</a>
-  </div>
-</nav>
+  <div class="nav-links"><a href="#how">How it works</a><a href="#dims">The rubric</a><a href="#trust">Why trust it</a></div>
+  <div class="nav-r"><a class="si" href="/login">Sign in</a><button class="btn btn-neon btn-sm" onclick="openDemoModal()">Request a demo</button></div>
+</div></nav>
 
-<!-- ═══════════════ 1. HERO ═══════════════ -->
-<section class="hero">
-  <div class="hero-grid">
-    <div class="hero-copy">
-      <h1 class="hero-h1 rv" style="--d:.06s">Every candidate,<br><span class="u-green">scored</span> on <span class="o">your&nbsp;rubric.</span></h1>
-      <p class="hero-lead rv" style="--d:.12s">One link: CV screening, then a live AI interview. Every score recomputed in code.</p>
-      <div class="hero-actions rv" style="--d:.18s">
-        <a class="btn-hero" onclick="openDemoModal()" style="cursor:pointer">Request demo
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
-        <a class="btn-outline" href="#how">See how it works</a>
-      </div>
-      <div class="trust rv" style="--d:.24s">
-        <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>One link, CV to interview</span>
-        <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>Scored in code</span>
-        <span><i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>Fair to every accent</span>
-      </div>
-    </div>
-
-    <div class="shot rv" style="--d:.15s">
-      <div class="frame">
-        <div class="frame-bar">
-          <span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span>
-          <span class="frame-url">topcandidate.pro/app</span>
+<header class="hero"><div class="wrap hero-grid">
+  <div>
+    <span class="kick rv"><span class="d"></span>Live AI interview · a human makes the final call</span>
+    <h1 class="hh rv">Every candidate, <span class="g">scored</span> on your rubric.</h1>
+    <p class="hsub rv">One link screens the CV, runs a live AI interview, and shows the evidence behind every number. You review the shortlist — the reasoning is already there.</p>
+    <div class="hcta rv"><button class="btn btn-neon" onclick="openDemoModal()">Request a demo</button><a class="btn btn-out" href="#dims" style="display:inline-flex;align-items:center">See how scoring works</a></div>
+    <p class="hnote rv">No black box — every score traces back to the CV line or answer it came from.</p>
+  </div>
+  <div class="stage rv">
+    <div class="floatpill p1">● Live scoring</div>
+    <div class="floatpill p2">Evidence-backed</div>
+    <div class="dash" id="dash">
+      <div class="db-top"><i></i><i></i><i></i><span class="u">topcandidate.pro/app</span></div>
+      <div class="db-body">
+        <div class="db-stats">
+          <div class="st"><div class="n">142</div><div class="l">Total Screened</div></div>
+          <div class="st"><div class="n">9</div><div class="l">Shortlisted</div></div>
+          <div class="st"><div class="n">7</div><div class="l">In Interview</div></div>
+          <div class="st"><div class="n">10</div><div class="l">Active Jobs</div></div>
         </div>
-        <!-- Static PRODUCT PREVIEW (representative numbers, not live) — matches the
-             redesigned Hiring Dashboard: dark-green sidebar, tinted floating panel,
-             stat tiles, donut charts, green bars. Inline SVG (no Chart.js). -->
-        <div class="lpdash">
-          <aside class="lpd-side">
-            <div class="lpd-mark"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="3.4" fill="#639922"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="#639922" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="17.5" cy="15.5" r="5" fill="#EF9F27"/><path d="M15.3 15.6l1.6 1.6 2.8-3" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <div class="lpd-nav on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></div>
-            <div class="lpd-nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.4-6 5.5-6s5.5 2.7 5.5 6"/></svg></div>
-            <div class="lpd-nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div>
-            <div class="lpd-nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
-            <div class="lpd-nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
-          </aside>
-          <div class="lpd-main">
-            <div class="lpd-hd"><b>Dashboard</b><span>Your recruitment health at a glance</span></div>
-
-            <div class="lpd-stats">
-              <div class="lpd-tile"><div class="lpd-chip g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.4-6 5.5-6s5.5 2.7 5.5 6"/><path d="M16 8h5M18.5 5.5v5"/></svg></div><div><div class="lpd-tn">142</div><div class="lpd-tl">Total Screened</div></div></div>
-              <div class="lpd-tile"><div class="lpd-chip gd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4 10-10"/></svg></div><div><div class="lpd-tn">9</div><div class="lpd-tl">Shortlisted</div></div></div>
-              <div class="lpd-tile"><div class="lpd-chip o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></div><div><div class="lpd-tn">7</div><div class="lpd-tl">In Interview</div></div></div>
-              <div class="lpd-tile"><div class="lpd-chip g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div><div class="lpd-tn">10</div><div class="lpd-tl">Active Jobs</div></div></div>
-            </div>
-
-            <div class="lpd-cards">
-              <div class="lpd-card">
-                <div class="lpd-ct">Pipeline by Stage</div>
-                <div class="lpd-donutwrap">
-                  <div class="lpd-donut">
-                    <svg width="66" height="66" viewBox="0 0 42 42">
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#eef2e8" stroke-width="5"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#639922" stroke-width="5" stroke-dasharray="6.34 93.66" stroke-dashoffset="25"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EF9F27" stroke-width="5" stroke-dasharray="4.93 95.07" stroke-dashoffset="18.66"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#a9d17a" stroke-width="5" stroke-dasharray="84.51 15.49" stroke-dashoffset="13.73"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#c2c9bd" stroke-width="5" stroke-dasharray="4.23 95.77" stroke-dashoffset="-70.78"/>
-                    </svg>
-                    <div class="lpd-dc"><b>142</b><span>total</span></div>
-                  </div>
-                  <div class="lpd-leg">
-                    <div class="lpd-lr"><i style="background:#639922"></i><span>Shortlisted</span><b>9</b></div>
-                    <div class="lpd-lr"><i style="background:#EF9F27"></i><span>Interview</span><b>7</b></div>
-                    <div class="lpd-lr"><i style="background:#a9d17a"></i><span>Screening</span><b>120</b></div>
-                    <div class="lpd-lr"><i style="background:#c2c9bd"></i><span>Rejected</span><b>6</b></div>
-                  </div>
-                </div>
-              </div>
-              <div class="lpd-card">
-                <div class="lpd-ct">Candidates by Score</div>
-                <div class="lpd-donutwrap">
-                  <div class="lpd-donut">
-                    <svg width="66" height="66" viewBox="0 0 42 42">
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#eef2e8" stroke-width="5"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#639922" stroke-width="5" stroke-dasharray="5.63 94.37" stroke-dashoffset="25"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#a9d17a" stroke-width="5" stroke-dasharray="23.94 76.06" stroke-dashoffset="19.37"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EF9F27" stroke-width="5" stroke-dasharray="42.96 57.04" stroke-dashoffset="-4.58"/>
-                      <circle cx="21" cy="21" r="15.9" fill="none" stroke="#c2c9bd" stroke-width="5" stroke-dasharray="27.47 72.53" stroke-dashoffset="-47.54"/>
-                    </svg>
-                    <div class="lpd-dc"><b>142</b><span>scored</span></div>
-                  </div>
-                  <div class="lpd-leg">
-                    <div class="lpd-lr"><i style="background:#639922"></i><span>80+</span><b>8</b></div>
-                    <div class="lpd-lr"><i style="background:#a9d17a"></i><span>65–80</span><b>34</b></div>
-                    <div class="lpd-lr"><i style="background:#EF9F27"></i><span>48–65</span><b>61</b></div>
-                    <div class="lpd-lr"><i style="background:#c2c9bd"></i><span>0–48</span><b>39</b></div>
-                  </div>
-                </div>
+        <div class="db-row">
+          <div class="db-card"><h5>Pipeline by Stage</h5>
+            <div class="donutwrap">
+              <div class="donut" style="background:conic-gradient(#3ddc84 0 6%,#ffab4a 6% 11%,#7cc42e 11% 96%,#4a5548 96% 100%)"></div>
+              <div class="dleg">
+                <div class="lr"><span class="dt" style="background:#3ddc84"></span>Shortlisted<b>9</b></div>
+                <div class="lr"><span class="dt" style="background:#ffab4a"></span>Interview<b>7</b></div>
+                <div class="lr"><span class="dt" style="background:#7cc42e"></span>Screening<b>120</b></div>
+                <div class="lr"><span class="dt" style="background:#4a5548"></span>Rejected<b>6</b></div>
               </div>
             </div>
-
-            <div class="lpd-card">
-              <div class="lpd-ct">Applicants per Job</div>
-              <div class="lpd-bars">
-                <div class="lpd-br"><div class="lpd-bl">Operation analyst</div><div class="lpd-bt"><div class="lpd-bf" style="width:100%"></div></div><div class="lpd-bv">22</div></div>
-                <div class="lpd-br"><div class="lpd-bl">Full-Stack AI Engineer</div><div class="lpd-bt"><div class="lpd-bf" style="width:73%"></div></div><div class="lpd-bv">16</div></div>
-                <div class="lpd-br"><div class="lpd-bl">Data Analyst</div><div class="lpd-bt"><div class="lpd-bf" style="width:59%"></div></div><div class="lpd-bv">13</div></div>
-                <div class="lpd-br"><div class="lpd-bl">Python Instructor</div><div class="lpd-bt"><div class="lpd-bf" style="width:50%"></div></div><div class="lpd-bv">11</div></div>
+          </div>
+          <div class="db-card"><h5>Candidates by Score</h5>
+            <div class="donutwrap">
+              <div class="donut" style="background:conic-gradient(#7cc42e 0 8%,#ffab4a 8% 48%,#4a5548 48% 100%)"></div>
+              <div class="dleg">
+                <div class="lr"><span class="dt" style="background:#3ddc84"></span>80+<b>0</b></div>
+                <div class="lr"><span class="dt" style="background:#7cc42e"></span>65–80<b>11</b></div>
+                <div class="lr"><span class="dt" style="background:#ffab4a"></span>48–65<b>57</b></div>
+                <div class="lr"><span class="dt" style="background:#4a5548"></span>0–48<b>74</b></div>
               </div>
             </div>
           </div>
         </div>
+        <div class="db-card"><h5>Applicants per Job</h5>
+          <div class="mini"><span class="lb">Other</span><div class="tk"><span style="width:100%;background:linear-gradient(90deg,#3ddc84,#22b866)"></span></div><span class="v">52</span></div>
+          <div class="mini"><span class="lb">Operation analyst</span><div class="tk"><span style="width:42%;background:linear-gradient(90deg,#3ddc84,#22b866)"></span></div><span class="v">22</span></div>
+          <div class="mini"><span class="lb">Full-Stack AI Eng.</span><div class="tk"><span style="width:31%;background:linear-gradient(90deg,#3ddc84,#22b866)"></span></div><span class="v">16</span></div>
+          <div class="mini"><span class="lb">Data Analyst</span><div class="tk"><span style="width:25%;background:linear-gradient(90deg,#3ddc84,#22b866)"></span></div><span class="v">13</span></div>
+        </div>
       </div>
     </div>
+    <div class="dash-cap">Representative product preview — sample numbers, not a live account.</div>
   </div>
-</section>
+</div></header>
 
-<!-- ═══════════════ 1b. WITHOUT vs WITH — every claim on the right is a
-     shipped capability (one-link screening, gated auto-interview, dashboard
-     verdicts with evidence). Do not add benefits the product doesn't do. ═══ -->
-<section class="vs-sec">
-  <div class="vs-grid">
+<div class="strip"><div class="wrap strip-in"><span class="lbl">In production with</span><b>LinkX360</b><b>Data Solution 360</b><span class="lbl">Two real teams — honest numbers.</span></div></div>
+
+<!-- Without / With — ported honest comparison. Every WITH line is a shipped
+     capability; do not add benefits the product doesn't do. -->
+<section id="vs"><div class="wrap">
+  <div class="eyebrow rv">The difference</div>
+  <h2 class="stitle rv">Screening, before and after.</h2>
+  <div class="vs-grid" style="margin-top:44px">
     <div class="vs-card vs-without rv">
       <div class="vs-tag">Without TopCandidate.pro</div>
       <ul>
@@ -556,411 +288,60 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
       </ul>
     </div>
   </div>
-</section>
+</div></section>
 
-<!-- ═══════════════ 2. HOW IT WORKS — both halves ═══════════════ -->
-<section class="sec" id="how">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">How it works</span>
-      <h2 class="sec-title">One link, both halves of the funnel</h2>
-      <p class="sec-sub">One standard per job — first on paper, then in conversation.</p>
-    </div>
-
-    <div class="part-label rv"><b>A</b> CV screening</div>
-    <div class="steps-3">
-      <div class="step3 rv">
-        <div class="step3-n">1</div>
-        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-        <div class="step3-t">Post the job, share one link</div>
-        <div class="step3-d">Set your weights, share the apply link — or upload a batch.</div>
-      </div>
-      <div class="step3 rv" style="--d:.07s">
-        <div class="step3-n">2</div>
-        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3 3 3 0 0 0 .5 1.65A3 3 0 0 0 5 13a3 3 0 0 0 3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0 3-3 3 3 0 0 0-1.5-2.35A3 3 0 0 0 18 9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg></div>
-        <div class="step3-t">Every CV scored on your rubric</div>
-        <div class="step3-d">Two passes, blended, recomputed in code.</div>
-      </div>
-      <div class="step3 rv" style="--d:.14s">
-        <div class="step3-n">3</div>
-        <div class="step3-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="step3-t">Ranked in your dashboard</div>
-        <div class="step3-d">Full report per candidate, emails from your own address.</div>
-      </div>
-    </div>
-
-    <!-- Part B — the live interview gets real space -->
-    <div class="iv-show">
-      <div class="rv">
-        <div class="part-label gn"><b>B</b> The live AI interview</div>
-        <h3 class="iv-title">Then the interview<br>comes <span class="o">to them.</span></h3>
-        <p class="iv-sub">Clear the CV threshold, and the interview starts — same link, same sitting, in the browser.</p>
-        <div class="iv-points">
-          <div class="iv-point">
-            <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-            <div>
-              <div class="iv-point-t">A real conversation, not a form</div>
-              <div class="iv-point-d">Adaptive follow-ups, from your job's questions — identical for everyone.</div>
-            </div>
-          </div>
-          <div class="iv-point">
-            <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-            <div>
-              <div class="iv-point-t">Every question shown as text, always</div>
-              <div class="iv-point-d">Spoken and on screen — read as well as listen.</div>
-            </div>
-          </div>
-          <div class="iv-point">
-            <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-            <div>
-              <div class="iv-point-t">Typed answers where writing reveals more</div>
-              <div class="iv-point-d">The interviewer waits silently while they write.</div>
-            </div>
-          </div>
-          <div class="iv-point">
-            <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-            <div>
-              <div class="iv-point-t">Scored fairly, monitored honestly</div>
-              <div class="iv-point-d">Substance over fluency. Signals for review, never verdicts.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="iv-mock rv" style="--d:.1s" aria-hidden="true">
-        <div class="ivcard">
-          <div class="ivatar">A</div>
-          <div>
-            <div class="ivname">Ayesha</div>
-            <div class="ivrole">AI Interviewer</div>
-          </div>
-          <div class="voice"><i></i><i></i><i></i><i></i></div>
-        </div>
-        <div class="iv-q-label">Question 2 of 10</div>
-        <div class="iv-q">Describe a data pipeline you built.<span class="caret"></span></div>
-        <div class="iv-presence"><i></i>Waiting for your answer — type below</div>
-        <div class="iv-typed">
-          <div class="iv-typed-label">Type your answer</div>
-          <div class="iv-typed-box">Take your time — the interviewer will wait…</div>
-          <div class="iv-typed-foot"><span>🎙 Mic paused while you type</span><span>Draft saved automatically</span></div>
-        </div>
-      </div>
-    </div>
+<section id="how"><div class="wrap">
+  <div class="eyebrow rv">How it works</div><h2 class="stitle rv">From application to a scored interview, in one link.</h2><p class="slead rv">The same flow runs for every applicant, so everyone is measured the same way.</p>
+  <div class="steps">
+    <div class="gp step rv"><div class="n">Step one</div><h3>Screen the CV</h3><p>Read against your rubric — scored twice, blended, recomputed in code so the number is reproducible.</p></div>
+    <div class="gp step rv"><div class="n">Step two</div><h3>Interview live</h3><p>Qualifying applicants flow into a short live AI interview through the same link.</p></div>
+    <div class="gp step rv"><div class="n">Step three</div><h3>Review the shortlist</h3><p>One overall score combines CV and interview, with the evidence behind each dimension.</p></div>
   </div>
-</section>
+</div></section>
 
-<!-- ═══════════════ 3. CAPABILITY CARDS ═══════════════ -->
-<section class="sec sec-alt" id="what">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">What it does</span>
-      <h2 class="sec-title">The whole funnel, honestly built</h2>
-      <p class="sec-sub">Seven things it actually does. We run our own hiring on every one.</p>
-    </div>
-    <div class="caps">
-
-      <div class="cap cap-feat rv">
-        <div class="cap-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <div>
-          <div class="cap-t">Fair to every candidate</div>
-          <div class="cap-d">Substance scores. English polish doesn't. <b>A sharp answer in broken English beats a fluent empty one.</b></div>
-          <span class="rule"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Tested on every scoring change</span>
-        </div>
-      </div>
-
-      <div class="cap rv">
-        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-        <div class="cap-t">One link, full funnel</div>
-        <div class="cap-d">Apply, CV, interview — one link, one sitting.</div>
-      </div>
-
-      <div class="cap rv" style="--d:.07s">
-        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></div>
-        <div class="cap-t">AI CV screening</div>
-        <div class="cap-d">Six weighted dimensions. Scored in code, not guessed.</div>
-      </div>
-
-      <div class="cap rv" style="--d:.14s">
-        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
-        <div class="cap-t">Live AI interview</div>
-        <div class="cap-d">Adaptive spoken + typed questions, drawn from your job.</div>
-      </div>
-
-      <div class="cap rv">
-        <div class="cap-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F57C2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
-        <div class="cap-t">Honest proctoring</div>
-        <div class="cap-d">Monitored and flagged for your review. Never called cheat-proof.</div>
-      </div>
-
-      <div class="cap rv" style="--d:.07s">
-        <div class="cap-ico gn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
-        <div class="cap-t">Full audit trail</div>
-        <div class="cap-d">Every score shows its evidence.</div>
-      </div>
-
-      <div class="cap rv" style="--d:.14s">
-        <div class="cap-ico gn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-        <div class="cap-t">Built for Bangladesh</div>
-        <div class="cap-d">PDF batches, Gmail sends, works on a phone.</div>
-      </div>
-
-    </div>
+<section id="dims"><div class="wrap">
+  <div class="eyebrow rv">The rubric</div><h2 class="stitle rv">Six dimensions, weighted your way.</h2><p class="slead rv">Balanced by default; tune per role, or start from a preset.</p>
+  <div class="dgrid">
+    <div class="dcell rv"><div class="w">25%</div><h4>Skills match</h4><p>Matched by what tools imply — not keyword overlap.</p></div>
+    <div class="dcell rv"><div class="w">20%</div><h4>Experience relevance</h4><p>How closely real work maps to the role.</p></div>
+    <div class="dcell rv"><div class="w">20%</div><h4>Achievement &amp; impact</h4><p>Evidence of quantified results.</p></div>
+    <div class="dcell rv"><div class="w">15%</div><h4>Role alignment</h4><p>Seniority, scope, and fit.</p></div>
+    <div class="dcell rv"><div class="w">10%</div><h4>Education &amp; certs</h4><p>Weighted by relevance.</p></div>
+    <div class="dcell rv"><div class="w">10%</div><h4>Stability &amp; tenure</h4><p>Surfaced for review, never auto-reject.</p></div>
   </div>
-</section>
+</div></section>
 
-<!-- ═══════════════ 4. SCORING FLOWCHART ═══════════════ -->
-<section class="sec" id="scoring">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">What actually runs</span>
-      <h2 class="sec-title">One CV, six checks, two opinions</h2>
-      <p class="sec-sub">Parsed separately, scored twice, checked by deterministic code.</p>
-    </div>
-
-    <div class="flow rv">
-      <div class="f-caption">In parallel</div>
-      <div class="f-row two">
-        <div class="f-card">
-          <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-          <div><div class="f-t">Parse CV</div><div class="f-s">roles, skills, dates, education</div></div>
-        </div>
-        <div class="f-card">
-          <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-          <div><div class="f-t">Parse JD</div><div class="f-s">requirements, must-haves</div></div>
-        </div>
-      </div>
-      <div class="f-conn"><i><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></i></div>
-      <div class="f-group">
-        <div class="f-caption">Two-pass scoring</div>
-        <div class="f-row two">
-          <div class="f-card">
-            <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <div><div class="f-t">Strict pass</div><div class="f-s">gatekeeper · temp 0.2</div></div>
-          </div>
-          <div class="f-card">
-            <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></div>
-            <div><div class="f-t">Upside pass</div><div class="f-s">hiring manager · temp 0.3</div></div>
-          </div>
-        </div>
-        <div class="f-blend"><span class="f-chip">Blend&nbsp;<small>60 / 40 per dimension</small></span></div>
-      </div>
-      <div class="f-conn"><i><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></i></div>
-      <div class="f-caption">Deterministic — no model call</div>
-      <div class="f-row two">
-        <div class="f-card">
-          <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-          <div><div class="f-t">Hard-gap check</div><div class="f-s">−15 to −25 each, capped −35</div></div>
-        </div>
-        <div class="f-card">
-          <div class="f-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-          <div><div class="f-t">Confidence gate</div><div class="f-s">&gt;12 pts apart → downgrade</div></div>
-        </div>
-      </div>
-      <div class="f-conn"><i><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></i></div>
-      <div class="f-final">
-        <div class="f-ico"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-        <div><div class="f-t">Final weighted score</div><div class="f-s">recomputed in code, not taken from the model · 0–100 + recommendation</div></div>
-      </div>
-    </div>
-    <p class="flow-foot">Every stage after the blend is ordinary code, not a prompt — the same input always produces the same adjustment.</p>
+<section id="trust"><div class="wrap">
+  <div class="eyebrow rv">Why you can trust it</div><h2 class="stitle rv">Built to be defended, not just to be fast.</h2><p class="slead rv">The market's biggest fear about AI hiring is bias and black-box decisions. This is built the opposite way.</p>
+  <div class="tcards">
+    <div class="gp tcard rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div><h4>Evidence behind every number</h4><p>Each dimension cites the CV line or answer it drew from.</p></div>
+    <div class="gp tcard rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7"/></svg></div><h4>A human decides</h4><p>The system ranks and reasons; it never makes the hire.</p></div>
+    <div class="gp tcard rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 15l3-3 3 2 4-5 4 4"/></svg></div><h4>Fair across accents</h4><p>Interviews score substance, not fluency.</p></div>
   </div>
-</section>
+</div></section>
 
-<!-- ═══════════════ 5. THE SIX DIMENSIONS ═══════════════ -->
-<section class="sec sec-alt" id="dimensions">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">The rubric</span>
-      <h2 class="sec-title">Six dimensions, weighted for the role</h2>
-      <p class="sec-sub">Each scored 0–20. The weights are yours to change.</p>
-    </div>
-    <div class="dims">
-      <div class="dim rv">
-        <div class="dim-top"><span class="dim-name">Skills Match</span><span class="dim-w">25%</span></div>
-<div class="dim-bar"><i style="width:100%"></i></div>
-      </div>
-      <div class="dim rv" style="--d:.05s">
-        <div class="dim-top"><span class="dim-name">Experience Relevance</span><span class="dim-w">20%</span></div>
-<div class="dim-bar"><i style="width:80%"></i></div>
-      </div>
-      <div class="dim rv" style="--d:.1s">
-        <div class="dim-top"><span class="dim-name">Achievement &amp; Impact</span><span class="dim-w">20%</span></div>
-<div class="dim-bar"><i style="width:80%"></i></div>
-      </div>
-      <div class="dim rv">
-        <div class="dim-top"><span class="dim-name">Role Alignment</span><span class="dim-w">15%</span></div>
-<div class="dim-bar"><i style="width:60%"></i></div>
-      </div>
-      <div class="dim rv" style="--d:.05s">
-        <div class="dim-top"><span class="dim-name">Education &amp; Certifications</span><span class="dim-w">10%</span></div>
-<div class="dim-bar"><i style="width:40%"></i></div>
-      </div>
-      <div class="dim rv" style="--d:.1s">
-        <div class="dim-top"><span class="dim-name">Stability &amp; Tenure</span><span class="dim-w">10%</span></div>
-<div class="dim-bar"><i style="width:40%"></i></div>
-      </div>
-    </div>
-    <p class="dims-note rv">Eight presets ship with the app — or set all six yourself.</p>
-  </div>
-</section>
+<section class="cta"><div class="wrap">
+  <h2 class="rv">See it screen your own CVs.</h2><p class="rv">Bring a real role and a batch of applications. In one demo you'll see the scores, the reasoning, and the shortlist.</p>
+  <div class="row rv"><button class="btn btn-neon" onclick="openDemoModal()">Request a demo</button><button class="btn btn-out" onclick="openDemoModal()">Talk to us first</button></div>
+</div></section>
 
-<!-- ═══════════════ 6. INTERNAL USE — real numbers ═══════════════ -->
-<section class="sec">
-  <div class="wrap">
-    <div class="use rv">
-      <span class="use-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Real internal numbers · August 2026</span>
-      <h2 class="use-title">We built it for our own hiring first</h2>
-      <p class="use-body">Every application at <strong>LinkX360</strong> and <strong>Data Solution 360</strong> — the two companies behind it — runs through this exact funnel.</p>
-      <div class="use-stats">
-        <div class="stat"><div class="stat-num">292</div><div class="stat-lbl">CVs screened<br>on the rubric</div></div>
-        <div class="stat"><div class="stat-num">12</div><div class="stat-lbl">roles screened<br>across both companies</div></div>
-        <div class="stat"><div class="stat-num">29</div><div class="stat-lbl">applications through<br>the public apply link</div></div>
-        <div class="stat"><div class="stat-num">2</div><div class="stat-lbl">companies —<br>both of them ours</div></div>
-      </div>
-      <p class="use-caveat">Honest small numbers beat invented big ones.</p>
-    </div>
-  </div>
-</section>
+<footer><div class="wrap fin">
+  <a href="/" class="brand" aria-label="TopCandidate.pro home">
+    <svg height="26" viewBox="0 0 352 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+      <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
+      <circle cx="28" cy="23" r="8.6" fill="#639922"/>
+      <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
+      <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
+      <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
+      <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#ffffff">TopCandidate</tspan><tspan fill="#ffab4a">.pro</tspan></text>
+    </svg>
+  </a>
+  <div>© 2026 TopCandidate.pro — a LinkX360 / Data Solution 360 product. Dhaka, Bangladesh.</div>
+  <div><a onclick="openDemoModal()">Request a demo</a> · <a href="/login">Sign in</a></div>
+</div></footer>
 
-<!-- ═══════════════ 7. ACCESS ═══════════════ -->
-<section class="sec sec-alt" id="access">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">Access</span>
-      <h2 class="sec-title">Early access, by conversation</h2>
-      <p class="sec-sub">There is no checkout and no plan to pick. We're onboarding teams one at a time while the product is still early.</p>
-    </div>
-    <div class="access rv">
-      <div class="access-title">Contact us for access</div>
-      <p class="access-body">Tell us what you're hiring for. If it's a fit, we set you up and walk the first batch with you.</p>
-      <div class="access-list">
-        <div class="access-item">
-          <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-          <span>Your own account, set up with you on a call</span>
-        </div>
-        <div class="access-item">
-          <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-          <span>Weightings and interview questions tuned to the roles you actually hire for</span>
-        </div>
-        <div class="access-item">
-          <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-          <span>Candidate emails sent from your own address</span>
-        </div>
-        <div class="access-item">
-          <i class="tick"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></i>
-          <span>Direct line to us while you're getting started</span>
-        </div>
-      </div>
-      <a onclick="openDemoModal()" class="btn-hero" style="width:100%;justify-content:center;cursor:pointer">Request demo</a>
-      <p class="access-note">Already set up? <a href="/login" style="color:var(--orange2);font-weight:700;text-decoration:none">Sign in here</a>.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ 8. FAQ ═══════════════ -->
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <span class="sec-eyebrow">Questions</span>
-      <h2 class="sec-title">Straight answers</h2>
-    </div>
-    <div class="faq rv">
-      <details class="faq-item">
-        <summary class="faq-q">What is the live AI interview?</summary>
-        <div class="faq-a">A real-time spoken conversation in the browser — your job's questions, identical for every candidate, every question also shown as text. Some are answered in writing.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Is scoring fair to candidates whose English isn't fluent?</summary>
-        <div class="faq-a">The scorers grade substance, not fluency — a sharp answer in broken English must outscore a fluent empty one, verified with test transcripts before every scoring change.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Does the proctoring catch cheating?</summary>
-        <div class="faq-a">It produces signals for human review — monitoring, flagged snapshots, a coverage timeline. Nothing is auto-rejected, and no browser system is cheat-proof.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Does a missing requirement reject a candidate?</summary>
-        <div class="faq-a">No. It applies a capped penalty and pushes the candidate down the ranking — never off it.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">What happens when the two scoring passes disagree?</summary>
-        <div class="faq-a">More than 12 points apart: flagged low-confidence and downgraded to Maybe. Never upgraded.</div>
-      </details>
-      <details class="faq-item">
-        <summary class="faq-q">Where does candidate data go?</summary>
-        <div class="faq-a">CV text and transcripts go to OpenAI's API for scoring — we say so plainly. PDFs delete after 30 days, and you can delete any screening.</div>
-      </details>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ FOOTER ═══════════════ -->
-<footer>
-  <div class="wrap">
-    <div class="foot-grid">
-      <div class="foot-brand">
-        <div class="foot-logo">
-          <svg height="28" viewBox="0 0 352 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
-            <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
-            <circle cx="28" cy="23" r="8.6" fill="#639922"/>
-            <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
-            <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
-            <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
-            <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8"><tspan fill="#1f2937">TopCandidate</tspan><tspan fill="#F57C2E">.pro</tspan></text>
-          </svg>
-        </div>
-        <p class="foot-tag">CV screening and live AI interviews on a rubric you control. Built in Dhaka, for HR teams in Bangladesh.</p>
-      </div>
-      <div>
-        <div class="foot-col-title">Product</div>
-        <a href="#how" class="foot-link">How it works</a>
-        <a href="#what" class="foot-link">What it does</a>
-        <a href="#scoring" class="foot-link">Scoring pipeline</a>
-        <a href="#dimensions" class="foot-link">The six dimensions</a>
-        <a onclick="openDemoModal()" class="foot-link" style="cursor:pointer">Request demo</a>
-      </div>
-      <div>
-        <div class="foot-col-title">Company</div>
-        <a href="mailto:hello@topcandidate.pro" class="foot-link">Contact</a>
-        <a href="/login" class="foot-link">Sign in</a>
-      </div>
-    </div>
-    <div class="foot-bot">
-      <span>© 2026 TopCandidate.pro — a LinkX360 / Data Solution 360 product.</span>
-      <span>Dhaka, Bangladesh</span>
-    </div>
-  </div>
-</footer>
-
-<!-- ═══════════════ DEMO REQUEST MODAL ═══════════════ -->
-<style>
-.demo-ov{position:fixed;inset:0;background:rgba(20,40,25,.55);backdrop-filter:blur(3px);z-index:1000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 16px}
-.demo-ov.on{display:flex}
-.demo-card{background:#fff;border-radius:20px;width:100%;max-width:480px;padding:26px 26px 24px;box-shadow:0 24px 70px rgba(20,40,25,.28);position:relative;animation:demoRise .28s ease}
-@keyframes demoRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.demo-card{animation:none}}
-.demo-x{position:absolute;top:14px;right:16px;background:none;border:none;font-size:24px;line-height:1;color:#9AA6A0;cursor:pointer;font-family:inherit}
-.demo-x:hover{color:#1f2937}
-.demo-head{text-align:center;margin-bottom:16px}
-.demo-badge{width:46px;height:46px;margin:0 auto 10px}
-.demo-head h3{font-size:20px;font-weight:800;color:#1f2937;letter-spacing:-.3px}
-.demo-head p{font-size:13px;color:#5B6B62;margin-top:5px;line-height:1.5}
-.demo-field{margin-bottom:11px}
-.demo-field label{display:block;font-size:12px;font-weight:700;color:#3C4A42;margin-bottom:5px}
-.demo-field input,.demo-field textarea{width:100%;padding:11px 13px;border:1.5px solid #DDE6DF;border-radius:11px;font-family:inherit;font-size:14px;color:#1f2937;outline:none;transition:border-color .15s,box-shadow .15s;background:#F8FAF8;resize:vertical}
-.demo-field input:focus,.demo-field textarea:focus{border-color:#639922;background:#fff;box-shadow:0 0 0 3px rgba(99,153,34,.14)}
-.demo-field input::placeholder,.demo-field textarea::placeholder{color:#9AA6A0}
-.demo-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-@media(max-width:440px){.demo-row{grid-template-columns:1fr}}
-.demo-err{display:none;background:#FEF2F2;border:1.5px solid #FECACA;color:#DC2626;font-size:13px;border-radius:10px;padding:9px 12px;margin-bottom:12px}
-.demo-submit{width:100%;margin-top:6px;padding:13px;border:none;border-radius:11px;background:#F57C2E;color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(245,124,46,.30);transition:background .15s,transform .12s}
-.demo-submit:hover{background:#E16A1F;transform:translateY(-1px)}
-.demo-submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
-.demo-ok{text-align:center;padding:14px 6px 6px}
-.demo-ok .ic{width:58px;height:58px;border-radius:50%;background:rgba(22,163,74,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
-.demo-ok h3{font-size:19px;font-weight:800;color:#1f2937;margin-bottom:8px}
-.demo-ok p{font-size:14px;color:#5B6B62;line-height:1.6;max-width:320px;margin:0 auto 18px}
-.demo-ok button{padding:11px 26px;border:none;border-radius:10px;background:#639922;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
-</style>
+<!-- ═══ DEMO REQUEST MODAL — same ids + submit flow as before (POST /api/demo-request) ═══ -->
 <div class="demo-ov" id="demo-ov" role="dialog" aria-modal="true" aria-labelledby="demo-title">
   <div class="demo-card">
     <button class="demo-x" onclick="closeDemoModal()" aria-label="Close">&times;</button>
@@ -971,18 +352,18 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
         <p>See TopCandidate.pro on your own roles — tell us a little and we'll set up a time.</p>
       </div>
       <div class="demo-err" id="demo-err"></div>
-      <div class="demo-field"><label>Name <span style="color:#F57C2E">*</span></label><input id="d-name" maxlength="120" placeholder="Your name" autocomplete="name"></div>
-      <div class="demo-field"><label>Company <span style="color:#F57C2E">*</span></label><input id="d-company" maxlength="160" placeholder="Company name" autocomplete="organization"></div>
+      <div class="demo-field"><label>Name <span style="color:var(--orange)">*</span></label><input id="d-name" maxlength="120" placeholder="Your name" autocomplete="name"></div>
+      <div class="demo-field"><label>Company <span style="color:var(--orange)">*</span></label><input id="d-company" maxlength="160" placeholder="Company name" autocomplete="organization"></div>
       <div class="demo-row">
-        <div class="demo-field"><label>Email <span style="color:#F57C2E">*</span></label><input id="d-email" type="email" maxlength="200" placeholder="you@company.com" autocomplete="email"></div>
-        <div class="demo-field"><label>Phone <span style="color:#F57C2E">*</span></label><input id="d-phone" maxlength="40" placeholder="+880…" autocomplete="tel"></div>
+        <div class="demo-field"><label>Email <span style="color:var(--orange)">*</span></label><input id="d-email" type="email" maxlength="200" placeholder="you@company.com" autocomplete="email"></div>
+        <div class="demo-field"><label>Phone <span style="color:var(--orange)">*</span></label><input id="d-phone" maxlength="40" placeholder="+880…" autocomplete="tel"></div>
       </div>
       <div class="demo-field"><label>What role(s) do you hire for?</label><input id="d-roles" maxlength="200" placeholder="e.g. Data analysts, engineers, sales"></div>
       <div class="demo-field"><label>What are you looking for from the demo?</label><textarea id="d-msg" maxlength="2000" rows="3" placeholder="A sentence or two on what you'd like to see."></textarea></div>
       <button class="demo-submit" id="demo-submit" onclick="submitDemo()">Request demo</button>
     </div>
     <div class="demo-ok" id="demo-success" style="display:none">
-      <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
       <h3>Thanks — request received</h3>
       <p>We'll be in touch to schedule your demo. Keep an eye on your inbox.</p>
       <button onclick="closeDemoModal()">Close</button>
@@ -991,6 +372,7 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
 </div>
 
 <script>
+// ── Demo modal — unchanged flow, POST /api/demo-request ──
 function openDemoModal(){ var o=document.getElementById('demo-ov'); if(!o)return; document.getElementById('demo-form-wrap').style.display=''; document.getElementById('demo-success').style.display='none'; o.classList.add('on'); document.body.style.overflow='hidden'; setTimeout(function(){var n=document.getElementById('d-name'); if(n)n.focus();},60); }
 function closeDemoModal(){ var o=document.getElementById('demo-ov'); if(!o)return; o.classList.remove('on'); document.body.style.overflow=''; }
 function submitDemo(){
@@ -1015,21 +397,28 @@ function submitDemo(){
 }
 document.addEventListener('click',function(e){ if(e.target && e.target.id==='demo-ov') closeDemoModal(); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemoModal(); });
-</script>
 
-<script>
-// Scroll reveal — one observer, adds .in once, never re-hides (no flicker on
-// scroll-up). prefers-reduced-motion users see everything instantly via CSS,
-// and if JS fails entirely the fallback below still shows the page.
+// ── Scroll reveal (adds .in once; reduced-motion users see everything via CSS) ──
 (function(){
-  var els = document.querySelectorAll('.rv');
+  var els=document.querySelectorAll('.rv');
   if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(en){
-      if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
-    });
-  }, {threshold:.12, rootMargin:'0px 0px -40px 0px'});
-  els.forEach(function(e){ io.observe(e); });
+  var io=new IntersectionObserver(function(es){es.forEach(function(en,i){if(en.isIntersecting){setTimeout(function(){en.target.classList.add('in')},i*70);io.unobserve(en.target);}})},{threshold:.15});
+  els.forEach(function(el){ io.observe(el); });
+})();
+
+// ── Spotlight + 3D tilt — mouse-only: guarded by pointer capability AND
+//    reduced-motion, so touch devices never bind these handlers. ──
+(function(){
+  var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var finePointer=matchMedia('(pointer:fine)').matches;
+  if(reduce||!finePointer) return;
+  var spot=document.getElementById('spot');
+  window.addEventListener('mousemove',function(e){spot.style.setProperty('--mx',e.clientX+'px');spot.style.setProperty('--my',e.clientY+'px');});
+  var dash=document.getElementById('dash');
+  if(!dash) return;
+  var stage=dash.parentElement;
+  stage.addEventListener('mousemove',function(e){var r=stage.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5;var y=(e.clientY-r.top)/r.height-.5;dash.style.transform='rotateY('+(-6+x*10)+'deg) rotateX('+(4-y*8)+'deg)';});
+  stage.addEventListener('mouseleave',function(){dash.style.transform='rotateY(-6deg) rotateX(4deg)';});
 })();
 </script>
 </body>

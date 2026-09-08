@@ -740,8 +740,14 @@ def main():
         try:
             r = c.get("/")
             body = r.text or ""
-            structural = (r.status_code == 200 and 'id="what"' in body and 'id="how"' in body
-                          and 'id="scoring"' in body and 'id="access"' in body
+            # Structural list updated 2026-09-08 for the Nocturne redesign
+            # (sections: how / dims / trust / vs) and now ALSO requires the
+            # demo modal — a future redesign can't ship a landing page with
+            # no working conversion path. The HONESTY (banned-copy) half
+            # below is deliberately untouched.
+            structural = (r.status_code == 200 and 'id="how"' in body and 'id="dims"' in body
+                          and 'id="trust"' in body and 'id="vs"' in body
+                          and 'id="demo-ov"' in body and '/api/demo-request' in body
                           and "</html>" in body and "{{" not in body)
             banned = [s for s in ("trusted by", "testimonial", "accuracy", "star rating")
                       if s in body.lower()]
