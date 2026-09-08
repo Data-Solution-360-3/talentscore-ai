@@ -110,7 +110,11 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .trust{display:flex;flex-wrap:wrap;gap:.6rem 1.5rem}
 .trust span{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--t2)}
 .tick{width:19px;height:19px;border-radius:50%;background:var(--gg);display:grid;place-items:center;flex-shrink:0}
-.shot{position:relative}
+/* The mock collapses on its CONTAINER's width, not the viewport — between
+   ~861-1050px the hero column is narrower than a phone while the viewport
+   isn't, so viewport queries never fired and .frame's overflow:hidden chopped
+   100px off the mock. inline-size containment + @container fixes any squeeze. */
+.shot{position:relative;container-type:inline-size}
 .frame{border-radius:var(--r-xxl);background:var(--surface);box-shadow:var(--shadow-xl);overflow:hidden;transition:transform .3s cubic-bezier(.2,.6,.2,1)}
 .frame:hover{transform:translateY(-4px)}
 .frame img{display:block;width:100%;height:auto}
@@ -123,12 +127,13 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .lpdash{display:grid;grid-template-columns:60px 1fr;background:
   radial-gradient(600px 300px at 10% -20%, #e2ebd8 0%, transparent 60%), #eef1ea;
   font-family:'Inter',system-ui,sans-serif}
-.lpdash .lpd-side{background:linear-gradient(180deg,#2e5e14 0%,#173404 100%);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0}
+/* soft transparent green wash instead of the old solid dark slab */
+.lpdash .lpd-side{background:linear-gradient(180deg,rgba(99,153,34,.16) 0%,rgba(99,153,34,.10) 100%);border-right:1px solid rgba(99,153,34,.22);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0}
 .lpdash .lpd-mark{width:30px;height:30px;border-radius:9px;background:#eaf4dd;display:grid;place-items:center;margin-bottom:8px}
 .lpdash .lpd-mark svg{width:19px;height:19px;display:block}
-.lpdash .lpd-nav{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#cbdcb8}
+.lpdash .lpd-nav{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#4F7C1B}
 .lpdash .lpd-nav svg{width:17px;height:17px}
-.lpdash .lpd-nav.on{background:#eaf4dd;color:#173404}
+.lpdash .lpd-nav.on{background:#fff;color:#2e5e14;box-shadow:0 1px 4px rgba(23,52,4,.10)}
 .lpdash .lpd-main{padding:13px 15px 15px;min-width:0}
 .lpdash .lpd-hd{margin-bottom:11px}
 .lpdash .lpd-hd b{display:block;font-size:14px;font-weight:800;color:#173404;letter-spacing:-.2px}
@@ -165,11 +170,19 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
   .lpdash .lpd-stats{grid-template-columns:1fr 1fr}
   .lpdash .lpd-cards{grid-template-columns:1fr}
 }
+/* container-width collapse — fires whenever the hero column itself is narrow,
+   regardless of viewport (the 861-1050px clip band). The viewport rules above
+   stay as a fallback for browsers without container-query support. */
+@container (max-width: 480px){
+  .lpdash .lpd-stats{grid-template-columns:1fr 1fr}
+  .lpdash .lpd-cards{grid-template-columns:1fr}
+  .lpdash .lpd-br .lpd-bl{width:72px}
+}
 
 /* ── 2. HOW IT WORKS — Part A steps ── */
 .part-label{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:var(--sp-3)}
 .part-label b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r-md);background:var(--orange);color:#fff;font-size:12.5px;letter-spacing:0}
-.part-label.gn b{background:var(--green)}
+.part-label.gn b{background:var(--gg);color:var(--green2);border:1px solid var(--gb)}
 .steps-3{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3)}
 .step3{position:relative;background:var(--surface);border-radius:var(--r-xxl);padding:var(--sp-4) 1.75rem;box-shadow:var(--shadow-sm);transition:transform .25s cubic-bezier(.2,.6,.2,1),box-shadow .25s}
 .step3:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
@@ -223,7 +236,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 .cap-feat{grid-column:1/-1;background:var(--ink);display:grid;grid-template-columns:auto 1fr;gap:var(--sp-3);align-items:flex-start;padding:var(--sp-4) 2.4rem;position:relative;overflow:hidden}
 .cap-feat::before{content:'';position:absolute;top:-140px;right:-100px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(22,163,74,.16),transparent 62%)}
 .cap-feat::after{content:'';position:absolute;bottom:-180px;left:-80px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(245,124,46,.12),transparent 62%)}
-.cap-feat .cap-ico{background:var(--green);margin:0;position:relative;z-index:1}
+.cap-feat .cap-ico{background:var(--gg);border:1px solid var(--gb);color:var(--green2);margin:0;position:relative;z-index:1}
 .cap-feat>div:last-child{position:relative;z-index:1}
 .cap-feat .cap-t{color:#fff;font-size:1.28rem}
 .cap-feat .cap-d{color:rgba(255,255,255,.80);font-size:.99rem;max-width:780px}
@@ -299,7 +312,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.86);backdrop-
 
 /* ── FOOTER — light, green + orange accents (no dark) ── */
 footer{position:relative;background:#F1F8F3;color:var(--t2);padding:var(--sp-6) 0 var(--sp-4);border-top:4px solid var(--orange)}
-footer::before{content:'';position:absolute;top:-4px;left:0;width:38%;height:4px;background:var(--green)}
+footer::before{content:'';position:absolute;top:-4px;left:0;width:38%;height:4px;background:linear-gradient(90deg,rgba(22,163,74,.45),rgba(22,163,74,0))}
 footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height:280px;background:radial-gradient(ellipse at center,rgba(245,124,46,.10),transparent 68%);pointer-events:none}
 .foot-grid{position:relative;z-index:1;display:flex;justify-content:space-between;gap:var(--sp-6);flex-wrap:wrap;padding-bottom:var(--sp-4);border-bottom:1px solid var(--gb)}
 .foot-bot{position:relative;z-index:1;color:var(--t3)}
@@ -356,7 +369,7 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
     <!-- Inlined (not <img>) so the wordmark uses the page's Inter — an SVG
          loaded via <img> can't see webfonts. Mark: candidate figure (green)
          + orange verified check on a soft light-green tile. -->
-    <svg height="30" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+    <svg height="30" viewBox="0 0 352 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
       <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
       <circle cx="28" cy="23" r="8.6" fill="#639922"/>
       <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
@@ -588,7 +601,7 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
     <div class="caps">
 
       <div class="cap cap-feat rv">
-        <div class="cap-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="cap-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <div>
           <div class="cap-t">Fair to every candidate</div>
           <div class="cap-d">Substance scores. English polish doesn't. <b>A sharp answer in broken English beats a fluent empty one.</b></div>
@@ -827,7 +840,7 @@ footer::after{content:'';position:absolute;top:0;right:-140px;width:520px;height
     <div class="foot-grid">
       <div class="foot-brand">
         <div class="foot-logo">
-          <svg height="28" viewBox="0 0 340 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+          <svg height="28" viewBox="0 0 352 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
             <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
             <circle cx="28" cy="23" r="8.6" fill="#639922"/>
             <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
