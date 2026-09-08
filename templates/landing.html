@@ -128,28 +128,45 @@ section{position:relative;padding:100px 0}
 .tcards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:50px}
 .tcard .ic{width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,rgba(61,220,132,.2),rgba(34,184,102,.08));border:1px solid rgba(61,220,132,.3);display:grid;place-items:center;margin-bottom:16px;box-shadow:0 0 18px -6px rgba(61,220,132,.5)}.tcard .ic svg{width:23px;height:23px;color:#9ff0c2}
 .tcard h4{font-size:19px;font-weight:600;letter-spacing:-.3px;margin-bottom:8px;color:#fff;font-family:var(--serif)}.tcard p{font-family:var(--sans);font-size:14.5px;color:var(--muted);line-height:1.6}
-/* ── #viva — the live-interview story: same glass + motion language ── */
-.viva-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:34px;margin-top:50px;align-items:start}
-.vrow{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;margin-bottom:12px}
+/* ── #viva — stacked matched-width blocks + the animated live panel ──
+   The steps container and the interviewer panel share the same full .wrap
+   bounds and the same glass treatment, so they read as a pair. */
+.vsteps{background:linear-gradient(160deg,rgba(61,220,132,.07),rgba(255,255,255,.02));border:1px solid var(--gline);border-radius:20px;backdrop-filter:blur(12px);margin-top:50px;padding:8px 28px}
+.vrow{display:flex;gap:18px;align-items:flex-start;padding:17px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.vrow:last-child{border-bottom:none}
 .vrow .vn{font-family:var(--serif);font-style:italic;color:var(--green);font-weight:600;font-size:15px;flex:none;width:26px;padding-top:2px}
-.vrow h3{font-size:17px;font-weight:600;color:#fff;margin-bottom:5px;font-family:var(--serif);letter-spacing:-.2px}
+.vrow h3{font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;font-family:var(--serif);letter-spacing:-.2px}
 .vrow p{font-family:var(--sans);font-size:13.5px;color:var(--muted);line-height:1.6}
 .vrow p b{color:var(--ink);font-weight:600}
-.iv-panel{position:sticky;top:100px}
+.iv-panel{margin-top:22px}
 .ivp{background:linear-gradient(155deg,rgba(61,220,132,.1),rgba(255,255,255,.03));border:1px solid rgba(61,220,132,.22);border-radius:20px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 40px -12px rgba(61,220,132,.25),inset 0 1px 0 rgba(255,255,255,.14);backdrop-filter:blur(18px);overflow:hidden;font-family:var(--sans)}
 .ivp-top{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.1);font-size:12px;font-weight:700;color:#fff}
 .ivp-top .live{display:inline-flex;align-items:center;gap:7px;margin-left:auto;font-size:10.5px;font-weight:700;color:#9ff0c2}
 .ivp-top .live i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px 2px rgba(61,220,132,.8);animation:pulse 2s infinite}
-.ivp-body{padding:20px 18px}
-.ivp-q{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px 16px;font-size:14px;color:var(--ink);line-height:1.6}
-.ivp-q .who{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9ff0c2;display:block;margin-bottom:6px}
-.ivp-note{font-size:10.5px;color:var(--faint);margin:8px 2px 16px}
+.ivp-body{padding:22px 24px}
+.ivp-q{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 18px;font-size:15.5px;color:var(--ink);line-height:1.6;min-height:96px}
+.ivp-q .who{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9ff0c2;display:block;margin-bottom:7px}
+.ivp-cursor{display:inline-block;width:2px;height:1em;background:var(--green);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.ivp-note{font-size:10.5px;color:var(--faint);margin:9px 2px 14px}
+.ivp-listen{display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-height:40px;opacity:0;transition:opacity .5s var(--ease)}
+.ivp-listen.on{opacity:1}
 .ivp-state{display:inline-flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;color:#9ff0c2;background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.28);border-radius:999px;padding:8px 16px 8px 10px}
 .ivp-state i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 14px 3px rgba(61,220,132,.9);animation:pulse 2s infinite}
-.ivp-ev{margin-top:16px;background:rgba(255,171,74,.06);border:1px solid rgba(255,171,74,.25);border-radius:12px;padding:11px 14px;font-size:11.5px;color:var(--muted);line-height:1.55}
+/* listening waveform — gentle staggered equalizer bars */
+.wave{display:inline-flex;align-items:center;gap:3px;height:24px}
+.wave i{width:3px;border-radius:2px;background:var(--green);height:8px;animation:wv 1.15s ease-in-out infinite;box-shadow:0 0 8px rgba(61,220,132,.5)}
+.wave i:nth-child(2){height:15px;animation-delay:.12s}
+.wave i:nth-child(3){height:21px;animation-delay:.24s}
+.wave i:nth-child(4){height:12px;animation-delay:.36s}
+.wave i:nth-child(5){height:19px;animation-delay:.48s}
+.wave i:nth-child(6){height:10px;animation-delay:.6s}
+.wave i:nth-child(7){height:16px;animation-delay:.72s}
+@keyframes wv{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1.35)}}
+.ivp-ev{margin-top:16px;background:rgba(255,171,74,.06);border:1px solid rgba(255,171,74,.25);border-radius:12px;padding:11px 14px;font-size:11.5px;color:var(--muted);line-height:1.55;transition:opacity .4s}
 .ivp-ev b{color:var(--orange);font-weight:700;display:block;font-size:10px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
 .ivp-ev i{color:var(--ink);font-style:italic}
-@media(prefers-reduced-motion:reduce){.ivp-top .live i,.ivp-state i{animation:none}}
+@media(prefers-reduced-motion:reduce){.ivp-top .live i,.ivp-state i,.wave i,.ivp-cursor{animation:none}.ivp-listen{opacity:1;transition:none}}
 
 .cta{text-align:center;padding:120px 0}
 .cta h2{font-size:clamp(34px,5vw,56px);letter-spacing:-1px;font-weight:600;line-height:1.06;max-width:15ch;margin:0 auto;color:#fff}
@@ -206,7 +223,7 @@ footer a{cursor:pointer}footer a:hover{color:#fff}
 .demo-ok p{font-size:14px;color:var(--muted);line-height:1.6;max-width:320px;margin:0 auto 18px}
 .demo-ok button{padding:11px 26px;border:none;border-radius:10px;background:linear-gradient(135deg,#3ddc84,#22b866);color:#02160c;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
 
-@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:48px}.steps,.dgrid,.tcards,.vs-grid,.viva-grid{grid-template-columns:1fr}.iv-panel{position:static}.nav-links{display:none}.floatpill{display:none}.dash{transform:none}.hero{padding:120px 0 70px;min-height:0}}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:48px}.steps,.dgrid,.tcards,.vs-grid{grid-template-columns:1fr}.nav-links{display:none}.floatpill{display:none}.dash{transform:none}.hero{padding:120px 0 70px;min-height:0}}
 @media(max-width:520px){.wrap{padding:0 20px}.db-stats{grid-template-columns:1fr 1fr}section{padding:70px 0}}
 </style>
 <noscript><style>.rv{opacity:1;transform:none}</style></noscript>
@@ -334,31 +351,32 @@ footer a{cursor:pointer}footer a:hover{color:#fff}
   <div class="eyebrow rv">The live interview</div>
   <h2 class="stitle rv">Half the product is a conversation.</h2>
   <p class="slead rv">The CV gets a candidate in the door. The interview is where they show how they think — the same short, structured conversation for everyone who qualifies.</p>
-  <div class="viva-grid">
-    <div>
-      <div class="gp vrow rv"><span class="vn">1.</span><div><h3>Create the job</h3>
-        <p>Post the role and pick a category — it sets the scoring rubric and the flavor of the interview for that role type.</p></div></div>
-      <div class="gp vrow rv"><span class="vn">2.</span><div><h3>Generate the questions — you approve them</h3>
-        <p>The system drafts interview questions for the role <b>once per job</b>, so every candidate faces the same set. <b>You review, edit, and approve them before anything goes live</b> — the AI never interviews unsupervised.</p></div></div>
-      <div class="gp vrow rv"><span class="vn">3.</span><div><h3>A live spoken conversation</h3>
-        <p>Through the same link, qualifying applicants talk with an AI interviewer that asks your approved questions, listens, and can pose a written scenario about a real work situation. Every question also appears as on-screen text. <b>English by default; Bangla is beta</b> — spoken Bangla transcription is imperfect, so typed answers are the reliable record there.</p></div></div>
-      <div class="gp vrow rv"><span class="vn">4.</span><div><h3>Scored with evidence</h3>
-        <p>Answers are transcribed and scored per dimension, and <b>each score cites a quote from what the candidate actually said</b>. The number is recomputed in code, and the interview combines with the CV into one overall.</p></div></div>
-      <div class="gp vrow rv"><span class="vn">5.</span><div><h3>Monitored, honestly</h3>
-        <p>Camera, screen, and tab/paste signals are recorded and anomalies are <b>flagged for a human to review</b> — a review signal, never an automatic decision. It raises the cost of cheating; it doesn't claim to prevent it. <b>A human always makes the final call.</b></p></div></div>
-    </div>
-    <div class="iv-panel rv">
-      <div class="ivp">
-        <div class="ivp-top">AI Interviewer<span class="live"><i></i>LIVE</span></div>
-        <div class="ivp-body">
-          <div class="ivp-q"><span class="who">Question 3 of 12 · spoken</span>Walk me through a dashboard you built — what decision did it change for the people using it?</div>
-          <div class="ivp-note">Every question is also shown on screen as text, exactly like this.</div>
+  <div class="vsteps rv">
+    <div class="vrow"><span class="vn">1.</span><div><h3>Create the job</h3>
+      <p>Pick a role category — it sets the scoring rubric and the interview's flavor.</p></div></div>
+    <div class="vrow"><span class="vn">2.</span><div><h3>Generate the questions</h3>
+      <p>One set per job, drafted once and <b>approved by you</b> before anything goes live — the same questions for every candidate.</p></div></div>
+    <div class="vrow"><span class="vn">3.</span><div><h3>A live spoken conversation</h3>
+      <p>Qualifying applicants talk with an AI interviewer that asks your approved questions — <b>English by default, Bangla in beta</b> — each one also shown as on-screen text.</p></div></div>
+    <div class="vrow"><span class="vn">4.</span><div><h3>Scored with evidence</h3>
+      <p>Every dimension cites a quote from the answer, interview and CV combine into one overall, and <b>a human makes the final call</b>.</p></div></div>
+    <div class="vrow"><span class="vn">5.</span><div><h3>Monitored, honestly</h3>
+      <p>Camera, screen, and tab signals are recorded and anomalies are <b>flagged for a human to review</b> — a signal, never an automatic decision.</p></div></div>
+  </div>
+  <div class="iv-panel rv">
+    <div class="ivp">
+      <div class="ivp-top">AI Interviewer<span class="live"><i></i>LIVE</span></div>
+      <div class="ivp-body">
+        <div class="ivp-q"><span class="who" id="ivq-meta">Question 3 of 12 · spoken</span><span id="ivq-text">Walk me through a dashboard you built — what decision did it change for the people using it?</span><span class="ivp-cursor" id="ivq-cur" style="display:none"></span></div>
+        <div class="ivp-note">Every question is also shown on screen as text, exactly like this.</div>
+        <div class="ivp-listen on" id="iv-listen">
           <span class="ivp-state"><i></i>Your turn — answer when ready</span>
-          <div class="ivp-ev"><b>How it scores · sample evidence</b>Depth &amp; specificity — <i>"the sales team stopped exporting to Excel because the mart refreshed nightly"</i> — cited under the score it supports.</div>
+          <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         </div>
+        <div class="ivp-ev"><b>How it scores · sample evidence</b><span id="iv-ev-t">Depth &amp; specificity — <i>"the sales team stopped exporting to Excel because the mart refreshed nightly"</i> — cited under the score it supports.</span></div>
       </div>
-      <div class="dash-cap">Representative preview — sample, not a live account.</div>
     </div>
+    <div class="dash-cap">Representative preview — sample, not a live account.</div>
   </div>
 </div></section>
 
@@ -467,6 +485,48 @@ document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemoM
   if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
   var io=new IntersectionObserver(function(es){es.forEach(function(en,i){if(en.isIntersecting){setTimeout(function(){en.target.classList.add('in')},i*70);io.unobserve(en.target);}})},{threshold:.15});
   els.forEach(function(el){ io.observe(el); });
+})();
+
+// ── #viva live-panel loop: type a sample question, show the listening
+//    state (waveform + "your turn"), swap the sample evidence, cycle.
+//    Reduced-motion: the loop never starts — the static first question,
+//    state, and evidence from the markup stay as-is. Samples only. ──
+(function(){
+  var qEl=document.getElementById('ivq-text');
+  if(!qEl || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  var QS=[
+    {n:3,q:'Walk me through a dashboard you built — what decision did it change for the people using it?',
+     e:'Depth & specificity — <i>"the sales team stopped exporting to Excel because the mart refreshed nightly"</i> — cited under the score it supports.'},
+    {n:4,q:'Tell me about a time the numbers looked wrong. How did you find out what was really happening?',
+     e:'Role competency — <i>"I reproduced it first — all the wrong totals were month-end dates"</i> — cited under the score it supports.'},
+    {n:5,q:'How would you explain a delayed report to a stakeholder who needs an answer today?',
+     e:'Clarity & structure — <i>"I gave the corrected number for what I verified, and no guarantee for the rest"</i> — cited under the score it supports.'},
+    {n:6,q:'What did you check before trusting a new data source in a production report?',
+     e:'Depth & specificity — <i>"I compared row counts against the source system for a week before switching over"</i> — cited under the score it supports.'}
+  ];
+  var meta=document.getElementById('ivq-meta'),cur=document.getElementById('ivq-cur'),
+      listen=document.getElementById('iv-listen'),evT=document.getElementById('iv-ev-t');
+  var qi=1; // markup already shows QS[0] statically; start the cycle on the next
+  function cycle(){
+    var x=QS[qi%QS.length]; qi++;
+    meta.textContent='Question '+x.n+' of 12 · spoken';
+    listen.classList.remove('on');
+    qEl.textContent=''; cur.style.display='inline-block';
+    var i=0;
+    var t=setInterval(function(){
+      qEl.textContent=x.q.slice(0,++i);
+      if(i>=x.q.length){
+        clearInterval(t);
+        setTimeout(function(){
+          cur.style.display='none';
+          evT.innerHTML=x.e;
+          listen.classList.add('on');
+          setTimeout(cycle,4600);
+        },450);
+      }
+    },26);
+  }
+  setTimeout(cycle,3800); // let the reader take in the first question before it moves
 })();
 
 // ── Spotlight + 3D tilt — mouse-only: guarded by pointer capability AND
