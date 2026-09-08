@@ -1907,6 +1907,29 @@ _TYPED_RULES = (
     "(TYPED) opening question as a voice-answer question.\n")
 
 
+def _viva_phase_plan(cfg: dict) -> list | None:
+    """Counts-only phase plan for the client's mode enforcement (the Bug-1
+    fix): e.g. [{"mode":"spoken","n":4},{"mode":"typed","n":4},
+    {"mode":"spoken","n":4}]. MUST mirror the split used by the instruction
+    builder. Question TEXT never leaves the server — the view-source
+    leak-lock is untouched; the client learns only how many of each kind.
+    Topics mode only: legacy/adaptive configs return None and the client
+    keeps today's behavior there."""
+    topics = _normalize_topics(cfg.get("topics")) if cfg.get("topics") else []
+    scenario = _normalize_scenario(cfg.get("scenario"))
+    if not topics:
+        return None
+    split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
+    n1 = sum(1 + len(t["followups"]) for t in topics[:split])
+    n2 = sum(1 + len(t["followups"]) for t in topics[split:])
+    phases = [{"mode": "spoken", "n": n1}]
+    if scenario and scenario.get("questions"):
+        phases.append({"mode": "typed", "n": len(scenario["questions"])})
+    if n2:
+        phases.append({"mode": "spoken", "n": n2})
+    return phases
+
+
 def _normalize_topics(raw) -> list[dict]:
     """[{"topic","main","followups"}] — the spoken part in topic clusters.
     The single validator for every path that stores or launches topics."""
@@ -2053,13 +2076,15 @@ def _build_live_instructions(questions: list, max_turns: int,
                 f"- Immediately after question {after_q} is answered, begin this section: say ONE short "
                 "transition sentence (the next part is a short written exercise about a work situation), "
                 "then call the tool show_scenario with the EXACT scenario text below. It appears on the "
-                "candidate's screen. After the tool result arrives, read the scenario aloud once, slowly "
-                "and clearly.\n"
-                "- Then ask the scenario questions below one at a time, IN ORDER, each as a TYPED "
-                "question: read it aloud, call begin_typed_answer with its exact text, and wait in "
+                "candidate's screen.\n"
+                "- This section is TEXT-ONLY on your side: the scenario and every question are displayed "
+                "on screen — do NOT read the scenario or the questions aloud. Between questions keep any "
+                "message to ONE short line of text at most.\n"
+                "- Ask the scenario questions below one at a time, IN ORDER, each as a TYPED "
+                "question: call begin_typed_answer with its exact text (that displays it), and wait in "
                 "silence (all TYPED rules above apply). Never invent a different scenario or extra "
                 "scenario questions.\n"
-                f"- The scenario (pass verbatim to show_scenario, then read aloud):\n"
+                f"- The scenario (pass verbatim to show_scenario; it is displayed, not read aloud):\n"
                 f"  \"{scenario['text'].replace(chr(34), chr(39))}\"\n"
                 "- The scenario questions:\n" + "\n".join(qlines) + "\n")
         b2 = block(topics[split:], split + 1) if split < len(topics) else ""
@@ -2873,6 +2898,9 @@ async def candidate_interview_page(token: str):
         # Scenario QUESTION COUNT only — for "Scenario question N of K"
         # progress. The scenario itself still never leaves the server.
         "{{SCEN_Q}}": str(len((_normalize_scenario(cfg.get("scenario")) or {"questions": []})["questions"])),
+        # Phase plan (counts only) — the client's single source of truth for
+        # spoken-vs-typed per question number. "null" for legacy configs.
+        "{{PHASES}}": __import__("json").dumps(_viva_phase_plan(cfg)),
     }.items():
         page = page.replace(key, val)
     return HTMLResponse(page)
