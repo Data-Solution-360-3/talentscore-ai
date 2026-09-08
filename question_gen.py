@@ -111,7 +111,7 @@ Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups"
 
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
                                    n_topics: int = 2, followups: int = 3,
-                                   language: str = "en"
+                                   language: str = "en", role_hint: str = ""
                                    ) -> tuple[list | None, str | None]:
     """The spoken part in topic clusters.
     Returns ([{"topic","main","followups"}], None) or (None, error)."""
@@ -131,8 +131,9 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
             messages=[
                 {"role": "system", "content": TOPIC_PROMPT.format(t=n_topics, f=followups, lang_rule=_lang(language))},
                 {"role": "user", "content":
-                    f"JOB TITLE: {job_title or 'not specified'}\n\n"
-                    f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
+                    f"JOB TITLE: {job_title or 'not specified'}\n"
+                    + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+                    + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
             ],
         )
         raw = json.loads(resp.choices[0].message.content)
@@ -182,7 +183,7 @@ Return JSON: {{"scenario": "...", "questions": ["...", ...]}}"""
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
-                                    k: int = 3, language: str = "en"
+                                    k: int = 3, language: str = "en", role_hint: str = ""
                                     ) -> tuple[dict | None, str | None]:
     """One scenario + its k written questions from the JD.
     Returns ({"text", "questions"}, None) or (None, error)."""
@@ -201,8 +202,9 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
             messages=[
                 {"role": "system", "content": SCENARIO_PROMPT.format(k=k, lang_rule=_lang(language))},
                 {"role": "user", "content":
-                    f"JOB TITLE: {job_title or 'not specified'}\n\n"
-                    f"JOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
+                    f"JOB TITLE: {job_title or 'not specified'}\n"
+                    + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+                    + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
             ],
         )
         raw = json.loads(resp.choices[0].message.content)

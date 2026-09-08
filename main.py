@@ -3738,14 +3738,19 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     # clusters AND the written scenario, from the same JD. Both go to the
     # DRAFT slot only; the scenario's failure is non-fatal and surfaced.
     lang = (job.get("interview_language") or "en").lower()
+    # Role-category flavor: one hint line steering generation toward the role
+    # type. The JD stays the content source; jobs without a category get "".
+    from scorer import ROLE_CATEGORIES
+    role_hint = ROLE_CATEGORIES.get(job.get("role_category") or "", {}).get("hint", "")
     topics, err = await generate_topic_questions(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", n_topics=n_topics, followups=followups, language=lang)
+        job_title=job.get("title") or "", n_topics=n_topics, followups=followups,
+        language=lang, role_hint=role_hint)
     if err or not topics:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
     scenario, scen_err = await generate_written_scenario(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", k=scen_k, language=lang)
+        job_title=job.get("title") or "", k=scen_k, language=lang, role_hint=role_hint)
     topics = _normalize_topics(topics)
     flat = _flatten_topics(topics)
     draft = {"topics": topics, "questions": flat, "count": len(flat),
@@ -4510,6 +4515,7 @@ async def create_job_endpoint(
     status: str = Form("active"),
     interview_language: str = Form("en"),   # 'en' (default) or 'bn' (Bangla, BETA)
     weights: str = Form(""),   # JSON-encoded dict of {dim_name: float}
+    role_category: str = Form(""),   # key from scorer.ROLE_CATEGORIES; "" = none
 ):
     user = await get_current_user(request)
     # Parse weights JSON if provided. Invalid JSON → ignore (job will use default weights at score time).
@@ -4534,6 +4540,13 @@ async def create_job_endpoint(
     }
     if weights_dict is not None:
         job["weights"] = weights_dict
+    # Role category (picker): stored only if it's a real key — it steers the
+    # question-generation flavor; the WEIGHTS were already applied client-side
+    # by the picker and arrive through the normal weights field above, so the
+    # recruiter's slider edits always win.
+    from scorer import ROLE_CATEGORIES
+    if role_category in ROLE_CATEGORIES:
+        job["role_category"] = role_category
     try:
         job_id = await save_job(job)
     except DuplicateJobError as e:
@@ -4560,12 +4573,16 @@ async def update_job_endpoint(
     min_experience: str = Form(""),
     interview_language: str = Form(""),
     weights: str = Form(""),
+    role_category: str = Form(""),
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
     from database import db as mongodb
     from bson import ObjectId
     updates = {}
+    from scorer import ROLE_CATEGORIES
+    if role_category in ROLE_CATEGORIES:
+        updates["role_category"] = role_category
     if interview_language:
         updates["interview_language"] = "bn" if interview_language.lower() == "bn" else "en"
     # Only update fields that were actually submitted (non-empty).

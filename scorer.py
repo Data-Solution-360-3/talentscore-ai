@@ -272,6 +272,46 @@ WEIGHT_PRESETS = {
 }
 
 
+# ── Role categories → preset profiles (job-creation picker) ─────────────
+# The picker is only as honest as this map: choosing a category APPLIES one of
+# the WEIGHT_PRESETS above as the job's scoring weights (the recruiter still
+# sees and can edit the sliders), and the hint line steers interview-question
+# generation. Categories deliberately do NOT inject skill expectations — those
+# stay parsed from the job's actual JD, which is more accurate than any
+# category-generic list and can't create false gaps.
+ROLE_CATEGORIES = {
+    "technical":          {"label": "Technical",               "preset": "engineering_senior",
+        "hint": "This is a hands-on technical/engineering role: probe real systems built, debugging stories, and concrete implementation choices."},
+    "data_analytics":     {"label": "Data & Analytics",        "preset": "data_analytics",
+        "hint": "This is a data role: probe real analyses done, data-quality judgment, tools actually used, and how findings changed a decision."},
+    "sales":              {"label": "Sales",                   "preset": "sales",
+        "hint": "This is a sales role: probe quota attainment, real deal stories, objection handling, and pipeline discipline."},
+    "marketing":          {"label": "Marketing",               "preset": "creative",
+        "hint": "This is a marketing role: probe campaigns actually run, measurable results, channel judgment, and audience understanding."},
+    "product":            {"label": "Product",                 "preset": "manager",
+        "hint": "This is a product role: probe prioritization calls, trade-off decisions, user evidence, and shipped outcomes."},
+    "hr_people":          {"label": "HR & People",             "preset": "operations",
+        "hint": "This is an HR/people role: probe difficult employee situations handled, process judgment, and confidentiality sense."},
+    "finance_accounting": {"label": "Finance & Accounting",    "preset": "data_analytics",
+        "hint": "This is a finance role: probe accuracy discipline, closing/reporting experience, controls, and how errors were caught."},
+    "customer_success":   {"label": "Customer Success",        "preset": "operations",
+        "hint": "This is a customer-facing role: probe difficult customer situations, retention stories, and communication judgment."},
+    "operations":         {"label": "Operations",              "preset": "operations",
+        "hint": "This is an operations role: probe process improvements made, coordination across teams, and handling things going wrong."},
+    "design":             {"label": "Design",                  "preset": "creative",
+        "hint": "This is a design role: probe real design decisions, iteration on feedback, and how the work affected users or the business."},
+    "legal_compliance":   {"label": "Legal & Compliance",      "preset": "data_analytics",
+        "hint": "This is a legal/compliance role: probe risk judgment, precision with rules and documents, and handling of ambiguity."},
+    "supply_chain":       {"label": "Supply Chain & Logistics","preset": "operations",
+        "hint": "This is a supply-chain role: probe real logistics problems solved, vendor coordination, and cost/timeline trade-offs."},
+    "executive":          {"label": "Executive / Leadership",  "preset": "manager",
+        "hint": "This is a leadership role: probe team outcomes owned, hard calls made, and how they developed people."},
+    "healthcare":         {"label": "Healthcare & Clinical",   "preset": "data_analytics",
+        "hint": "This is a clinical/healthcare role: probe protocol discipline, patient-safety judgment, and certifications in actual use."},
+    "other":              {"label": "Other / Not listed",      "preset": "balanced", "hint": ""},
+}
+
+
 def normalize_weights(weights: dict | None) -> dict:
     """Return a clean weights dict that always:
        - contains all 6 dimensions (missing ones get default)
