@@ -1882,6 +1882,27 @@ def _normalize_questions(raw) -> list[dict]:
 # where it is in the interview, flips the mode by calling this client tool.
 # If it ever fails to call it, the question just gets asked by voice:
 # degraded, never broken.
+# The MCQ sibling of begin_typed_answer: the model carries each MCQ's question
+# and OPTIONS in its instructions (never the answer key) and hands them to the
+# page with this call; the candidate clicks one, the choice returns as the
+# tool result, and grading happens server-side at scoring time only.
+_MCQ_TOOL = {
+    "type": "function",
+    "name": "begin_mcq_answer",
+    "description": ("Show a multiple-choice case question with its options on the candidate's "
+                    "screen. Call it with the exact question and the exact options from your "
+                    "instructions, then wait in silence for the tool result with their choice."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "question": {"type": "string", "description": "The exact multiple-choice question."},
+            "options": {"type": "array", "items": {"type": "string"},
+                        "description": "The exact options, in order."},
+        },
+        "required": ["question", "options"],
+    },
+}
+
 _TYPED_ANSWER_TOOL = [{
     "type": "function",
     "name": "begin_typed_answer",
@@ -1933,8 +1954,8 @@ def _viva_phase_plan(cfg: dict) -> list | None:
     n1 = sum(1 + len(t["followups"]) for t in topics[:split])
     n2 = sum(1 + len(t["followups"]) for t in topics[split:])
     phases = [{"mode": "spoken", "n": n1}]
-    if scenario and scenario.get("questions"):
-        phases.append({"mode": "typed", "n": len(scenario["questions"])})
+    if _scen_turns(scenario):
+        phases.append({"mode": "typed", "n": _scen_turns(scenario)})
     if n2:
         phases.append({"mode": "spoken", "n": n2})
     return phases
@@ -1967,17 +1988,43 @@ def _flatten_topics(topics: list[dict]) -> list[dict]:
 
 
 def _normalize_scenario(raw) -> dict | None:
-    """{"text", "questions": [2-4 strings]} or None. The single validator for
-    every path that stores or launches a scenario — generation, review-save,
-    approve, and config all go through here."""
+    """{"text", "questions": [written strings], "mcq"?: [{"q","options","correct"}]}
+    or None. The single validator for every path that stores or launches a
+    scenario — generation, review-save, approve, and config all go through
+    here. The mcq "correct" index is server-side grading data: it is stored
+    with the job/config and must NEVER be sent to the interview model or the
+    candidate page."""
     if not isinstance(raw, dict):
         return None
-    text = str(raw.get("text", "")).strip()[:900]
+    text = str(raw.get("text", "")).strip()[:3000]
     questions = [str(q).strip()[:300] for q in (raw.get("questions") or [])
                  if str(q).strip()][:8]
+    mcq = []
+    for m in (raw.get("mcq") or [])[:4]:
+        if not isinstance(m, dict):
+            continue
+        q = str(m.get("q") or m.get("question") or "").strip()[:300]
+        opts = [str(o).strip()[:200] for o in (m.get("options") or []) if str(o).strip()][:5]
+        try:
+            c = int(m.get("correct"))
+        except Exception:
+            continue
+        if q and len(opts) >= 2 and 0 <= c < len(opts):
+            mcq.append({"q": q, "options": opts, "correct": c})
     if not text or len(questions) < 2:
         return None
-    return {"text": text, "questions": questions}
+    out = {"text": text, "questions": questions}
+    if mcq:
+        out["mcq"] = mcq
+    return out
+
+
+def _scen_turns(scenario: dict | None) -> int:
+    """Total case-section turns: MCQs + written. THE single count every budget,
+    phase plan, and progress label derives from."""
+    if not scenario:
+        return 0
+    return len(scenario.get("questions") or []) + len(scenario.get("mcq") or [])
 
 
 # The scenario's display signal, sibling to begin_typed_answer: the page never
@@ -2011,9 +2058,12 @@ _SCENARIO_RULES_TEMPLATE = (
     "- This section is TEXT-ONLY on your side: the scenario and every question are displayed "
     "on screen — do NOT read the scenario or the questions aloud. After the tool result "
     "arrives, and between questions, keep any message to ONE short line of text at most.\n"
-    "- Ask the scenario questions below one at a time, IN ORDER, each as a TYPED question: "
-    "call begin_typed_answer with its exact text (that displays it), and wait in silence. "
-    "All TYPED rules above apply to these questions.\n"
+    "- Ask the scenario questions below one at a time, IN ORDER. For a question marked (MCQ), "
+    "call the tool begin_mcq_answer with the EXACT question and its EXACT options in order, "
+    "wait in silence for their choice, and NEVER say or hint which option is right — you do "
+    "not know the answer key; acknowledge neutrally and move on. For a question marked "
+    "(TYPED), call begin_typed_answer with its exact text (that displays it), and wait in "
+    "silence. All TYPED rules above apply.\n"
     "- Ask these questions exactly as written. No adaptive follow-ups inside this section, and "
     "never invent a different scenario or extra scenario questions.\n"
     "- The scenario (pass verbatim to show_scenario; it is displayed, not read aloud):\n"
@@ -2078,28 +2128,40 @@ def _build_live_instructions(questions: list, max_turns: int,
         if scenario:
             after_q = i
             qlines = []
+            for m in (scenario.get("mcq") or []):
+                i += 1
+                opts = "  ".join(f"({chr(97+oi)}) {o}" for oi, o in enumerate(m["options"]))
+                qlines.append(f"  {i}. (MCQ) {m['q']}\n     Options: {opts}")
             for q in scenario["questions"]:
                 i += 1
                 qlines.append(f"  {i}. (TYPED) {q}")
+            mcq_rule = (
+                "- For each (MCQ) question: call the tool begin_mcq_answer with the EXACT question and "
+                "its EXACT options in order, then wait in silence for their choice. NEVER say, hint at, "
+                "or react to which option is right — you do not know the answer key; acknowledge every "
+                "choice neutrally ('noted') and move on.\n"
+                if scenario.get("mcq") else "")
             scen_block = (
-                f"WRITTEN SCENARIO — the middle of the interview, right after question {after_q}\n"
+                # "WRITTEN SCENARIO" stays in the heading — the smoke lock greps it.
+                f"WRITTEN SCENARIO (BUSINESS CASE) — the middle of the interview, right after question {after_q}\n"
                 f"- Immediately after question {after_q} is answered, begin this section: say ONE short "
-                "transition sentence (the next part is a short written exercise about a work situation), "
-                "then call the tool show_scenario with the EXACT scenario text below. It appears on the "
-                "candidate's screen.\n"
-                "- This section is TEXT-ONLY on your side: the scenario and every question are displayed "
-                "on screen — do NOT read the scenario or the questions aloud. Between questions keep any "
+                "transition sentence (the next part is a written business case about a work situation), "
+                "then call the tool show_scenario with the EXACT case text below. It appears on the "
+                "candidate's screen and stays pinned while they answer.\n"
+                "- This section is TEXT-ONLY on your side: the case and every question are displayed "
+                "on screen — do NOT read the case or the questions aloud. Between questions keep any "
                 "message to ONE short line of text at most.\n"
-                "- Ask the scenario questions below one at a time, IN ORDER, each as a TYPED "
-                "question: call begin_typed_answer with its exact text (that displays it), and wait in "
-                "silence (all TYPED rules above apply). Never invent a different scenario or extra "
-                "scenario questions.\n"
-                f"- The scenario (pass verbatim to show_scenario; it is displayed, not read aloud):\n"
+                "- Ask the case questions below one at a time, IN ORDER.\n"
+                + mcq_rule +
+                "- For each (TYPED) question: call begin_typed_answer with its exact text (that "
+                "displays it), and wait in silence (all TYPED rules above apply). Never invent a "
+                "different case or extra case questions.\n"
+                f"- The case (pass verbatim to show_scenario; it is displayed, not read aloud):\n"
                 f"  \"{scenario['text'].replace(chr(34), chr(39))}\"\n"
-                "- The scenario questions:\n" + "\n".join(qlines) + "\n")
+                "- The case questions:\n" + "\n".join(qlines) + "\n")
         b2 = block(topics[split:], split + 1) if split < len(topics) else ""
         if scenario and b2:
-            scen_block += ("- After the last scenario question is submitted, say one short sentence "
+            scen_block += ("- After the last case question is submitted, say one short sentence "
                            "that you are returning to spoken questions, then continue with Spoken "
                            "Block 2 below.\n")
         middle = (
@@ -2143,9 +2205,14 @@ def _build_live_instructions(questions: list, max_turns: int,
         + middle
         + (_TYPED_RULES if has_typed else "")
         + (_SCENARIO_RULES_TEMPLATE.format(
-               k=len(scenario["questions"]), max_turns=max_turns,
+               k=_scen_turns(scenario), max_turns=max_turns,
                scenario=scenario["text"].replace('"', "'"),
-               qlist="\n".join(f"  {i+1}. {q}" for i, q in enumerate(scenario["questions"])))
+               qlist="\n".join(
+                   [f"  {i+1}. (MCQ) {m['q']}\n     Options: "
+                    + "  ".join(f"({chr(97+oi)}) {o}" for oi, o in enumerate(m["options"]))
+                    for i, m in enumerate(scenario.get("mcq") or [])]
+                   + [f"  {len(scenario.get('mcq') or [])+i+1}. (TYPED) {q}"
+                      for i, q in enumerate(scenario["questions"])]))
            if (scenario and not topics) else "") +
         "\nCONTROL NOTES\n"
         "- System messages of the form \"[Interview control note: ...]\" tell you how many questions "
@@ -2422,7 +2489,7 @@ async def score_live_session(session_id: str):
                 (scen_pairs if (t or {}).get("scen") else qa_pairs).append(
                     (q, str(t.get("text", ""))))
         spoken_only = [t for t in full
-                       if (t or {}).get("mode") not in ("typed", "scenario")]
+                       if (t or {}).get("mode") not in ("typed", "scenario", "mcq")]
 
         result, err = await score_spoken_interview(
             spoken_only, OPENAI_API_KEY, job_title=job_title, language=lang)
@@ -2463,6 +2530,40 @@ async def score_live_session(session_id: str):
                 scen_text, scen_pairs, OPENAI_API_KEY, job_title=job_title, language=lang)
             if scenario_error:
                 print(f"[VIVA-LIVE] scenario scoring failed for {session_id}: {scenario_error}")
+
+        # ── MCQ grading + fold (deterministic, server-side only) ──
+        # MCQs are graded right/wrong against the answer key stored in the
+        # session's config (the key never reached the model or the page).
+        # Fold: scenario overall = written x 0.75 + MCQ% x 0.25 — EXCEPT when
+        # every written answer is blank: the written deterministic-zero floor
+        # stands and MCQs are excluded entirely. Clicking is not evidence of
+        # thinking, so two lucky picks can never rescue an empty set. The
+        # scorer itself and the fairness floor are untouched.
+        scen_cfg = _normalize_scenario((sess.get("config") or {}).get("scenario"))
+        mcq_defs = (scen_cfg or {}).get("mcq") or []
+        if scenario_result is not None and mcq_defs:
+            picks = [t for t in full if (t or {}).get("mode") == "mcq"]
+            correct, detail = 0, []
+            for idx, mdef in enumerate(mcq_defs):
+                pick = picks[idx] if idx < len(picks) else None
+                ci = pick.get("choice") if isinstance(pick, dict) else None
+                ok = isinstance(ci, int) and ci == mdef["correct"]
+                correct += 1 if ok else 0
+                detail.append({"q": mdef["q"], "picked": ci,
+                               "picked_text": str((pick or {}).get("text", ""))[:200],
+                               "correct_index": mdef["correct"], "correct": ok})
+            mcq_pct = round(100 * correct / len(mcq_defs))
+            written_overall = int(scenario_result.get("overall", 0))
+            written_blank = (not scen_pairs) or all(
+                not (a or "").strip() for _, a in scen_pairs)
+            combined = written_overall if written_blank else \
+                round(0.75 * written_overall + 0.25 * mcq_pct)
+            scenario_result["written_overall"] = written_overall
+            scenario_result["mcq"] = {"correct": correct, "total": len(mcq_defs),
+                                      "pct": mcq_pct, "detail": detail,
+                                      "weight": 0.25,
+                                      "excluded_written_blank": written_blank}
+            scenario_result["overall"] = max(0, min(100, combined))
 
         # One combined interview number from the existing segment scores.
         spoken_overall = int(result.get("overall", 0))
@@ -2796,7 +2897,7 @@ def _validated_viva_config(body: dict) -> dict:
         # budget can hold the spoken openings plus the whole written section.
         cfg["max_turns"] = max(cfg["max_turns"],
                                min(_VIVA_MAX_TURNS_CAP,
-                                   len(questions) + len(scenario["questions"])))
+                                   len(questions) + _scen_turns(scenario)))
     topics = _normalize_topics(body.get("topics"))
     if topics:
         # Topic-structured interview: fully scripted, so the budget is EXACT —
@@ -2805,8 +2906,7 @@ def _validated_viva_config(body: dict) -> dict:
         cfg["topics"] = topics
         cfg["questions"] = _flatten_topics(topics)
         cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
-                               len(cfg["questions"])
-                               + (len(scenario["questions"]) if scenario else 0))
+                               len(cfg["questions"]) + _scen_turns(scenario))
     return cfg
 
 
@@ -2905,9 +3005,9 @@ async def candidate_interview_page(token: str):
         # Interview language — 'en' (default) or 'bn' (Bangla, BETA). Drives the
         # candidate-facing UI copy, Bengali font, and the BETA transcript banner.
         "{{LANG}}": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
-        # Scenario QUESTION COUNT only — for "Scenario question N of K"
+        # Case-section TURN COUNT only (MCQ + written) — for "question N of K"
         # progress. The scenario itself still never leaves the server.
-        "{{SCEN_Q}}": str(len((_normalize_scenario(cfg.get("scenario")) or {"questions": []})["questions"])),
+        "{{SCEN_Q}}": str(_scen_turns(_normalize_scenario(cfg.get("scenario")))),
         # Phase plan (counts only) — the client's single source of truth for
         # spoken-vs-typed per question number. "null" for legacy configs.
         "{{PHASES}}": __import__("json").dumps(_viva_phase_plan(cfg)),
@@ -2998,7 +3098,9 @@ async def candidate_session_token(request: Request, token: str):
     vad = cfg.get("vad", _VIVA_DEFAULT_VAD)
     tools = None
     if has_typed:
-        tools = list(_TYPED_ANSWER_TOOL) + ([_SCENARIO_TOOL] if scenario else [])
+        tools = (list(_TYPED_ANSWER_TOOL)
+                 + ([_SCENARIO_TOOL] if scenario else [])
+                 + ([_MCQ_TOOL] if (scenario and scenario.get("mcq")) else []))
     try:
         out = await _mint_realtime_secret(instructions, vad, tools=tools,
                                           language=cfg.get("language", "en"))
@@ -3055,8 +3157,20 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
             if (t or {}).get("scen"):
                 entry["scen"] = True
         elif (t or {}).get("mode") == "scenario":
-            entry["mode"] = "scenario"       # the pinned scenario text itself
-            entry["text"] = text[:900]
+            entry["mode"] = "scenario"       # the pinned case text itself
+            entry["text"] = text[:3000]
+        elif (t or {}).get("mode") == "mcq":
+            # MCQ pick: the chosen option's text plus the choice index — the
+            # index is what server-side grading compares to the answer key.
+            entry["mode"] = "mcq"
+            entry["scen"] = True
+            entry["text"] = text[:300]
+            try:
+                ci = int((t or {}).get("choice"))
+                if 0 <= ci <= 10:
+                    entry["choice"] = ci
+            except Exception:
+                pass
         else:
             entry["text"] = text[:600]
         clean.append(entry)
@@ -3660,7 +3774,7 @@ async def public_apply_status(token: str, application_id: str):
         jqs = _normalize_questions(approved.get("questions"))
         jtopics = _normalize_topics(approved.get("topics"))
         jsc = _normalize_scenario(approved.get("scenario"))
-        scen_turns = len(jsc["questions"]) if jsc else 0
+        scen_turns = _scen_turns(jsc)
         if jtopics:
             # Topic-structured set: fully scripted, budget EXACT. This is the
             # count-mismatch fix — the old path added "+2 adaptive follow-ups"

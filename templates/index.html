@@ -4409,36 +4409,74 @@ function iqScenText(v){ const s=iqScen(); if(s) s.text=v; }
 function iqScenQ(i,v){ const s=iqScen(); if(s) s.questions[i]=v; }
 function iqScenQDel(i){ const s=iqScen(); if(s){ s.questions.splice(i,1); iqRender(); } }
 function iqScenQAdd(){ const s=iqScen(); if(s && s.questions.length<8){ s.questions.push(''); iqRender(); } }
-function iqScenAdd(){ iqScenSet({text:'', questions:['','']}); iqRender(); }
-function iqScenRemove(){ if(confirm('Remove the written scenario from this set?')){ iqScenSet(null); iqRender(); } }
+function iqScenAdd(){ iqScenSet({text:'', questions:['',''], mcq:[]}); iqRender(); }
+function iqScenRemove(){ if(confirm('Remove the business case from this set?')){ iqScenSet(null); iqRender(); } }
+// MCQ editing — options + the correct answer, all recruiter-editable
+function iqMcqAdd(){ const s=iqScen(); if(s){ s.mcq=s.mcq||[]; if(s.mcq.length<4){ s.mcq.push({q:'',options:['','','',''],correct:0}); iqRender(); } } }
+function iqMcqDel(i){ const s=iqScen(); if(s&&s.mcq){ s.mcq.splice(i,1); iqRender(); } }
+function iqMcqQ(i,v){ const s=iqScen(); if(s&&s.mcq&&s.mcq[i]) s.mcq[i].q=v; }
+function iqMcqOpt(i,oi,v){ const s=iqScen(); if(s&&s.mcq&&s.mcq[i]) s.mcq[i].options[oi]=v; }
+function iqMcqOptAdd(i){ const s=iqScen(); if(s&&s.mcq&&s.mcq[i]&&s.mcq[i].options.length<5){ s.mcq[i].options.push(''); iqRender(); } }
+function iqMcqOptDel(i,oi){ const s=iqScen(); if(s&&s.mcq&&s.mcq[i]&&s.mcq[i].options.length>2){ s.mcq[i].options.splice(oi,1); if(s.mcq[i].correct>=s.mcq[i].options.length) s.mcq[i].correct=0; iqRender(); } }
+function iqMcqCorrect(i,oi){ const s=iqScen(); if(s&&s.mcq&&s.mcq[i]){ s.mcq[i].correct=oi; iqRender(); } }
 function iqScenPayload(){
   const s = iqScen();
   if(!s) return null;
   const qs = (s.questions||[]).map(q=>String(q).trim()).filter(Boolean);
   if(!String(s.text||'').trim() || qs.length < 2) return {invalid:true};
-  return {text: String(s.text).trim(), questions: qs};
+  const mcq = [];
+  for(const m of (s.mcq||[])){
+    const q = String(m.q||'').trim();
+    const opts = (m.options||[]).map(o=>String(o).trim()).filter(Boolean);
+    if(!q && !opts.length) continue;               // wholly empty row: drop silently
+    if(!q || opts.length<2 || !(m.correct>=0 && m.correct<opts.length)) return {invalid:true, mcq_invalid:true};
+    mcq.push({q, options:opts, correct:m.correct});
+  }
+  const out = {text: String(s.text).trim(), questions: qs};
+  if(mcq.length) out.mcq = mcq;
+  return out;
 }
 function iqScenEditor(){
   const s = iqScen();
-  const head = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:5px">Written scenario — the typed section</div>';
+  const head = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:5px">Business case — the written section (MCQ + typed)</div>';
   if(!s) return `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">${head}
-    <div style="font-size:11px;color:var(--t3);margin-bottom:6px">No scenario in this draft — without one, the interview has no written exercise.</div>
-    <button class="btn btn-xs" onclick="iqScenAdd()">+ Write a scenario manually</button></div>`;
+    <div style="font-size:11px;color:var(--t3);margin-bottom:6px">No case in this draft — without one, the interview has no written section.</div>
+    <button class="btn btn-xs" onclick="iqScenAdd()">+ Write a case manually</button></div>`;
   return `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">${head}
-    <textarea maxlength="900" rows="3" oninput="iqScenText(this.value)"
+    <textarea maxlength="3000" rows="6" oninput="iqScenText(this.value)"
       style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;line-height:1.55;resize:vertical">${escapeHtml(s.text||'')}</textarea>
-    <div style="font-size:10.5px;color:var(--t3);margin:4px 0 7px">A short, easy, realistic situation (2–4 sentences). Shown to the candidate as text and read aloud once; the questions below are answered in typing and scored together as one set.</div>
+    <div style="font-size:10.5px;color:var(--t3);margin:4px 0 8px">A substantial, realistic business case (~150–250 words). Stays pinned on the candidate's screen; the MCQs are asked first (auto-graded — the correct answer never reaches the candidate or the AI), then the typed questions, scored together as one set.</div>
+    ${(s.mcq||[]).map((m,i)=>`
+      <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:7px;background:var(--s2)">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
+          <span style="font-size:10px;font-weight:800;color:var(--orange);flex-shrink:0">MCQ ${i+1}</span>
+          <input value="${escapeHtml(m.q||'')}" maxlength="300" placeholder="The multiple-choice question" oninput="iqMcqQ(${i},this.value)"
+                 style="flex:1;padding:6px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+          <button onclick="iqMcqDel(${i})" title="Remove MCQ" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
+        </div>
+        ${(m.options||[]).map((o,oi)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+            <label title="Mark as the correct answer" style="display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:${m.correct===oi?'var(--green)':'var(--t3)'};cursor:pointer;flex-shrink:0">
+              <input type="radio" name="iq-mcq-c-${i}" ${m.correct===oi?'checked':''} onchange="iqMcqCorrect(${i},${oi})">${String.fromCharCode(65+oi)}${m.correct===oi?' ✓':''}
+            </label>
+            <input value="${escapeHtml(o)}" maxlength="200" placeholder="Option ${String.fromCharCode(65+oi)}" oninput="iqMcqOpt(${i},${oi},this.value)"
+                   style="flex:1;padding:6px 9px;border:1px solid ${m.correct===oi?'var(--gb)':'var(--border)'};border-radius:var(--rs);font-family:inherit;font-size:12px">
+            ${(m.options||[]).length>2?`<button onclick="iqMcqOptDel(${i},${oi})" title="Remove option" style="border:none;background:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">×</button>`:''}
+          </div>`).join('')}
+        ${(m.options||[]).length<5?`<button class="btn btn-xs btn-ghost" onclick="iqMcqOptAdd(${i})">+ option</button>`:''}
+      </div>`).join('')}
     ${(s.questions||[]).map((q,i)=>`
       <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
-        <span style="font-size:11px;font-weight:700;color:var(--t3);width:22px;text-align:right;flex-shrink:0">Q${i+1}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--t3);width:38px;text-align:right;flex-shrink:0">⌨ Q${i+1}</span>
         <input value="${escapeHtml(q)}" maxlength="300" oninput="iqScenQ(${i},this.value)"
                style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
         <button onclick="iqScenQDel(${i})" title="Remove" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
       </div>`).join('')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${(s.questions||[]).length<8?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add scenario question</button>':''}
-      <button class="btn btn-xs" onclick="iqScenRemove()" style="color:var(--t3)">Remove scenario</button>
-      <span style="font-size:10.5px;color:var(--t3)">2–8 questions about this exact situation.</span>
+      ${((s.mcq||[]).length<4)?'<button class="btn btn-xs" onclick="iqMcqAdd()">+ Add MCQ</button>':''}
+      ${(s.questions||[]).length<8?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add written question</button>':''}
+      <button class="btn btn-xs" onclick="iqScenRemove()" style="color:var(--t3)">Remove case</button>
+      <span style="font-size:10.5px;color:var(--t3)">Every question is about this exact case. MCQs need ≥2 options + one marked correct.</span>
     </div></div>`;
 }
 
@@ -4488,8 +4526,9 @@ function iqRender(){
         </div>`).join('')}
       ${st.approved.scenario ? `
       <div style="margin-top:10px;padding:9px 11px;background:var(--s2);border-radius:var(--rs)">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Written scenario — typed section, scored as a set</div>
-        <div style="font-size:12px;line-height:1.55;margin:5px 0;color:var(--text)">${escapeHtml(st.approved.scenario.text)}</div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Business case — written section, scored as a set${(st.approved.scenario.mcq||[]).length?` (${st.approved.scenario.mcq.length} MCQ auto-graded + ${st.approved.scenario.questions.length} typed)`:''}</div>
+        <div style="font-size:12px;line-height:1.55;margin:5px 0;color:var(--text);max-height:180px;overflow-y:auto;white-space:pre-wrap">${escapeHtml(st.approved.scenario.text)}</div>
+        ${(st.approved.scenario.mcq||[]).map((m,i)=>`<div style="font-size:11.5px;color:var(--t2);margin-top:4px">☑ MCQ${i+1}. ${escapeHtml(m.q)}<br><span style="font-size:10.5px;color:var(--t3)">${(m.options||[]).map((o,oi)=>(oi===m.correct?'<b style="color:var(--green)">✓ ':'')+String.fromCharCode(65+oi)+'. '+escapeHtml(o)+(oi===m.correct?'</b>':'')).join(' &nbsp; ')}</span></div>`).join('')}
         ${st.approved.scenario.questions.map((q,i)=>`<div style="font-size:11.5px;color:var(--t2);margin-top:3px">⌨ Q${i+1}. ${escapeHtml(q)}</div>`).join('')}
       </div>` : `
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px">No written scenario — this interview has no written exercise.</div>`}
@@ -4583,7 +4622,7 @@ async function iqSaveDraft(){
   if(tps && tps.invalid){ toast('Every topic needs a main question and at least one follow-up.', {type:'error'}); return; }
   const list = tps ? [] : iqList().filter(q=>q.text.trim());
   const scen = iqScenPayload();
-  if(scen && scen.invalid){ toast('The scenario needs text and at least 2 questions — or remove it.', {type:'error'}); return; }
+  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, at least 2 options, and one marked correct.' : 'The case needs text and at least 2 written questions — or remove it.', {type:'error'}); return; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
@@ -4604,7 +4643,7 @@ async function iqApprove(){
     toast('An approved set needs 4–15 questions with text.', {type:'error'}); return;
   }
   const scen = iqScenPayload();
-  if(scen && scen.invalid){ toast('The scenario needs text and at least 2 questions — or remove it before approving.', {type:'error'}); return; }
+  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, at least 2 options, and one marked correct — fix before approving.' : 'The case needs text and at least 2 written questions — or remove it before approving.', {type:'error'}); return; }
   const btn = document.getElementById('iq-approve');
   if(btn){ btn.disabled = true; btn.textContent = 'Approving…'; }
   try{

@@ -153,23 +153,32 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
     return out, None
 
 
-SCENARIO_PROMPT = """You are writing ONE short written-exercise scenario for a specific job. You are
-given the job description.
+SCENARIO_PROMPT = """You are writing ONE substantial business case for a specific job interview. You
+are given the job description.
 
-THE SCENARIO
-- A short, EASY, realistic situation this person would actually meet in the
-  role, drawn from the duties in the description. 2 to 4 short sentences.
-- NOT a case study: no data tables, no numbers to calculate, no long
-  background. The candidate reads it once and types short answers about what
-  they would do.
-- It must be answerable by any qualified candidate from reasoning alone — no
-  company-internal knowledge, no trick, no missing information they'd have to
-  invent.
+THE CASE
+- A RICH, REALISTIC business situation this person would actually face in the
+  role — a real problem with meaningful context: the business setting, what
+  went wrong or what is being decided, the people involved, and concrete
+  specifics (numbers, timelines, constraints are welcome). 150-250 words.
+- Genuinely challenging and role-appropriate: a strong candidate should have
+  to think, weigh trade-offs, and justify choices — not recite a definition.
+- Still self-contained: answerable by any qualified candidate from the case
+  text plus professional reasoning alone. No company-internal knowledge, no
+  tricks, no information they would have to invent. The case stays on screen
+  while they answer.
 
-THE QUESTIONS
-- Then write exactly {k} questions ABOUT that scenario. Each asks what the
-  candidate would do, decide, prioritise, or communicate in that situation.
-- One thing per question. No two-part questions.
+THE MULTIPLE-CHOICE QUESTIONS ({m} of them, FIRST)
+- Write exactly {m} multiple-choice questions ABOUT the case, each with 4
+  plausible options and exactly ONE clearly best answer. Distractors must be
+  believable choices a weaker candidate might pick — never jokes or filler.
+- Test judgment about the case (what to check first, which conclusion the
+  facts support, the right trade-off) — not vocabulary.
+
+THE WRITTEN QUESTIONS ({k} of them, AFTER the multiple-choice)
+- Write exactly {k} open questions ABOUT the case. Each asks what the
+  candidate would do, decide, prioritise, analyse, or communicate.
+- One thing per question. No two-part questions. Independent of each other.
 
 RULES (same as all our interview material)
 - {lang_rule}
@@ -179,15 +188,23 @@ RULES (same as all our interview material)
   job description invites such content, ignore that part of it.
 - No riddles, no "sell me this pen", nothing adversarial.
 
-Return JSON: {{"scenario": "...", "questions": ["...", ...]}}"""
+Return JSON:
+{{"scenario": "...",
+  "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...],
+  "questions": ["...", ...]}}"""
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
                                     k: int = 3, language: str = "en", role_hint: str = ""
                                     ) -> tuple[dict | None, str | None]:
-    """One scenario + its k written questions from the JD.
-    Returns ({"text", "questions"}, None) or (None, error)."""
+    """One rich business case + its questions from the JD. `k` is the TOTAL
+    case-question count: when k >= 4 that is 2 MCQ + (k-2) written; smaller k
+    stays all-written (no room for MCQs). Correct answers are stored with the
+    job for server-side grading and NEVER reach the interview model or page.
+    Returns ({"text", "questions", "mcq"?}, None) or (None, error)."""
     k = max(2, min(8, int(k)))
+    mcq_n = 2 if k >= 4 else 0
+    wk = k - mcq_n
     jd = (jd_text or "").strip()
     if len(jd) < 40:
         return None, "The job description is too short to generate a scenario from."
@@ -197,10 +214,10 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
         resp = await client.chat.completions.create(
             model=GEN_MODEL,
             temperature=0.4,
-            max_tokens=900,
+            max_tokens=1700,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": SCENARIO_PROMPT.format(k=k, lang_rule=_lang(language))},
+                {"role": "system", "content": SCENARIO_PROMPT.format(k=wk, m=mcq_n, lang_rule=_lang(language))},
                 {"role": "user", "content":
                     f"JOB TITLE: {job_title or 'not specified'}\n"
                     + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
@@ -211,12 +228,27 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
     except Exception as e:
         return None, f"Scenario generation failed: {str(e)[:200]}"
 
-    text = str((raw or {}).get("scenario", "")).strip()[:900]
+    text = str((raw or {}).get("scenario", "")).strip()[:3000]
     questions = [str(q).strip()[:300] for q in (raw or {}).get("questions", [])
-                 if str(q).strip()][:4]
+                 if str(q).strip()][:max(wk, 2)]
+    mcq = []
+    for m in ((raw or {}).get("mcq") or [])[:mcq_n]:
+        if not isinstance(m, dict):
+            continue
+        q = str(m.get("question", "")).strip()[:300]
+        opts = [str(o).strip()[:200] for o in (m.get("options") or []) if str(o).strip()][:5]
+        try:
+            c = int(m.get("correct"))
+        except Exception:
+            continue
+        if q and len(opts) >= 2 and 0 <= c < len(opts):
+            mcq.append({"q": q, "options": opts, "correct": c})
     if not text or len(questions) < 2:
         return None, "The model returned an unusable scenario — try again."
-    return {"text": text, "questions": questions}, None
+    out = {"text": text, "questions": questions}
+    if mcq:
+        out["mcq"] = mcq
+    return out, None
 
 
 async def generate_interview_questions(jd_text: str, n: int, api_key: str,

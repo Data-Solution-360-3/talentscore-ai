@@ -20,8 +20,9 @@ window.SessionRender = (function(){
             <span class="score-big">${res.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>
           ${wr?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Typed segment</div>
             <span class="score-big">${wr.segment_score}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>`:''}
-          ${sr?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Written scenario</div>
-            <span class="score-big">${sr.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>`:''}
+          ${sr?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Business case</div>
+            <span class="score-big">${sr.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
+            ${sr.mcq?`<div style="font-size:.72rem;color:var(--t3)">MCQ ${sr.mcq.correct}/${sr.mcq.total} correct (auto-graded, ×${sr.mcq.weight}) + written ${sr.written_overall} (×${(1-sr.mcq.weight).toFixed(2)})${sr.mcq.excluded_written_blank?' — <b style="color:var(--red,#DC2626)">MCQs excluded: written answers were blank</b>':''}</div>`:''}</div>`:''}
           <span style="font-size:.78rem;color:var(--t3);max-width:280px;line-height:1.5">Different rubrics, shown separately — not averaged into one number.</span>
         </div>
         <div style="font-size:.85rem;color:var(--t2);margin-bottom:.2rem">${esc(res.summary||'')}</div>`;
@@ -124,7 +125,7 @@ window.SessionRender = (function(){
     let html = `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .3rem">Transcript</div>`;
     html += (s.transcript||[]).map(t => `
       <div class="turn ${t.role==='ai'?'ai':'you'}">
-        <span class="who">${t.role==='ai'?('🤖 '+esc((s.config&&s.config.interviewer_name)||'AI Interviewer')):'🗣 Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ scenario answer':' · ⌨ typed answer'):''}${t.mode==='scenario'?' · 📋 scenario shown':''}${t.pasted?' · <b style="color:var(--orange2,#E16A1F)">📋 contains pasted content</b>':''}</span>${esc(t.text)}
+        <span class="who">${t.role==='ai'?('🤖 '+esc((s.config&&s.config.interviewer_name)||'AI Interviewer')):'🗣 Candidate'}${t.mode==='typed'?(t.scen?' · ⌨ case answer':' · ⌨ typed answer'):''}${t.mode==='mcq'?' · ☑ MCQ choice'+(typeof t.choice==='number'?' ('+String.fromCharCode(65+t.choice)+')':''):''}${t.mode==='scenario'?' · 📋 case shown':''}${t.pasted?' · <b style="color:var(--orange2,#E16A1F)">📋 contains pasted content</b>':''}</span>${esc(t.text)}
       </div>`).join('') || '<div class="notice">No transcript captured.</div>';
     return html;
   }

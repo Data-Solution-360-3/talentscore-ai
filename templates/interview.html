@@ -77,6 +77,12 @@ input,select,textarea{max-width:100%}
    branding, presence pill and top label hide — the AI is silent in this
    section, so an "AI Interviewer" card would be false UI. */
 .written-mode #ivcard,.written-mode #presence,.written-mode #q-label{display:none}
+/* MCQ options — brand buttons with a clear selected state */
+.mcq-opt{font-family:inherit;font-size:14px;line-height:1.5;text-align:left;padding:11px 14px;border:1.5px solid var(--border2);border-radius:12px;background:var(--surface);color:#1f2937;cursor:pointer;transition:.12s;display:flex;gap:9px;align-items:flex-start}
+.mcq-opt b{flex-shrink:0;color:#6B7280;font-weight:800}
+.mcq-opt:hover{border-color:#639922;background:rgba(99,153,34,.05)}
+.mcq-opt.sel{border-color:#639922;background:rgba(99,153,34,.10);box-shadow:0 0 0 2px rgba(99,153,34,.25)}
+.mcq-opt.sel b{color:#4F7C1B}
 .question .caret{display:inline-block;width:3px;height:1em;background:var(--orange);border-radius:2px;vertical-align:-.15em;margin-left:3px;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{50%{opacity:0}}
 
@@ -233,6 +239,16 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
     <textarea id="typed-ta" maxlength="4000" placeholder="Type your answer here…"></textarea>
     <div class="typed-hints"><span>Take your time — the interviewer will wait.</span><span>🎙 Mic paused while you type</span></div>
     <button class="typed-submit" id="typed-submit" type="button">Submit answer</button>
+  </div>
+  <!-- MCQ panel — the multiple-choice sibling of the typed box. Options come
+       from the begin_mcq_answer tool at ask time; the answer key never
+       reaches this page. -->
+  <div class="typed" id="mcqbox" style="display:none">
+    <div class="typed-label" id="mcq-label">Choose one answer</div>
+    <div id="mcq-q" style="font-size:15px;font-weight:700;color:#1f2937;line-height:1.6;margin:2px 0 10px;text-align:left"></div>
+    <div id="mcq-opts" style="display:flex;flex-direction:column;gap:8px;text-align:left"></div>
+    <div class="typed-hints"><span>Pick the best answer for this case.</span><span>🎙 Mic paused</span></div>
+    <button class="typed-submit" id="mcq-submit" type="button" disabled>Submit choice</button>
   </div>
 </section>
 
@@ -719,6 +735,72 @@ function submitTyped(){
   setPresence('think','One moment…');
 }
 
+// ── MCQ questions (case section) — the multiple-choice sibling of the typed
+// flow. Options arrive via begin_mcq_answer at ask time; the answer key never
+// reaches this page — grading is server-side at scoring time. Same section
+// guarantees as typed: mic muted, VAD off, AI text-only, clean screen.
+let mcqCallId=null, mcqOpts=[], mcqSel=-1, mcqActive=false;
+function enterMcq(callId, question, options){
+  mcqCallId = callId;
+  mcqOpts = (options||[]).map(o=>String(o).slice(0,200)).slice(0,5);
+  mcqSel = -1; mcqActive = true;
+  // an early-opened typed box belongs to this same question — close it
+  if(typing){ typing=false; awaitingQ=false; $('typed').classList.remove('on'); $('typed-q').style.display='none'; }
+  sendVad(null); setMic(false);
+  if(scenActive) scenQN = SCEN_Q ? Math.min(scenQN+1, SCEN_Q) : scenQN+1;
+  $('question').classList.add('q-typed');
+  document.body.classList.add('written-mode');
+  $('mcq-label').textContent = scenActive
+    ? 'Case question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'')+' — choose one answer'
+    : 'Choose one answer';
+  if(scenActive) $('scen-prog').textContent = 'Question '+scenQN+(SCEN_Q?' of '+SCEN_Q:'')+' about this case';
+  $('mcq-q').textContent = String(question||'').slice(0,300);
+  $('mcq-opts').innerHTML = mcqOpts.map((o,i)=>
+    `<button type="button" class="mcq-opt" onclick="pickMcq(${i})"><b>${String.fromCharCode(65+i)}.</b><span>${escapeHtml(o)}</span></button>`).join('');
+  $('mcq-submit').disabled = true;
+  $('mcqbox').style.display = 'block';
+  setPresence('think','Choose an answer below');
+  log('mcq panel: open', mcqCallId?'(tool '+mcqCallId+')':'(no call id)', scenActive?'case q'+scenQN:'');
+}
+function pickMcq(i){
+  mcqSel = i;
+  document.querySelectorAll('#mcq-opts .mcq-opt').forEach((b,bi)=>b.classList.toggle('sel', bi===i));
+  $('mcq-submit').disabled = false;
+}
+function submitMcq(){
+  if(mcqSel<0 || mcqSel>=mcqOpts.length) return;
+  const textAns = mcqOpts[mcqSel];
+  // choice index is what the server grades against the answer key
+  transcript.push({role:'you', text:textAns, mode:'mcq', scen:1, choice:mcqSel});
+  $('mcqbox').style.display='none'; mcqActive=false;
+  // section-complete check — same rule as typed submits (MCQs come first in
+  // practice, so this is a safety net, not the normal exit)
+  if(scenActive && SCEN_Q && scenQN >= SCEN_Q){
+    scenActive=false; scenDone=true; $('scen').style.display='none';
+    log('case section complete — card unpinned, returning to spoken');
+  }
+  if(!scenActive){
+    setMic(true);
+    if(restoreTD) sendVad(restoreTD);
+    $('question').classList.remove('q-typed');
+    document.body.classList.remove('written-mode');
+  }
+  if(dc && dc.readyState==='open'){
+    if(mcqCallId){
+      dc.send(JSON.stringify({type:'conversation.item.create',
+        item:{type:'function_call_output', call_id:mcqCallId,
+              output: JSON.stringify({selected_index:mcqSel, selected:textAns.slice(0,200)})}}));
+    }else{
+      dc.send(JSON.stringify({type:'conversation.item.create', item:{type:'message', role:'system',
+        content:[{type:'input_text', text:'[Interview control note: the candidate selected option '+(mcqSel+1)+
+          ' for your multiple-choice question; it is recorded. Acknowledge neutrally in a few words and continue with the next question.]'}]}}));
+    }
+    respCreate();
+  }
+  mcqCallId=null; mcqOpts=[]; mcqSel=-1;
+  setPresence('think','One moment…');
+}
+
 function onEvent(ev){
   let msg; try{ msg = JSON.parse(ev.data); }catch(_){ return; }
   const t = msg.type || '';
@@ -757,6 +839,12 @@ function onEvent(ev){
       respTypedTool = true;
       let q=''; try{ q = String(JSON.parse(msg.item.arguments||'{}').question||''); }catch(_){}
       enterTyped(msg.item.call_id, q);   // attaches call_id (+question) to the already-open box
+      awaitingQ = false;
+    }else if(msg.item.name==='begin_mcq_answer'){
+      respTypedTool = true;   // an MCQ ask IS this response's question — count it once
+      let q='', opts=[];
+      try{ const a=JSON.parse(msg.item.arguments||'{}'); q=String(a.question||''); opts=Array.isArray(a.options)?a.options:[]; }catch(_){}
+      enterMcq(msg.item.call_id, q, opts);
       awaitingQ = false;
     }else if(msg.item.name==='show_scenario'){
       respScenTool = true;
@@ -821,17 +909,18 @@ function onEvent(ev){
         else { questionsAsked++; }
       }
       sendControlNote();
-      // during the typed phase the turn still counts (the typed ask IS a
-      // question) but the floor stays with the candidate's keyboard
-      if(!typing) setPresence('you','Your turn — speak when ready');
-      else setPresence('think','Waiting for your answer — type below');
+      // during the typed/MCQ phase the turn still counts (the ask IS a
+      // question) but the floor stays with the candidate's keyboard/mouse
+      if(typing) setPresence('think','Waiting for your answer — type below');
+      else if(mcqActive) setPresence('think','Choose an answer below');
+      else setPresence('you','Your turn — speak when ready');
     }
   }else if(t==='output_audio_buffer.cleared'){
     aiSpeaking = false;
   }else if(t==='output_audio_buffer.stopped'){
     aiSpeaking = false;
     if(closingDone){ finishInterview(); }
-    else if(!closing && !typing){ setPresence('you','Your turn — speak when ready'); }
+    else if(!closing && !typing && !mcqActive){ setPresence('you','Your turn — speak when ready'); }
   }
 }
 
@@ -1296,6 +1385,7 @@ window.addEventListener('load', ()=>{
   $('btn-resume').addEventListener('click', manualResume);
   $('btn-end').addEventListener('click', endInterview);
   $('typed-submit').addEventListener('click', submitTyped);
+  $('mcq-submit').addEventListener('click', submitMcq);
   // every keystroke mirrors to sessionStorage: the draft survives a drop, a
   // re-mint, and a full page reload through the Resume card
   $('typed-ta').addEventListener('input', ()=>{
