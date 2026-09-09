@@ -118,9 +118,42 @@ async def disconnect():
         print("[DB] Disconnected from MongoDB")
 
 
+# ── A1 EXPAND: org tenancy stamping ──────────────────────────
+# Every tenant-owned document gains org_id at write time, resolved from its
+# own user_id (users.org_id — 1:1 for existing accounts, and correct for
+# invited members later, whose user doc carries their org). Reads are NOT
+# changed in this phase; org_id is additive and harmless until cutover.
+_ORG_CACHE: dict = {}
+
+
+async def org_of_user(user_id) -> str | None:
+    uid = str(user_id or "")
+    if not uid:
+        return None
+    if uid in _ORG_CACHE:
+        return _ORG_CACHE[uid]
+    q = {"_id": ObjectId(uid)} if ObjectId.is_valid(uid) else {"_id": uid}
+    u = await db.users.find_one(q, {"org_id": 1})
+    oid = (u or {}).get("org_id")
+    if oid:
+        _ORG_CACHE[uid] = str(oid)
+        return str(oid)
+    return None
+
+
+async def stamp_org(doc: dict) -> dict:
+    """Add org_id to a tenant doc from its own user_id (no-op if present)."""
+    if "org_id" not in doc:
+        oid = await org_of_user(doc.get("user_id"))
+        if oid:
+            doc["org_id"] = oid
+    return doc
+
+
 async def save_screening(result: dict) -> str:
     doc = {**result, "created_at": datetime.utcnow()}
     doc.pop("_id", None)
+    doc = await stamp_org(doc)
     inserted = await db.screenings.insert_one(doc)
     return str(inserted.inserted_id)
 
@@ -238,6 +271,7 @@ async def save_job(job: dict) -> str:
     doc = {**job, "title": title, "created_at": datetime.utcnow(), "candidates_count": 0,
            "active": True, "is_public": False, "public_token": generate_public_token()}
     doc.pop("_id", None)
+    doc = await stamp_org(doc)
     inserted = await db.jobs.insert_one(doc)
     return str(inserted.inserted_id)
 
@@ -559,6 +593,7 @@ async def delete_pending(email: str):
 
 async def save_payment(payment: dict) -> str:
     doc = {**payment, "created_at": datetime.utcnow()}
+    doc = await stamp_org(doc)
     inserted = await db.payments.insert_one(doc)
     return str(inserted.inserted_id)
 
@@ -596,6 +631,7 @@ async def invite_team_member(owner_user_id: str, email: str, role: str, company_
         "status": "pending",
         "invited_at": datetime.utcnow(),
     }
+    doc["org_id"] = await org_of_user(owner_user_id)
     inserted = await db.team_invites.insert_one(doc)
     return str(inserted.inserted_id)
 
@@ -898,6 +934,8 @@ async def upsert_application(job: dict, name: str, email: str, phone: str,
         "submitted_ip_hash": ip_hash,
     }
 
+    doc = await stamp_org(doc)
+
     if existing:
         # Keep the latest. Candidates re-upload after fixing a typo, and refusing
         # them reads as broken. The old PDF goes with the old record.
@@ -913,6 +951,7 @@ async def store_application_pdf(application_id: str, job_id: str, user_id: str,
                                 data: bytes, filename: str) -> str:
     now = datetime.utcnow()
     res = await db.application_files.insert_one({
+        "org_id": await org_of_user(user_id),
         "application_id": application_id,
         "job_id": job_id,
         "user_id": user_id,
@@ -1032,6 +1071,7 @@ async def create_interview(user_id: str, question: str, job_id: str = None,
         "active": True,
         "created_at": datetime.utcnow(),
     }
+    doc = await stamp_org(doc)
     res = await db.interviews.insert_one(doc)
     doc["_id"] = str(res.inserted_id)
     return doc
@@ -1118,6 +1158,7 @@ async def create_live_interview(user_id: str, config: dict) -> dict:
         "active": True,
         "created_at": datetime.utcnow(),
     }
+    doc = await stamp_org(doc)
     res = await db.live_interviews.insert_one(doc)
     doc["_id"] = str(res.inserted_id)
     return doc
@@ -1173,6 +1214,7 @@ async def save_proctor_snapshot(token: str, user_id: str, application_id: str | 
                                 kind: str, data: bytes, label: str = "") -> None:
     now = datetime.utcnow()
     await db.proctor_snapshots.insert_one({
+        "org_id": await org_of_user(user_id),
         "token": token,
         "user_id": user_id,
         "application_id": application_id,
@@ -1241,6 +1283,7 @@ EMPLOYEE_STATUSES = ("active", "on_leave", "terminated")
 async def create_employee(user_id: str, fields: dict) -> str:
     now = datetime.utcnow()
     doc = {**fields, "user_id": user_id, "created_at": now, "updated_at": now}
+    doc = await stamp_org(doc)
     res = await db.employees.insert_one(doc)
     return str(res.inserted_id)
 
@@ -1354,7 +1397,7 @@ ATTENDANCE_STATUSES = ("present", "absent", "leave", "holiday")
 async def create_leave_request(user_id: str, doc: dict) -> str:
     now = datetime.utcnow()
     res = await db.leave_requests.insert_one(
-        {**doc, "user_id": user_id, "created_at": now})
+        await stamp_org({**doc, "user_id": user_id, "created_at": now}))
     return str(res.inserted_id)
 
 
@@ -1409,7 +1452,8 @@ async def mark_attendance(user_id: str, employee_id: str, date: str,
         {"user_id": user_id, "employee_id": employee_id, "date": date},
         {"$set": {"status": status, "check_in": check_in, "check_out": check_out,
                   "updated_at": datetime.utcnow()},
-         "$setOnInsert": {"created_at": datetime.utcnow()}},
+         "$setOnInsert": {"created_at": datetime.utcnow(),
+                          "org_id": await org_of_user(user_id)}},
         upsert=True)
 
 
@@ -1525,6 +1569,7 @@ async def create_perf_cycle(user_id: str, name: str, competencies: list | None) 
            "competencies": comps, "weights": dict(PERF_WEIGHTS),
            "scale_max": PERF_SCALE_MAX, "peer_anon_floor": PERF_PEER_ANON_FLOOR,
            "created_at": datetime.utcnow()}
+    doc = await stamp_org(doc)
     res = await db.perf_cycles.insert_one(doc)
     doc["_id"] = str(res.inserted_id)
     return serialize_mongo(doc)
@@ -1600,6 +1645,7 @@ async def add_perf_assignment(user_id: str, cycle_id: str, subject_id: str,
            "subject_employee_id": subject_id, "reviewer_employee_id": reviewer_id,
            "relation": relation, "status": "pending", "answers": None,
            "created_at": datetime.utcnow()}
+    doc = await stamp_org(doc)
     await db.perf_assignments.update_one(
         {"cycle_id": cycle_id, "subject_employee_id": subject_id,
          "reviewer_employee_id": reviewer_id, "relation": relation},
@@ -1837,6 +1883,7 @@ def _sal_int(v) -> int:
 
 async def upsert_salary_structure(user_id: str, employee_id: str, body: dict) -> dict:
     doc = {
+        "org_id": await org_of_user(user_id),
         "user_id": user_id,
         "employee_id": employee_id,
         "currency": "BDT",
@@ -1926,6 +1973,7 @@ async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str
                "employees": len(slips), "totals": totals,
                "math_held": True,   # tax placeholder + LWP not deducted
                "created_at": now}
+    run_doc = await stamp_org(run_doc)
     if existing:
         await db.payslips.delete_many({"run_id": str(existing["_id"])})
         await db.payroll_runs.update_one({"_id": existing["_id"]}, {"$set": run_doc})
@@ -1933,9 +1981,12 @@ async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str
     else:
         res = await db.payroll_runs.insert_one(run_doc)
         run_id = str(res.inserted_id)
+    _org = run_doc.get("org_id")
     for sl in slips:
         sl["run_id"] = run_id
         sl["user_id"] = user_id
+        if _org:
+            sl["org_id"] = _org
     await db.payslips.insert_many(slips)
     run_doc["_id"] = run_id
     return serialize_mongo(run_doc), None
@@ -2145,6 +2196,7 @@ async def save_interview_session(doc: dict) -> str:
     no audio or video is stored here (that is L5's proctoring capture)."""
     doc = {**doc, "created_at": datetime.utcnow()}
     doc.pop("_id", None)
+    doc = await stamp_org(doc)
     res = await db.interview_sessions.insert_one(doc)
     return str(res.inserted_id)
 

@@ -1482,8 +1482,10 @@ async def send_email_to_candidate(
         raise HTTPException(status_code=502, detail=err)
 
     # Record the send so the UI can show "Email sent" next to this candidate
+    from database import org_of_user as _org_of
     await mongodb.email_history.insert_one({
         "screening_id":   screening_id,
+        "org_id":         await _org_of(user["user_id"]),
         "user_id":        user["user_id"],
         "company":        user.get("company", ""),
         "candidate_name": doc.get("candidate_name", "Unknown"),
@@ -5755,6 +5757,8 @@ async def manual_payment_request(
         "status": "pending_review",
         "created_at": __import__("datetime").datetime.utcnow(),
     }
+    from database import stamp_org as _stamp_org
+    doc = await _stamp_org(doc)
     inserted = await mongodb.manual_payments.insert_one(doc)
     return {
         "success": True,

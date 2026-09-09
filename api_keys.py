@@ -75,6 +75,8 @@ async def create_api_key(user_id: str, name: str, plan: str = "trial") -> dict:
         "month_reset_at": datetime.utcnow().replace(day=1),
         "webhook_url": None,
     }
+    from database import stamp_org
+    doc = await stamp_org(doc)
     inserted = await db.api_keys.insert_one(doc)
     doc["_id"] = str(inserted.inserted_id)
     doc["raw_key"] = raw_key  # Only returned once
