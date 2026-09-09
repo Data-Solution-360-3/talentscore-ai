@@ -25,7 +25,7 @@ def serialize_mongo(doc):
     about would leave the next raw-ObjectId field to break the same way, so this
     walks the whole document at any depth. Note: job_id and user_id in
     screenings are consistently strings — this is NOT the string-vs-ObjectId
-    typing behind user_match(); cv_file_id is a correctly-typed reference that
+    typing behind org_match(); cv_file_id is a correctly-typed reference that
     simply was never stringified on the way out.
     """
     if isinstance(doc, ObjectId):
@@ -52,6 +52,10 @@ async def connect():
     await db.screenings.create_index("created_at")
     await db.screenings.create_index("recommendation")
     await db.screenings.create_index("overall_score")
+    # A1: every tenant read now filters on org_id; the dashboard list is
+    # org_id + created_at desc, so that pair is the compound.
+    await db.screenings.create_index([("org_id", 1), ("created_at", -1)])
+    await db.jobs.create_index("org_id")
     await db.jobs.create_index("created_at")
 
     # ── Public application link ──
@@ -377,6 +381,18 @@ async def create_user(email: str, hashed_password: str, company_name: str, role:
         "plan": "trial",  # trial / basic / pro
     }
     inserted = await db.users.insert_one(doc)
+    # A1: every account gets an org at birth. Registration is the only place a
+    # user can exist without one; team members arrive via accept_team_invite,
+    # which puts them INTO an existing org instead.
+    org = await db.orgs.insert_one({
+        "name": (company_name or email).strip()[:120],
+        "owner_user_id": str(inserted.inserted_id),
+        "created_at": datetime.utcnow(),
+    })
+    await db.users.update_one(
+        {"_id": inserted.inserted_id},
+        {"$set": {"org_id": str(org.inserted_id), "org_role": "owner"}})
+    _ORG_CACHE[str(inserted.inserted_id)] = str(org.inserted_id)
     return str(inserted.inserted_id)
 
 
@@ -440,11 +456,11 @@ async def sync_screening_count(user_id: str):
     from datetime import datetime
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # user_match, not plain equality: a screening whose user_id was stored as a
+    # org_match, not plain equality: a screening whose user_id was stored as a
     # non-string is invisible to an equality match, so the month count runs low and
     # the user is handed free quota. This is the number the batch limit enforces on.
     count = await db.screenings.count_documents({
-        **user_match(user_id),
+        **org_match(user_id),
         "created_at": {"$gte": month_start}
     })
     await db.users.update_one(
@@ -458,25 +474,30 @@ async def sync_screening_count(user_id: str):
 # TENANT-SCOPED QUERIES (filter by company/user)
 # ─────────────────────────────────────────────────────────────
 
-def user_match(user_id: str) -> dict:
-    """The single user_id matching rule for tenant-scoped screening queries.
+def org_match(user_id: str) -> dict:
+    """The single tenant-scoping rule: rows belong to an ORG, not a user (A1).
 
-    get_screenings_for_user used this $or form while get_stats_for_user used a plain
-    equality match, so the two could disagree about how many screenings a user has —
-    the same class of bug as the four different "shortlisted" counts in the UI.
-    The $or form is the superset and is now used by both; equality would silently
-    drop records whose user_id was stored as a non-string.
+    Resolves the caller's org from _ORG_CACHE, which get_current_user warms on
+    every authenticated request (and org_of_user/stamp_org warm on writes), so
+    the lookup here can stay synchronous and every existing call site keeps its
+    shape. A cold cache — only possible on a path that never authenticated this
+    user in this worker — falls back to the caller's OWN rows, which fails
+    closed: they can never see another org's data, at worst less of their own
+    org's until their next authenticated request.
     """
+    oid = _ORG_CACHE.get(str(user_id or ""))
+    if oid:
+        return {"org_id": oid}
     return {"$or": [{"user_id": user_id}, {"user_id": str(user_id)}]}
 
 
 async def count_screenings_for_user(user_id: str) -> int:
     """Unfiltered total, so callers can tell a full page from a truncated one."""
-    return await db.screenings.count_documents(user_match(user_id))
+    return await db.screenings.count_documents(org_match(user_id))
 
 
 async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
-    cursor = db.screenings.find(user_match(user_id)).sort("created_at", -1).limit(limit)
+    cursor = db.screenings.find(org_match(user_id)).sort("created_at", -1).limit(limit)
     results = []
     async for doc in cursor:
         results.append(serialize_mongo(doc))
@@ -485,7 +506,7 @@ async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
 
 async def get_stats_for_user(user_id: str) -> dict:
     pipeline = [
-        {"$match": user_match(user_id)},
+        {"$match": org_match(user_id)},
         {
             "$group": {
                 "_id": None,
@@ -513,7 +534,7 @@ async def get_stats_for_user(user_id: str) -> dict:
 
 
 async def get_jobs_for_user(user_id: str) -> list:
-    cursor = db.jobs.find({"user_id": user_id, "active": True}).sort("created_at", -1)
+    cursor = db.jobs.find({**org_match(user_id), "active": True}).sort("created_at", -1)
     jobs = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
@@ -523,7 +544,7 @@ async def get_jobs_for_user(user_id: str) -> list:
 
 async def get_skills_gaps_for_user(user_id: str) -> list:
     pipeline = [
-        {"$match": {"user_id": user_id}},
+        {"$match": org_match(user_id)},
         {"$unwind": "$critical_gaps"},
         {"$group": {"_id": "$critical_gaps", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
@@ -535,7 +556,7 @@ async def get_skills_gaps_for_user(user_id: str) -> list:
 
 async def get_dimension_averages_for_user(user_id: str) -> list:
     pipeline = [
-        {"$match": {"user_id": user_id}},
+        {"$match": org_match(user_id)},
         {"$unwind": "$dimensions"},
         {"$group": {
             "_id": "$dimensions.name",
@@ -599,7 +620,7 @@ async def save_payment(payment: dict) -> str:
 
 
 async def get_payments_for_user(user_id: str) -> list:
-    cursor = db.payments.find({"user_id": user_id}).sort("created_at", -1).limit(20)
+    cursor = db.payments.find(org_match(user_id)).sort("created_at", -1).limit(20)
     payments = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
@@ -618,29 +639,92 @@ async def update_user_subscription(user_id: str, plan: str, subscription_data: d
 # TEAM MEMBERS
 # ─────────────────────────────────────────────────────────────
 
-async def invite_team_member(owner_user_id: str, email: str, role: str, company_name: str) -> str:
-    """Create a team member invitation."""
+TEAM_ROLES = ("recruiter", "viewer")   # what an owner may hand out (Q1/Q2)
+
+
+async def invite_team_member(owner_user_id: str, email: str, role: str, company_name: str) -> dict:
+    """Create a team invitation into the OWNER'S ORG, carrying a single-use token.
+
+    Legacy "screener" maps to "recruiter"; anything unrecognized becomes
+    "viewer" — an unknown role must never grant more than read access.
+    Returns {invite_id, token, role}.
+    """
+    import secrets as _secrets
     existing = await db.users.find_one({"email": email.lower()})
     if existing:
         raise ValueError("This email is already registered.")
+    org_role = {"screener": "recruiter"}.get(role, role)
+    if org_role not in TEAM_ROLES:
+        org_role = "viewer"
+    token = _secrets.token_urlsafe(24)
     doc = {
         "email": email.lower(),
         "owner_user_id": owner_user_id,
         "company_name": company_name,
-        "role": role,  # "viewer" or "screener"
+        "role": org_role,
+        "token": token,
         "status": "pending",
         "invited_at": datetime.utcnow(),
+        "org_id": await org_of_user(owner_user_id),
     }
-    doc["org_id"] = await org_of_user(owner_user_id)
     inserted = await db.team_invites.insert_one(doc)
-    return str(inserted.inserted_id)
+    return {"invite_id": str(inserted.inserted_id), "token": token, "role": org_role}
+
+
+async def get_invite_by_token(token: str) -> dict | None:
+    if not token:
+        return None
+    doc = await db.team_invites.find_one({"token": token, "status": "pending"})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+async def accept_team_invite(token: str, hashed_password: str, full_name: str = "") -> dict:
+    """Redeem a pending invite: create the account INSIDE the inviter's org.
+
+    The org and role come from the invite document, never from the request —
+    a forged form can't pick its own org or promote itself. Raises ValueError
+    on any non-redeemable state so the route can 400 without leaking which
+    state it was.
+    """
+    invite = await db.team_invites.find_one({"token": token, "status": "pending"})
+    if not invite or not invite.get("org_id"):
+        raise ValueError("This invitation is no longer valid.")
+    if await db.users.find_one({"email": invite["email"]}):
+        raise ValueError("This email is already registered.")
+    doc = {
+        "email": invite["email"],
+        "password": hashed_password,
+        "company_name": invite.get("company_name", ""),
+        "full_name": (full_name or "").strip(),
+        "role": "client",
+        "active": True,
+        "created_at": datetime.utcnow(),
+        "screening_count": 0,
+        "plan": "trial",
+        "org_id": str(invite["org_id"]),
+        "org_role": invite.get("role", "viewer"),
+    }
+    inserted = await db.users.insert_one(doc)
+    _ORG_CACHE[str(inserted.inserted_id)] = str(invite["org_id"])
+    await db.team_invites.update_one(
+        {"_id": invite["_id"]},
+        {"$set": {"status": "accepted", "accepted_at": datetime.utcnow(),
+                  "member_user_id": str(inserted.inserted_id)}})
+    return {"user_id": str(inserted.inserted_id), "email": invite["email"],
+            "org_id": str(invite["org_id"]), "org_role": doc["org_role"]}
 
 
 async def get_team_members(owner_user_id: str) -> list:
-    """Get all team members (active users) under this account."""
-    cursor = db.users.find({"owner_user_id": owner_user_id})
+    """Everyone in the caller's org except the caller — org, not owner_user_id,
+    is what membership means after A1."""
+    org = await org_of_user(owner_user_id)
+    q = {"org_id": org} if org else {"owner_user_id": owner_user_id}
     members = []
-    async for doc in cursor:
+    async for doc in db.users.find(q):
+        if str(doc["_id"]) == str(owner_user_id):
+            continue
         doc["_id"] = str(doc["_id"])
         doc.pop("password", None)
         members.append(doc)
@@ -648,10 +732,13 @@ async def get_team_members(owner_user_id: str) -> list:
 
 
 async def get_team_invites(owner_user_id: str) -> list:
-    cursor = db.team_invites.find({"owner_user_id": owner_user_id, "status": "pending"})
+    org = await org_of_user(owner_user_id)
+    q = {"org_id": org, "status": "pending"} if org else \
+        {"owner_user_id": owner_user_id, "status": "pending"}
     invites = []
-    async for doc in cursor:
+    async for doc in db.team_invites.find(q):
         doc["_id"] = str(doc["_id"])
+        doc.pop("token", None)   # the token is the credential — list views never carry it
         invites.append(doc)
     return invites
 
@@ -793,12 +880,15 @@ async def rotate_job_token(job_id: str) -> dict | None:
     return {**job, "public_token": token, "_id": str(job["_id"])}
 
 
-def user_match_field(field: str, user_id: str) -> dict:
-    """user_match, for collections whose owner field isn't called user_id.
+def org_match_field(field: str, user_id: str) -> dict:
+    """org_match, for collections whose legacy owner field isn't called user_id.
 
-    Same reason as user_match: the id is not reliably stored as a string, so a
-    plain equality match silently drops rows.
+    Post-A1 both filters scope by org_id; the field only matters for the
+    fail-closed cold-cache fallback (same contract as org_match).
     """
+    oid = _ORG_CACHE.get(str(user_id or ""))
+    if oid:
+        return {"org_id": oid}
     return {"$or": [{field: user_id}, {field: str(user_id)}]}
 
 
@@ -1030,7 +1120,7 @@ async def save_jd_parse(job_id: str, jd_text: str, model: str, parsed: dict) -> 
 
 
 async def get_applications_for_job(job_id: str, user_id: str, status: str = "") -> list:
-    q = {"job_id": job_id, **user_match_field("user_id", user_id)}
+    q = {"job_id": job_id, **org_match_field("user_id", user_id)}
     if status:
         q["status"] = status
     cursor = db.applications.find(q, {"cv_pdf_b64": 0}).sort("submitted_at", -1).limit(500)
@@ -1274,7 +1364,7 @@ async def update_job_interview_questions(job_id: str, patch: dict) -> None:
 # ── Employees (HRM module 1) ─────────────────────────────────
 # The foundation record for every future HRM module: attendance, leave,
 # performance, and payroll will all reference the stable employee _id.
-# Tenant-scoped by user_id with the same user_match discipline as jobs
+# Tenant-scoped by user_id with the same org_match discipline as jobs
 # and screenings — an admin only ever sees their own company's staff.
 
 EMPLOYEE_STATUSES = ("active", "on_leave", "terminated")
@@ -1289,7 +1379,7 @@ async def create_employee(user_id: str, fields: dict) -> str:
 
 
 async def get_employees_for_user(user_id: str) -> list:
-    cursor = db.employees.find(user_match_field("user_id", user_id)).sort("created_at", -1)
+    cursor = db.employees.find(org_match_field("user_id", user_id)).sort("created_at", -1)
     return [serialize_mongo(d) async for d in cursor]
 
 
@@ -1298,7 +1388,7 @@ async def get_employee_for_user(employee_id: str, user_id: str) -> dict | None:
         oid = ObjectId(employee_id)
     except Exception:
         return None
-    doc = await db.employees.find_one({"_id": oid, **user_match_field("user_id", user_id)})
+    doc = await db.employees.find_one({"_id": oid, **org_match_field("user_id", user_id)})
     return serialize_mongo(doc) if doc else None
 
 
@@ -1308,14 +1398,14 @@ async def update_employee_for_user(employee_id: str, user_id: str, fields: dict)
     except Exception:
         return False
     res = await db.employees.update_one(
-        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"_id": oid, **org_match_field("user_id", user_id)},
         {"$set": {**fields, "updated_at": datetime.utcnow()}})
     return res.matched_count == 1
 
 
 async def find_employee_by_email(user_id: str, email: str) -> dict | None:
     doc = await db.employees.find_one(
-        {**user_match_field("user_id", user_id), "email": (email or "").strip().lower()})
+        {**org_match_field("user_id", user_id), "email": (email or "").strip().lower()})
     return serialize_mongo(doc) if doc else None
 
 
@@ -1332,7 +1422,7 @@ async def set_employee_invite(employee_id: str, user_id: str, token: str,
     except Exception:
         return False
     res = await db.employees.update_one(
-        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"_id": oid, **org_match_field("user_id", user_id)},
         {"$set": {"invite_token": token, "invite_expires": expires,
                   "updated_at": datetime.utcnow()}})
     return res.matched_count == 1
@@ -1378,7 +1468,7 @@ async def update_employee_contact(employee_id: str, user_id: str, phone: str) ->
     except Exception:
         return False
     res = await db.employees.update_one(
-        {"_id": oid, **user_match_field("user_id", user_id)},
+        {"_id": oid, **org_match_field("user_id", user_id)},
         {"$set": {"phone": phone[:40], "updated_at": datetime.utcnow()}})
     return res.matched_count == 1
 
@@ -1403,7 +1493,7 @@ async def create_leave_request(user_id: str, doc: dict) -> str:
 
 async def get_leave_requests_for_user(user_id: str, status: str = "",
                                       employee_id: str = "") -> list:
-    q = dict(user_match_field("user_id", user_id))
+    q = dict(org_match_field("user_id", user_id))
     if status:
         q["status"] = status
     if employee_id:
@@ -1422,7 +1512,7 @@ async def claim_leave_decision(request_id: str, user_id: str, status: str,
     except Exception:
         return None
     doc = await db.leave_requests.find_one_and_update(
-        {"_id": oid, **user_match_field("user_id", user_id), "status": "pending"},
+        {"_id": oid, **org_match_field("user_id", user_id), "status": "pending"},
         {"$set": {"status": status, "approver": approver,
                   "decided_at": datetime.utcnow()}})
     return serialize_mongo(doc) if doc else None
@@ -1434,7 +1524,7 @@ async def leave_taken_days(user_id: str, employee_id: str, year: int) -> dict:
     is an exact year filter."""
     out = {t: 0 for t in LEAVE_TYPES}
     cursor = db.leave_requests.aggregate([
-        {"$match": {**user_match_field("user_id", user_id),
+        {"$match": {**org_match_field("user_id", user_id),
                     "employee_id": employee_id, "status": "approved",
                     "start_date": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}}},
         {"$group": {"_id": "$type", "days": {"$sum": "$days"}}},
@@ -1460,7 +1550,7 @@ async def mark_attendance(user_id: str, employee_id: str, date: str,
 async def hr_summary_counts(user_id: str) -> dict:
     """Lightweight, additive dashboard counts — tenant-scoped, independent of
     the hiring stats. Never touches CandidateStats or any screening query."""
-    match = user_match_field("user_id", user_id)
+    match = org_match_field("user_id", user_id)
     today = datetime.utcnow().strftime("%Y-%m-%d")
     employees = await db.employees.count_documents(
         {**match, "status": {"$ne": "terminated"}})
@@ -1490,7 +1580,7 @@ async def hr_summary_counts(user_id: str) -> dict:
 
 async def get_attendance_for_month(user_id: str, month: str,
                                    employee_id: str = "") -> list:
-    q = {**user_match_field("user_id", user_id),
+    q = {**org_match_field("user_id", user_id),
          "date": {"$gte": f"{month}-01", "$lte": f"{month}-31"}}
     if employee_id:
         q["employee_id"] = employee_id
@@ -1578,7 +1668,7 @@ async def create_perf_cycle(user_id: str, name: str, competencies: list | None) 
 async def list_perf_cycles(user_id: str) -> list:
     out = []
     async for c in db.perf_cycles.find(
-            user_match_field("user_id", user_id)).sort("created_at", -1).limit(40):
+            org_match_field("user_id", user_id)).sort("created_at", -1).limit(40):
         out.append(serialize_mongo(c))
     return out
 
@@ -1586,7 +1676,7 @@ async def list_perf_cycles(user_id: str) -> list:
 async def get_perf_cycle(user_id: str, cycle_id: str) -> dict | None:
     try:
         c = await db.perf_cycles.find_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id)})
+            {**org_match_field("user_id", user_id), "_id": ObjectId(cycle_id)})
     except Exception:
         return None
     return serialize_mongo(c) if c else None
@@ -1596,7 +1686,7 @@ async def set_perf_cycle_status(user_id: str, cycle_id: str,
                                 to_status: str, from_statuses: tuple) -> bool:
     try:
         res = await db.perf_cycles.update_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
+            {**org_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
              "status": {"$in": list(from_statuses)}},
             {"$set": {"status": to_status, f"{to_status}_at": datetime.utcnow()}})
         return res.modified_count == 1
@@ -1608,7 +1698,7 @@ async def delete_perf_cycle(user_id: str, cycle_id: str) -> bool:
     """Draft or closed cycles only — an active cycle must be closed first."""
     try:
         res = await db.perf_cycles.delete_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
+            {**org_match_field("user_id", user_id), "_id": ObjectId(cycle_id),
              "status": {"$in": ["draft", "closed"]}})
         if res.deleted_count == 1:
             await db.perf_assignments.delete_many({"cycle_id": cycle_id})
@@ -1635,7 +1725,7 @@ async def add_perf_assignment(user_id: str, cycle_id: str, subject_id: str,
     for label, eid in (("subject", subject_id), ("reviewer", reviewer_id)):
         try:
             emp = await db.employees.find_one(
-                {**user_match_field("user_id", user_id), "_id": ObjectId(eid),
+                {**org_match_field("user_id", user_id), "_id": ObjectId(eid),
                  "status": {"$ne": "terminated"}})
         except Exception:
             emp = None
@@ -1659,7 +1749,7 @@ async def add_perf_assignment(user_id: str, cycle_id: str, subject_id: str,
 async def remove_perf_assignment(user_id: str, assignment_id: str) -> bool:
     try:
         a = await db.perf_assignments.find_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(assignment_id)})
+            {**org_match_field("user_id", user_id), "_id": ObjectId(assignment_id)})
     except Exception:
         return False
     if not a:
@@ -1675,7 +1765,7 @@ async def list_perf_assignments(user_id: str, cycle_id: str) -> list:
     """Admin matrix view — names joined for readability. Admin-only caller."""
     out = []
     async for a in db.perf_assignments.find(
-            {**user_match_field("user_id", user_id), "cycle_id": cycle_id}):
+            {**org_match_field("user_id", user_id), "cycle_id": cycle_id}):
         out.append(serialize_mongo(a))
     ids = set()
     for a in out:
@@ -1705,7 +1795,7 @@ async def list_reviews_for_employee(tenant: str, employee_id: str) -> list:
     out = []
     cycles = {}
     async for a in db.perf_assignments.find(
-            {**user_match_field("user_id", tenant),
+            {**org_match_field("user_id", tenant),
              "reviewer_employee_id": employee_id}).sort("created_at", 1):
         cid = a["cycle_id"]
         if cid not in cycles:
@@ -1736,7 +1826,7 @@ async def get_review_for_employee(tenant: str, employee_id: str,
     tenant, inactive cycle — all identical, probe-resistant."""
     try:
         a = await db.perf_assignments.find_one(
-            {**user_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
+            {**org_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
              "reviewer_employee_id": employee_id})
     except Exception:
         return None
@@ -1768,7 +1858,7 @@ async def submit_review_answers(tenant: str, employee_id: str, assignment_id: st
     if view["status"] != "pending":
         return False, "This review was already submitted."
     res = await db.perf_assignments.update_one(
-        {**user_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
+        {**org_match_field("user_id", tenant), "_id": ObjectId(assignment_id),
          "reviewer_employee_id": employee_id, "status": "pending"},
         {"$set": {"status": "submitted", "answers": answers,
                   "submitted_at": datetime.utcnow()}})
@@ -1794,7 +1884,7 @@ async def aggregate_perf_cycle(user_id: str, cycle_id: str) -> dict | None:
 
     by_subject: dict[str, list] = {}
     async for a in db.perf_assignments.find(
-            {**user_match_field("user_id", user_id), "cycle_id": cycle_id}):
+            {**org_match_field("user_id", user_id), "cycle_id": cycle_id}):
         by_subject.setdefault(a["subject_employee_id"], []).append(a)
 
     names = {}
@@ -1895,14 +1985,14 @@ async def upsert_salary_structure(user_id: str, employee_id: str, body: dict) ->
         "updated_at": datetime.utcnow(),
     }
     await db.salary_structures.update_one(
-        {**user_match_field("user_id", user_id), "employee_id": employee_id},
+        {**org_match_field("user_id", user_id), "employee_id": employee_id},
         {"$set": doc}, upsert=True)
     return doc
 
 
 async def get_salary_structures(user_id: str) -> dict:
     out = {}
-    async for s in db.salary_structures.find(user_match_field("user_id", user_id)):
+    async for s in db.salary_structures.find(org_match_field("user_id", user_id)):
         out[str(s.get("employee_id"))] = serialize_mongo(s)
     return out
 
@@ -1915,7 +2005,7 @@ async def _unpaid_leave_days(user_id: str, employee_id: str, month: str) -> int:
     the owner's sign-off."""
     total = 0
     async for lr in db.leave_requests.find({
-            **user_match_field("user_id", user_id),
+            **org_match_field("user_id", user_id),
             "employee_id": employee_id, "type": "unpaid", "status": "approved",
             "start_date": {"$gte": f"{month}-01", "$lte": f"{month}-31"}}):
         try:
@@ -1930,7 +2020,7 @@ async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str
     salary structure. Replaces an existing DRAFT for the same month; refuses
     to touch an approved/paid one. Returns (run, error)."""
     existing = await db.payroll_runs.find_one(
-        {**user_match_field("user_id", user_id), "month": month})
+        {**org_match_field("user_id", user_id), "month": month})
     if existing and existing.get("status") != "draft":
         return None, f"A {existing.get('status')} run already exists for {month} — it can't be replaced."
     structures = await get_salary_structures(user_id)
@@ -1939,7 +2029,7 @@ async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str
 
     slips, totals = [], {"gross": 0, "pf": 0, "net_before_tax": 0}
     async for e in db.employees.find(
-            {**user_match_field("user_id", user_id), "status": {"$ne": "terminated"}}):
+            {**org_match_field("user_id", user_id), "status": {"$ne": "terminated"}}):
         s = structures.get(str(e["_id"]))
         if not s:
             continue
@@ -1995,7 +2085,7 @@ async def create_payroll_run(user_id: str, month: str) -> tuple[dict | None, str
 async def list_payroll_runs(user_id: str) -> list:
     out = []
     async for r in db.payroll_runs.find(
-            user_match_field("user_id", user_id)).sort("month", -1).limit(36):
+            org_match_field("user_id", user_id)).sort("month", -1).limit(36):
         out.append(serialize_mongo(r))
     return out
 
@@ -2003,7 +2093,7 @@ async def list_payroll_runs(user_id: str) -> list:
 async def get_payroll_run(user_id: str, run_id: str) -> tuple[dict | None, list]:
     try:
         run = await db.payroll_runs.find_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(run_id)})
+            {**org_match_field("user_id", user_id), "_id": ObjectId(run_id)})
     except Exception:
         return None, []
     if not run:
@@ -2017,7 +2107,7 @@ async def get_payroll_run(user_id: str, run_id: str) -> tuple[dict | None, list]
 async def approve_payroll_run(user_id: str, run_id: str) -> bool:
     try:
         res = await db.payroll_runs.update_one(
-            {**user_match_field("user_id", user_id), "_id": ObjectId(run_id), "status": "draft"},
+            {**org_match_field("user_id", user_id), "_id": ObjectId(run_id), "status": "draft"},
             {"$set": {"status": "approved", "approved_at": datetime.utcnow()}})
         return res.modified_count == 1
     except Exception:
@@ -2036,7 +2126,7 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
     """start/end are inclusive datetimes for datetime-stamped collections;
     start_s/end_s are the same bounds as YYYY-MM-DD strings for the HRM
     collections, whose dates are lexicographic strings by design."""
-    scope = user_match_field("user_id", user_id)
+    scope = org_match_field("user_id", user_id)
 
     # ALL funnel hires, all-time — the list is tiny (employee records created
     # from screenings). The client range-filters it and derives time-to-hire,
@@ -2173,9 +2263,9 @@ async def kpi_data(user_id: str, start: datetime, end: datetime,
             }
 
     # Jobs posted — tenant-scoped, all-time (total incl. deactivated + active).
-    jobs_total = await db.jobs.count_documents(user_match_field("user_id", user_id))
+    jobs_total = await db.jobs.count_documents(org_match_field("user_id", user_id))
     jobs_active = await db.jobs.count_documents(
-        {**user_match_field("user_id", user_id), "active": True})
+        {**org_match_field("user_id", user_id), "active": True})
 
     return {
         "range": {"start": start_s, "end": end_s},

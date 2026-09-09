@@ -100,8 +100,12 @@ async def validate_api_key(raw_key: str) -> dict | None:
 
 
 async def get_keys_for_user(user_id: str) -> list:
-    """Get all API keys for a user."""
-    cursor = db.api_keys.find({"user_id": user_id}).sort("created_at", -1)
+    """All API keys in the caller's ORG (A1) — keys are org infrastructure,
+    not personal property, same as the screenings they create."""
+    from database import org_of_user
+    org = await org_of_user(user_id)
+    q = {"org_id": org} if org else {"user_id": user_id}
+    cursor = db.api_keys.find(q).sort("created_at", -1)
     keys = []
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
@@ -111,9 +115,12 @@ async def get_keys_for_user(user_id: str) -> list:
 
 
 async def revoke_api_key(key_id: str, user_id: str) -> bool:
-    """Revoke an API key."""
+    """Revoke an API key — any key in the caller's org (A1)."""
+    from database import org_of_user
+    org = await org_of_user(user_id)
+    scope = {"org_id": org} if org else {"user_id": user_id}
     result = await db.api_keys.update_one(
-        {"_id": ObjectId(key_id), "user_id": user_id},
+        {"_id": ObjectId(key_id), **scope},
         {"$set": {"active": False}}
     )
     return result.modified_count > 0

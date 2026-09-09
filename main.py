@@ -50,10 +50,11 @@ from database import (
     invite_team_member, get_team_members, get_team_invites,
     update_user_profile, update_user_notifications, get_full_user,
     generate_public_token, hash_ip, get_job_by_public_token, set_job_public,
-    rotate_job_token, ensure_job_token, user_match_field, reserve_screening_slot,
+    rotate_job_token, ensure_job_token, org_match_field, reserve_screening_slot,
     release_screening_slot, get_spend_state, rate_limit_allows,
     upsert_application, store_application_pdf, count_pending_applications,
-    get_applications_for_job, user_match,
+    get_applications_for_job, org_match,
+    get_invite_by_token, accept_team_invite, TEAM_ROLES,
     create_interview, get_interview_by_token,
     save_written_submission, get_written_submissions,
     save_interview_session, get_interview_sessions, get_interview_session,
@@ -442,7 +443,56 @@ async def get_current_user(request: Request) -> dict:
     # tenant's admin, no matter which endpoint they aim a token at.
     if payload.get("role") == "employee":
         raise HTTPException(status_code=403, detail="Employees cannot access this area.")
+    # A1: org membership is read FRESH from the DB on every request (same
+    # reasoning as require_admin) — a user moved between orgs, or a role
+    # change, takes effect immediately, never on token expiry. This is also
+    # what keeps database._ORG_CACHE warm so org_match() can stay synchronous.
+    import database as _database
+    from bson import ObjectId as _OID
+    uid = str(payload.get("user_id") or "")
+    q = {"_id": _OID(uid)} if _OID.is_valid(uid) else {"_id": uid}
+    odoc = await _database.db.users.find_one(q, {"org_id": 1, "org_role": 1})
+    if not odoc:
+        raise HTTPException(status_code=401, detail="Account not found.")
+    payload["org_id"] = str(odoc.get("org_id") or "")
+    payload["org_role"] = odoc.get("org_role") or "owner"
+    if payload["org_id"]:
+        _database._ORG_CACHE[uid] = payload["org_id"]
+    # Q2: viewers are read-only EVERYWHERE, enforced at the front door rather
+    # than per-route so a forgotten decorator can never hand a viewer a write.
+    # Auth endpoints (logout, password change on own account) stay reachable.
+    if (payload["org_role"] == "viewer"
+            and request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and not request.url.path.startswith("/api/auth/")):
+        raise HTTPException(status_code=403, detail="Viewers have read-only access.")
     return payload
+
+
+def require_org_role(*roles: str):
+    """Dependency factory for the Q2 role split. Usage:
+    user = await require_org_role("owner")(request)."""
+    async def dep(request: Request) -> dict:
+        user = await get_current_user(request)
+        if user.get("org_role", "owner") not in roles:
+            raise HTTPException(status_code=403, detail="Not available for your role.")
+        return user
+    return dep
+
+
+require_org_owner = require_org_role("owner")
+
+
+def _org_denied(doc: dict, user: dict) -> bool:
+    """Per-document tenant check (A1): the row's org must be the caller's org.
+
+    A row with no org_id (written mid-migration, before the backfill sweep
+    catches it) falls back to the old per-user ownership test; a row with no
+    owner at all stays readable, exactly as it always was.
+    """
+    doc_org = str(doc.get("org_id") or "")
+    if doc_org:
+        return doc_org != str(user.get("org_id") or "")
+    return bool(doc.get("user_id")) and str(doc.get("user_id")) != str(user["user_id"])
 
 
 def _get_employee_token(request: Request) -> str | None:
@@ -1182,7 +1232,7 @@ async def payroll_salaries(request: Request):
     structures = await get_salary_structures(user["user_id"])
     out = []
     async for e in db.employees.find(
-            {**user_match_field("user_id", user["user_id"]), "status": {"$ne": "terminated"}}):
+            {**org_match_field("user_id", user["user_id"]), "status": {"$ne": "terminated"}}):
         s = structures.get(str(e["_id"]))
         out.append({"employee_id": str(e["_id"]), "name": e.get("name"),
                     "department": e.get("department") or "",
@@ -1198,7 +1248,7 @@ async def payroll_set_salary(request: Request, employee_id: str):
     from bson import ObjectId as _OID
     try:
         emp = await db.employees.find_one(
-            {**user_match_field("user_id", user["user_id"]), "_id": _OID(employee_id)})
+            {**org_match_field("user_id", user["user_id"]), "_id": _OID(employee_id)})
     except Exception:
         emp = None
     if not emp:
@@ -1330,7 +1380,7 @@ async def get_screening_attempts(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     email = str(doc.get("applicant_email") or "").strip().lower()
@@ -1365,7 +1415,7 @@ async def get_screening(request: Request, screening_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
     # Allow access if no user_id (legacy data) or if it belongs to this user
-    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     return doc
 
@@ -1376,7 +1426,7 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     await delete_screening(screening_id)
     return {"deleted": True}
@@ -1408,13 +1458,13 @@ async def update_screening_stage(
         oid = ObjectId(screening_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid screening ID.")
-    doc = await mongodb.screenings.find_one({"_id": oid}, {"user_id": 1})
+    doc = await mongodb.screenings.find_one({"_id": oid}, {"user_id": 1, "org_id": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="Screening not found.")
     # Tenant check — admins bypass
     db_user = await get_user_by_id(user["user_id"])
     is_admin = bool(db_user and db_user.get("role") == "admin")
-    if not is_admin and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if not is_admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     await mongodb.screenings.update_one(
         {"_id": oid},
@@ -1457,7 +1507,7 @@ async def send_email_to_candidate(
         raise HTTPException(status_code=404, detail="Candidate not found.")
     db_user = await get_user_by_id(user["user_id"])
     is_admin = bool(db_user and db_user.get("role") == "admin")
-    if not is_admin and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if not is_admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     # Resolve target email: explicit override > parsed CV email
@@ -1557,7 +1607,7 @@ async def get_candidate_email_history(request: Request, screening_id: str):
     user = await get_current_user(request)
     # Same tenant rule as the send endpoint
     cursor = mongodb.email_history.find(
-        {"screening_id": screening_id, "user_id": user["user_id"]}
+        {"screening_id": screening_id, **org_match(user["user_id"])}
     ).sort("sent_at", -1)
     out = []
     async for row in cursor:
@@ -1578,13 +1628,13 @@ async def get_cv_pdf(request: Request, screening_id: str):
 
     doc = await db.screenings.find_one(
         {"_id": oid},
-        {"cv_pdf_b64": 1, "cv_filename": 1, "user_id": 1, "cv_file_id": 1},
+        {"cv_pdf_b64": 1, "cv_filename": 1, "user_id": 1, "org_id": 1, "cv_file_id": 1},
     )
     if not doc:
         raise HTTPException(status_code=404, detail="CV file not found.")
     # Ownership before content: the old order answered "does this screening have a
     # CV?" for screenings the caller doesn't own.
-    if user["role"] != "admin" and doc.get("user_id") and doc.get("user_id") != user["user_id"]:
+    if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     # application_files is the primary store; cv_pdf_b64 is the legacy copy that
@@ -1690,8 +1740,7 @@ async def owned_job(job_id: str, user: dict) -> dict:
         raise HTTPException(status_code=404, detail="Job not found.")
     db_user = await get_user_by_id(user["user_id"])
     is_admin = bool(db_user and db_user.get("role") == "admin")
-    owner = job.get("user_id")
-    if not is_admin and owner and str(owner) != str(user["user_id"]):
+    if not is_admin and _org_denied(job, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     job["_id"] = str(job["_id"])
     return job
@@ -4555,7 +4604,7 @@ async def create_employee_route(request: Request):
         try:
             s = await db.screenings.find_one(
                 {"_id": _OID(str(body["screening_id"])),
-                 **user_match_field("user_id", user["user_id"])}, {"_id": 1})
+                 **org_match_field("user_id", user["user_id"])}, {"_id": 1})
         except Exception:
             s = None
         if s:
@@ -4813,7 +4862,7 @@ async def update_job_endpoint(
             pass   # silently ignore bad JSON — caller can retry
     if updates:
         result = await mongodb.jobs.update_one(
-            {"_id": ObjectId(job_id), "user_id": user["user_id"]},
+            {"_id": ObjectId(job_id), **org_match(user["user_id"])},
             {"$set": updates}
         )
         if result.matched_count == 0:
@@ -4824,6 +4873,9 @@ async def update_job_endpoint(
 @app.delete("/api/jobs/{job_id}")
 async def delete_job_endpoint(request: Request, job_id: str):
     user = await get_current_user(request)
+    # Ownership BEFORE deletion — without this, any authenticated account
+    # could delete any tenant's job by guessing its id.
+    await owned_job(job_id, user)
     deleted = await delete_job(job_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Job not found.")
@@ -5127,33 +5179,108 @@ async def stripe_webhook(request: Request):
 # ── TEAM ──
 
 @app.post("/api/team/invite")
-async def team_invite(request: Request, email: str = Form(...), role: str = Form("screener")):
-    user = await get_current_user(request)
+async def team_invite(request: Request, email: str = Form(...), role: str = Form("recruiter")):
+    # Q2: only the org OWNER hands out membership.
+    user = await require_org_owner(request)
     db_user = await get_user_by_id(user["user_id"])
     company = db_user.get("company_name", user["company"]) if db_user else user["company"]
     try:
-        invite_id = await invite_team_member(
+        invite = await invite_team_member(
             owner_user_id=user["user_id"],
             email=email,
             role=role,
             company_name=company,
         )
-        # Send invitation email
+        accept_link = f"{APP_URL}/join?invite={invite['token']}"
+        # Send invitation email (best-effort; the link in the response is the
+        # reliable path — the owner can always copy it to the invitee).
         from email_service import send_team_invite_email
         email_sent = send_team_invite_email(
             to_email=email,
             invited_by=user["email"],
             company_name=company,
-            role=role.capitalize(),
+            role=invite["role"].capitalize(),
         )
         return {
             "success": True,
-            "invite_id": invite_id,
+            "invite_id": invite["invite_id"],
+            "role": invite["role"],
+            "accept_link": accept_link,
             "email_sent": email_sent,
-            "message": f"Invitation sent to {email}" if email_sent else f"Invite saved but email not sent — Gmail not configured in Render environment"
+            "message": (f"Invitation sent to {email}" if email_sent
+                        else "Invite created — share the accept link with them directly."),
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+_JOIN_PAGE_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join your team — TopCandidate.pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;
+background:#FAFBFC;color:#142848;min-height:100vh;display:grid;place-items:center;padding:1.5rem}
+.c{background:#fff;border:1px solid #E4E8F0;border-radius:16px;padding:2.5rem 2rem;max-width:440px;
+width:100%;box-shadow:0 4px 12px rgba(20,40,72,.06)}
+h1{font-size:1.3rem;font-weight:800;margin-bottom:.5rem;letter-spacing:-.5px}
+p{color:#4A5970;line-height:1.6;font-size:.92rem;margin-bottom:1.1rem}
+label{display:block;font-size:.8rem;font-weight:600;margin:.9rem 0 .3rem}
+input{width:100%;padding:.65rem .8rem;border:1px solid #D5DBE7;border-radius:8px;font:inherit}
+button{width:100%;margin-top:1.2rem;padding:.75rem;border:0;border-radius:8px;background:#142848;
+color:#fff;font-weight:700;font-size:.95rem;cursor:pointer}
+.err{color:#B4232C;font-size:.85rem;margin-top:.8rem;display:none}</style></head>
+<body><div class="c"><h1>Join {{COMPANY}}</h1>
+<p>You've been invited to join <strong>{{COMPANY}}</strong> on TopCandidate.pro as
+a <strong>{{ROLE}}</strong> ({{EMAIL}}). Choose a password to activate your account.</p>
+<form id="f"><label>Full name</label><input name="full_name" autocomplete="name">
+<label>Password</label><input name="password" type="password" minlength="8" required autocomplete="new-password">
+<button type="submit">Activate account</button><div class="err" id="e"></div></form>
+<script>
+document.getElementById('f').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  fd.append('token', new URLSearchParams(location.search).get('invite') || '');
+  const r = await fetch('/api/team/accept-invite', {method:'POST', body:fd});
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) { location.href = '/login?joined=1'; return; }
+  const e = document.getElementById('e');
+  e.textContent = j.detail || 'Could not activate this invitation.';
+  e.style.display = 'block';
+});
+</script></div></body></html>"""
+
+
+@app.get("/join", include_in_schema=False)
+async def join_page(request: Request, invite: str = ""):
+    """Invite acceptance page. Any non-redeemable token gets the same closed
+    page as a dead job link — nothing to probe."""
+    inv = await get_invite_by_token(invite)
+    if not inv:
+        return _closed_link_page()
+    page = (_JOIN_PAGE_HTML
+            .replace("{{COMPANY}}", _html.escape(inv.get("company_name") or "your team"))
+            .replace("{{ROLE}}", _html.escape(inv.get("role") or "viewer"))
+            .replace("{{EMAIL}}", _html.escape(inv.get("email") or "")))
+    return HTMLResponse(page)
+
+
+@app.post("/api/team/accept-invite")
+async def accept_invite_route(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(""),
+):
+    """Redeem an invite token: creates the member INSIDE the inviter's org with
+    the role the OWNER chose. Unauthenticated by design — the token is the
+    credential; org and role come only from the invite document."""
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    try:
+        member = await accept_team_invite(token, hash_password(password), full_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"success": True, "email": member["email"], "role": member["org_role"]}
 
 
 @app.get("/api/team")
@@ -5164,34 +5291,49 @@ async def get_team(request: Request):
     return {"members": members, "invites": invites}
 
 
+# A1/Q4: the four cross-tenant move tools below are SUPER-ADMIN only and
+# every one of them names an EXPLICIT source or target org — the old
+# match-everything ({}) filters that could swallow every tenant's data in one
+# call are gone. Each move stamps BOTH user_id and org_id so a moved row is
+# never split between two tenancy notions.
+# /api/user/claim-screenings is RETIRED outright: unowned rows are the
+# quarantine org's problem (Q5), never first-come-first-served.
+
 @app.post("/api/admin/migrate-screenings")
-async def migrate_screenings(request: Request):
-    """Admin tool: assign ALL screenings to the admin user."""
-    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
-    from database import db
-    # Reassign ALL screenings to admin
+async def migrate_screenings(request: Request, source_org_id: str = Form(...)):
+    """Super-admin: move one EXPLICIT org's screenings into the caller's org."""
+    user = await require_super_admin(request)
+    from database import db, org_of_user
+    my_org = await org_of_user(user["user_id"])
+    if not my_org:
+        raise HTTPException(status_code=409, detail="Caller has no org.")
     result = await db.screenings.update_many(
-        {},
-        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
+        {"org_id": str(source_org_id)},
+        {"$set": {"user_id": user["user_id"], "org_id": str(my_org),
+                  "company": user["company"]}}
     )
-    return {"migrated": result.modified_count, "message": f"Assigned {result.modified_count} screenings to {user['email']}"}
+    return {"migrated": result.modified_count,
+            "message": f"Moved {result.modified_count} screenings from org {source_org_id} to {user['email']}"}
 
 
 @app.post("/api/admin/transfer-to/{target_email}")
 async def transfer_to_user(request: Request, target_email: str):
-    """Admin: transfer ALL screenings to a specific user by email."""
-    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
+    """Super-admin: transfer the CALLER'S OWN org's screenings to a user's org."""
+    user = await require_super_admin(request)
     target = await get_user_by_email(target_email)
     if not target:
         raise HTTPException(status_code=404, detail=f"User {target_email} not found.")
-    from database import db
+    from database import db, org_of_user
+    my_org = await org_of_user(user["user_id"])
+    target_org = await org_of_user(target["_id"])
+    if not my_org or not target_org:
+        raise HTTPException(status_code=409, detail="Both accounts must have an org.")
     result = await db.screenings.update_many(
-        {},
-        {"$set": {"user_id": target["_id"], "company": target["company_name"]}}
+        {"org_id": str(my_org)},
+        {"$set": {"user_id": target["_id"], "org_id": str(target_org),
+                  "company": target["company_name"]}}
     )
-    # Update screening counts
-    await db.users.update_many({}, {"$set": {"screening_count": 0}})
-    count = await db.screenings.count_documents({"user_id": target["_id"]})
+    count = await db.screenings.count_documents({"org_id": str(target_org)})
     from bson import ObjectId
     await db.users.update_one(
         {"_id": ObjectId(target["_id"])},
@@ -5202,26 +5344,18 @@ async def transfer_to_user(request: Request, target_email: str):
 
 @app.post("/api/admin/migrate-from/{source_user_id}")
 async def migrate_from_user(request: Request, source_user_id: str):
-    """Admin tool: move screenings from one user to admin."""
-    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
-    from database import db
+    """Super-admin: move one EXPLICIT user's screenings into the caller's org."""
+    user = await require_super_admin(request)
+    from database import db, org_of_user
+    my_org = await org_of_user(user["user_id"])
+    if not my_org:
+        raise HTTPException(status_code=409, detail="Caller has no org.")
     result = await db.screenings.update_many(
         {"user_id": source_user_id},
-        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
+        {"$set": {"user_id": user["user_id"], "org_id": str(my_org),
+                  "company": user["company"]}}
     )
     return {"migrated": result.modified_count}
-
-
-@app.post("/api/user/claim-screenings")
-async def claim_my_screenings(request: Request):
-    """Let current user claim all unowned screenings."""
-    user = await get_current_user(request)
-    from database import db
-    result = await db.screenings.update_many(
-        {"$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]},
-        {"$set": {"user_id": user["user_id"], "company": user["company"]}}
-    )
-    return {"claimed": result.modified_count}
 
 
 @app.post("/api/admin/transfer-screenings")
@@ -5231,10 +5365,10 @@ async def transfer_screenings(
     to_user_id: str = Form(""),
     to_email: str = Form(""),
 ):
-    """Transfer all screenings from one user to another."""
-    user = await require_admin(request)   # fresh DB role, never the stale JWT claim
-    from database import db
-    
+    """Super-admin: transfer one explicit user's screenings to another user's org."""
+    user = await require_super_admin(request)
+    from database import db, org_of_user
+
     # Find target user by email if user_id not provided
     if not to_user_id and to_email:
         target = await get_user_by_email(to_email)
@@ -5246,13 +5380,18 @@ async def transfer_screenings(
         target = await get_user_by_id(to_user_id)
         to_company = target["company_name"] if target else ""
 
+    target_org = await org_of_user(to_user_id) if to_user_id else None
+    if not target_org:
+        raise HTTPException(status_code=409, detail="Target account must have an org.")
+
     # If no from_user_id, transfer from current admin
     if not from_user_id:
         from_user_id = user["user_id"]
 
     result = await db.screenings.update_many(
         {"user_id": from_user_id},
-        {"$set": {"user_id": to_user_id, "company": to_company}}
+        {"$set": {"user_id": to_user_id, "org_id": str(target_org),
+                  "company": to_company}}
     )
     return {
         "transferred": result.modified_count,
@@ -5317,7 +5456,7 @@ async def admin_diagnostics(request: Request):
     """
     await require_admin(request)
     from datetime import datetime
-    from database import db as mongodb, user_match
+    from database import db as mongodb, org_match
 
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -5352,9 +5491,9 @@ async def admin_diagnostics(request: Request):
             "stored_screening_count": u.get("screening_count", 0),
             "month_reset_at": u.get("month_reset_at"),
             "screenings_this_month": await mongodb.screenings.count_documents(
-                {**user_match(uid), "created_at": {"$gte": month_start}}
+                {**org_match(uid), "created_at": {"$gte": month_start}}
             ),
-            "screenings_all_time": await mongodb.screenings.count_documents(user_match(uid)),
+            "screenings_all_time": await mongodb.screenings.count_documents(org_match(uid)),
         })
 
     # ── Pending/accepted team invites, so an account's provenance is visible ──
@@ -5628,7 +5767,11 @@ async def api_list_results(
     key_doc, user = await get_api_user(request)
     limit = min(limit, 100)
 
-    query = {"user_id": user["_id"], "source": "api_v1"}
+    # A1: the key's org scopes the read; a legacy key with no org falls back
+    # to the key owner's rows (fail-closed).
+    _org = key_doc.get("org_id")
+    query = {**({"org_id": str(_org)} if _org else {"user_id": user["_id"]}),
+             "source": "api_v1"}
     if job_title:
         query["job_title"] = {"$regex": job_title, "$options": "i"}
     if recommendation:
@@ -5665,10 +5808,11 @@ async def api_get_result(request: Request, screening_id: str):
     """Get full details of a specific screening result."""
     key_doc, user = await get_api_user(request)
     from bson import ObjectId as BsonObjectId
+    _org = key_doc.get("org_id")
     try:
         doc = await db.screenings.find_one({
             "_id": BsonObjectId(screening_id),
-            "user_id": user["_id"]
+            **({"org_id": str(_org)} if _org else {"user_id": user["_id"]}),
         })
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid screening ID.")
@@ -5854,7 +5998,7 @@ async def get_job_details(request: Request, job_id: str):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
     query = {"_id": oid}
     if not is_admin:
-        query.update(user_match_field("user_id", user["user_id"]))   # tenant isolation
+        query.update(org_match_field("user_id", user["user_id"]))   # tenant isolation
     doc = await mongodb.jobs.find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail="Job not found.")

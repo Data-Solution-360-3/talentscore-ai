@@ -1,0 +1,228 @@
+"""
+Tenancy isolation gate (A1) — proves the org_id cutover actually isolates.
+
+WHAT IT PROVES
+    Two orgs, four accounts: org A holds an owner, a recruiter and a viewer;
+    org B holds an owner. Every claim the migration makes is exercised over
+    real HTTP against the live server:
+
+      1. LISTS  — each org's list endpoints return that org's rows and no
+         other org's; the recruiter sees the owner's rows (Q2: hiring data
+         is shared inside the org).
+      2. DIRECT-ID PROBES — org A aiming org B's real ids at every per-doc
+         endpoint (screening get/attempts/cv/stage/delete/email, job
+         update/delete/applications) gets 403/404, never 200.
+      3. ROLES — the viewer reads but cannot write anywhere; the recruiter
+         writes hiring data but cannot invite; only the owner invites.
+      4. HRM — neither recruiter nor owner reaches /api/employees (the
+         super-admin gate is strictly stronger than Q2's owner-only rule).
+      5. CANDIDATE PATH — a row written through upsert_application (the
+         exact function the public apply flow calls) carries the JOB'S org.
+
+    Fixtures are created directly in the database (this runs on the server,
+    like smoke_test), authenticated with minted JWTs, and removed afterwards.
+    Nothing here calls OpenAI or touches real tenant rows.
+
+USAGE
+    python scripts/test_tenancy.py                        # against production
+    python scripts/test_tenancy.py --base http://127.0.0.1:8000
+
+    Exit 0 = every check passed. Exit 1 = any isolation failure.
+"""
+
+import argparse
+import asyncio
+import os
+import sys
+from datetime import datetime
+
+import httpx
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from dotenv import load_dotenv
+load_dotenv()
+
+from pymongo import MongoClient
+from auth import create_token
+
+DEFAULT_BASE = "https://topcandidate.pro"
+MARK = "tenancy-gate.test"          # every fixture carries this, cleanup keys on it
+
+failures = []
+
+
+def check(name: str, ok: bool, note: str = ""):
+    colour = "\033[32mPASS\033[0m" if ok else "\033[31mFAIL\033[0m"
+    print(f"  {colour}  {name}{('  — ' + note) if note else ''}")
+    if not ok:
+        failures.append(name)
+
+
+def token_for(user_doc) -> str:
+    return create_token({
+        "user_id": str(user_doc["_id"]),
+        "email": user_doc["email"],
+        "company": user_doc.get("company_name", ""),
+        "role": "client",
+    })
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", default=DEFAULT_BASE)
+    args = ap.parse_args()
+    base = args.base.rstrip("/")
+
+    uri = os.getenv("MONGO_URI")
+    if not uri:
+        print("MONGO_URI not set — this gate runs on the server."); sys.exit(1)
+    dbx = MongoClient(uri, serverSelectionTimeoutMS=15000,
+                      tlsAllowInvalidCertificates=True)[os.getenv("DB_NAME", "talentscore")]
+
+    # ── fixtures ────────────────────────────────────────────────────────────
+    now = datetime.utcnow()
+    org_a = str(dbx.orgs.insert_one({"name": "TenancyGate A", "owner_user_id": "",
+                                     "fixture": MARK, "created_at": now}).inserted_id)
+    org_b = str(dbx.orgs.insert_one({"name": "TenancyGate B", "owner_user_id": "",
+                                     "fixture": MARK, "created_at": now}).inserted_id)
+
+    def mk_user(email, org, org_role):
+        return dbx.users.insert_one({
+            "email": email, "password": "!", "company_name": f"TenancyGate {org_role}",
+            "role": "client", "active": True, "created_at": now, "screening_count": 0,
+            "plan": "trial", "org_id": org, "org_role": org_role, "fixture": MARK,
+        })
+
+    owner_a = mk_user(f"owner-a@{MARK}", org_a, "owner")
+    rec_a   = mk_user(f"rec-a@{MARK}",   org_a, "recruiter")
+    view_a  = mk_user(f"view-a@{MARK}",  org_a, "viewer")
+    owner_b = mk_user(f"owner-b@{MARK}", org_b, "owner")
+    dbx.orgs.update_one({"_id": {"$eq": __import__("bson").ObjectId(org_a)}},
+                        {"$set": {"owner_user_id": str(owner_a.inserted_id)}})
+
+    def mk_screening(org, uid):
+        return str(dbx.screenings.insert_one({
+            "user_id": str(uid), "org_id": org, "candidate_name": "Fixture Person",
+            "job_title": "Fixture Role", "overall_score": 50, "recommendation": "MAYBE",
+            "stage": "pending", "fixture": MARK, "created_at": now,
+        }).inserted_id)
+
+    def mk_job(org, uid):
+        return str(dbx.jobs.insert_one({
+            "user_id": str(uid), "org_id": org, "title": f"Fixture Job {org[-5:]}",
+            "description": "fixture", "active": True, "fixture": MARK, "created_at": now,
+        }).inserted_id)
+
+    scr_a, scr_b = mk_screening(org_a, owner_a.inserted_id), mk_screening(org_b, owner_b.inserted_id)
+    job_a, job_b = mk_job(org_a, owner_a.inserted_id), mk_job(org_b, owner_b.inserted_id)
+
+    t_owner_a = token_for(dbx.users.find_one({"_id": owner_a.inserted_id}))
+    t_rec_a   = token_for(dbx.users.find_one({"_id": rec_a.inserted_id}))
+    t_view_a  = token_for(dbx.users.find_one({"_id": view_a.inserted_id}))
+    t_owner_b = token_for(dbx.users.find_one({"_id": owner_b.inserted_id}))
+
+    def hdr(t):
+        return {"Authorization": f"Bearer {t}"}
+
+    try:
+        with httpx.Client(base_url=base, timeout=30, follow_redirects=True) as c:
+
+            print("\nLists — each org sees its own rows and only its own")
+            r = c.get("/api/screenings", headers=hdr(t_owner_a))
+            body = r.text
+            check("owner A list has A's row", r.status_code == 200 and scr_a in body)
+            check("owner A list lacks B's row", scr_b not in body)
+            r = c.get("/api/screenings", headers=hdr(t_rec_a))
+            check("recruiter A sees org A's row (shared hiring data)",
+                  r.status_code == 200 and scr_a in r.text)
+            r = c.get("/api/screenings", headers=hdr(t_owner_b))
+            check("owner B list has B's row", r.status_code == 200 and scr_b in r.text)
+            check("owner B list lacks A's row", scr_a not in r.text)
+            r = c.get("/api/jobs", headers=hdr(t_owner_a))
+            check("owner A jobs has A's job", r.status_code == 200 and job_a in r.text)
+            check("owner A jobs lacks B's job", job_b not in r.text)
+
+            print("\nDirect-ID probes — org A aiming at org B's real ids")
+            probes = [
+                ("GET",    f"/api/screenings/{scr_b}",          {}),
+                ("GET",    f"/api/screenings/{scr_b}/attempts", {}),
+                ("GET",    f"/api/screenings/{scr_b}/cv",       {}),
+                ("POST",   f"/api/screenings/{scr_b}/stage",    {"stage": "pending"}),
+                ("DELETE", f"/api/screenings/{scr_b}",          {}),
+                ("POST",   f"/api/candidates/{scr_b}/email",
+                           {"subject": "x", "body": "x"}),
+                ("PUT",    f"/api/jobs/{job_b}",                {"title": "hijack"}),
+                ("DELETE", f"/api/jobs/{job_b}",                {}),
+                ("GET",    f"/api/jobs/{job_b}/applications",   {}),
+            ]
+            for method, path, data in probes:
+                r = c.request(method, path, headers=hdr(t_owner_a),
+                              data=data if method in ("POST", "PUT") else None)
+                check(f"{method} {path.replace(scr_b, '<B-scr>').replace(job_b, '<B-job>')} refused",
+                      r.status_code in (403, 404), f"got {r.status_code}")
+            still = dbx.screenings.find_one({"_id": __import__("bson").ObjectId(scr_b)})
+            check("B's screening still exists after A's delete probe", bool(still))
+            stillj = dbx.jobs.find_one({"_id": __import__("bson").ObjectId(job_b)})
+            check("B's job still exists and untitled-hijacked",
+                  bool(stillj) and stillj.get("title") != "hijack")
+
+            print("\nRoles — viewer read-only, recruiter writes hiring, owner invites")
+            r = c.get("/api/screenings", headers=hdr(t_view_a))
+            check("viewer A can read org A's screenings",
+                  r.status_code == 200 and scr_a in r.text)
+            r = c.post(f"/api/screenings/{scr_a}/stage", headers=hdr(t_view_a),
+                       data={"stage": "shortlisted"})
+            check("viewer A cannot write (stage change 403)", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.delete(f"/api/jobs/{job_a}", headers=hdr(t_view_a))
+            check("viewer A cannot delete a job", r.status_code == 403, f"got {r.status_code}")
+            r = c.post("/api/team/invite", headers=hdr(t_view_a),
+                       data={"email": f"nobody1@{MARK}", "role": "viewer"})
+            check("viewer A cannot invite", r.status_code == 403, f"got {r.status_code}")
+            r = c.post(f"/api/screenings/{scr_a}/stage", headers=hdr(t_rec_a),
+                       data={"stage": "shortlisted"})
+            check("recruiter A CAN change stage on org A's screening",
+                  r.status_code == 200, f"got {r.status_code}")
+            r = c.post("/api/team/invite", headers=hdr(t_rec_a),
+                       data={"email": f"nobody2@{MARK}", "role": "viewer"})
+            check("recruiter A cannot invite (owner-only)", r.status_code == 403,
+                  f"got {r.status_code}")
+
+            print("\nHRM — hidden from every non-super-admin org member (Q2)")
+            for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
+                r = c.get("/api/employees", headers=hdr(tok))
+                check(f"{name} cannot reach HRM", r.status_code == 403, f"got {r.status_code}")
+
+            print("\nCandidate path — application rows carry the JOB'S org")
+            async def _apply():
+                import database
+                await database.connect()
+                job_doc = await database.db.jobs.find_one(
+                    {"_id": __import__("bson").ObjectId(job_a)})
+                app_id, _ = await database.upsert_application(
+                    job_doc, "Fixture Applicant", f"applicant@{MARK}", "",
+                    "cv.pdf", "fixturehash")
+                row = await database.db.applications.find_one(
+                    {"_id": __import__("bson").ObjectId(app_id)})
+                return row
+            row = asyncio.run(_apply())
+            check("upsert_application stamped org A's org_id",
+                  bool(row) and str(row.get("org_id")) == org_a,
+                  f"org_id={row.get('org_id') if row else None}")
+
+    finally:
+        # ── cleanup: everything carrying the fixture mark, plus side effects ──
+        dbx.users.delete_many({"fixture": MARK})
+        dbx.orgs.delete_many({"fixture": MARK})
+        dbx.screenings.delete_many({"fixture": MARK})
+        dbx.jobs.delete_many({"fixture": MARK})
+        dbx.applications.delete_many({"email": f"applicant@{MARK}"})
+        dbx.team_invites.delete_many({"email": {"$regex": MARK}})
+        dbx.email_history.delete_many({"screening_id": {"$in": [scr_a, scr_b]}})
+
+    print(f"\n{len(failures)} FAILED" if failures else "\nALL TENANCY CHECKS PASSED")
+    sys.exit(1 if failures else 0)
+
+
+if __name__ == "__main__":
+    main()
