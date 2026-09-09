@@ -620,6 +620,14 @@ async def batch_page(request: Request):
     return read_template("batch.html")
 
 
+@app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+async def privacy_page():
+    """Public privacy policy (Batch 5). Every claim on this page maps to a
+    mechanism that actually runs — TTL indexes, the retention purge timer, or
+    delete_candidate. If a mechanism changes, this page changes with it."""
+    return HTMLResponse(read_template("privacy.html"))
+
+
 @app.get("/candidate", response_class=HTMLResponse)
 async def candidate_page(request: Request):
     token = get_token_from_request(request)
@@ -752,6 +760,7 @@ async def me(request: Request):
             "email": db_user.get("email", user["email"]),
             "company": db_user.get("company_name", user.get("company", "")),
             "role": db_user.get("role", "client"),
+            "org_role": db_user.get("org_role", "owner"),
             "is_super_admin": bool(db_user.get("is_super_admin")),
             "plan": db_user.get("plan", "trial"),
             "screening_count": db_user.get("screening_count", 0),
@@ -1430,6 +1439,40 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
         raise HTTPException(status_code=403, detail="Access denied.")
     await delete_screening(screening_id)
     return {"deleted": True}
+
+
+@app.post("/api/candidates/{screening_id}/erase")
+async def erase_candidate_route(request: Request, screening_id: str,
+                                confirm: str = Form("")):
+    """ERASURE (Batch 5): irreversible personal-data cascade for one candidate.
+
+    Owner/admin only (a recruiter can reject a candidate, not erase the
+    record of them), org-scoped by the same _org_denied gate as every other
+    candidate route, and armed only by typing ERASE. Leaves the anonymized
+    tombstone; the deletion is logged with who ran it.
+    """
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    if not is_admin and user.get("org_role") != "owner":
+        raise HTTPException(status_code=403,
+                            detail="Only the workspace owner can erase candidate data.")
+    if confirm != "ERASE":
+        raise HTTPException(status_code=400,
+                            detail="Type ERASE to confirm — this permanently deletes all of this candidate's data.")
+    doc = await get_screening_by_id(screening_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found.")
+    if not is_admin and _org_denied(doc, user):
+        raise HTTPException(status_code=403, detail="Access denied.")
+    from database import delete_candidate
+    try:
+        counts = await delete_candidate(screening_id, deleted_by=user["user_id"])
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found.")
+    print(f"[ERASURE] org={user.get('org_id')} by={user.get('email')} "
+          f"screening={screening_id} counts={counts}")
+    return {"success": True, "deleted": counts}
 
 
 @app.post("/api/screenings/{screening_id}/stage")
@@ -3501,6 +3544,12 @@ async def score_application(application_id: str):
             pass
 
 
+# Consent version stamped on every application (Batch 5). Bump when the
+# consent wording or the privacy policy changes MATERIALLY, so each stored
+# consent names the text the candidate actually saw.
+PRIVACY_VERSION = "2026-09-10.v1"
+
+
 @app.post("/api/apply/{token}")
 async def public_apply_submit(
     request: Request,
@@ -3510,10 +3559,17 @@ async def public_apply_submit(
     email: str = Form(...),
     phone: str = Form(""),
     cv_file: UploadFile = File(...),
+    consent: str = Form(""),
 ):
     job = await get_job_by_public_token(token)
     if not job:
         raise HTTPException(status_code=404, detail="This position isn't accepting applications.")
+
+    # Consent is enforced HERE, not just by the checkbox — a direct POST
+    # without it is refused, so no application can exist unconsented.
+    if consent != "1":
+        raise HTTPException(status_code=400,
+                            detail="Please accept the data-processing notice to apply.")
 
     email_norm = (email or "").strip().lower()
     if "@" not in email_norm or len(email_norm) < 5:
@@ -3570,6 +3626,11 @@ async def public_apply_submit(
     application_id, replaced = await upsert_application(
         job, name, email_norm, phone, cv_file.filename or "cv.pdf", iph, cv_hash
     )
+    # Record WHEN they consented and WHICH text version they saw.
+    from bson import ObjectId as _COID
+    await db.applications.update_one(
+        {"_id": _COID(application_id)},
+        {"$set": {"consent_at": _dt.utcnow(), "consent_version": PRIVACY_VERSION}})
     # One-time exception consumed: the next application from this email is blocked again.
     if reapply_allowed:
         try:
@@ -5240,6 +5301,8 @@ a <strong>{{ROLE}}</strong> ({{EMAIL}}). Choose a password to activate your acco
 <form id="f"><label>Full name</label><input name="full_name" autocomplete="name">
 <label>Password</label><input name="password" type="password" minlength="8" required autocomplete="new-password">
 <button type="submit">Activate account</button><div class="err" id="e"></div></form>
+<p style="margin-top:1.1rem;font-size:.78rem;color:#8a93a5;text-align:center">
+By activating you agree to the <a href="/privacy">privacy policy</a>.</p>
 <script>
 document.getElementById('f').addEventListener('submit', async (ev) => {
   ev.preventDefault();

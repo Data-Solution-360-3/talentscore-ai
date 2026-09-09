@@ -174,10 +174,22 @@ input,select,textarea{max-width:100%}
           <input type="file" id="cv" accept="application/pdf,.pdf" style="display:none" onchange="pickFile(this)">
         </div>
 
+        <div class="fw" style="background:#F1F4F9;border:1px solid #E4E8F0;border-radius:10px;padding:.8rem .9rem">
+          <label style="display:flex;gap:.6rem;align-items:flex-start;cursor:pointer;font-size:.8rem;color:#33415c;line-height:1.55">
+            <input type="checkbox" id="consent" style="margin-top:3px;flex:none;width:15px;height:15px">
+            <span>I agree that my CV and application details will be analysed to assess my fit for this role,
+            and — if I'm invited to an AI interview — that a text transcript is kept for 12 months and
+            up to 12 periodic still camera/screen snapshots are kept for 30 days, with tab, paste, and
+            camera signals flagged for <strong>human</strong> review (no continuous video is stored, and no
+            automatic decision is made). Details and deletion requests:
+            <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>. <span style="color:#E16A1F">*</span></span>
+          </label>
+        </div>
+
         <button class="btn" type="submit" id="btn">Submit application</button>
       </form>
 
-      <p class="retention">Your CV is analysed to score your fit for this role. The file is deleted after {{RETENTION_DAYS}} days; the extracted profile is kept so we can consider you for future roles.</p>
+      <p class="retention">Your CV is analysed to score your fit for this role. The file is deleted after {{RETENTION_DAYS}} days; the extracted profile is kept for 12 months.</p>
     </div>
   </div>
 
@@ -271,6 +283,7 @@ async function submitApp(e){
   if(!name){showErr('Please enter your name.');return false;}
   if(!email||email.indexOf('@')<1){showErr('Please enter a valid email address.');return false;}
   if(!picked){showErr('Please attach your CV as a PDF.');return false;}
+  if(!document.getElementById('consent').checked){showErr('Please accept the data-processing notice to apply.');return false;}
 
   const btn=document.getElementById('btn');
   btn.disabled=true;
@@ -278,6 +291,7 @@ async function submitApp(e){
 
   const fd=new FormData();
   fd.append('name',name); fd.append('email',email); fd.append('phone',phone); fd.append('cv_file',picked);
+  fd.append('consent','1');
 
   try{
     const res=await fetch('/api/apply/'+TOKEN,{method:'POST',body:fd});

@@ -101,7 +101,31 @@ async def connect():
     await db.interviews.create_index("user_id")
     await db.interview_written_answers.create_index([("interview_id", 1), ("email", 1)])
     await db.interview_written_answers.create_index("status")
-    await db.interview_sessions.create_index("created_at")
+
+    # ── Batch 5 retention TTLs (12 months from record CREATION) ──
+    # Mongo's TTL monitor deletes docs whose field value is older than
+    # expireAfterSeconds — nothing is purged on deploy day unless a record is
+    # already past 12 months old (verified none at rollout, Sep 2026).
+    # NOTE: `interviews` (recruiter question-set configs) is deliberately NOT
+    # here — it holds no candidate data; TTLing it would delete recruiter setups.
+    async def _ensure_ttl(coll, field: str, seconds: int):
+        """Create a TTL index, replacing a pre-existing PLAIN index on the
+        same key (Mongo refuses same-key/different-options as a conflict).
+        The TTL index still serves the old index's sort/filter duty."""
+        try:
+            await coll.create_index(field, expireAfterSeconds=seconds)
+        except Exception:
+            try:
+                await coll.drop_index(f"{field}_1")
+                await coll.create_index(field, expireAfterSeconds=seconds)
+            except Exception as e:
+                # Never let retention setup take the app down — log and serve.
+                print(f"[RETENTION] TTL index on {coll.name}.{field} failed: {e}")
+
+    RETAIN_12MO = 365 * 24 * 3600
+    await _ensure_ttl(db.interview_sessions, "created_at", RETAIN_12MO)          # transcripts
+    await _ensure_ttl(db.interview_written_answers, "created_at", RETAIN_12MO)   # written answers
+    await _ensure_ttl(db.email_history, "sent_at", RETAIN_12MO)                  # email bodies
     await db.interview_sessions.create_index("status")
     await db.live_interviews.create_index("public_token", unique=True, sparse=True)
     await db.live_interviews.create_index("user_id")
@@ -568,6 +592,67 @@ async def get_dimension_averages_for_user(user_id: str) -> list:
     results = await db.screenings.aggregate(pipeline).to_list(20)
     return [{"name": r["_id"], "avg_score": round(r["avg_score"], 1),
              "count": r["count"]} for r in results]
+
+
+async def delete_candidate(screening_id: str, deleted_by: str = "") -> dict:
+    """ERASURE (Batch 5): full personal-data cascade for one candidate.
+
+    Deletes everything tied to the person across all 8 collections that hold
+    candidate data, then leaves ONE anonymized tombstone — org, job, date,
+    per-collection counts. No name, no email, no hash: the tombstone proves
+    an application existed and was erased, nothing more. IRREVERSIBLE.
+
+    Tenancy is the CALLER'S duty (the route checks _org_denied before calling)
+    — this helper trusts screening_id has already been scoped to the org.
+    """
+    s = await db.screenings.find_one({"_id": ObjectId(screening_id)})
+    if not s:
+        raise ValueError("Screening not found.")
+    sid_obj, sid_str = s["_id"], str(s["_id"])
+    app_id = str(s.get("application_id") or "")
+    email = str(s.get("applicant_email") or "").strip().lower()
+    counts = {}
+
+    counts["screenings"] = (await db.screenings.delete_one({"_id": sid_obj})).deleted_count
+    counts["email_history"] = (await db.email_history.delete_many(
+        {"screening_id": sid_str})).deleted_count
+    # screening_id is stored as ObjectId by the PDF store, application_id as str
+    counts["application_files"] = (await db.application_files.delete_many(
+        {"$or": [{"screening_id": sid_obj}, {"screening_id": sid_str},
+                 *([{"application_id": app_id}] if app_id else [])]})).deleted_count
+    if app_id:
+        try:
+            app_q = {"_id": ObjectId(app_id)}
+        except Exception:
+            app_q = {"_id": app_id}
+        counts["applications"] = (await db.applications.delete_many(app_q)).deleted_count
+        counts["interview_sessions"] = (await db.interview_sessions.delete_many(
+            {"application_id": app_id})).deleted_count
+        counts["live_interviews"] = (await db.live_interviews.delete_many(
+            {"application_id": app_id})).deleted_count
+        counts["proctor_snapshots"] = (await db.proctor_snapshots.delete_many(
+            {"application_id": app_id})).deleted_count
+    else:
+        counts["applications"] = counts["interview_sessions"] = 0
+        counts["live_interviews"] = counts["proctor_snapshots"] = 0
+    if email:
+        wq = {"email": email}
+        if s.get("org_id"):
+            wq["org_id"] = str(s["org_id"])
+        counts["interview_written_answers"] = (
+            await db.interview_written_answers.delete_many(wq)).deleted_count
+    else:
+        counts["interview_written_answers"] = 0
+
+    await db.erasure_tombstones.insert_one({
+        "org_id": str(s.get("org_id") or ""),
+        "job_id": str(s.get("job_id") or ""),
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": str(deleted_by or ""),
+        "deleted_counts": counts,
+        "reason": "erasure_request",
+    })
+    return counts
 
 
 # ─────────────────────────────────────────────────────────────

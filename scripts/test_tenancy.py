@@ -100,11 +100,11 @@ def main():
     dbx.orgs.update_one({"_id": {"$eq": __import__("bson").ObjectId(org_a)}},
                         {"$set": {"owner_user_id": str(owner_a.inserted_id)}})
 
-    def mk_screening(org, uid):
+    def mk_screening(org, uid, **extra):
         return str(dbx.screenings.insert_one({
             "user_id": str(uid), "org_id": org, "candidate_name": "Fixture Person",
             "job_title": "Fixture Role", "overall_score": 50, "recommendation": "MAYBE",
-            "stage": "pending", "fixture": MARK, "created_at": now,
+            "stage": "pending", "fixture": MARK, "created_at": now, **extra,
         }).inserted_id)
 
     def mk_job(org, uid):
@@ -113,8 +113,36 @@ def main():
             "description": "fixture", "active": True, "fixture": MARK, "created_at": now,
         }).inserted_id)
 
-    scr_a, scr_b = mk_screening(org_a, owner_a.inserted_id), mk_screening(org_b, owner_b.inserted_id)
     job_a, job_b = mk_job(org_a, owner_a.inserted_id), mk_job(org_b, owner_b.inserted_id)
+
+    # scr_a carries a full personal-data trail across every collection the
+    # erasure cascade must clear (Batch 5); scr_b stays minimal.
+    erase_email = f"erase-me@{MARK}"
+    from bson import ObjectId as _OID
+    app_a = str(dbx.applications.insert_one({
+        "job_id": job_a, "email": erase_email, "name": "Fixture Person",
+        "org_id": org_a, "status": "pending", "submitted_at": now,
+        "fixture": MARK}).inserted_id)
+    scr_a = mk_screening(org_a, owner_a.inserted_id,
+                         application_id=app_a, applicant_email=erase_email)
+    scr_b = mk_screening(org_b, owner_b.inserted_id)
+    dbx.application_files.insert_one({
+        "application_id": app_a, "screening_id": _OID(scr_a), "data": b"pdfbytes",
+        "org_id": org_a, "fixture": MARK, "created_at": now})
+    dbx.interview_sessions.insert_one({
+        "application_id": app_a, "org_id": org_a, "created_at": now,
+        "transcript": [{"role": "ai", "text": "q"}, {"role": "you", "text": "a"}],
+        "fixture": MARK})
+    dbx.live_interviews.insert_one({
+        "application_id": app_a, "org_id": org_a, "created_at": now, "fixture": MARK})
+    dbx.proctor_snapshots.insert_one({
+        "application_id": app_a, "org_id": org_a, "token": f"tok-{MARK}",
+        "created_at": now, "fixture": MARK})
+    dbx.interview_written_answers.insert_one({
+        "email": erase_email, "org_id": org_a, "created_at": now, "fixture": MARK})
+    dbx.email_history.insert_one({
+        "screening_id": scr_a, "org_id": org_a, "sent_at": now,
+        "body": "personal email body", "fixture": MARK})
 
     t_owner_a = token_for(dbx.users.find_one({"_id": owner_a.inserted_id}))
     t_rec_a   = token_for(dbx.users.find_one({"_id": rec_a.inserted_id}))
@@ -210,15 +238,69 @@ def main():
                   bool(row) and str(row.get("org_id")) == org_a,
                   f"org_id={row.get('org_id') if row else None}")
 
+            print("\nErasure (Batch 5) — owner-only, org-scoped, full cascade")
+            r = c.post(f"/api/candidates/{scr_a}/erase", headers=hdr(t_view_a),
+                       data={"confirm": "ERASE"})
+            check("viewer A cannot erase", r.status_code == 403, f"got {r.status_code}")
+            r = c.post(f"/api/candidates/{scr_a}/erase", headers=hdr(t_rec_a),
+                       data={"confirm": "ERASE"})
+            check("recruiter A cannot erase (owner-only)", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.post(f"/api/candidates/{scr_b}/erase", headers=hdr(t_owner_a),
+                       data={"confirm": "ERASE"})
+            check("owner A CANNOT erase org B's candidate (cross-org)",
+                  r.status_code in (403, 404), f"got {r.status_code}")
+            still_b = dbx.screenings.find_one({"_id": _OID(scr_b)})
+            check("org B's screening survived the cross-org erase attempt", bool(still_b))
+            r = c.post(f"/api/candidates/{scr_a}/erase", headers=hdr(t_owner_a),
+                       data={"confirm": "delete"})
+            check("wrong confirm string refused (must type ERASE)",
+                  r.status_code == 400, f"got {r.status_code}")
+            r = c.post(f"/api/candidates/{scr_a}/erase", headers=hdr(t_owner_a),
+                       data={"confirm": "ERASE"})
+            check("owner A CAN erase own candidate", r.status_code == 200,
+                  f"got {r.status_code}")
+            residue = {
+                "screenings": dbx.screenings.count_documents({"_id": _OID(scr_a)}),
+                "applications": dbx.applications.count_documents({"_id": _OID(app_a)}),
+                "application_files": dbx.application_files.count_documents(
+                    {"application_id": app_a}),
+                "interview_sessions": dbx.interview_sessions.count_documents(
+                    {"application_id": app_a}),
+                "live_interviews": dbx.live_interviews.count_documents(
+                    {"application_id": app_a}),
+                "proctor_snapshots": dbx.proctor_snapshots.count_documents(
+                    {"application_id": app_a}),
+                "interview_written_answers": dbx.interview_written_answers.count_documents(
+                    {"email": erase_email}),
+                "email_history": dbx.email_history.count_documents(
+                    {"screening_id": scr_a}),
+            }
+            for coll_name, left in residue.items():
+                check(f"erasure cleared {coll_name}", left == 0, f"{left} rows left")
+            tomb = dbx.erasure_tombstones.find_one({"org_id": org_a})
+            check("anonymized tombstone exists", bool(tomb))
+            leak = [k for k in (tomb or {}) if k in
+                    ("email", "name", "candidate_name", "applicant_email", "phone")] \
+                or [v for v in (tomb or {}).values()
+                    if isinstance(v, str) and erase_email in v]
+            check("tombstone carries NO personal data", bool(tomb) and not leak,
+                  f"leaked: {leak}" if leak else "")
+
     finally:
         # ── cleanup: everything carrying the fixture mark, plus side effects ──
         dbx.users.delete_many({"fixture": MARK})
         dbx.orgs.delete_many({"fixture": MARK})
         dbx.screenings.delete_many({"fixture": MARK})
         dbx.jobs.delete_many({"fixture": MARK})
-        dbx.applications.delete_many({"email": f"applicant@{MARK}"})
+        dbx.applications.delete_many({"email": {"$regex": MARK}})
         dbx.team_invites.delete_many({"email": {"$regex": MARK}})
         dbx.email_history.delete_many({"screening_id": {"$in": [scr_a, scr_b]}})
+        for coll in ("applications", "application_files", "interview_sessions",
+                     "live_interviews", "proctor_snapshots",
+                     "interview_written_answers", "email_history"):
+            dbx[coll].delete_many({"fixture": MARK})
+        dbx.erasure_tombstones.delete_many({"org_id": {"$in": [org_a, org_b]}})
 
     print(f"\n{len(failures)} FAILED" if failures else "\nALL TENANCY CHECKS PASSED")
     sys.exit(1 if failures else 0)

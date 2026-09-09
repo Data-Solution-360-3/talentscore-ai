@@ -1489,6 +1489,7 @@ img,svg,video{max-width:100%}
       <button class="btn btn-ghost btn-sm" onclick="actionAddEmployee()" title="Create an employee record pre-filled from this candidate">＋ Add as employee</button>
       <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>Send email</button>
       <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
+      <button class="btn btn-ghost btn-sm" id="btn-erase" style="display:none;color:var(--red,#dc2626)" onclick="eraseCandidate()" title="Permanently delete ALL of this candidate's data (privacy erasure) — irreversible">Erase data…</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
     </div>
   </div>
@@ -2688,6 +2689,24 @@ async function quickAction(id, action){
   }
 }
 
+// ── ERASURE (Batch 5) — owner/admin only; server re-checks role + org ──
+async function eraseCandidate(){
+  if(!currentCandId) return;
+  const typed = prompt(
+    'PRIVACY ERASURE — this permanently deletes ALL of this candidate\'s data: '+
+    'application, CV, parsed profile, interview transcript & scores, snapshots, '+
+    'written answers, and email history. Only an anonymized tombstone remains. '+
+    'This CANNOT be undone.\n\nType ERASE to confirm:');
+  if(typed === null) return;
+  if(typed !== 'ERASE'){ toast('Erasure cancelled — you must type ERASE exactly.', {type:'warning'}); return; }
+  const fd = new FormData(); fd.append('confirm','ERASE');
+  const res = await fetch('/api/candidates/'+currentCandId+'/erase', {method:'POST', body:fd, credentials:'include'});
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ toast(data.detail || 'Erasure failed.', {type:'error'}); return; }
+  toast('Candidate data erased across all collections. An anonymized tombstone was kept.', {type:'success', duration:8000});
+  closeModal('cand-modal');
+  loadFromDB();
+}
 async function actionShortlist(){ await quickAction(currentCandId,'shortlist'); closeModal('cand-modal'); }
 async function actionReject(){    await quickAction(currentCandId,'reject');    closeModal('cand-modal'); }
 async function actionInterview(){ await quickAction(currentCandId,'interview'); closeModal('cand-modal'); }
@@ -5392,6 +5411,11 @@ async function loadFromDB(){
     window._meCache = me;
     // Gate the HRM side: reveal the toggle only for super-admin, hide for clients.
     applyModeAccess(me.is_super_admin === true);
+    // Erasure is owner/admin only — the server enforces this; hiding the
+    // button just keeps the UI honest for recruiters/viewers.
+    if(me.org_role === 'owner' || me.role === 'admin'){
+      document.getElementById('btn-erase')?.style.removeProperty('display');
+    }
 
     // Fetch screenings, jobs in parallel - don't let stats failure block
     const [screenRes,jobsRes]=await Promise.all([
