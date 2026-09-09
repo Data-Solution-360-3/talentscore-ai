@@ -31,6 +31,7 @@ async def screen_single_cv(
     extra_fields: dict = None,
     weights: dict = None,
     jd_requirements: dict = None,
+    model: str = None,   # per-job CV-model pin (forward-only 4o/mini seam)
 ) -> dict:
     """
     Screen one CV. Called concurrently for all CVs in the batch.
@@ -60,6 +61,7 @@ async def screen_single_cv(
                 api_key=api_key,
                 weights=weights,
                 jd_requirements=jd_requirements,
+                model=model,
             )
             if error:
                 await on_progress(index, "failed", filename, None, error=error)
@@ -109,6 +111,7 @@ async def run_batch_screening(
     extra_fields: dict = None,
     weights: dict = None,
     jd_requirements: dict = None,
+    model: str = None,   # per-job CV-model pin (forward-only 4o/mini seam)
 ) -> dict:
     """
     Screen a batch of CVs concurrently.
@@ -145,6 +148,7 @@ async def run_batch_screening(
             extra_fields=extra_fields or {},
             weights=weights,
             jd_requirements=jd_requirements,
+            model=model,
         )
         for i, (filename, file_bytes) in enumerate(files)
     ]

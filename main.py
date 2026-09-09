@@ -874,14 +874,20 @@ async def batch_screen_endpoint(
     # Without job_id, fall through to scorer defaults. Same path for any job that
     # hasn't had weights set — preserves backward compat for existing data.
     job_weights = None
+    batch_cv_model = None   # None = pipeline default; pinned jobs override below
     if job_id:
         try:
             from database import db as mongodb
             from bson import ObjectId
-            job_doc = await mongodb.jobs.find_one({"_id": ObjectId(job_id)}, {"weights": 1})
+            job_doc = await mongodb.jobs.find_one({"_id": ObjectId(job_id)},
+                                                  {"weights": 1, "cv_scoring_model": 1})
             if job_doc and isinstance(job_doc.get("weights"), dict):
                 job_weights = job_doc["weights"]
                 print(f"[BATCH-WEIGHTS] using custom weights for job {job_id}: {job_weights}")
+            if job_doc and job_doc.get("cv_scoring_model"):
+                # Pinned job (pre-mini-switch): the whole batch scores on its
+                # model so this posting never mixes calibrations.
+                batch_cv_model = job_doc["cv_scoring_model"]
         except Exception as e:
             print(f"[BATCH-WEIGHTS] failed to load weights for job {job_id}: {e}")
 
@@ -915,13 +921,14 @@ async def batch_screen_endpoint(
 
             # One JD parse for the whole batch instead of one per CV — so every
             # candidate in this run is measured against an identical rubric.
-            jd_req = await resolve_jd_requirements(job_id, jd_text)
+            jd_req = await resolve_jd_requirements(job_id, jd_text, model=batch_cv_model)
             results = await run_batch_screening(
                 files=files, jd_text=jd_text,
                 api_key=OPENAI_API_KEY, on_progress=on_progress,
                 extra_fields=extra,
                 weights=job_weights,
                 jd_requirements=jd_req,
+                model=batch_cv_model,
             )
             # Also tag results in memory for the response
             for r in results.get("results", []):
@@ -1637,7 +1644,7 @@ this link, ask them for an up-to-date one.</p>
 </div></body></html>"""
 
 
-async def resolve_jd_requirements(job_id: str, jd_text: str):
+async def resolve_jd_requirements(job_id: str, jd_text: str, model: str | None = None):
     """Parse a job's description once and reuse it for every candidate.
 
     Cost is the smaller half of this. The larger half is fairness: the JD parse
@@ -1653,13 +1660,16 @@ async def resolve_jd_requirements(job_id: str, jd_text: str):
 
     if not job_id or not (jd_text or "").strip():
         return None
+    # The cache stays keyed on the model that actually parses (per-job pin or
+    # default) — a 4o-pinned job never reads a mini parse and vice versa.
+    m = model or PIPELINE_MODEL
     try:
-        cached = await get_cached_jd_parse(job_id, jd_text, PIPELINE_MODEL)
+        cached = await get_cached_jd_parse(job_id, jd_text, m)
         if cached:
             return cached
-        parsed = await parse_jd_only(jd_text, OPENAI_API_KEY)
+        parsed = await parse_jd_only(jd_text, OPENAI_API_KEY, model=m)
         if parsed:
-            await save_jd_parse(job_id, jd_text, PIPELINE_MODEL, parsed)
+            await save_jd_parse(job_id, jd_text, m, parsed)
         return parsed
     except Exception as e:
         print(f"[JD-CACHE] falling back to inline parse for job {job_id}: {e}")
@@ -3221,13 +3231,18 @@ async def score_application(application_id: str):
         # Public applicants trickle in one at a time, so without this every
         # single applicant would buy their own JD parse — and be scored against
         # it rather than against the same one as everyone else on the posting.
-        jd_req = await resolve_jd_requirements(app_doc["job_id"], jd_text)
+        # Per-job CV-model pin: jobs stamped before the 4o->mini switch keep
+        # gpt-4o so no posting mixes calibrations; unstamped (new) jobs use
+        # the default (gpt-4o-mini).
+        cv_model = job.get("cv_scoring_model") or None
+        jd_req = await resolve_jd_requirements(app_doc["job_id"], jd_text, model=cv_model)
         result, err = await run_screening_pipeline(
             cv_text=cv_text,
             jd_text=jd_text,
             api_key=OPENAI_API_KEY,
             weights=weights,
             jd_requirements=jd_req,
+            model=cv_model,
         )
         if err or not result:
             # Money may already be spent — the reservation is NOT released.
@@ -3758,9 +3773,14 @@ async def job_interview_questions_generate(request: Request, job_id: str):
             return max(lo, min(hi, int(body.get(key, default))))
         except Exception:
             return default
+    # Defaults moved to a 50/50 spoken/written mix (2026-09-09, cost decision):
+    # 2 topics x (1 main + 2 follow-ups) = 6 spoken + 6 scenario = 12. Written
+    # questions cost ~nothing (text-only section) and typed answers carry no
+    # ESL transcription penalty. Recruiters can still set any mix per job;
+    # existing approved sets are untouched until regenerated.
     n_topics = _clamp("topics", 2, 1, 4)
-    followups = _clamp("followups", 3, 1, 5)
-    scen_k = _clamp("scenario_questions", 4, 2, 8)
+    followups = _clamp("followups", 2, 1, 5)
+    scen_k = _clamp("scenario_questions", 6, 2, 8)
     if not await rate_limit_allows(f"iqgen:{job_id}", 10, 86400):
         raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
 

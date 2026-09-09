@@ -935,9 +935,10 @@ Respond ONLY with this JSON:
 # ─────────────────────────────────────────────────────────────
 
 async def gpt_json_call(client: AsyncOpenAI, system: str, user: str,
-                        temperature: float = 0.0, max_tokens: int = 2500) -> dict:
+                        temperature: float = 0.0, max_tokens: int = 2500,
+                        model: str | None = None) -> dict:
     response = await client.chat.completions.create(
-        model=PIPELINE_MODEL,
+        model=model or PIPELINE_MODEL,
         max_tokens=max_tokens,
         temperature=temperature,
         # Best-effort determinism: with a fixed seed, identical inputs tend to
@@ -1240,13 +1241,18 @@ def cv_is_self_consistent(cv: dict) -> tuple[bool, str]:
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
 
-# The model every call in this pipeline uses. Named rather than repeated inline
-# so a cached JD parse can be keyed on it — a cache keyed on a model string that
-# drifts from the model actually used is worse than no cache.
-PIPELINE_MODEL = "gpt-4o"
+# The DEFAULT model for this pipeline. gpt-4o-mini since 2026-09-09 (A/B'd on
+# real CVs: fairness margins +80, floors held, evidence equally specific,
+# consistency ~= gpt-4o's own; ~16x cheaper). FORWARD-ONLY calibration seam:
+# jobs created before the switch carry cv_scoring_model="gpt-4o" (stamped at
+# migration) and every scoring call for them passes that pin through `model=`,
+# so no single posting mixes 4o- and mini-calibrated scores. The three
+# interview scorers are NOT this pipeline and stay on gpt-4o (mini failed the
+# scenario emptiness floor). Cached JD parses stay keyed on the model used.
+PIPELINE_MODEL = "gpt-4o-mini"
 
 
-async def parse_jd_only(jd_text: str, api_key: str) -> dict:
+async def parse_jd_only(jd_text: str, api_key: str, model: str | None = None) -> dict:
     """Parse a job description into structured requirements, once.
 
     Exposed so a caller can parse a JD a single time per job and reuse the
@@ -1254,12 +1260,14 @@ async def parse_jd_only(jd_text: str, api_key: str) -> dict:
     Same prompt and same call the pipeline makes inline — no second code path.
     """
     client = AsyncOpenAI(api_key=api_key)
-    return await gpt_json_call(client, JD_PARSE_PROMPT, build_jd_parse_prompt(jd_text))
+    return await gpt_json_call(client, JD_PARSE_PROMPT, build_jd_parse_prompt(jd_text),
+                               model=model)
 
 
 async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
                                   weights: dict | None = None,
-                                  jd_requirements: dict | None = None) -> tuple[dict, str | None]:
+                                  jd_requirements: dict | None = None,
+                                  model: str | None = None) -> tuple[dict, str | None]:
     """Full screening pipeline. Returns (result_dict, error_str_or_None).
 
     `weights` is an optional per-job override of the dimension weights. If None,
@@ -1270,6 +1278,9 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
     keeps working unchanged."""
     try:
         client = AsyncOpenAI(api_key=api_key)
+        # Per-job model pin (forward-only calibration seam): None = the
+        # current default; jobs stamped "gpt-4o" keep the old calibration.
+        m = model or PIPELINE_MODEL
 
         # ── STEP 1A + 1B in parallel ──
         # jd_requirements may be supplied by the caller from the job document's
@@ -1280,12 +1291,12 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # every candidate faces an identical rubric.
         if jd_requirements is None:
             cv_profile, jd_requirements = await asyncio.gather(
-                gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text)),
-                gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text))
+                gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m),
+                gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text), model=m)
             )
         else:
             cv_profile = await gpt_json_call(
-                client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text)
+                client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m
             )
 
         # ── Self-consistency: one retry if the model contradicted itself ──
@@ -1295,7 +1306,7 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
                 f"\n\nIMPORTANT: Your previous parse had a contradiction: {reason}\n"
                 f"Re-parse carefully. Sum years from actual roles in work_experience."
             )
-            cv_profile = await gpt_json_call(client, CV_STRUCTURE_PROMPT, retry_prompt)
+            cv_profile = await gpt_json_call(client, CV_STRUCTURE_PROMPT, retry_prompt, model=m)
 
         # ── STEP 1C: deterministic tenure analysis (no GPT) ──
         tenure = analyze_tenure(cv_profile)
@@ -1309,8 +1320,8 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # fits its role; upside keeps a little latitude for benefit-of-doubt.
         # The 60/40 blend and code-side recompute are unchanged.
         strict_result, upside_result = await asyncio.gather(
-            gpt_json_call(client, SCORING_SYSTEM_PROMPT, strict_prompt, temperature=0.0),
-            gpt_json_call(client, SCORING_SYSTEM_PROMPT, upside_prompt, temperature=0.2),
+            gpt_json_call(client, SCORING_SYSTEM_PROMPT, strict_prompt, temperature=0.0, model=m),
+            gpt_json_call(client, SCORING_SYSTEM_PROMPT, upside_prompt, temperature=0.2, model=m),
         )
 
         # ── Detect hard-requirement gaps deterministically ──
@@ -1328,6 +1339,7 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         final["parsed_cv"] = cv_profile
         final["parsed_jd"] = jd_requirements
         final["weights_used"] = normalize_weights(weights)
+        final["cv_scoring_model"] = m   # traceability across the 4o->mini seam
         final["authenticity"] = authenticity
 
         # If authenticity is strongly flagged, surface it as a hiring risk so it
