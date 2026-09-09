@@ -1036,25 +1036,6 @@ async function logout(){
   window.location.href='/login';
 }
 
-async function migrateAll(){
-  if(!confirm('This will assign ALL screenings to your admin account. Continue?'))return;
-  const res=await fetch('/api/admin/migrate-screenings',{method:'POST',credentials:'include'});
-  const data=await res.json();
-  const el=document.getElementById('migrate-result');
-  el.textContent='✓ '+data.message;el.style.display='block';
-  setTimeout(()=>loadAll(),1000);
-}
-
-async function migrateFromUser(){
-  const userId=document.getElementById('migrate-from-user').value;
-  if(!userId){alert('Please select a user');return;}
-  const res=await fetch('/api/admin/migrate-from/'+userId,{method:'POST',credentials:'include'});
-  const data=await res.json();
-  const el=document.getElementById('migrate-result');
-  el.textContent='✓ Moved '+data.migrated+' screenings';el.style.display='block';
-  setTimeout(()=>loadAll(),1000);
-}
-
 // ── DEMO REQUESTS (super-admin lead inbox) ──
 let _demos=[];
 const DEMO_STATUSES=['new','contacted','scheduled','closed'];

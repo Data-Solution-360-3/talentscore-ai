@@ -504,8 +504,8 @@ img,video{max-width:100%}
       <div class="card" style="border-color:var(--border2)">
         <div class="card-title" style="margin-bottom:.5rem">Team roles</div>
         <div style="font-size:13px;color:var(--t2);line-height:1.8">
-          <strong style="color:var(--text)">Admin</strong> — Full access, can invite/remove members, manage billing<br>
-          <strong style="color:var(--text)">Screener</strong> — Can screen CVs and view results, cannot manage team<br>
+          <strong style="color:var(--text)">Owner</strong> — Full access, can invite members, manage billing<br>
+          <strong style="color:var(--text)">Recruiter</strong> — Can screen CVs and manage candidates, cannot manage team<br>
           <strong style="color:var(--text)">Viewer</strong> — Can only view screening results, cannot run new screenings
         </div>
       </div>
@@ -690,11 +690,11 @@ img,video{max-width:100%}
     <div class="form-group"><label class="form-label">Email address *</label><input class="form-input" id="invite-email" type="email" placeholder="colleague@company.com"></div>
     <div class="form-group"><label class="form-label">Role</label>
       <select class="form-select" id="invite-role">
-        <option value="screener">Screener — can run screenings and view results</option>
+        <option value="recruiter">Recruiter — can run screenings and manage candidates</option>
         <option value="viewer">Viewer — can only view results</option>
       </select>
     </div>
-    <div class="form-hint" style="margin-top:-4px">They'll receive an email invitation to join your workspace.</div>
+    <div class="form-hint" style="margin-top:-4px">You'll get an invite link to share — they set a password and join your workspace.</div>
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('invite-modal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="sendInvite()">Send invitation</button>
@@ -800,6 +800,7 @@ function nav(id, el){
   if(id==='api') loadApiKeys();
   if(id==='usage') refreshUsage();
   if(id==='email-templates') loadEmailTemplatesPage();
+  if(id==='team') loadTeam();
 }
 
 // ── EMAIL TEMPLATES ──
@@ -1176,6 +1177,29 @@ async function manageBilling(){
 }
 
 // ── TEAM ──
+function escTeam(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+async function loadTeam(){
+  const tb=document.getElementById('team-tbl');
+  if(!tb)return;
+  try{
+    const res=await fetch('/api/team',{credentials:'include'});
+    if(!res.ok)return;
+    const data=await res.json();
+    const rows=[];
+    (data.members||[]).forEach(m=>{
+      rows.push('<tr><td>'+escTeam(m.full_name||m.company_name||'—')+'</td><td>'+escTeam(m.email)+'</td>'+
+        '<td style="text-transform:capitalize">'+escTeam(m.org_role||'member')+'</td>'+
+        '<td><span style="color:var(--ok,#2e7d32)">Active</span></td><td>—</td></tr>');
+    });
+    (data.invites||[]).forEach(i=>{
+      rows.push('<tr><td>—</td><td>'+escTeam(i.email)+'</td>'+
+        '<td style="text-transform:capitalize">'+escTeam(i.role||'viewer')+'</td>'+
+        '<td><span style="color:var(--t3)">Invited</span></td><td>—</td></tr>');
+    });
+    tb.innerHTML=rows.length?rows.join('')
+      :'<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">You are the only member. Invite your team!</td></tr>';
+  }catch(e){}
+}
 async function sendInvite(){
   const email=document.getElementById('invite-email').value.trim();
   const role=document.getElementById('invite-role').value;
@@ -1189,11 +1213,22 @@ async function sendInvite(){
     if(!res.ok)throw new Error(data.detail||'Failed');
     closeModal('invite-modal');
     document.getElementById('invite-email').value='';
-    if(data.email_sent){
-      toast('Invitation email sent to '+email, {type:'success'});
-    } else {
-      toast('Invite saved for '+email+', but email could not be sent — Gmail is not configured on the server', {type:'warning', duration:10000});
+    // The accept link is the reliable path (email is best-effort): put it on
+    // the clipboard so the owner can paste it straight to the invitee.
+    let copied=false;
+    if(data.accept_link){
+      try{await navigator.clipboard.writeText(data.accept_link);copied=true;}catch(e){}
     }
+    if(data.email_sent){
+      toast('Invitation email sent to '+email+(copied?' — invite link also copied to your clipboard':''), {type:'success', duration:8000});
+    } else if(copied){
+      toast('Invite link for '+email+' copied to your clipboard — send it to them to complete signup', {type:'success', duration:10000});
+    } else if(data.accept_link){
+      window.prompt('Invite created for '+email+'. Copy this link and send it to them:', data.accept_link);
+    } else {
+      toast('Invite saved for '+email+', but no email was sent — ask them to contact you for access', {type:'warning', duration:10000});
+    }
+    loadTeam();
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
 
