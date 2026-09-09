@@ -241,7 +241,9 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
             c = int(m.get("correct"))
         except Exception:
             continue
-        if q and len(opts) >= 2 and 0 <= c < len(opts):
+        # Exactly FOUR options — malformed MCQs are dropped rather than
+        # shipped; the recruiter sees fewer MCQs and can regenerate or add.
+        if q and len(opts) == 4 and 0 <= c < 4:
             mcq.append({"q": q, "options": opts, "correct": c})
     if not text or len(questions) < 2:
         return None, "The model returned an unusable scenario — try again."

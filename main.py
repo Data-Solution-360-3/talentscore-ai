@@ -2009,7 +2009,8 @@ def _normalize_scenario(raw) -> dict | None:
             c = int(m.get("correct"))
         except Exception:
             continue
-        if q and len(opts) >= 2 and 0 <= c < len(opts):
+        # Exactly FOUR options per MCQ — the confirmed product requirement.
+        if q and len(opts) == 4 and 0 <= c < 4:
             mcq.append({"q": q, "options": opts, "correct": c})
     if not text or len(questions) < 2:
         return None
@@ -2130,16 +2131,20 @@ def _build_live_instructions(questions: list, max_turns: int,
             qlines = []
             for m in (scenario.get("mcq") or []):
                 i += 1
-                opts = "  ".join(f"({chr(97+oi)}) {o}" for oi, o in enumerate(m["options"]))
-                qlines.append(f"  {i}. (MCQ) {m['q']}\n     Options: {opts}")
+                # one option per line, NO letters — the model must pass these
+                # exact strings as an array; letter prefixes leaked into the
+                # candidate's screen when they lived on one formatted line.
+                opts = "\n".join(f"       - {o}" for o in m["options"])
+                qlines.append(f"  {i}. (MCQ) {m['q']}\n     The options (pass EXACTLY these strings, in this order, as the options array — do not add letters or numbering):\n{opts}")
             for q in scenario["questions"]:
                 i += 1
                 qlines.append(f"  {i}. (TYPED) {q}")
             mcq_rule = (
                 "- For each (MCQ) question: call the tool begin_mcq_answer with the EXACT question and "
-                "its EXACT options in order, then wait in silence for their choice. NEVER say, hint at, "
-                "or react to which option is right — you do not know the answer key; acknowledge every "
-                "choice neutrally ('noted') and move on.\n"
+                "the options as an ARRAY of the exact option strings, in order, without adding letters "
+                "or numbering. Then wait in silence for their choice. NEVER say, hint at, or react to "
+                "which option is right — you do not know the answer key; acknowledge every choice "
+                "neutrally ('noted') and move on.\n"
                 if scenario.get("mcq") else "")
             scen_block = (
                 # "WRITTEN SCENARIO" stays in the heading — the smoke lock greps it.
@@ -2208,8 +2213,8 @@ def _build_live_instructions(questions: list, max_turns: int,
                k=_scen_turns(scenario), max_turns=max_turns,
                scenario=scenario["text"].replace('"', "'"),
                qlist="\n".join(
-                   [f"  {i+1}. (MCQ) {m['q']}\n     Options: "
-                    + "  ".join(f"({chr(97+oi)}) {o}" for oi, o in enumerate(m["options"]))
+                   [f"  {i+1}. (MCQ) {m['q']}\n     The options (pass EXACTLY these strings, in order, as the options array — no letters or numbering):\n"
+                    + "\n".join(f"       - {o}" for o in m["options"])
                     for i, m in enumerate(scenario.get("mcq") or [])]
                    + [f"  {len(scenario.get('mcq') or [])+i+1}. (TYPED) {q}"
                       for i, q in enumerate(scenario["questions"])]))
@@ -2543,26 +2548,54 @@ async def score_live_session(session_id: str):
         mcq_defs = (scen_cfg or {}).get("mcq") or []
         if scenario_result is not None and mcq_defs:
             picks = [t for t in full if (t or {}).get("mode") == "mcq"]
+
+            # Match each config MCQ to its pick by QUESTION TEXT (the client
+            # tags every pick with `mq`), falling back to order only when no
+            # text match exists. Order-based pairing silently cross-graded
+            # answers when the model asked MCQs out of sequence (seen in a
+            # real session) — text matching makes that impossible.
+            def _norm(s):
+                return " ".join(str(s or "").lower().split())[:80]
+            used = set()
+            def _pick_for(mdef):
+                key = _norm(mdef["q"])
+                for pi, p in enumerate(picks):
+                    if pi in used:
+                        continue
+                    mq = _norm((p or {}).get("mq"))
+                    if mq and key and (mq == key or mq in key or key in mq):
+                        used.add(pi); return p
+                for pi, p in enumerate(picks):   # fallback: first unused, in order
+                    if pi not in used:
+                        used.add(pi); return p
+                return None
+
             correct, detail = 0, []
-            for idx, mdef in enumerate(mcq_defs):
-                pick = picks[idx] if idx < len(picks) else None
+            for mdef in mcq_defs:
+                pick = _pick_for(mdef)
                 ci = pick.get("choice") if isinstance(pick, dict) else None
                 ok = isinstance(ci, int) and ci == mdef["correct"]
                 correct += 1 if ok else 0
                 detail.append({"q": mdef["q"], "picked": ci,
                                "picked_text": str((pick or {}).get("text", ""))[:200],
+                               "matched_by": ("question" if pick and _norm(pick.get("mq")) else "order"),
                                "correct_index": mdef["correct"], "correct": ok})
             mcq_pct = round(100 * correct / len(mcq_defs))
             written_overall = int(scenario_result.get("overall", 0))
-            written_blank = (not scen_pairs) or all(
-                not (a or "").strip() for _, a in scen_pairs)
-            combined = written_overall if written_blank else \
+            # MCQs are EXCLUDED when the written set is a non-answer — either
+            # literally blank, or floored by the scorer itself (<= 2, its own
+            # non-answer verdict). Lucky clicks can never lift an empty or
+            # garbage set off the floor. The scorer and floor are untouched.
+            written_nonanswer = ((not scen_pairs)
+                                 or all(not (a or "").strip() for _, a in scen_pairs)
+                                 or written_overall <= 2)
+            combined = written_overall if written_nonanswer else \
                 round(0.75 * written_overall + 0.25 * mcq_pct)
             scenario_result["written_overall"] = written_overall
             scenario_result["mcq"] = {"correct": correct, "total": len(mcq_defs),
                                       "pct": mcq_pct, "detail": detail,
                                       "weight": 0.25,
-                                      "excluded_written_blank": written_blank}
+                                      "excluded_written_nonanswer": written_nonanswer}
             scenario_result["overall"] = max(0, min(100, combined))
 
         # One combined interview number from the existing segment scores.
@@ -3008,6 +3041,9 @@ async def candidate_interview_page(token: str):
         # Case-section TURN COUNT only (MCQ + written) — for "question N of K"
         # progress. The scenario itself still never leaves the server.
         "{{SCEN_Q}}": str(_scen_turns(_normalize_scenario(cfg.get("scenario")))),
+        # MCQ COUNT only (they are asked first) — steers the client's per-turn
+        # control notes to name the right tool. Counts, never content.
+        "{{SCEN_MCQ}}": str(len((_normalize_scenario(cfg.get("scenario")) or {}).get("mcq") or [])),
         # Phase plan (counts only) — the client's single source of truth for
         # spoken-vs-typed per question number. "null" for legacy configs.
         "{{PHASES}}": __import__("json").dumps(_viva_phase_plan(cfg)),
@@ -3089,7 +3125,9 @@ async def candidate_session_token(request: Request, token: str):
                     "already presented the written scenario; it is still visible on the "
                     "candidate's screen. Do NOT call show_scenario again and do NOT re-read the "
                     "scenario in full. Continue from where the transcript leaves off: ask the next "
-                    "unanswered scenario question as a TYPED question — or, if every scenario "
+                    "unanswered scenario question IN ITS OWN FORMAT — an (MCQ) question via "
+                    "begin_mcq_answer with its exact options array, a (TYPED) question via "
+                    "begin_typed_answer — or, if every scenario "
                     "question is already answered, continue with the remaining spoken questions.")
             if has_typed and awaiting_typed:
                 instructions += _VIVA_TYPED_RECOVERY_TEMPLATE.format(
@@ -3160,11 +3198,15 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
             entry["mode"] = "scenario"       # the pinned case text itself
             entry["text"] = text[:3000]
         elif (t or {}).get("mode") == "mcq":
-            # MCQ pick: the chosen option's text plus the choice index — the
-            # index is what server-side grading compares to the answer key.
+            # MCQ pick: chosen option text, the choice index, and the QUESTION
+            # (mq) — grading matches picks to config MCQs by question text so
+            # an out-of-order ask can never cross-grade answers.
             entry["mode"] = "mcq"
             entry["scen"] = True
             entry["text"] = text[:300]
+            mq = str((t or {}).get("mq", "")).strip()
+            if mq:
+                entry["mq"] = mq[:200]
             try:
                 ci = int((t or {}).get("choice"))
                 if 0 <= ci <= 10:

@@ -225,12 +225,12 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
   <div class="q-label" id="q-label">Getting ready…</div>
   <div class="question" id="question"><span class="caret"></span></div>
   <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
-  <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:12px 14px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08);max-height:34vh;overflow:hidden">
+  <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:12px 14px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08);max-height:44vh;overflow:hidden">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="background:#16A34A;color:#fff;border-radius:9999px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.6px">📋 CASE STUDY</span>
       <span id="scen-prog" style="font-size:11px;font-weight:800;color:#3C7A5A"></span>
     </div>
-    <div id="scen-text" style="font-size:15px;line-height:1.65;color:#1F2A24;white-space:pre-wrap;overflow-y:auto;max-height:21vh"></div>
+    <div id="scen-text" style="font-size:15px;line-height:1.65;color:#1F2A24;white-space:pre-wrap;overflow-y:auto;max-height:30vh"></div>
     <div style="font-size:11.5px;color:#6B7B72;margin-top:8px">This case study stays on screen — every question below is about it.</div>
   </div>
   <div class="typed" id="typed">
@@ -278,7 +278,8 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
 // ═════════════════════════════════════════════════════════════
 const TOKEN = "{{TOKEN}}";
 const MAX_TURNS = parseInt("{{MAX_TURNS}}") || 4;
-const SCEN_Q = parseInt("{{SCEN_Q}}") || 0;   // scenario question count — for "N of 4" progress only
+const SCEN_Q = parseInt("{{SCEN_Q}}") || 0;   // case-section turn count (MCQ + written) — progress label
+const SCEN_MCQ = parseInt("{{SCEN_MCQ}}") || 0;   // how many of those are MCQs (asked FIRST) — steers control notes
 // Phase plan (counts only, injected server-side; question TEXT never reaches
 // this page). THE single source of truth for whether question N is SPOKEN or
 // TYPED — the question text, the status pill, and the input mode all derive
@@ -580,12 +581,20 @@ function sendControlNote(){
     let extra = 'Continue adaptively.';
     if(PHASES){
       const nextN = questionsAsked+1, m = expectedMode(nextN);
-      if(m==='typed' && nextN===typedPhaseStart())
-        extra = 'The written scenario section starts NOW: first call show_scenario with the exact scenario text, then ask scenario question 1 by calling begin_typed_answer with its exact text. Text only — do not speak the scenario or the questions.';
-      else if(m==='typed')
-        extra = 'The next question is a TYPED scenario question: call begin_typed_answer with its exact text and wait in silence — do not speak it.';
-      else
+      if(m==='typed'){
+        // ordinal within the case section (1-based); MCQs come first
+        const caseOrd = nextN - typedPhaseStart() + 1;
+        const isMcq = SCEN_MCQ > 0 && caseOrd <= SCEN_MCQ;
+        const askHow = isMcq
+          ? 'call begin_mcq_answer with the exact question and its options as an array of the exact option strings (no letters or numbering added)'
+          : 'call begin_typed_answer with its exact text';
+        if(nextN===typedPhaseStart())
+          extra = 'The written case section starts NOW: first call show_scenario with the exact case text, then ask case question 1 — '+askHow+'. Text only — do not speak the case or the questions.';
+        else
+          extra = 'The next question is case question '+caseOrd+' — '+askHow+', then wait in silence. Do not speak it.';
+      }else{
         extra = 'The next question is SPOKEN: ask it by voice, exactly as scripted.';
+      }
     }
     text = '[Interview control note: You have asked '+questionsAsked+' of '+MAX_TURNS+' questions. '+(MAX_TURNS-questionsAsked)+' remaining. '+extra+']';
   }
@@ -618,6 +627,8 @@ function sendVad(td){
 function enterTyped(callId, question){
   if(callId) typedCallId = callId;
   if(question) typedQuestion = question.slice(0,300);
+  // panels are mutually exclusive — a pending MCQ box yields to the typed one
+  if(mcqActive){ $('mcqbox').style.display='none'; mcqActive=false; }
   sendVad(null); setMic(false);
   const firstOpen = !typing;
   if(firstOpen){
@@ -653,7 +664,7 @@ function enterTyped(callId, question){
 }
 // ── scenario section: pin the scenario, ack the tool, let the model speak ──
 function showScenario(callId, text){
-  scenText = String(text||'').slice(0,900);
+  scenText = String(text||'').slice(0,3000);   // matches the server cap — a rich case must never truncate
   if(!scenText){ log('show_scenario with empty text — ignored'); return; }
   scenActive = true;
   try{ sessionStorage.setItem(SCEN_KEY, scenText); }catch(_){}
@@ -739,10 +750,20 @@ function submitTyped(){
 // flow. Options arrive via begin_mcq_answer at ask time; the answer key never
 // reaches this page — grading is server-side at scoring time. Same section
 // guarantees as typed: mic muted, VAD off, AI text-only, clean screen.
-let mcqCallId=null, mcqOpts=[], mcqSel=-1, mcqActive=false;
+let mcqCallId=null, mcqOpts=[], mcqSel=-1, mcqActive=false, mcqQuestion='';
+// Defensive option cleaning: the model sometimes echoes instruction formatting —
+// letter prefixes ("(a) ...", "A. ...") or all options merged into one string.
+// Strip prefixes; split a merged string on its letter markers.
+function cleanMcqOpts(raw){
+  let o = (raw||[]).map(x=>String(x));
+  if(o.length===1 && /\([a-e]\)/i.test(o[0]))
+    o = o[0].split(/\s*\([a-e]\)\s*/i).filter(s=>s.trim());
+  return o.map(s=>s.replace(/^\s*\(?[a-eA-E][\)\.\]]\s+/,'').trim()).filter(Boolean).slice(0,5);
+}
 function enterMcq(callId, question, options){
   mcqCallId = callId;
-  mcqOpts = (options||[]).map(o=>String(o).slice(0,200)).slice(0,5);
+  mcqOpts = cleanMcqOpts(options).map(o=>o.slice(0,200));
+  mcqQuestion = String(question||'').slice(0,200);
   mcqSel = -1; mcqActive = true;
   // an early-opened typed box belongs to this same question — close it
   if(typing){ typing=false; awaitingQ=false; $('typed').classList.remove('on'); $('typed-q').style.display='none'; }
@@ -770,8 +791,9 @@ function pickMcq(i){
 function submitMcq(){
   if(mcqSel<0 || mcqSel>=mcqOpts.length) return;
   const textAns = mcqOpts[mcqSel];
-  // choice index is what the server grades against the answer key
-  transcript.push({role:'you', text:textAns, mode:'mcq', scen:1, choice:mcqSel});
+  // choice index + the question (mq) — the server grades by matching mq to
+  // the config MCQ, so an out-of-order ask can never cross-grade answers
+  transcript.push({role:'you', text:textAns, mode:'mcq', scen:1, choice:mcqSel, mq:mcqQuestion});
   $('mcqbox').style.display='none'; mcqActive=false;
   // section-complete check — same rule as typed submits (MCQs come first in
   // practice, so this is a safety net, not the normal exit)

@@ -22,7 +22,7 @@ window.SessionRender = (function(){
             <span class="score-big">${wr.segment_score}<span style="font-size:.9rem;color:var(--t3)">/100</span></span></div>`:''}
           ${sr?`<div><div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)">Business case</div>
             <span class="score-big">${sr.overall}<span style="font-size:.9rem;color:var(--t3)">/100</span></span>
-            ${sr.mcq?`<div style="font-size:.72rem;color:var(--t3)">MCQ ${sr.mcq.correct}/${sr.mcq.total} correct (auto-graded, ×${sr.mcq.weight}) + written ${sr.written_overall} (×${(1-sr.mcq.weight).toFixed(2)})${sr.mcq.excluded_written_blank?' — <b style="color:var(--red,#DC2626)">MCQs excluded: written answers were blank</b>':''}</div>`:''}</div>`:''}
+            ${sr.mcq?`<div style="font-size:.72rem;color:var(--t3)">MCQ ${sr.mcq.correct}/${sr.mcq.total} correct (auto-graded, ×${sr.mcq.weight}) + written ${sr.written_overall} (×${(1-sr.mcq.weight).toFixed(2)})${(sr.mcq.excluded_written_nonanswer||sr.mcq.excluded_written_blank)?' — <b style="color:var(--red,#DC2626)">MCQs excluded: the written answers were blank or non-answers</b>':''}</div>`:''}</div>`:''}
           <span style="font-size:.78rem;color:var(--t3);max-width:280px;line-height:1.5">Different rubrics, shown separately — not averaged into one number.</span>
         </div>
         <div style="font-size:.85rem;color:var(--t2);margin-bottom:.2rem">${esc(res.summary||'')}</div>`;

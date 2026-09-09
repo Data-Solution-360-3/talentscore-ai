@@ -4429,7 +4429,7 @@ function iqScenPayload(){
     const q = String(m.q||'').trim();
     const opts = (m.options||[]).map(o=>String(o).trim()).filter(Boolean);
     if(!q && !opts.length) continue;               // wholly empty row: drop silently
-    if(!q || opts.length<2 || !(m.correct>=0 && m.correct<opts.length)) return {invalid:true, mcq_invalid:true};
+    if(!q || opts.length!==4 || !(m.correct>=0 && m.correct<4)) return {invalid:true, mcq_invalid:true};
     mcq.push({q, options:opts, correct:m.correct});
   }
   const out = {text: String(s.text).trim(), questions: qs};
@@ -4461,9 +4461,7 @@ function iqScenEditor(){
             </label>
             <input value="${escapeHtml(o)}" maxlength="200" placeholder="Option ${String.fromCharCode(65+oi)}" oninput="iqMcqOpt(${i},${oi},this.value)"
                    style="flex:1;padding:6px 9px;border:1px solid ${m.correct===oi?'var(--gb)':'var(--border)'};border-radius:var(--rs);font-family:inherit;font-size:12px">
-            ${(m.options||[]).length>2?`<button onclick="iqMcqOptDel(${i},${oi})" title="Remove option" style="border:none;background:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">×</button>`:''}
           </div>`).join('')}
-        ${(m.options||[]).length<5?`<button class="btn btn-xs btn-ghost" onclick="iqMcqOptAdd(${i})">+ option</button>`:''}
       </div>`).join('')}
     ${(s.questions||[]).map((q,i)=>`
       <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
@@ -4476,7 +4474,7 @@ function iqScenEditor(){
       ${((s.mcq||[]).length<4)?'<button class="btn btn-xs" onclick="iqMcqAdd()">+ Add MCQ</button>':''}
       ${(s.questions||[]).length<8?'<button class="btn btn-xs" onclick="iqScenQAdd()">+ Add written question</button>':''}
       <button class="btn btn-xs" onclick="iqScenRemove()" style="color:var(--t3)">Remove case</button>
-      <span style="font-size:10.5px;color:var(--t3)">Every question is about this exact case. MCQs need ≥2 options + one marked correct.</span>
+      <span style="font-size:10.5px;color:var(--t3)">Every question is about this exact case. Each MCQ is one question + exactly four options, one marked correct.</span>
     </div></div>`;
 }
 
@@ -4622,7 +4620,7 @@ async function iqSaveDraft(){
   if(tps && tps.invalid){ toast('Every topic needs a main question and at least one follow-up.', {type:'error'}); return; }
   const list = tps ? [] : iqList().filter(q=>q.text.trim());
   const scen = iqScenPayload();
-  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, at least 2 options, and one marked correct.' : 'The case needs text and at least 2 written questions — or remove it.', {type:'error'}); return; }
+  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, exactly 4 options, and one marked correct.' : 'The case needs text and at least 2 written questions — or remove it.', {type:'error'}); return; }
   try{
     const r = await fetch(`/api/jobs/${st.jobId}/interview-questions`, {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
@@ -4643,7 +4641,7 @@ async function iqApprove(){
     toast('An approved set needs 4–15 questions with text.', {type:'error'}); return;
   }
   const scen = iqScenPayload();
-  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, at least 2 options, and one marked correct — fix before approving.' : 'The case needs text and at least 2 written questions — or remove it before approving.', {type:'error'}); return; }
+  if(scen && scen.invalid){ toast(scen.mcq_invalid ? 'Each MCQ needs a question, exactly 4 options, and one marked correct — fix before approving.' : 'The case needs text and at least 2 written questions — or remove it before approving.', {type:'error'}); return; }
   const btn = document.getElementById('iq-approve');
   if(btn){ btn.disabled = true; btn.textContent = 'Approving…'; }
   try{
