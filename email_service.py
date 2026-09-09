@@ -166,14 +166,20 @@ def send_welcome_email(to_email: str, company_name: str) -> bool:
     return ok
 
 
-def send_team_invite_email(to_email: str, invited_by: str, company_name: str, role: str) -> bool:
-    """Send team invitation email."""
+def send_team_invite_email(to_email: str, invited_by: str, company_name: str,
+                           role: str, accept_link: str) -> tuple[bool, str]:
+    """Send team invitation email. Returns (ok, resend_id_or_error).
+
+    accept_link is the tokenized /join URL built by the invite route — the
+    ONLY working entry to the accept flow. The old hardcoded /login?invite=1
+    CTA sent invitees to a password prompt they couldn't answer (A1 bug).
+    """
     if not RESEND_API_KEY:
         print(f"[EMAIL] Resend not configured. Team invite for {to_email} from {company_name}")
-        return False  # Return False so we show proper error to user
+        return False, "RESEND_API_KEY not set"
 
     subject = f"You're invited to join {company_name} on {APP_NAME}"
-    register_url = f"{APP_URL}/login?invite=1&email={to_email}&company={company_name}"
+    register_url = accept_link
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -200,8 +206,11 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
               <a href="{register_url}" style="color:#fff;font-size:15px;font-weight:700;text-decoration:none">Accept invitation →</a>
             </td></tr>
           </table>
-          <p style="margin:0;font-size:12px;color:#999;text-align:center">
+          <p style="margin:0 0 8px;font-size:12px;color:#999;text-align:center">
             Or copy this link: <a href="{register_url}" style="color:#F57C2E">{register_url}</a>
+          </p>
+          <p style="margin:0;font-size:12px;color:#999;text-align:center">
+            This invitation link expires in 7 days.
           </p>
         </td></tr>
         <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
@@ -216,7 +225,7 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str, ro
     ok, info = _resend_send(to_email, subject, html=html)
     if not ok:
         print(f"[EMAIL] Failed to send invite to {to_email}: {info}")
-    return ok
+    return ok, info
 
 
 # ─────────────────────────────────────────────────────────────

@@ -5195,11 +5195,12 @@ async def team_invite(request: Request, email: str = Form(...), role: str = Form
         # Send invitation email (best-effort; the link in the response is the
         # reliable path — the owner can always copy it to the invitee).
         from email_service import send_team_invite_email
-        email_sent = send_team_invite_email(
+        email_sent, email_info = send_team_invite_email(
             to_email=email,
             invited_by=user["email"],
             company_name=company,
             role=invite["role"].capitalize(),
+            accept_link=accept_link,
         )
         return {
             "success": True,
@@ -5207,6 +5208,10 @@ async def team_invite(request: Request, email: str = Form(...), role: str = Form
             "role": invite["role"],
             "accept_link": accept_link,
             "email_sent": email_sent,
+            # Resend's delivery id when sent (checkable in their dashboard);
+            # the failure reason otherwise. Never contains the token.
+            "email_id": email_info if email_sent else None,
+            "email_error": None if email_sent else email_info,
             "message": (f"Invitation sent to {email}" if email_sent
                         else "Invite created — share the accept link with them directly."),
         }
@@ -5242,7 +5247,7 @@ document.getElementById('f').addEventListener('submit', async (ev) => {
   fd.append('token', new URLSearchParams(location.search).get('invite') || '');
   const r = await fetch('/api/team/accept-invite', {method:'POST', body:fd});
   const j = await r.json().catch(() => ({}));
-  if (r.ok) { location.href = '/login?joined=1'; return; }
+  if (r.ok) { location.href = '/app'; return; }
   const e = document.getElementById('e');
   e.textContent = j.detail || 'Could not activate this invitation.';
   e.style.display = 'block';
@@ -5250,13 +5255,32 @@ document.getElementById('f').addEventListener('submit', async (ev) => {
 </script></div></body></html>"""
 
 
+_INVITE_CLOSED_HTML = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invitation not available — TopCandidate.pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;
+background:#FAFBFC;color:#142848;min-height:100vh;display:grid;place-items:center;padding:1.5rem}
+.c{background:#fff;border:1px solid #E4E8F0;border-radius:16px;padding:2.5rem 2rem;max-width:440px;
+text-align:center;box-shadow:0 4px 12px rgba(20,40,72,.06)}
+h1{font-size:1.35rem;font-weight:800;margin-bottom:.75rem;letter-spacing:-.5px}
+p{color:#4A5970;line-height:1.65;font-size:.95rem}
+a{color:#E16A1F;font-weight:600;text-decoration:none}</style></head>
+<body><div class="c"><h1>This invitation is no longer valid</h1>
+<p>The link may have expired (invitations last 7 days) or already been used.
+Ask your team owner to send you a fresh invitation.</p>
+<p style="margin-top:1.25rem"><a href="https://topcandidate.pro">TopCandidate.pro</a></p>
+</div></body></html>"""
+
+
 @app.get("/join", include_in_schema=False)
 async def join_page(request: Request, invite: str = ""):
-    """Invite acceptance page. Any non-redeemable token gets the same closed
-    page as a dead job link — nothing to probe."""
+    """Invite acceptance page — public by token, like the candidate /apply
+    routes. Unknown, used, and expired tokens all get the SAME closed page:
+    a clear message, but nothing that distinguishes the three states."""
     inv = await get_invite_by_token(invite)
     if not inv:
-        return _closed_link_page()
+        return HTMLResponse(_INVITE_CLOSED_HTML, status_code=404)
     page = (_JOIN_PAGE_HTML
             .replace("{{COMPANY}}", _html.escape(inv.get("company_name") or "your team"))
             .replace("{{ROLE}}", _html.escape(inv.get("role") or "viewer"))
@@ -5280,7 +5304,17 @@ async def accept_invite_route(
         member = await accept_team_invite(token, hash_password(password), full_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"success": True, "email": member["email"], "role": member["org_role"]}
+    # Log the new member straight in — same claims and cookie as /api/auth/login,
+    # so /join can land them on /app without a second password prompt.
+    session = create_token({
+        "user_id": member["user_id"],
+        "email": member["email"],
+        "company": member.get("company_name", ""),
+        "role": "client",
+    })
+    resp = JSONResponse({"success": True, "email": member["email"], "role": member["org_role"]})
+    resp.set_cookie("access_token", session, httponly=True, max_age=30*24*3600, samesite="lax")
+    return resp
 
 
 @app.get("/api/team")

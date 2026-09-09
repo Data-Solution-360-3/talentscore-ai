@@ -1220,7 +1220,7 @@ async function sendInvite(){
       try{await navigator.clipboard.writeText(data.accept_link);copied=true;}catch(e){}
     }
     if(data.email_sent){
-      toast('Invitation email sent to '+email+(copied?' — invite link also copied to your clipboard':''), {type:'success', duration:8000});
+      toast('Invitation email sent to '+email+(data.email_id?' (delivery id '+data.email_id+')':'')+(copied?' — invite link also copied to your clipboard':''), {type:'success', duration:10000});
     } else if(copied){
       toast('Invite link for '+email+' copied to your clipboard — send it to them to complete signup', {type:'success', duration:10000});
     } else if(data.accept_link){

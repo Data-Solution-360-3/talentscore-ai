@@ -671,12 +671,23 @@ async def invite_team_member(owner_user_id: str, email: str, role: str, company_
     return {"invite_id": str(inserted.inserted_id), "token": token, "role": org_role}
 
 
+INVITE_VALID_DAYS = 7   # the link is a credential (it mints an org account) — short life
+
+
+def _invite_expired(invite: dict) -> bool:
+    at = invite.get("invited_at")
+    return (not at) or (datetime.utcnow() - at > timedelta(days=INVITE_VALID_DAYS))
+
+
 async def get_invite_by_token(token: str) -> dict | None:
+    """A redeemable invite, or None — used, unknown, and EXPIRED all collapse
+    to None so every dead state renders the identical closed page."""
     if not token:
         return None
     doc = await db.team_invites.find_one({"token": token, "status": "pending"})
-    if doc:
-        doc["_id"] = str(doc["_id"])
+    if not doc or _invite_expired(doc):
+        return None
+    doc["_id"] = str(doc["_id"])
     return doc
 
 
@@ -689,7 +700,7 @@ async def accept_team_invite(token: str, hashed_password: str, full_name: str = 
     state it was.
     """
     invite = await db.team_invites.find_one({"token": token, "status": "pending"})
-    if not invite or not invite.get("org_id"):
+    if not invite or not invite.get("org_id") or _invite_expired(invite):
         raise ValueError("This invitation is no longer valid.")
     if await db.users.find_one({"email": invite["email"]}):
         raise ValueError("This email is already registered.")
@@ -713,7 +724,8 @@ async def accept_team_invite(token: str, hashed_password: str, full_name: str = 
         {"$set": {"status": "accepted", "accepted_at": datetime.utcnow(),
                   "member_user_id": str(inserted.inserted_id)}})
     return {"user_id": str(inserted.inserted_id), "email": invite["email"],
-            "org_id": str(invite["org_id"]), "org_role": doc["org_role"]}
+            "org_id": str(invite["org_id"]), "org_role": doc["org_role"],
+            "company_name": doc["company_name"]}
 
 
 async def get_team_members(owner_user_id: str) -> list:
