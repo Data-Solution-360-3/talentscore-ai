@@ -2813,7 +2813,7 @@ def _validate_proctoring(p) -> dict:
             counts[k] = v
     durations = {}
     raw_dur = p.get("durations") if isinstance(p.get("durations"), dict) else {}
-    for k in ("camera_off", "tab_away", "look_away"):
+    for k in ("camera_off", "tab_away", "focus_loss", "look_away"):
         v = _clampi(raw_dur.get(k, 0), 0, 86400)
         if v:
             durations[k] = v
@@ -4006,7 +4006,23 @@ async def set_job_viva_config(request: Request, job_id: str):
     # The job modal can flip proctoring on its own, without resending (or
     # clobbering) the rest of the stored setup.
     if body.get("proctoring") in ("off", "S", "M"):
-        cfg["proctoring"] = body["proctoring"]
+        want = body["proctoring"]
+        prev = (existing_cfg or {}).get("proctoring")
+        # Silent-downgrade guard (the Sep-9 recording gap): a FULL-SETUP save
+        # ("questions" in the payload — the /viva-live attach card) whose
+        # proctoring selector was never touched used to clobber a stored S/M
+        # back to 'off'. Such a save keeps the stored mode unless the card
+        # states the owner chose Off deliberately (proctoring_confirm_off).
+        # Gate-field saves from the job modal carry no questions key and are
+        # always honored — that selector is prefilled from this stored config.
+        if ("questions" in body and want == "off" and prev in ("S", "M")
+                and not body.get("proctoring_confirm_off")):
+            cfg["proctoring"] = prev
+        else:
+            cfg["proctoring"] = want
+    elif (existing_cfg or {}).get("proctoring") in ("off", "S", "M"):
+        # No proctoring in the payload at all: keep what the job already has.
+        cfg["proctoring"] = existing_cfg["proctoring"]
     viva = {
         "enabled": True,
         "threshold": threshold,

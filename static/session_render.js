@@ -139,6 +139,9 @@ window.SessionRender = (function(){
       const mmss = t => Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
       // ── Anti-cheat review flags: counts + coverage numbers, honest labels. ──
       const c = pr.counts||{}, du = pr.durations||{};
+      // Face-derived chips are SOFT signals: looking down to think is normal —
+      // they get an explicit label so no reviewer reads them as a verdict.
+      const SOFT = {no_face:1, multi_face:1, look_away:1};
       const flagChips = [
         ['camera_off','Camera off', du.camera_off],
         ['tab_switch','Tab switch / focus lost', du.tab_away],
@@ -147,11 +150,13 @@ window.SessionRender = (function(){
         ['look_away','Look-away', du.look_away],
         ['partial_share','Partial screen share'], ['share_stopped','Screen share stopped'],
       ].filter(([k])=> (c[k]||0) > 0).map(([k,label,dur])=>
-        `<span style="display:inline-block;background:var(--og);color:var(--orange2);border:1px solid var(--ob);border-radius:9999px;padding:2px 10px;font-size:11.5px;font-weight:700;margin:0 4px 4px 0">${esc(label)} ×${c[k]}${dur?` · ${dur}s`:''}</span>`
+        `<span style="display:inline-block;background:var(--og);color:var(--orange2);border:1px solid var(--ob);border-radius:9999px;padding:2px 10px;font-size:11.5px;font-weight:700;margin:0 4px 4px 0">${esc(label)} ×${c[k]}${dur?` · ${dur}s`:''}${SOFT[k]?' <i style="font-weight:500;opacity:.75">· soft signal</i>':''}</span>`
       ).join('');
       const camCov = (pr.cam_on_seconds!=null && pr.total_seconds) ? `camera on <b>${mmss(pr.cam_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
       const scrCov = (pr.scr_on_seconds!=null && pr.total_seconds && pr.final_scr && pr.final_scr!=='unavailable') ? `screen shared <b>${mmss(pr.scr_on_seconds)}</b> of ${mmss(pr.total_seconds)}` : '';
-      const cov = [camCov, scrCov].filter(Boolean).join(' · ');
+      const awayCov = du.tab_away ? `tab hidden <b>${Math.round(du.tab_away)}s</b> total` : '';
+      const focusCov = du.focus_loss ? `window unfocused <b>${Math.round(du.focus_loss)}s</b> total` : '';
+      const cov = [camCov, scrCov, awayCov, focusCov].filter(Boolean).join(' · ');
       // Three states, honestly distinguished (T1): flags recorded and none
       // raised != flags never stored. Sessions saved before the candidate
       // path persisted flags (flags_schema absent) must NEVER read as clean.

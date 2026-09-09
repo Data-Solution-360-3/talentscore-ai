@@ -1178,13 +1178,19 @@ function onCamBack(){
 function onAway(reason){
   if(!proc || !proc.focusArmed || proc.awaySince) return;
   proc.awaySince = Date.now();
+  proc.awayReason = reason;   // 'tab hidden' vs 'window lost focus' — split below
   showProctorPrompt('tab','Please stay on this interview tab — leaving it is recorded for the hiring team.');
 }
 function onBack(){
   if(!proc || !proc.awaySince) return;
   const dur = (Date.now()-proc.awaySince)/1000; proc.awaySince = 0;
-  proc.durations.tab_away = (proc.durations.tab_away||0) + dur;
-  flag('tab_switch','left the interview tab / window lost focus', dur);
+  // Two separate duration buckets for the reviewer: tab actually hidden vs
+  // window merely unfocused (still visible — e.g. clicked another window).
+  // The FLAG type stays tab_switch for both, so ejection thresholds and every
+  // existing count are unchanged; only the duration reporting got finer.
+  const k = proc.awayReason === 'window lost focus' ? 'focus_loss' : 'tab_away';
+  proc.durations[k] = (proc.durations[k]||0) + dur;
+  flag('tab_switch', 'left the interview ('+(proc.awayReason||'tab hidden')+')', dur);
   hideProctorPrompt('tab');
 }
 // Face/eye monitoring (BETA review signal, false positives expected). ~8 FPS.

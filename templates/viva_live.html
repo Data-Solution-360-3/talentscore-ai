@@ -818,6 +818,8 @@ function setupChanged(){
 window.addEventListener('load', ()=>{
   document.querySelectorAll('#qrows .q-text, #qrows .q-mode, #cfg-turns, #cfg-vad, #cfg-proc, #cfg-ivname')
     .forEach(el => { el.addEventListener('input', setupChanged); el.addEventListener('change', setupChanged); });
+  const p = $('cfg-proc');
+  if(p) p.addEventListener('change', ()=>{ window._procTouched = true; });
 });
 
 window.addEventListener('load', ()=>{
@@ -837,8 +839,14 @@ function atjPrefill(){
   $('atj-enabled').checked = !!(v && v.enabled);
   $('atj-th').value  = (v && v.threshold != null) ? v.threshold : 48;
   $('atj-cap').value = (v && v.daily_cap != null) ? v.daily_cap : 25;
+  // Proctoring PREFILLS from the job's stored config — this selector sitting
+  // at its default "Off" while saving questions is exactly how proctoring got
+  // silently turned off on live jobs (the Sep-9 recording gap). Prefill makes
+  // the shown value the stored value; changing it after this is deliberate.
+  const pc = v && v.config && v.config.proctoring;
+  if(['off','S','M'].includes(pc)){ $('cfg-proc').value = pc; window._procTouched = false; }
   $('atj-status').textContent = v && v.enabled
-    ? `Currently ON for this job — threshold ${v.threshold}, cap ${v.daily_cap}/day.`
+    ? `Currently ON for this job — threshold ${v.threshold}, cap ${v.daily_cap}/day, proctoring ${pc||'off'}.`
     : 'Currently OFF for this job. Saving snapshots the interview setup above onto it.';
 }
 
@@ -878,6 +886,9 @@ async function atjSave(){
         max_turns: Math.max(1, Math.min(8, parseInt($('cfg-turns').value)||4)),
         vad: $('cfg-vad').value || 'patient',
         proctoring: $('cfg-proc').value || 'off',
+        // Off is only honored on a full-setup save when the owner actually
+        // chose it — an untouched default can no longer clobber a stored S/M.
+        proctoring_confirm_off: $('cfg-proc').value === 'off' && !!window._procTouched,
         interviewer_name: $('cfg-ivname').value.trim() || 'AI Interviewer',
         job_title: j.title || ''
       })
