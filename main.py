@@ -1492,6 +1492,160 @@ async def erase_candidate_route(request: Request, screening_id: str,
     return {"success": True, "deleted": counts}
 
 
+@app.get("/api/usage/cost")
+async def usage_cost_dashboard(request: Request):
+    """Owner/admin-only spend dashboard (READ-ONLY over the existing meter).
+
+    Scope is enforced SERVER-SIDE from the caller's own org — never from a
+    parameter — so one client can never query another's numbers. A super-admin
+    sees all orgs plus the per-org table. Double-count rule: CV scoring is
+    summed from screenings.api_usage; interview audio + transcript scoring
+    from interview_sessions (which also catches owner test sessions);
+    question-gen/jd-parse from the ledger, org-resolved via their job_id.
+    Everything here is an ESTIMATE from stored, dated rates.
+    """
+    from datetime import datetime as _dtt
+
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    is_super = bool(db_user and db_user.get("is_super_admin"))
+    if not is_admin and user.get("org_role") != "owner":
+        raise HTTPException(status_code=403, detail="Not available for your role.")
+    org = None if is_super else str(user.get("org_id") or "")
+
+    now = _dtt.utcnow()
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    mon0 = day0.replace(day=1)
+
+    def _f(v):
+        try:
+            return float(v or 0)
+        except Exception:
+            return 0.0
+
+    def _i(v):
+        try:
+            return int(v or 0)
+        except Exception:
+            return 0
+
+    windows = {"today": day0, "month": mon0, "all": None}
+    totals = {w: {"usd": 0.0, "in": 0, "out": 0} for w in windows}
+    comps = {}      # component -> per-window usd + all-time tokens/op-count
+    models = {}     # model -> {usd, in, out}
+    per_org = {}    # super-admin only
+    cand = []       # per-candidate sums for avg + top list
+
+    def _add(component, model, when, usd, tin, tout, org_id, count=1):
+        c = comps.setdefault(component, {"today": 0.0, "month": 0.0, "all": 0.0,
+                                         "in": 0, "out": 0, "count": 0})
+        for w, start in windows.items():
+            if start is None or (when and when >= start):
+                totals[w]["usd"] += usd
+                totals[w]["in"] += tin
+                totals[w]["out"] += tout
+                c[w] += usd
+        c["in"] += tin; c["out"] += tout; c["count"] += count
+        m = models.setdefault(model or "unknown", {"usd": 0.0, "in": 0, "out": 0})
+        m["usd"] += usd; m["in"] += tin; m["out"] += tout
+        if is_super:
+            o = per_org.setdefault(str(org_id or "untagged"),
+                                   {"usd": 0.0, "components": {}})
+            o["usd"] += usd
+            o["components"][component] = round(o["components"].get(component, 0.0) + usd, 5)
+
+    # ── CV scoring: screenings.api_usage (canonical) + per-candidate sums ──
+    q = {"api_usage.cv_scoring": {"$exists": True}}
+    if org is not None:
+        q["org_id"] = org
+    async for s in db.screenings.find(q, {
+            "created_at": 1, "org_id": 1, "candidate_name": 1,
+            "api_usage.cv_scoring": 1, "interview_scoring_usage": 1,
+            "interview_realtime_usage": 1}).sort("created_at", -1).limit(5000):
+        cv = (s.get("api_usage") or {}).get("cv_scoring") or {}
+        _add("cv_scoring", cv.get("model"), s.get("created_at"),
+             _f(cv.get("est_usd")), _i(cv.get("input_tokens")),
+             _i(cv.get("output_tokens")), s.get("org_id"))
+        c_usd = (_f(cv.get("est_usd"))
+                 + _f((s.get("interview_scoring_usage") or {}).get("est_usd"))
+                 + _f((s.get("interview_realtime_usage") or {}).get("est_usd")))
+        cand.append({"screening_id": str(s["_id"]),
+                     "candidate_name": str(s.get("candidate_name") or "Unknown")[:60],
+                     "est_usd": round(c_usd, 4),
+                     "cv_usd": round(_f(cv.get("est_usd")), 4),
+                     "audio_usd": round(_f((s.get("interview_realtime_usage") or {}).get("est_usd")), 4),
+                     "scoring_usd": round(_f((s.get("interview_scoring_usage") or {}).get("est_usd")), 4)})
+
+    # ── Interview audio + transcript scoring: sessions (canonical) ──
+    q = {"$or": [{"usage": {"$exists": True}}, {"scoring_usage": {"$exists": True}}]}
+    if org is not None:
+        q["org_id"] = org
+    async for s in db.interview_sessions.find(q, {
+            "created_at": 1, "org_id": 1, "usage": 1, "scoring_usage": 1}) \
+            .sort("created_at", -1).limit(5000):
+        u = s.get("usage") or {}
+        if u:
+            _add("interview_audio", VIVA_LIVE_MODEL, s.get("created_at"),
+                 _f(u.get("est_usd")), _i(u.get("input")), _i(u.get("output")),
+                 s.get("org_id"))
+        sc = s.get("scoring_usage") or {}
+        if sc:
+            m = ((sc.get("components") or {}).get("spoken") or {}).get("model") or "gpt-4o"
+            _add("interview_scoring", m, s.get("created_at"),
+                 _f(sc.get("est_usd")), _i(sc.get("input_tokens")),
+                 _i(sc.get("output_tokens")), s.get("org_id"))
+
+    # ── question-gen + jd-parse: ledger rows, org-resolved via job_id ──
+    job_org = {}
+    async for j in db.jobs.find({}, {"org_id": 1}):
+        job_org[str(j["_id"])] = str(j.get("org_id") or "")
+    async for r in db.api_usage_log.find(
+            {"purpose": {"$in": ["question_gen", "jd_parse"]}}).limit(5000):
+        row_org = job_org.get(str(r.get("job_id") or ""), "untagged")
+        if org is not None and row_org != org:
+            continue
+        _add(r.get("purpose"), r.get("model"), r.get("ts"),
+             _f(r.get("est_usd")), _i(r.get("input_tokens")),
+             _i(r.get("output_tokens")), row_org)
+
+    # per-org names (super-admin only)
+    orgs_out = None
+    if is_super and per_org:
+        names = {}
+        async for o in db.orgs.find({}, {"name": 1}):
+            names[str(o["_id"])] = o.get("name") or ""
+        orgs_out = [{"org_id": k, "name": names.get(k, k[:8]),
+                     "est_usd": round(v["usd"], 4), "components": v["components"]}
+                    for k, v in sorted(per_org.items(), key=lambda kv: -kv[1]["usd"])]
+
+    cand.sort(key=lambda c: -c["est_usd"])
+    avg = round(sum(c["est_usd"] for c in cand) / len(cand), 4) if cand else 0.0
+
+    return {
+        "estimate_note": ("All figures are ESTIMATES computed from stored, dated rate "
+                          "constants — the real bill is OpenAI's dashboard. Fairness-gate "
+                          "and dev-script runs are NOT captured here, so this total reads "
+                          "LOWER than the actual OpenAI bill. Metering began 2026-09-10; "
+                          "earlier candidates carry no cost data."),
+        "bdt_per_usd": 122.85,
+        "totals": {w: {"est_usd": round(t["usd"], 4), "input_tokens": t["in"],
+                       "output_tokens": t["out"]} for w, t in totals.items()},
+        "components": {k: {"today_usd": round(v["today"], 4),
+                           "month_usd": round(v["month"], 4),
+                           "all_usd": round(v["all"], 4),
+                           "input_tokens": v["in"], "output_tokens": v["out"],
+                           "operations": v["count"]} for k, v in comps.items()},
+        "models": {k: {"est_usd": round(v["usd"], 4), "input_tokens": v["in"],
+                       "output_tokens": v["out"]} for k, v in models.items()},
+        "per_candidate_avg_usd": avg,
+        "candidates_metered": len(cand),
+        "top_candidates": cand[:10],
+        "per_org": orgs_out,   # null unless super-admin
+        "scope": "all_orgs" if is_super else "your_org",
+    }
+
+
 @app.post("/api/screenings/{screening_id}/stage")
 async def update_screening_stage(
     request: Request,
