@@ -146,7 +146,8 @@ def _sys(base: str, language: str, spoken: bool = False) -> str:
 
 
 async def _pass_call(client: AsyncOpenAI, angle: str, temperature: float,
-                     job_title: str, qa_pairs: list, language: str = "en") -> dict:
+                     job_title: str, qa_pairs: list, language: str = "en",
+                     usage_out: list | None = None) -> dict:
     resp = await client.chat.completions.create(
         model=SCORING_MODEL,
         temperature=temperature,
@@ -157,6 +158,8 @@ async def _pass_call(client: AsyncOpenAI, angle: str, temperature: float,
             {"role": "user", "content": _build_user_prompt(angle, job_title, qa_pairs)},
         ],
     )
+    if usage_out is not None:   # cost observability — measurement only
+        usage_out.append(getattr(resp, "usage", None))
     return json.loads(resp.choices[0].message.content)
 
 
@@ -204,13 +207,14 @@ async def score_written_answers(qa_pairs: list, api_key: str,
     live_pairs = [(i, qa_pairs[i]) for i in range(n) if i not in blank_idx]
 
     strict_by, generous_by = {}, {}
+    _usages: list = []
     if live_pairs:
         client = AsyncOpenAI(api_key=api_key)
         sub = [qa for _, qa in live_pairs]
         try:
             strict_raw, generous_raw = await asyncio.gather(
-                _pass_call(client, STRICT_ANGLE, 0.2, job_title, sub, language),
-                _pass_call(client, GENEROUS_ANGLE, 0.3, job_title, sub, language),
+                _pass_call(client, STRICT_ANGLE, 0.2, job_title, sub, language, usage_out=_usages),
+                _pass_call(client, GENEROUS_ANGLE, 0.3, job_title, sub, language, usage_out=_usages),
             )
         except Exception as e:
             return None, f"Scoring call failed: {str(e)[:200]}"
@@ -249,6 +253,7 @@ async def score_written_answers(qa_pairs: list, api_key: str,
                         "summary": summary, "audit": audit})
 
     segment = round(sum(a["overall"] for a in answers) / n)
+    from usage_meter import summarize_chat_usage
     return {
         "scorer_version": INTERVIEW_SCORER_VERSION,
         "model": SCORING_MODEL,
@@ -256,6 +261,8 @@ async def score_written_answers(qa_pairs: list, api_key: str,
         "answers": answers,
         "segment_score": max(0, min(100, segment)),
         "blank_answers": sorted(blank_idx),
+        # cost observability — additive, ignored by every existing reader
+        "usage": summarize_chat_usage(SCORING_MODEL, _usages),
     }, None
 
 
@@ -364,6 +371,7 @@ async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
         }, None
 
     client = AsyncOpenAI(api_key=api_key)
+    _usages: list = []
 
     async def _call(angle: str, temperature: float) -> dict:
         resp = await client.chat.completions.create(
@@ -374,6 +382,7 @@ async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
                 {"role": "user", "content": _build_scenario_prompt(angle, job_title, scenario, qa_pairs)},
             ],
         )
+        _usages.append(getattr(resp, "usage", None))   # cost observability
         return json.loads(resp.choices[0].message.content)
 
     try:
@@ -393,8 +402,10 @@ async def score_scenario_answers(scenario: str, qa_pairs: list, api_key: str,
         dims_out.append({"name": d, "score": bl, "strict": ss, "generous": gs, "reason": sr or gr})
     overall = max(0, min(100, round(sum(blended.values()) / 80 * 100)))
 
+    from usage_meter import summarize_chat_usage
     return {
         "scorer_version": SCENARIO_SCORER_VERSION, "model": SCORING_MODEL,
+        "usage": summarize_chat_usage(SCORING_MODEL, _usages),   # cost observability
         "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
         "scenario": (scenario or "")[:1200],
         "qa": [{"question": q, "answer": (a or "")[:MAX_ANSWER_CHARS]} for q, a in qa_pairs],
@@ -484,7 +495,8 @@ def _spoken_zero(reason: str) -> dict:
 
 
 async def _spoken_pass(client: AsyncOpenAI, angle: str, temperature: float,
-                       job_title: str, convo: str, language: str = "en") -> dict:
+                       job_title: str, convo: str, language: str = "en",
+                       usage_out: list | None = None) -> dict:
     resp = await client.chat.completions.create(
         model=SCORING_MODEL,
         temperature=temperature,
@@ -498,6 +510,8 @@ async def _spoken_pass(client: AsyncOpenAI, angle: str, temperature: float,
                 "Score the four dimensions for this interview as a whole."},
         ],
     )
+    if usage_out is not None:   # cost observability — measurement only
+        usage_out.append(getattr(resp, "usage", None))
     return json.loads(resp.choices[0].message.content)
 
 
@@ -535,10 +549,11 @@ async def score_spoken_interview(transcript: list, api_key: str,
 
     convo = _render_transcript(transcript)
     client = AsyncOpenAI(api_key=api_key)
+    _usages: list = []
     try:
         strict_raw, generous_raw = await asyncio.gather(
-            _spoken_pass(client, STRICT_ANGLE, 0.2, job_title, convo, language),
-            _spoken_pass(client, GENEROUS_ANGLE, 0.3, job_title, convo, language),
+            _spoken_pass(client, STRICT_ANGLE, 0.2, job_title, convo, language, usage_out=_usages),
+            _spoken_pass(client, GENEROUS_ANGLE, 0.3, job_title, convo, language, usage_out=_usages),
         )
     except Exception as e:
         return None, f"Scoring call failed: {str(e)[:200]}"
@@ -553,9 +568,11 @@ async def score_spoken_interview(transcript: list, api_key: str,
         dims_out.append({"name": d, "score": bl, "strict": ss, "generous": gs,
                          "reason": sr or gr, "evidence": se or ge})
     overall = max(0, min(100, round(sum(blended.values()) / 80 * 100)))
+    from usage_meter import summarize_chat_usage
     return {
         "scorer_version": SPOKEN_SCORER_VERSION,
         "model": SCORING_MODEL,
+        "usage": summarize_chat_usage(SCORING_MODEL, _usages),   # cost observability
         "blend": {"strict": BLEND_STRICT, "generous": BLEND_GENEROUS},
         "dimensions": dims_out,
         "overall": overall,

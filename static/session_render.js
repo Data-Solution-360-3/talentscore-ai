@@ -105,18 +105,25 @@ window.SessionRender = (function(){
   // ── Owner-only cost telemetry. Both surfaces that call this (recruiter
   //    results + candidate report) are recruiter-facing; candidates never see
   //    it. USD is an estimate from the server's named rate constants. ──
+  const BDT_PER_USD = 122.85;   // display conversion only — an estimate, like the USD itself
+
   function costHTML(s){
-    const u = s.usage;
-    if(!u || typeof u!=='object') return '';
-    const usd = (typeof u.est_usd==='number') ? u.est_usd : 0;
-    const hit = (typeof u.cache_hit_pct==='number') ? u.cache_hit_pct : 0;
+    const u = s.usage;                 // Realtime audio (metered live)
+    const sc = s.scoring_usage;        // transcript scoring (chat completions)
+    if((!u || typeof u!=='object') && (!sc || typeof sc!=='object')) return '';
     const k = n => (Math.abs(+n||0)>=1000 ? ((+n||0)/1000).toFixed(1)+'k' : String(+n||0));
-    const tip = `input ${k(u.input)} tok (cached ${k(u.cached_input)}) · output ${k(u.output)} tok`
-              + ` · audio in/out ${k(u.in_audio)}/${k(u.out_audio)} · ${u.responses||0} responses`
-              + ` · rates ${u.rates_version||'—'}`;
+    const rtUsd = (u && typeof u.est_usd==='number') ? u.est_usd : 0;
+    const scUsd = (sc && typeof sc.est_usd==='number') ? sc.est_usd : 0;
+    const total = rtUsd + scUsd;
+    const hit = (u && typeof u.cache_hit_pct==='number') ? u.cache_hit_pct : 0;
+    const tip = (u?`realtime: input ${k(u.input)} tok (cached ${k(u.cached_input)}) · output ${k(u.output)} tok`
+              + ` · audio in/out ${k(u.in_audio)}/${k(u.out_audio)} · ${u.responses||0} responses · rates ${u.rates_version||'—'}`:'')
+              + (sc?` | scoring: ${sc.calls||0} calls · in ${k(sc.input_tokens)} / out ${k(sc.output_tokens)} tok`
+              + ` (${esc((sc.components&&Object.keys(sc.components).join('+'))||'')}) · rates ${sc.rates_version||'—'}`:'');
     return `<div class="evrow" style="margin:-.3rem 0 .6rem;font-size:11px;color:var(--t3)" title="${esc(tip)}">
-      <span>💵 Est. cost <b>$${usd.toFixed(2)}</b></span>
-      <span>cache hit ${hit}%</span>
+      <span>💵 Interview est. <b>$${total.toFixed(3)}</b> (৳${(total*BDT_PER_USD).toFixed(1)})</span>
+      <span>audio $${rtUsd.toFixed(3)} · scoring $${scUsd.toFixed(3)}</span>
+      ${u?`<span>cache hit ${hit}%</span>`:''}
       <span style="opacity:.65">estimated · owner only</span></div>`;
   }
 

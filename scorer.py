@@ -936,7 +936,8 @@ Respond ONLY with this JSON:
 
 async def gpt_json_call(client: AsyncOpenAI, system: str, user: str,
                         temperature: float = 0.0, max_tokens: int = 2500,
-                        model: str | None = None) -> dict:
+                        model: str | None = None,
+                        usage_out: list | None = None) -> dict:
     response = await client.chat.completions.create(
         model=model or PIPELINE_MODEL,
         max_tokens=max_tokens,
@@ -951,6 +952,10 @@ async def gpt_json_call(client: AsyncOpenAI, system: str, user: str,
             {"role": "user", "content": user}
         ]
     )
+    # Cost observability: the caller may collect token usage. Pure
+    # measurement — never affects the call or the parsed result.
+    if usage_out is not None:
+        usage_out.append(getattr(response, "usage", None))
     return json.loads(response.choices[0].message.content)
 
 
@@ -1252,7 +1257,8 @@ def cv_is_self_consistent(cv: dict) -> tuple[bool, str]:
 PIPELINE_MODEL = "gpt-4o-mini"
 
 
-async def parse_jd_only(jd_text: str, api_key: str, model: str | None = None) -> dict:
+async def parse_jd_only(jd_text: str, api_key: str, model: str | None = None,
+                        usage_out: list | None = None) -> dict:
     """Parse a job description into structured requirements, once.
 
     Exposed so a caller can parse a JD a single time per job and reuse the
@@ -1261,7 +1267,7 @@ async def parse_jd_only(jd_text: str, api_key: str, model: str | None = None) ->
     """
     client = AsyncOpenAI(api_key=api_key)
     return await gpt_json_call(client, JD_PARSE_PROMPT, build_jd_parse_prompt(jd_text),
-                               model=model)
+                               model=model, usage_out=usage_out)
 
 
 async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
@@ -1281,6 +1287,10 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # Per-job model pin (forward-only calibration seam): None = the
         # current default; jobs stamped "gpt-4o" keep the old calibration.
         m = model or PIPELINE_MODEL
+        # Cost observability: every GPT call in this pipeline drops its token
+        # usage here; the summary is stamped on the result (and thus the
+        # screening doc) at the end. Measurement only.
+        _usages: list = []
 
         # ── STEP 1A + 1B in parallel ──
         # jd_requirements may be supplied by the caller from the job document's
@@ -1291,12 +1301,12 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # every candidate faces an identical rubric.
         if jd_requirements is None:
             cv_profile, jd_requirements = await asyncio.gather(
-                gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m),
-                gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text), model=m)
+                gpt_json_call(client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m, usage_out=_usages),
+                gpt_json_call(client, JD_PARSE_PROMPT,    build_jd_parse_prompt(jd_text), model=m, usage_out=_usages)
             )
         else:
             cv_profile = await gpt_json_call(
-                client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m
+                client, CV_STRUCTURE_PROMPT, build_cv_parse_prompt(cv_text), model=m, usage_out=_usages
             )
 
         # ── Self-consistency: one retry if the model contradicted itself ──
@@ -1306,7 +1316,7 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
                 f"\n\nIMPORTANT: Your previous parse had a contradiction: {reason}\n"
                 f"Re-parse carefully. Sum years from actual roles in work_experience."
             )
-            cv_profile = await gpt_json_call(client, CV_STRUCTURE_PROMPT, retry_prompt, model=m)
+            cv_profile = await gpt_json_call(client, CV_STRUCTURE_PROMPT, retry_prompt, model=m, usage_out=_usages)
 
         # ── STEP 1C: deterministic tenure analysis (no GPT) ──
         tenure = analyze_tenure(cv_profile)
@@ -1320,8 +1330,8 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         # fits its role; upside keeps a little latitude for benefit-of-doubt.
         # The 60/40 blend and code-side recompute are unchanged.
         strict_result, upside_result = await asyncio.gather(
-            gpt_json_call(client, SCORING_SYSTEM_PROMPT, strict_prompt, temperature=0.0, model=m),
-            gpt_json_call(client, SCORING_SYSTEM_PROMPT, upside_prompt, temperature=0.2, model=m),
+            gpt_json_call(client, SCORING_SYSTEM_PROMPT, strict_prompt, temperature=0.0, model=m, usage_out=_usages),
+            gpt_json_call(client, SCORING_SYSTEM_PROMPT, upside_prompt, temperature=0.2, model=m, usage_out=_usages),
         )
 
         # ── Detect hard-requirement gaps deterministically ──
@@ -1341,6 +1351,10 @@ async def run_screening_pipeline(cv_text: str, jd_text: str, api_key: str,
         final["weights_used"] = normalize_weights(weights)
         final["cv_scoring_model"] = m   # traceability across the 4o->mini seam
         final["authenticity"] = authenticity
+        # Cost observability (owner-only display; stripped from non-owner API
+        # responses). Rides the result dict onto the screening document.
+        from usage_meter import summarize_chat_usage
+        final["api_usage"] = {"cv_scoring": summarize_chat_usage(m, _usages)}
 
         # If authenticity is strongly flagged, surface it as a hiring risk so it
         # shows up in the existing risks list (without lowering the score).

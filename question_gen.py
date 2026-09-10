@@ -111,7 +111,8 @@ Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups"
 
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
                                    n_topics: int = 2, followups: int = 3,
-                                   language: str = "en", role_hint: str = ""
+                                   language: str = "en", role_hint: str = "",
+                                   usage_out: list | None = None
                                    ) -> tuple[list | None, str | None]:
     """The spoken part in topic clusters.
     Returns ([{"topic","main","followups"}], None) or (None, error)."""
@@ -136,6 +137,8 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
                     + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
             ],
         )
+        if usage_out is not None:   # cost observability — measurement only
+            usage_out.append(getattr(resp, "usage", None))
         raw = json.loads(resp.choices[0].message.content)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
@@ -195,7 +198,8 @@ Return JSON:
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
-                                    k: int = 3, language: str = "en", role_hint: str = ""
+                                    k: int = 3, language: str = "en", role_hint: str = "",
+                                    usage_out: list | None = None
                                     ) -> tuple[dict | None, str | None]:
     """One rich business case + its questions from the JD. `k` is the TOTAL
     case-question count: when k >= 4 that is 2 MCQ + (k-2) written; smaller k
@@ -224,6 +228,8 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
                     + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
             ],
         )
+        if usage_out is not None:   # cost observability — measurement only
+            usage_out.append(getattr(resp, "usage", None))
         raw = json.loads(resp.choices[0].message.content)
     except Exception as e:
         return None, f"Scenario generation failed: {str(e)[:200]}"

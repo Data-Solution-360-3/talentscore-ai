@@ -482,6 +482,21 @@ def require_org_role(*roles: str):
 require_org_owner = require_org_role("owner")
 
 
+_COST_FIELDS = ("api_usage", "interview_scoring_usage", "interview_realtime_usage")
+
+
+def _strip_cost_fields(doc, user: dict):
+    """Cost telemetry is OWNER/ADMIN-only display data. Recruiters, viewers,
+    and API consumers get the same documents with the cost keys removed —
+    candidates never receive these documents at all."""
+    if user.get("org_role") == "owner" or user.get("role") == "admin":
+        return doc
+    if isinstance(doc, dict):
+        for k in _COST_FIELDS:
+            doc.pop(k, None)
+    return doc
+
+
 def _org_denied(doc: dict, user: dict) -> bool:
     """Per-document tenant check (A1): the row's org must be the caller's org.
 
@@ -1369,6 +1384,8 @@ async def list_screenings(request: Request, limit: int = 2000):
         screenings = await get_screenings_for_user(user["user_id"], limit=limit)
         total = await count_screenings_for_user(user["user_id"])
 
+    for s in screenings:
+        _strip_cost_fields(s, user)
     return {
         "screenings": screenings,
         "count": len(screenings),
@@ -1426,7 +1443,7 @@ async def get_screening(request: Request, screening_id: str):
     # Allow access if no user_id (legacy data) or if it belongs to this user
     if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
-    return doc
+    return _strip_cost_fields(doc, user)
 
 
 @app.delete("/api/screenings/{screening_id}")
@@ -1762,9 +1779,15 @@ async def resolve_jd_requirements(job_id: str, jd_text: str, model: str | None =
         cached = await get_cached_jd_parse(job_id, jd_text, m)
         if cached:
             return cached
-        parsed = await parse_jd_only(jd_text, OPENAI_API_KEY, model=m)
+        _ju: list = []
+        parsed = await parse_jd_only(jd_text, OPENAI_API_KEY, model=m, usage_out=_ju)
         if parsed:
             await save_jd_parse(job_id, jd_text, m, parsed)
+            # Cost observability: one row per cache MISS (per job+model).
+            from usage_meter import summarize_chat_usage
+            from database import log_api_usage
+            await log_api_usage({"purpose": "jd_parse", "job_id": str(job_id),
+                                 **summarize_chat_usage(m, _ju)})
         return parsed
     except Exception as e:
         print(f"[JD-CACHE] falling back to inline parse for job {job_id}: {e}")
@@ -2708,6 +2731,15 @@ async def score_live_session(session_id: str):
         interview_parts = {"spoken": spoken_overall, "written": written_overall,
                            "weights": {"spoken": IV_W_SPOKEN, "written": IV_W_WRITTEN}}
 
+        # Cost observability: fold the three scorers' token usage into one
+        # per-session summary (owner-only display; pure measurement).
+        from usage_meter import merge_usage_summaries
+        scoring_usage = merge_usage_summaries({
+            "spoken": (result or {}).get("usage"),
+            "written": (written_result or {}).get("usage"),
+            "scenario": (scenario_result or {}).get("usage"),
+        })
+
         await db.interview_sessions.update_one(
             {"_id": _OID(session_id)},
             {"$set": {"score_status": "scored", "score_result": result,
@@ -2717,7 +2749,19 @@ async def score_live_session(session_id: str):
                       "scenario_error": scenario_error,
                       "interview_score": interview_score,
                       "interview_parts": interview_parts,
+                      "scoring_usage": scoring_usage,
                       "scored_at": _dt.utcnow(), "score_error": None}})
+        try:
+            from database import log_api_usage
+            await log_api_usage({"purpose": "interview_scoring",
+                                 "session_id": str(session_id),
+                                 "model": scoring_usage.get("components", {}).get("spoken", {}).get("model", ""),
+                                 "calls": scoring_usage.get("calls"),
+                                 "input_tokens": scoring_usage.get("input_tokens"),
+                                 "output_tokens": scoring_usage.get("output_tokens"),
+                                 "est_usd": scoring_usage.get("est_usd")})
+        except Exception:
+            pass
 
         # Write the combined numbers back onto the candidate's SCREENING, so
         # every ranking surface reads one document. EVERY scored session with
@@ -2755,6 +2799,13 @@ async def score_live_session(session_id: str):
                                 "interview_review_flag": iv_flag,
                                 "overall_combined": round(OV_W_CV * cv + OV_W_IV * interview_score),
                                 "overall_weights": {"cv": OV_W_CV, "interview": OV_W_IV},
+                                # Cost observability: both interview cost legs
+                                # copied onto the candidate doc, so ONE document
+                                # carries the full per-candidate spend picture
+                                # (CV pipeline usage was stamped at screening).
+                                "interview_scoring_usage": scoring_usage,
+                                "interview_realtime_usage": (sess.get("usage")
+                                                             if isinstance(sess.get("usage"), dict) else None),
                                 "interview_scored_at": _dt.utcnow()}})
         except Exception as wb:
             print(f"[VIVA-LIVE] screening write-back failed for {session_id}: {wb}")
@@ -3519,6 +3570,13 @@ async def score_application(application_id: str):
         })
         screening_id = await save_screening(result)
 
+        # Cost observability ledger (fire-and-forget, measurement only).
+        _cvu = (result.get("api_usage") or {}).get("cv_scoring") or {}
+        if _cvu:
+            from database import log_api_usage
+            await log_api_usage({"purpose": "cv_scoring", "screening_id": screening_id,
+                                 "job_id": app_doc["job_id"], **_cvu})
+
         # Point the stored PDF at the screening too, so the existing CV viewer
         # resolves it exactly like a batch-uploaded one.
         await db.application_files.update_one(
@@ -4076,21 +4134,29 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     # type. The JD stays the content source; jobs without a category get "".
     from scorer import ROLE_CATEGORIES
     role_hint = ROLE_CATEGORIES.get(job.get("role_category") or "", {}).get("hint", "")
+    _gen_usages: list = []
     topics, err = await generate_topic_questions(
         job.get("description") or "", OPENAI_API_KEY,
         job_title=job.get("title") or "", n_topics=n_topics, followups=followups,
-        language=lang, role_hint=role_hint)
+        language=lang, role_hint=role_hint, usage_out=_gen_usages)
     if err or not topics:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
     scenario, scen_err = await generate_written_scenario(
         job.get("description") or "", OPENAI_API_KEY,
-        job_title=job.get("title") or "", k=scen_k, language=lang, role_hint=role_hint)
+        job_title=job.get("title") or "", k=scen_k, language=lang, role_hint=role_hint,
+        usage_out=_gen_usages)
     topics = _normalize_topics(topics)
     flat = _flatten_topics(topics)
+    # Cost observability (owner-only; measurement, never behavior).
+    from usage_meter import summarize_chat_usage
+    gen_usage = summarize_chat_usage(GEN_MODEL, _gen_usages)
     draft = {"topics": topics, "questions": flat, "count": len(flat),
              "generated_at": _dt.utcnow(), "model": GEN_MODEL,
+             "gen_usage": gen_usage,
              "scenario": _normalize_scenario(scenario)}
     await update_job_interview_questions(job["_id"], {"draft": draft})
+    from database import log_api_usage
+    await log_api_usage({"purpose": "question_gen", "job_id": str(job["_id"]), **gen_usage})
     out = {"success": True, "draft": serialize_mongo(draft)}
     if scen_err:
         out["scenario_error"] = scen_err
@@ -5933,6 +5999,8 @@ async def api_get_result(request: Request, screening_id: str):
         raise HTTPException(status_code=404, detail="Screening not found.")
     doc["_id"] = str(doc["_id"])
     doc.pop("cv_pdf_b64", None)
+    for k in _COST_FIELDS:   # cost telemetry never leaves via the public API
+        doc.pop(k, None)
     return doc
 
 

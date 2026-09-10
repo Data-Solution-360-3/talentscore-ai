@@ -594,6 +594,17 @@ async def get_dimension_averages_for_user(user_id: str) -> list:
              "count": r["count"]} for r in results]
 
 
+async def log_api_usage(entry: dict) -> None:
+    """Cost observability ledger: one small row per logical OpenAI operation
+    (purpose tag, model, token counts, est USD, refs) — NEVER prompt contents.
+    Fire-and-forget: a ledger failure must never affect the operation it
+    measures, so every exception is swallowed."""
+    try:
+        await db.api_usage_log.insert_one({**entry, "ts": datetime.utcnow()})
+    except Exception:
+        pass
+
+
 async def delete_candidate(screening_id: str, deleted_by: str = "") -> dict:
     """ERASURE (Batch 5): full personal-data cascade for one candidate.
 

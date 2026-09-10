@@ -2596,6 +2596,7 @@ function openCandModal(id){
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:8px">
       <strong style="color:var(--t2)">Audit:</strong> Screened ${fmtTime(r.created_at)} · 2 AI runs averaged · final score recomputed in code
     </div>
+    ${candCostHTML(r)}
     </div>
 
     <div id="ctab-iv" class="ctab-pane"><div class="notice">Loading interview…</div></div>
@@ -2609,6 +2610,28 @@ function openCandModal(id){
     loaded: false, s: null,
   };
   openModal('cand-modal');
+}
+
+// ── Per-candidate cost line (owner/admin only; the server also strips these
+//    fields from non-owner responses, so this render gate is belt-and-braces).
+//    ESTIMATES from the server's dated rate constants — rates change.
+function candCostHTML(r){
+  const me = window._meCache || {};
+  if(!(me.org_role === 'owner' || me.role === 'admin')) return '';
+  const BDT = 122.85;
+  const cv = (r.api_usage && r.api_usage.cv_scoring) || null;
+  const sc = r.interview_scoring_usage || null;
+  const rt = r.interview_realtime_usage || null;
+  if(!cv && !sc && !rt) return '';
+  const usd = x => (x && typeof x.est_usd === 'number') ? x.est_usd : 0;
+  const total = usd(cv) + usd(sc) + usd(rt);
+  const part = (label, x) => x ? `${label} $${usd(x).toFixed(3)}` : `${label} —`;
+  return `<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:6px">
+    <strong style="color:var(--t2)">💵 OpenAI spend (est.):</strong>
+    <b>$${total.toFixed(3)}</b> (৳${(total*BDT).toFixed(1)}) —
+    ${part('CV scoring', cv)} · ${part('interview audio', rt)} · ${part('interview scoring', sc)}
+    <span style="opacity:.65">· estimated from stored rates · owner only</span>
+  </div>`;
 }
 
 function candTab(t){
@@ -6382,6 +6405,6 @@ window.addEventListener('resize',()=>{ clearTimeout(_kpiRz); _kpiRz=setTimeout((
 },250); });
 </script>
 <script src="/static/score_core.js"></script>
-<script src="/static/session_render.js?v=2"></script>
+<script src="/static/session_render.js?v=3"></script>
 </body>
 </html>
