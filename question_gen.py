@@ -197,57 +197,199 @@ Return JSON:
   "questions": ["...", ...]}}"""
 
 
-SCREENING_MCQ_PROMPT = """You are writing a short knowledge screen for a specific job.
-Write exactly {n} multiple-choice questions from the job description below.
+# ── Screening-MCQ pipeline (drafter → critic → refiner, all gpt-4o) ─────
+# Generation QUALITY only: the output shape, grading, storage, and the
+# recruiter review/approve gate are untouched. Cost-bounded by construction:
+# at most FOUR batched calls total (draft, critic, refine-failed, re-check),
+# never per-question calls, never a second refine round.
 
-RULES
-- Each question tests PRACTICAL, role-relevant knowledge or judgment a
-  qualified candidate should have — not trivia, not vocabulary, not riddles.
-- Each question: 4 plausible options, exactly ONE clearly best answer.
-  Distractors must be believable choices a weaker candidate might pick.
-- Self-contained: answerable from general professional knowledge of the role.
-  No company-internal facts, nothing that depends on the employer.
-- {lang_rule}
+_MCQ_FAIRNESS_RULES = """- {lang_rule}
 - NEVER ask about, or write questions around: age, religion, marital or family
   status, pregnancy, health or disability, ethnicity, political views, or
-  anything a recruiter could not lawfully ask.
+  anything a recruiter could not lawfully ask."""
+
+MCQ_DRAFT_PROMPT = """You are writing a knowledge screen for a specific job. Draft exactly {n}
+multiple-choice questions grounded in the ACTUAL day-to-day work this job
+description describes.
+
+WHAT MAKES A QUESTION GOOD HERE
+- It tests judgment or working knowledge a real person IN THIS ROLE needs —
+  a decision they'd face, a trade-off they'd weigh, a mistake they'd have to
+  catch. Not vocabulary, not trivia, not textbook definitions.
+- Exactly 4 options, exactly ONE defensibly best answer.
+- THE DISTRACTORS ARE THE CRAFT: each wrong option must be something a person
+  with PARTIAL knowledge would genuinely pick — a real, common misconception,
+  a plausible-but-inferior approach, or a right-sounding answer for a subtly
+  different situation. A distractor a layperson can eliminate on sight is a
+  failure. No joke options, no obviously-absurd options.
+- No two options may overlap in meaning, and the correct one must not be the
+  longest, most detailed, or most hedged option (length/format must not leak
+  the answer).
+- Self-contained: answerable from professional knowledge of the role plus the
+  question itself. No company-internal facts.
+{fairness}
 
 Return JSON:
 {{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+
+MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job. You are NOT given the
+answer key. For EACH question, do two things IN ORDER:
+
+1. SOLVE IT BLIND: pick the single best option yourself (best_index).
+2. JUDGE IT against these criteria — fail it if ANY apply:
+   - OBVIOUS: the correct answer is guessable on sight, or format/length gives
+     it away.
+   - WEAK DISTRACTOR: any option a layperson (no role knowledge) could
+     eliminate immediately; distractors must reflect real partial-knowledge
+     misconceptions.
+   - NOT GROUNDED: not clearly about this specific role's real work as
+     described in the job description.
+   - TRIVIA: tests recall of a definition/fact rather than job-relevant
+     judgment or applied knowledge.
+   - AMBIGUOUS: two options overlap, or more than one option is defensibly
+     correct, or none clearly is.
+
+Be strict: a question that merely "seems fine" but tests nothing a real
+candidate in this role must know should FAIL as NOT GROUNDED or TRIVIA.
+
+Return JSON:
+{{"reviews": [{{"i": <index in the list>, "best_index": <0-3>, "pass": true|false,
+"reasons": ["short, specific reasons — empty when pass"]}}, ...]}}"""
+
+MCQ_REFINE_PROMPT = """You are fixing screening MCQs that failed review, for a specific job.
+For each item you get the question, its options, the intended correct index,
+and the reviewer's SPECIFIC reasons. Rewrite each question to FIX those
+reasons while keeping it grounded in this job's real work. You may rewrite
+the stem, any option, or replace the question entirely with a better one on
+the same topic area. Same bar as before:
+- 4 options, ONE defensibly best answer, distractors = genuine
+  partial-knowledge misconceptions, nothing a layperson can eliminate,
+  no length/format leak, no trivia, no ambiguity.
+{fairness}
+
+Return JSON (same order as given):
+{{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+
+
+def _mcq_shape_ok(m) -> bool:
+    try:
+        return (isinstance(m, dict) and str(m.get("question", "")).strip()
+                and len([o for o in (m.get("options") or []) if str(o).strip()]) == 4
+                and 0 <= int(m.get("correct")) < 4)
+    except Exception:
+        return False
+
+
+async def _gen_json(client, system: str, user: str, temperature: float,
+                    max_tokens: int, usage_out: list | None) -> dict:
+    resp = await client.chat.completions.create(
+        model=GEN_MODEL, temperature=temperature, max_tokens=max_tokens,
+        response_format={"type": "json_object"},
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": user}])
+    if usage_out is not None:   # cost observability — measurement only
+        usage_out.append(getattr(resp, "usage", None))
+    return json.loads(resp.choices[0].message.content) or {}
 
 
 async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                                   job_title: str = "", language: str = "en",
                                   role_hint: str = "", usage_out: list | None = None
                                   ) -> tuple[list | None, str | None]:
-    """MCQ pre-filter DRAFT set (high-volume funnel). Draft only — the caller
-    stores it for recruiter review; nothing generated here goes live without
-    an explicit approve. Returns (raw mcq list, None) or (None, error)."""
+    """MCQ pre-filter DRAFT set via the drafter→critic→refiner pipeline.
+
+    The critic BLIND-SOLVES every question (never sees the key); a mismatch
+    with the drafter's key fails the question as ambiguous/wrong-key — the
+    guard against a confident wrong answer key silently filtering good
+    candidates. Bounded: draft(n+6) → critic → refine failures once →
+    re-check once → done; survivors best-first, trimmed to n. Draft only —
+    the recruiter still reviews, edits, and approves before anything goes
+    live. Returns (mcq list, None) or (None, error)."""
     n = max(5, min(15, int(n)))
     jd = (jd_text or "").strip()
     if len(jd) < 40:
         return None, "The job description is too short to generate questions from."
     client = AsyncOpenAI(api_key=api_key)
+    job_ctx = (f"JOB TITLE: {job_title or 'not specified'}\n"
+               + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+               + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
+    fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=_lang(language))
+
+    def _fmt(items):
+        return "\n\n".join(
+            f"[{i}] {m['question']}\n" + "\n".join(
+                f"   ({oi}) {o}" for oi, o in enumerate(m["options"]))
+            for i, m in enumerate(items))
+
+    # ── 1) DRAFT n+6 (over-draft so the critic can discard, not force-pass) ──
     try:
-        resp = await client.chat.completions.create(
-            model=GEN_MODEL,
-            temperature=0.4,
-            max_tokens=2400,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": SCREENING_MCQ_PROMPT.format(n=n, lang_rule=_lang(language))},
-                {"role": "user", "content":
-                    f"JOB TITLE: {job_title or 'not specified'}\n"
-                    + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
-                    + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
-            ],
-        )
-        if usage_out is not None:   # cost observability — measurement only
-            usage_out.append(getattr(resp, "usage", None))
-        raw = json.loads(resp.choices[0].message.content)
+        raw = await _gen_json(client,
+                              MCQ_DRAFT_PROMPT.format(n=n + 6, fairness=fairness),
+                              job_ctx, 0.5, 3200, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
-    return (raw or {}).get("mcq") or [], None
+    drafts = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)][:n + 6]
+    if len(drafts) < 3:
+        return None, "Drafting produced too few valid questions — try again."
+
+    # ── 2) CRITIC: blind-solve + judge (one batched call, key never sent) ──
+    async def _critic(items):
+        raw = await _gen_json(client, MCQ_CRITIC_PROMPT,
+                              job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
+                              0.0, 2200, usage_out)
+        verdicts = {}
+        for r in (raw.get("reviews") or []):
+            try:
+                verdicts[int(r.get("i"))] = r
+            except Exception:
+                continue
+        passed, failed = [], []
+        for i, m in enumerate(items):
+            v = verdicts.get(i)
+            if v is None:
+                failed.append((m, ["not reviewed"]))
+                continue
+            reasons = [str(x)[:160] for x in (v.get("reasons") or [])][:4]
+            try:
+                key_match = int(v.get("best_index")) == int(m["correct"])
+            except Exception:
+                key_match = False
+            if not key_match:
+                reasons.append("blind solver chose a different option — key is wrong or the question is ambiguous")
+            if bool(v.get("pass")) and key_match:
+                passed.append(m)
+            else:
+                failed.append((m, reasons or ["failed review"]))
+        return passed, failed
+
+    try:
+        passed, failed = await _critic(drafts)
+    except Exception as e:
+        return None, f"Review call failed: {str(e)[:200]}"
+
+    # ── 3+4) REFINE the failures once, re-check once, then STOP ──
+    if failed and len(passed) < n:
+        fail_block = "\n\n".join(
+            f"[{i}] {m['question']}\n" + "\n".join(
+                f"   ({oi}) {o}" for oi, o in enumerate(m["options"]))
+            + f"\n   intended correct: ({m['correct']})"
+            + "\n   reviewer reasons: " + "; ".join(rs)
+            for i, (m, rs) in enumerate(failed))
+        try:
+            raw = await _gen_json(client,
+                                  MCQ_REFINE_PROMPT.format(fairness=fairness),
+                                  job_ctx + "\n\nQUESTIONS TO FIX:\n" + fail_block,
+                                  0.4, 2800, usage_out)
+            refined = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)]
+            if refined:
+                re_passed, _ = await _critic(refined)
+                passed.extend(re_passed)
+        except Exception as e:
+            # Bounded and fail-soft: refinement trouble never loses the
+            # questions that already passed.
+            print(f"[MCQ-GEN] refine round failed (continuing with passers): {str(e)[:120]}")
+
+    return passed[:n], None
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
