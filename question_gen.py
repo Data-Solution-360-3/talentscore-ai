@@ -213,9 +213,13 @@ multiple-choice questions grounded in the ACTUAL day-to-day work this job
 description describes.
 
 WHAT MAKES A QUESTION GOOD HERE
-- It tests judgment or working knowledge a real person IN THIS ROLE needs —
-  a decision they'd face, a trade-off they'd weigh, a mistake they'd have to
-  catch. Not vocabulary, not trivia, not textbook definitions.
+- Frame EVERY question as a realistic work SCENARIO for this role: a
+  situation the person is in, then what they should do, conclude, check
+  first, or prioritize. NEVER a bare recall stem — no "which
+  term/clause/function/feature does X", no definitions, no vocabulary.
+  A knowledgeable-but-thoughtless person must not be able to ace it on
+  memorized facts alone; the answer must require applying knowledge to the
+  situation.
 - Exactly 4 options, exactly ONE defensibly best answer.
 - THE DISTRACTORS ARE THE CRAFT: each wrong option must be something a person
   with PARTIAL knowledge would genuinely pick — a real, common misconception,
@@ -244,13 +248,25 @@ answer key. For EACH question, do two things IN ORDER:
      misconceptions.
    - NOT GROUNDED: not clearly about this specific role's real work as
      described in the job description.
-   - TRIVIA: tests recall of a definition/fact rather than job-relevant
-     judgment or applied knowledge.
+   - TRIVIA / RECALL: answerable by memorized definition, terminology, or
+     tool/keyword/clause/function knowledge ALONE. Any stem of the form
+     "which term/clause/function/feature does X" FAILS — even when the
+     distractors are plausible. The test: could a knowledgeable-but-
+     thoughtless person ace it on recall, without weighing the situation?
+     If yes, FAIL.
+   - NO SCENARIO: the stem does not put the candidate in a realistic work
+     situation for THIS role (a decision to make, a trade-off to weigh, a
+     problem to diagnose, something to check or prioritize FIRST).
+     Calibration: "While analyzing a dataset you notice missing values in a
+     key column — what is the best FIRST step?" PASSES (a situation, tempting
+     shortcuts as distractors, judgment required). "Which SQL concept would
+     you use to retrieve data from two related tables?" FAILS (recall dressed
+     as a task).
    - AMBIGUOUS: two options overlap, or more than one option is defensibly
      correct, or none clearly is.
 
-Be strict: a question that merely "seems fine" but tests nothing a real
-candidate in this role must know should FAIL as NOT GROUNDED or TRIVIA.
+Be strict: a question that merely "seems fine" but tests recall instead of
+applied judgment must FAIL. When you are unsure between pass and fail, FAIL.
 
 Return JSON:
 {{"reviews": [{{"i": <index in the list>, "best_index": <0-3>, "pass": true|false,
@@ -261,10 +277,13 @@ For each item you get the question, its options, the intended correct index,
 and the reviewer's SPECIFIC reasons. Rewrite each question to FIX those
 reasons while keeping it grounded in this job's real work. You may rewrite
 the stem, any option, or replace the question entirely with a better one on
-the same topic area. Same bar as before:
+the same topic area. A question failed for TRIVIA/RECALL or NO SCENARIO must
+come back CONVERTED into a realistic work scenario on the same topic — a
+situation, then what to do / conclude / check first — never a lightly
+reworded recall stem. Same bar as before:
 - 4 options, ONE defensibly best answer, distractors = genuine
   partial-knowledge misconceptions, nothing a layperson can eliminate,
-  no length/format leak, no trivia, no ambiguity.
+  no length/format leak, no recall-only stems, no ambiguity.
 {fairness}
 
 Return JSON (same order as given):
@@ -321,14 +340,14 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                 f"   ({oi}) {o}" for oi, o in enumerate(m["options"]))
             for i, m in enumerate(items))
 
-    # ── 1) DRAFT n+6 (over-draft so the critic can discard, not force-pass) ──
+    # ── 1) DRAFT n+8 (over-draft so the stricter critic can discard freely) ──
     try:
         raw = await _gen_json(client,
-                              MCQ_DRAFT_PROMPT.format(n=n + 6, fairness=fairness),
-                              job_ctx, 0.5, 3200, usage_out)
+                              MCQ_DRAFT_PROMPT.format(n=n + 8, fairness=fairness),
+                              job_ctx, 0.5, 3600, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
-    drafts = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)][:n + 6]
+    drafts = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)][:n + 8]
     if len(drafts) < 3:
         return None, "Drafting produced too few valid questions — try again."
 
