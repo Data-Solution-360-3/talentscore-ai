@@ -36,7 +36,7 @@ async def run():
     sent = retried = 0
 
     # ── 1) reminders ─────────────────────────────────────────
-    async for a in db.applications.find(
+    for a in await db.applications.find(
             {"funnel": "mcq", "interview_token": {"$exists": True},
              "invited_at": {"$exists": True},
              "reminder_sent_at": {"$exists": False}}).to_list(500):
@@ -72,7 +72,7 @@ async def run():
         print(f"reminder -> {a.get('email')} (sent={ok}, id={info if ok else '-'})")
 
     # ── 2) cap retries ───────────────────────────────────────
-    async for a in db.applications.find(
+    for a in await db.applications.find(
             {"funnel": "mcq", "status": "scored", "viva_capped": True,
              "interview_token": {"$exists": False}}).to_list(500):
         job = await db.jobs.find_one({"_id": ObjectId(str(a["job_id"]))})
