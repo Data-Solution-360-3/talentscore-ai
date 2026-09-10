@@ -4784,6 +4784,21 @@ function mcqfRender(){
       + qs.slice(0,3).map((m,i)=>`<div style="margin-top:3px;color:var(--t3)">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')
       + (qs.length>3?`<div style="color:var(--t3);margin-top:2px">…and ${qs.length-3} more — Review / edit to see all.</div>`:'')+`</div>`;
   }
+  if(appr){
+    const pm=(mf.paste_mode==='monitor')?'monitor':'restrict';
+    html += `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:11px;font-weight:600;color:var(--t2)">
+      <label>Copy/paste
+        <select id="mcqf-pm" style="margin-left:4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:600">
+          <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
+          <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
+        </select></label>
+      <label>Time limit (min, 0=none)
+        <input id="mcqf-tl" type="number" min="0" max="180" value="${mf.time_limit_minutes||0}"
+          style="width:56px;margin-left:4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:700"></label>
+      <button class="btn btn-xs" onclick="mcqfSettings()">Save settings</button>
+      <span style="font-weight:500;color:var(--t3)">Candidates are told the active rules on the instruction screen — no silent blocking or recording.</span>
+    </div>`;
+  }
   if(on){
     html += `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">
@@ -4866,7 +4881,7 @@ function mcqFunnelRender(){
             :r.interview==='expired'?'<span style="color:var(--red,#DC2626)">expired</span>'
             :r.interview==='capped'?'<span style="color:var(--amber,#B45309)" title="Qualified; daily interview cap was full — retried automatically next day">capped — retrying</span>'
             :'<span style="color:var(--t3)">—</span>'}</td>
-        <td>${r.status==='held'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')">Release</button>`
+        <td>${r.mcq_score!=null?`<button class="btn btn-xs" onclick="mcqfReport('${r.application_id}')">Report</button> `:''}${r.status==='held'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')">Release</button>`
             :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Re-hold</button>`
             :r.interview==='expired'?`<button class="btn btn-xs btn-primary" onclick="mcqfReinvite('${r.application_id}')">Re-invite</button>`:''}</td></tr>`).join('')
       +`</tbody></table>${(f.rows||[]).length>30?`<div style="color:var(--t3);font-size:10.5px;margin-top:3px">Showing top 30 of ${f.rows.length}.</div>`:''}</div>`;
@@ -4883,6 +4898,68 @@ async function mcqfAdvance(){
   if(!r.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
   toast('Advanced '+d.advanced+' candidate(s) — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
   mcqFunnelLoad();
+}
+async function mcqfSettings(){
+  const d=await mcqfApi({action:'settings',
+    paste_mode:document.getElementById('mcqf-pm').value,
+    time_limit_minutes:parseInt(document.getElementById('mcqf-tl').value)||0});
+  if(d){ mcqfRender(); toast('Assessment settings saved — the instruction screen now shows these rules.',{type:'success'}); }
+}
+// ── Per-candidate ASSESSMENT REPORT (Pathao #9): assessment info,
+//    per-question analysis, and the written activity log. Review data for a
+//    human — nothing here auto-disqualifies. ──
+async function mcqfReport(appId){
+  const st=window._mcqfState;
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-report/'+appId,{credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Could not load report',{type:'error'}); return; }
+  if(!document.getElementById('mcqr-modal')){
+    document.body.insertAdjacentHTML('beforeend',
+      `<div class="modal-overlay" id="mcqr-modal"><div class="modal modal-lg">
+        <div class="modal-hd"><h3 class="modal-title" id="mcqr-title">Assessment report</h3>
+        <button class="modal-close" onclick="closeModal('mcqr-modal')">✕</button></div>
+        <div id="mcqr-body"></div>
+        <div class="modal-footer"><button class="btn btn-ghost btn-sm" onclick="closeModal('mcqr-modal')">Close</button></div>
+      </div></div>`);
+  }
+  const a=d.assessment||{}, cand=d.candidate||{};
+  document.getElementById('mcqr-title').textContent='Assessment report — '+(cand.name||cand.email||'Candidate');
+  const mmss=s=>{s=Math.round(+s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+  let html=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-bottom:.7rem">
+    <span>Score <b>${a.score??'—'}/${a.total??'—'}${a.pct!=null?' ('+a.pct+'%)':''}</b></span>
+    <span>Duration <b>${a.total_seconds!=null?mmss(a.total_seconds):'—'}</b>${a.time_limit_minutes?' of '+a.time_limit_minutes+' min limit':''}</span>
+    ${a.timed_out?'<span style="color:var(--amber,#B45309)"><b>auto-submitted at timeout</b></span>':''}
+    <span>Mode: <b>${a.paste_mode==='monitor'?'copy/paste allowed (recorded)':'copy/paste restricted'}</b></span>
+    <span style="color:var(--t3)">submitted ${escapeHtml((a.taken_at||'').slice(0,16).replace('T',' '))}</span>
+  </div>
+  <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">Per-question analysis</div>
+  <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Question</th><th>Answer</th><th>Result</th><th>Time</th><th>Returns</th><th>Changes</th></tr></thead><tbody>`;
+  (d.questions||[]).forEach(q=>{
+    html+=`<tr><td style="color:var(--t3)">${q.n}</td>
+      <td style="max-width:340px">${escapeHtml(q.question)}<div style="font-size:10.5px;color:var(--t3);margin-top:2px">${
+        (q.options||[]).map((o,oi)=>(oi===q.correct_index?'<b style="color:var(--green)">✓ ':'')+String.fromCharCode(65+oi)+'. '+escapeHtml(o)+(oi===q.correct_index?'</b>':'')).join(' &nbsp; ')}</div></td>
+      <td>${q.unanswered?'<span style="color:var(--t3)">unanswered</span>':'<b>'+String.fromCharCode(65+q.chosen)+'</b>'}</td>
+      <td>${q.unanswered?'—':(q.is_correct?'<span style="color:var(--green)">✓ correct</span>':'<span style="color:var(--red,#DC2626)">✗ incorrect</span>')} · ${q.marks} mark</td>
+      <td>${q.time_seconds!=null?q.time_seconds+'s':'—'}</td><td>${q.returns||0}</td><td>${q.answer_changes||0}</td></tr>`;
+  });
+  html+=`</tbody></table></div>
+  <div style="font-size:10.5px;color:var(--t3);margin:.4rem 0 .8rem">Per-question time is neutral behavioral data for your review — fast or slow means nothing on its own, and none of it affects the score.</div>`;
+  const act=d.activity||{};
+  html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">Activity log <span style="text-transform:none;letter-spacing:0;font-weight:500">— monitored + flagged, never blocked or auto-disqualified; expect false positives</span></div>`;
+  if(act.enabled){
+    const c=act.counts||{}, du=act.durations||{};
+    const chips=Object.entries(c).map(([k,v])=>`<span style="display:inline-block;background:var(--og);color:var(--orange2);border:1px solid var(--ob);border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:700;margin:0 4px 4px 0">${escapeHtml(k.replace(/_/g,' '))} ×${v}</span>`).join('');
+    html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.7rem .9rem;font-size:.83rem;color:var(--t2);line-height:1.7">
+      ${du.tab_away?`tab hidden <b>${Math.round(du.tab_away)}s</b> total · `:''}${du.focus_loss?`window unfocused <b>${Math.round(du.focus_loss)}s</b> total`:''}
+      <div style="margin:.35rem 0">${chips||'<span style="color:var(--t3)">No activity flags raised.</span>'}</div>
+      ${(act.flags||[]).map(f=>`<div><b style="font-variant-numeric:tabular-nums">${mmss(f.t)}</b> — ${escapeHtml(f.reason||f.type)}${f.dur?` <span style="color:var(--t3)">· ${f.dur}s</span>`:''}</div>`).join('')}
+      <div style="font-size:11px;color:var(--t3);margin-top:.5rem;line-height:1.5">Browser monitoring cannot see a second device, a second monitor, or other tabs' contents — these signals raise the cost of casual cheating and catch obvious cases; they are not proof.</div>
+    </div>`;
+  }else{
+    html+=`<div style="background:var(--s2);border:1px dashed var(--border);border-radius:var(--rs);padding:.7rem .9rem;font-size:.83rem;color:var(--t2)">No activity log stored — this assessment was taken before activity monitoring shipped (11 Sep 2026). The absence of flags is a storage gap, not a clean signal.</div>`;
+  }
+  document.getElementById('mcqr-body').innerHTML=html;
+  openModal('mcqr-modal');
 }
 async function mcqfReinvite(appId){
   if(!confirm('Send a fresh interview invite? The old link is permanently killed and the candidate gets a new email with a new deadline.')) return;

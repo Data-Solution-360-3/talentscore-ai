@@ -3911,6 +3911,58 @@ async def public_apply_submit(
 
 MCQ_FILTER_MIN, MCQ_FILTER_MAX = 5, 15
 
+# Activity-log flag types for the MCQ assessment = the interview's proctoring
+# whitelist plus the assessment-only events. One family, one honesty rule:
+# review signals for a human, never auto-disqualification.
+_ASSESS_FLAG_TYPES = _PROCTOR_FLAG_TYPES | {"refresh", "reopen", "inactivity"}
+
+
+def _validate_assessment_activity(p) -> dict:
+    """Sibling of _validate_proctoring for the MCQ assessment surface —
+    same clamps, same bounded shapes, DOM-only event types."""
+    if not (isinstance(p, dict) and p.get("enabled")):
+        return {"enabled": False, "flags_schema": 1}
+    flags = []
+    for f in (p.get("flags") or [])[:200]:
+        if isinstance(f, dict) and str(f.get("type", "")) in _ASSESS_FLAG_TYPES:
+            fl = {"t": _clampi(f.get("t"), 0, 86400),
+                  "type": str(f.get("type"))[:20],
+                  "reason": str(f.get("reason", ""))[:160]}
+            if f.get("dur") is not None:
+                fl["dur"] = _clampi(f.get("dur"), 0, 86400)
+            flags.append(fl)
+    counts = {}
+    raw_counts = p.get("counts") if isinstance(p.get("counts"), dict) else {}
+    for k in _ASSESS_FLAG_TYPES:
+        v = _clampi(raw_counts.get(k, 0), 0, 100000)
+        if v:
+            counts[k] = v
+    durations = {}
+    raw_dur = p.get("durations") if isinstance(p.get("durations"), dict) else {}
+    for k in ("tab_away", "focus_loss"):
+        v = _clampi(raw_dur.get(k, 0), 0, 86400)
+        if v:
+            durations[k] = v
+    return {"enabled": True, "flags_schema": 1,
+            "mode": "monitor" if p.get("mode") == "monitor" else "restrict",
+            "flags": flags, "counts": counts, "durations": durations,
+            "total_seconds": _clampi(p.get("total_seconds"), 0, 86400)}
+
+
+def _validate_mcq_timings(raw, n_questions: int) -> list:
+    """Per-question timing (NEUTRAL behavioral data — never a score input):
+    first_opened_at (s from start), total_ms on the question, returns,
+    answer_changes. Clamped, fixed length."""
+    out = []
+    for i in range(n_questions):
+        t = raw[i] if isinstance(raw, list) and i < len(raw) and isinstance(raw[i], dict) else {}
+        out.append({"q": i,
+                    "first_opened_at": _clampi(t.get("first_opened_at"), 0, 86400),
+                    "total_ms": _clampi(t.get("total_ms"), 0, 86400000),
+                    "returns": _clampi(t.get("returns"), 0, 1000),
+                    "answer_changes": _clampi(t.get("answer_changes"), 0, 1000)})
+    return out
+
 
 def _normalize_mcq_set(raw) -> list:
     """Same per-item rules as the interview MCQs (_normalize_scenario): one
@@ -4016,6 +4068,20 @@ async def mcq_filter_save(request: Request, job_id: str):
                                  {"$set": {"mcq_filter": mf}})
         return {"success": True, "mcq_filter": serialize_mongo(mf)}
 
+    if action == "settings":
+        # Assessment behavior settings — DISCLOSED to the candidate on the
+        # instruction screen, always (no silent blocking or recording).
+        if body.get("paste_mode") in ("restrict", "monitor"):
+            mf["paste_mode"] = body["paste_mode"]
+        if "time_limit_minutes" in body:
+            try:
+                mf["time_limit_minutes"] = max(0, min(180, int(body.get("time_limit_minutes") or 0)))
+            except Exception:
+                mf["time_limit_minutes"] = 0
+        await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                 {"$set": {"mcq_filter": mf}})
+        return {"success": True, "mcq_filter": serialize_mongo(mf)}
+
     raise HTTPException(status_code=400, detail="Unknown action.")
 
 
@@ -4030,7 +4096,13 @@ async def apply_mcq_questions(token: str):
     qs = (mf.get("approved") or {}).get("questions") if mf.get("enabled") else None
     if not qs:
         raise HTTPException(status_code=404, detail="Not available.")
-    return {"questions": [{"q": q["q"], "options": q["options"]} for q in qs]}
+    # The instruction screen renders its DISCLOSURE from these fields — the
+    # candidate always learns the paste rule, the time limit, and what is
+    # monitored, before question 1. Never the answer key.
+    return {"questions": [{"q": q["q"], "options": q["options"]} for q in qs],
+            "paste_mode": ("monitor" if mf.get("paste_mode") == "monitor" else "restrict"),
+            "time_limit_minutes": int(mf.get("time_limit_minutes") or 0),
+            "can_go_back": True}
 
 
 @app.post("/api/apply/{token}/mcq/{application_id}")
@@ -4061,9 +4133,14 @@ async def apply_mcq_submit(request: Request, token: str, application_id: str):
         body = await request.json()
         choices = body.get("choices")
     except Exception:
-        choices = None
+        body, choices = {}, None
     if not isinstance(choices, list) or len(choices) != len(qs):
         raise HTTPException(status_code=400, detail="Please answer every question.")
+    # Auto-submit on timeout (jobs WITH a time limit only): unanswered
+    # questions arrive as -1 and are simply incorrect. Jobs without a limit
+    # keep the strict all-answered rule — exactly the pre-existing behavior.
+    has_limit = int(mf.get("time_limit_minutes") or 0) > 0
+    timed_out = bool(body.get("timed_out")) and has_limit
     score = 0
     clean = []
     for i, q in enumerate(qs):
@@ -4071,15 +4148,35 @@ async def apply_mcq_submit(request: Request, token: str, application_id: str):
             c = int(choices[i])
         except Exception:
             c = -1
+        if c == -1 and timed_out:
+            clean.append(-1)
+            continue
         if not 0 <= c < 4:
             raise HTTPException(status_code=400, detail="Please answer every question.")
         clean.append(c)
         if c == q["correct"]:
             score += 1
+
+    # NEUTRAL behavioral data beside the grade — never a scoring input:
+    # per-question timing, the activity log, and the assessment clock.
+    timings = _validate_mcq_timings(body.get("timings"), len(qs))
+    activity = _validate_assessment_activity(body.get("activity"))
+    try:
+        started_at = _dt.utcfromtimestamp(
+            max(0, min(4102444800, int(body.get("started_at_epoch") or 0)))) \
+            if body.get("started_at_epoch") else None
+    except Exception:
+        started_at = None
+    now = _dt.utcnow()
     await db.applications.update_one(
         {"_id": aid, "mcq_score": {"$exists": False}},   # atomic one-shot
         {"$set": {"mcq_score": score, "mcq_total": len(qs),
-                  "mcq_answers": clean, "mcq_taken_at": _dt.utcnow()}})
+                  "mcq_answers": clean, "mcq_taken_at": now,
+                  "mcq_timings": timings,
+                  "assessment_activity": activity,
+                  "assessment_started_at": started_at,
+                  "assessment_total_seconds": _clampi(activity.get("total_seconds"), 0, 86400),
+                  "assessment_timed_out": timed_out}})
     return {"success": True, "state": "received"}
 
 
@@ -4176,6 +4273,64 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
           + (f" capped_by={capped_by}" if capped_by else ""))
     return {"success": True, "advanced": advanced, "requested": n,
             "held_remaining": max(0, len(held) - advanced), "capped_by": capped_by}
+
+
+@app.get("/api/jobs/{job_id}/mcq-report/{application_id}")
+async def mcq_assessment_report(request: Request, job_id: str, application_id: str):
+    """Recruiter's per-candidate ASSESSMENT REPORT (org-scoped via owned_job):
+    assessment info, per-question analysis (answer / correct / marks / time /
+    returns — the answer key is recruiter-only, it never rides a candidate
+    surface), and the written activity log. Everything here is review data
+    for a HUMAN — nothing in it auto-disqualifies anyone."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    from bson import ObjectId as _OID
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found.")
+    a = await db.applications.find_one({"_id": aid, "job_id": str(job["_id"]),
+                                        "funnel": "mcq"})
+    if not a:
+        raise HTTPException(status_code=404, detail="Not found.")
+    qs = ((job.get("mcq_filter") or {}).get("approved") or {}).get("questions") or []
+    answers = a.get("mcq_answers") or []
+    timings = {t.get("q"): t for t in (a.get("mcq_timings") or []) if isinstance(t, dict)}
+    per_q = []
+    for i, q in enumerate(qs):
+        c = answers[i] if i < len(answers) else None
+        t = timings.get(i) or {}
+        per_q.append({
+            "n": i + 1, "question": q["q"], "options": q["options"],
+            "chosen": c if isinstance(c, int) and c >= 0 else None,
+            "correct_index": q["correct"],
+            "is_correct": isinstance(c, int) and c == q["correct"],
+            "unanswered": not (isinstance(c, int) and 0 <= c < 4),
+            "marks": 1 if (isinstance(c, int) and c == q["correct"]) else 0,
+            "time_seconds": round((t.get("total_ms") or 0) / 1000, 1),
+            "first_opened_at": t.get("first_opened_at"),
+            "returns": t.get("returns") or 0,
+            "answer_changes": t.get("answer_changes") or 0,
+        })
+    return {
+        "candidate": {"name": a.get("name"), "email": a.get("email"),
+                      "status": a.get("status"),
+                      "submitted_at": str(a.get("submitted_at") or "")},
+        "assessment": {
+            "score": a.get("mcq_score"), "total": a.get("mcq_total"),
+            "pct": (round(100 * a["mcq_score"] / a["mcq_total"])
+                    if a.get("mcq_total") and a.get("mcq_score") is not None else None),
+            "started_at": str(a.get("assessment_started_at") or ""),
+            "taken_at": str(a.get("mcq_taken_at") or ""),
+            "total_seconds": a.get("assessment_total_seconds"),
+            "timed_out": bool(a.get("assessment_timed_out")),
+            "time_limit_minutes": int((job.get("mcq_filter") or {}).get("time_limit_minutes") or 0),
+            "paste_mode": ("monitor" if (job.get("mcq_filter") or {}).get("paste_mode") == "monitor"
+                           else "restrict"),
+        },
+        "questions": per_q,
+        "activity": a.get("assessment_activity") or {"enabled": False, "flags_schema": 1},
+    }
 
 
 @app.post("/api/jobs/{job_id}/mcq-reinvite")

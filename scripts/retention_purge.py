@@ -42,8 +42,17 @@ def main():
          "$or": [{f: {"$exists": True}} for f in PURGE_FIELDS]},
         {"$unset": {f: "" for f in PURGE_FIELDS},
          "$set": {"retention_purged_at": datetime.utcnow()}})
+    # MCQ assessment data (answers, per-question timing, activity log) is
+    # candidate behavioral data on the applications row — same 12-month rule.
+    APP_FIELDS = ["mcq_answers", "mcq_timings", "assessment_activity"]
+    r2 = db.applications.update_many(
+        {"submitted_at": {"$lt": cutoff},
+         "assessment_purged_at": {"$exists": False},
+         "$or": [{f: {"$exists": True}} for f in APP_FIELDS]},
+        {"$unset": {f: "" for f in APP_FIELDS},
+         "$set": {"assessment_purged_at": datetime.utcnow()}})
     print(f"{datetime.utcnow().isoformat()}Z retention purge: cutoff={cutoff.date()} "
-          f"screenings purged={r.modified_count}")
+          f"screenings purged={r.modified_count} applications purged={r2.modified_count}")
 
 
 if __name__ == "__main__":

@@ -195,12 +195,40 @@ input,select,textarea{max-width:100%}
 
   <div id="mcq-view" style="display:none">
     <div class="fc" style="text-align:left">
-      <div class="fc-title">One more step — a short questionnaire</div>
-      <div class="fc-sub">Your application is saved. Answer these {{JOB_TITLE}}-related multiple-choice questions to complete it — pick one answer per question.</div>
-      <div class="err" id="mcq-err"></div>
-      <div id="mcq-qs" style="margin-top:1rem"></div>
-      <button class="btn" id="mcq-btn" onclick="submitMcqTest()">Submit answers</button>
-      <p class="retention">Your answers are reviewed by the hiring team together with your CV. There are no trick questions.</p>
+      <!-- INSTRUCTION + DISCLOSURE screen: shown BEFORE question 1, always. -->
+      <div id="mcq-intro">
+        <div class="fc-title">One more step — a short questionnaire</div>
+        <div class="fc-sub">Your application is saved. This test completes it.</div>
+        <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.88rem;color:#33415c;line-height:1.75">
+          <b>How it works</b><br>
+          • <span id="mi-count">—</span> multiple-choice questions, one at a time — pick one answer each.<br>
+          • You <b>can go back</b> and change answers before submitting.<br>
+          • <span id="mi-time">No time limit — take the time you need.</span><br>
+          • <span id="mi-paste">Copy and paste are <b>disabled</b> during the test.</span><br>
+          • On the last question, press <b>Submit answers</b>. You'll see a confirmation — then the hiring team reviews your test together with your CV.<br>
+          <span style="display:block;margin-top:.5rem;color:#4A5970;font-size:.82rem">
+          <b>Monitoring notice:</b> while the test is open we record tab switches, window focus changes,
+          copy/paste attempts, and time spent per question. These are <b>review signals read by a human</b> —
+          nothing here automatically disqualifies you, and switching tabs doesn't end your test.
+          Details: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>.</span>
+        </div>
+        <button class="btn" onclick="mcqBegin()">Start the questionnaire</button>
+      </div>
+      <!-- One-question pager -->
+      <div id="mcq-quiz" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+          <div style="font-size:.82rem;font-weight:800;color:#142848" id="mcq-prog">Question 1</div>
+          <div style="font-size:.82rem;font-weight:800;color:#B4232C;display:none" id="mcq-clock"></div>
+        </div>
+        <div class="err" id="mcq-err"></div>
+        <div id="mcq-qbox"></div>
+        <div style="display:flex;gap:.6rem;margin-top:1rem">
+          <button class="btn" id="mcq-prev" style="background:#EDF0F5;color:#142848" onclick="mcqNav(-1)">← Previous</button>
+          <button class="btn" id="mcq-next" onclick="mcqNav(1)">Next →</button>
+          <button class="btn" id="mcq-btn" style="display:none" onclick="submitMcqTest(false)">Submit answers</button>
+        </div>
+        <p class="retention" id="mcq-unanswered" style="display:none"></p>
+      </div>
     </div>
   </div>
 
@@ -233,6 +261,7 @@ input,select,textarea{max-width:100%}
   </div>
 </div>
 
+<script src="/static/assessment_monitor.js?v=1"></script>
 <script>
 const TOKEN = "{{TOKEN}}";
 const MAX_BYTES = {{MAX_MB}} * 1024 * 1024;
@@ -343,47 +372,140 @@ function showView(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// ── MCQ pre-filter step (only jobs that turned it ON reach this) ──
-let _mcqAppId=null, _mcqN=0;
+// ── MCQ assessment step (only jobs that turned the filter ON reach this).
+//    One question at a time; per-question timing + the activity monitor are
+//    NEUTRAL review data for a human — disclosed on the intro screen, never
+//    a score input, never auto-disqualifying. State survives reloads.
+let _mcq=null;
+function escq(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function _mcqKey(){ return 'tc-mcq-'+_mcq.appId; }
+function _mcqSave(){
+  try{ sessionStorage.setItem(_mcqKey(), JSON.stringify({
+    answers:_mcq.answers, timings:_mcq.timings, started:_mcq.started, cur:_mcq.cur})); }catch(_){}
+}
 async function startMcq(appId){
-  _mcqAppId = appId;
   try{
     const r = await fetch('/api/apply/'+TOKEN+'/mcq');
     if(!r.ok) throw new Error('unavailable');
     const d = await r.json();
     const qs = d.questions||[];
     if(!qs.length) throw new Error('empty');
-    _mcqN = qs.length;
-    document.getElementById('mcq-qs').innerHTML = qs.map((q,i)=>`
-      <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:.9rem 1rem;margin-bottom:.8rem">
-        <div style="font-size:.92rem;font-weight:700;color:#142848;margin-bottom:.55rem">${i+1}. ${escq(q.q)}</div>
-        ${q.options.map((o,oi)=>`
-          <label style="display:flex;gap:.55rem;align-items:flex-start;padding:.35rem .2rem;font-size:.88rem;color:#33415c;cursor:pointer;line-height:1.5">
-            <input type="radio" name="mcq-${i}" value="${oi}" style="margin-top:3px;flex:none"> <span><b>${String.fromCharCode(65+oi)}.</b> ${escq(o)}</span>
-          </label>`).join('')}
-      </div>`).join('');
+    _mcq = {appId, qs, mode:d.paste_mode||'restrict', limitMin:d.time_limit_minutes||0,
+            cur:0, answers:qs.map(()=>-1),
+            timings:qs.map(()=>({first_opened_at:null,total_ms:0,returns:0,answer_changes:0,visited:false})),
+            started:0, activeSince:0, deadline:0, clock:null};
+    try{ const saved=JSON.parse(sessionStorage.getItem(_mcqKey())||'null');
+      if(saved && Array.isArray(saved.answers) && saved.answers.length===qs.length){
+        _mcq.answers=saved.answers; _mcq.cur=Math.min(saved.cur||0, qs.length-1);
+        if(Array.isArray(saved.timings) && saved.timings.length===qs.length) _mcq.timings=saved.timings;
+        _mcq.started=saved.started||0;
+      } }catch(_){}
+    // Disclosure text reflects the ACTUAL settings — no silent rules.
+    document.getElementById('mi-count').textContent = qs.length;
+    document.getElementById('mi-time').innerHTML = _mcq.limitMin
+      ? 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — the remaining time is shown; when it runs out, your answers so far are submitted automatically.'
+      : 'No time limit — take the time you need.';
+    document.getElementById('mi-paste').innerHTML = _mcq.mode==='monitor'
+      ? 'Copy and paste are <b>allowed</b>, but every use is recorded for the hiring team.'
+      : 'Copy and paste are <b>disabled</b> during the test (attempts are recorded).';
     showView('mcq-view');
+    document.getElementById('mcq-intro').style.display = _mcq.started ? 'none' : 'block';
+    document.getElementById('mcq-quiz').style.display = _mcq.started ? 'block' : 'none';
+    if(_mcq.started){ _mcqResume(); }
   }catch(_){ showDone(); }   // filter unavailable: application is already saved
 }
-function escq(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
-async function submitMcqTest(){
+function mcqBegin(){
+  _mcq.started = _mcq.started || Date.now();
+  document.getElementById('mcq-intro').style.display='none';
+  document.getElementById('mcq-quiz').style.display='block';
+  _mcqResume();
+}
+function _mcqResume(){
+  AssessMonitor.start({pasteMode:_mcq.mode, storageKey:_mcqKey()});
+  if(_mcq.limitMin){
+    _mcq.deadline = _mcq.started + _mcq.limitMin*60000;
+    document.getElementById('mcq-clock').style.display='block';
+    _mcq.clock = setInterval(_mcqTick, 1000); _mcqTick();
+  }
+  _mcqShow(_mcq.cur);
+  _mcqSave();
+}
+function _mcqTick(){
+  const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
+  document.getElementById('mcq-clock').textContent =
+    '⏱ '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+' left';
+  if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
+}
+function _mcqCloseTiming(){
+  if(_mcq.activeSince){
+    _mcq.timings[_mcq.cur].total_ms += Date.now()-_mcq.activeSince;
+    _mcq.activeSince = 0;
+  }
+}
+function _mcqShow(i){
+  _mcqCloseTiming();
+  _mcq.cur = i;
+  const t=_mcq.timings[i];
+  if(t.first_opened_at==null) t.first_opened_at = Math.round((Date.now()-_mcq.started)/1000);
+  else if(t.visited) t.returns++;
+  t.visited = true;
+  _mcq.activeSince = Date.now();
+  AssessMonitor.noteQuestion(i);
+  const q=_mcq.qs[i];
+  document.getElementById('mcq-prog').textContent = 'Question '+(i+1)+' of '+_mcq.qs.length;
+  document.getElementById('mcq-qbox').innerHTML = `
+    <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem">
+      <div style="font-size:.95rem;font-weight:700;color:#142848;margin-bottom:.6rem">${escq(q.q)}</div>
+      ${q.options.map((o,oi)=>`
+        <label style="display:flex;gap:.55rem;align-items:flex-start;padding:.4rem .2rem;font-size:.9rem;color:#33415c;cursor:pointer;line-height:1.5">
+          <input type="radio" name="mcq-q" value="${oi}" ${_mcq.answers[i]===oi?'checked':''} onchange="mcqPick(${oi})" style="margin-top:3px;flex:none">
+          <span><b>${String.fromCharCode(65+oi)}.</b> ${escq(o)}</span>
+        </label>`).join('')}
+    </div>`;
+  document.getElementById('mcq-prev').style.visibility = i>0?'visible':'hidden';
+  const last = i===_mcq.qs.length-1;
+  document.getElementById('mcq-next').style.display = last?'none':'inline-block';
+  document.getElementById('mcq-btn').style.display = last?'inline-block':'none';
+  const un=_mcq.answers.filter(a=>a<0).length;
+  const unEl=document.getElementById('mcq-unanswered');
+  unEl.style.display = (last&&un)?'block':'none';
+  if(last&&un) unEl.textContent = un+' question(s) still unanswered — use Previous to go back before submitting.';
+  _mcqSave();
+}
+function mcqPick(oi){
+  if(_mcq.answers[_mcq.cur]>=0 && _mcq.answers[_mcq.cur]!==oi) _mcq.timings[_mcq.cur].answer_changes++;
+  _mcq.answers[_mcq.cur]=oi;
+  _mcqSave();
+  if(_mcq.cur===_mcq.qs.length-1) _mcqShow(_mcq.cur);   // refresh unanswered note
+}
+function mcqNav(d){ _mcqShow(Math.max(0, Math.min(_mcq.qs.length-1, _mcq.cur+d))); }
+async function submitMcqTest(timedOut){
   const err=document.getElementById('mcq-err');
   err.style.display='none';
-  const choices=[];
-  for(let i=0;i<_mcqN;i++){
-    const sel=document.querySelector('input[name="mcq-'+i+'"]:checked');
-    if(!sel){ err.textContent='Please answer question '+(i+1)+'.'; err.style.display='block';
-      err.classList.add('on'); window.scrollTo({top:0,behavior:'smooth'}); return; }
-    choices.push(parseInt(sel.value));
+  _mcqCloseTiming();
+  if(!timedOut){
+    const firstUn=_mcq.answers.findIndex(a=>a<0);
+    if(firstUn>=0){ err.textContent='Please answer question '+(firstUn+1)+' — use Previous to go back.';
+      err.style.display='block'; err.classList.add('on'); _mcqShow(firstUn); return; }
   }
+  if(_mcq.clock) clearInterval(_mcq.clock);
   const btn=document.getElementById('mcq-btn');
   btn.disabled=true; btn.textContent='Submitting…';
+  const payload={
+    choices:_mcq.answers,
+    timed_out:!!timedOut,
+    started_at_epoch: Math.round(_mcq.started/1000),
+    timings:_mcq.timings.map(t=>({first_opened_at:t.first_opened_at||0,total_ms:Math.round(t.total_ms),
+                                  returns:t.returns,answer_changes:t.answer_changes})),
+    activity: (window.AssessMonitor?AssessMonitor.summary():{enabled:false}),
+  };
   try{
-    const r=await fetch('/api/apply/'+TOKEN+'/mcq/'+encodeURIComponent(_mcqAppId),{
+    const r=await fetch('/api/apply/'+TOKEN+'/mcq/'+encodeURIComponent(_mcq.appId),{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({choices})});
+      body: JSON.stringify(payload)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.detail||'Could not submit — please try again.');
+    try{ sessionStorage.removeItem(_mcqKey()); }catch(_){}
     showDone();
   }catch(e){
     err.textContent=e.message; err.style.display='block'; err.classList.add('on');
