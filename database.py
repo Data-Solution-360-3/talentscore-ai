@@ -1363,10 +1363,15 @@ async def create_live_interview(user_id: str, config: dict) -> dict:
 
 
 async def get_live_interview_by_token(token: str) -> dict | None:
-    """Probe-resistant resolve: unknown, deactivated, and already-completed
-    tokens all return None so the page renders one identical closed response."""
+    """Probe-resistant resolve: unknown, deactivated, already-completed, and
+    EXPIRED tokens all return None so the page renders one identical closed
+    response. expires_at (Part 2 invite deadlines) is enforced HERE — the one
+    chokepoint the candidate page, the mint, and the session save all pass
+    through. Links without expires_at (everything pre-Part-2) never expire."""
     doc = await db.live_interviews.find_one(
-        {"public_token": token, "active": True, "completed_sessions": {"$lt": 1}})
+        {"public_token": token, "active": True, "completed_sessions": {"$lt": 1},
+         "$or": [{"expires_at": {"$exists": False}}, {"expires_at": None},
+                 {"expires_at": {"$gt": datetime.utcnow()}}]})
     if doc:
         doc["_id"] = str(doc["_id"])
     return doc

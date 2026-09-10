@@ -4331,6 +4331,9 @@ function renderPublicLink(job, spend){
               <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
                 <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
                        style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+              <label title="How long a funnel invite link stays valid" style="font-size:11px;font-weight:600;color:var(--t2)">Invite window (days)
+                <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}"
+                       style="width:56px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
               <label style="font-size:11px;font-weight:600;color:var(--t2)">Proctoring
                 <select id="viva-proc" style="margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
                   <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
@@ -4852,14 +4855,20 @@ function mcqFunnelRender(){
   }
   const rows=(f.rows||[]).slice(0,30);
   if(rows.length){
-    html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th></th></tr></thead><tbody>`
+    html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th>Interview</th><th></th></tr></thead><tbody>`
       +rows.map((r,i)=>`<tr><td style="color:var(--t3)">${i+1}</td><td>${escapeHtml(r.name||r.email||'—')}</td>
         <td><b>${r.mcq_score==null?'—':r.mcq_score+'/'+r.mcq_total}</b></td>
         <td>${r.status==='held'?'<span style="color:var(--amber,#B45309)">held — not advanced</span>'
             :r.status==='released'?'<span style="color:var(--t3)">released</span>'
             :'<span style="color:var(--green)">'+escapeHtml(r.status)+(r.screened?' ✓ screened':'')+'</span>'}</td>
+        <td>${r.interview==='done'?'<span style="color:var(--green)">✓ done</span>'
+            :r.interview==='invited'?'<span style="color:var(--indigo)">invited '+escapeHtml(r.invited_at||'')+' · by '+escapeHtml(r.invite_deadline||'')+'</span>'
+            :r.interview==='expired'?'<span style="color:var(--red,#DC2626)">expired</span>'
+            :r.interview==='capped'?'<span style="color:var(--amber,#B45309)" title="Qualified; daily interview cap was full — retried automatically next day">capped — retrying</span>'
+            :'<span style="color:var(--t3)">—</span>'}</td>
         <td>${r.status==='held'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')">Release</button>`
-            :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Re-hold</button>`:''}</td></tr>`).join('')
+            :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Re-hold</button>`
+            :r.interview==='expired'?`<button class="btn btn-xs btn-primary" onclick="mcqfReinvite('${r.application_id}')">Re-invite</button>`:''}</td></tr>`).join('')
       +`</tbody></table>${(f.rows||[]).length>30?`<div style="color:var(--t3);font-size:10.5px;margin-top:3px">Showing top 30 of ${f.rows.length}.</div>`:''}</div>`;
   }else html+=`<div style="color:var(--t3)">No funnel applicants yet.</div>`;
   el.innerHTML=html;
@@ -4875,6 +4884,16 @@ async function mcqfAdvance(){
   toast('Advanced '+d.advanced+' candidate(s) — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
   mcqFunnelLoad();
 }
+async function mcqfReinvite(appId){
+  if(!confirm('Send a fresh interview invite? The old link is permanently killed and the candidate gets a new email with a new deadline.')) return;
+  const st=window._mcqfState;
+  const fd=new FormData(); fd.append('application_id',appId);
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-reinvite',{method:'POST',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Re-invite failed',{type:'error'}); return; }
+  toast(d.email_sent?'Fresh invite sent.':'New link created, but the email could not be sent — check Resend.',{type:d.email_sent?'success':'warning',duration:8000});
+  mcqFunnelLoad();
+}
 async function mcqfRelease(appId, action){
   const st=window._mcqfState;
   const fd=new FormData(); fd.append('application_id',appId); fd.append('action',action);
@@ -4886,12 +4905,14 @@ async function mcqfRelease(appId, action){
 async function saveJobViva(jobId, enabled){
   const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
   const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));
+  const win = Math.max(1, Math.min(30, parseInt(document.getElementById('viva-window')?.value)||5));
   const proc = ['off','S','M'].includes(document.getElementById('viva-proc')?.value)
     ? document.getElementById('viva-proc').value : undefined;
   const res = await fetch(`/api/jobs/${jobId}/viva`,{
     method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(enabled ? {enabled:true, threshold:th, daily_cap:cap,
+                                    invite_window_days:win,
                                     ...(proc?{proctoring:proc}:{})} : {enabled:false})
   });
   let d={}; try{ d=await res.json(); }catch(_){}

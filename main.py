@@ -3745,6 +3745,17 @@ async def score_application(application_id: str):
             {"$set": {"status": "scored", "screening_id": screening_id, "scored_at": _dt.utcnow(),
                       "error": None}},
         )
+
+        # ── Part 2: automated interview invite — FUNNEL candidates only.
+        # Non-funnel applicants are live on the apply page and keep today's
+        # poll-driven launch, byte-identical. invite_funnel_candidate applies
+        # the EXISTING threshold gate and is idempotent/fail-soft: an email
+        # failure never affects the screening that just completed.
+        if app_doc.get("funnel") == "mcq":
+            try:
+                await invite_funnel_candidate(job, application_id)
+            except Exception as ie:
+                print(f"[INVITE] failed for {application_id}: {ie}")
         await sync_screening_count(str(app_doc.get("user_id")))
     except Exception as e:
         print(f"[APPLY] scoring failed for {application_id}: {e}")
@@ -4078,12 +4089,22 @@ async def mcq_funnel_view(request: Request, job_id: str):
     user = await get_current_user(request)
     job = await owned_job(job_id, user)
     total_q = len(((job.get("mcq_filter") or {}).get("approved") or {}).get("questions") or [])
+    # Interview delivery state (Part 2): one query maps this job's live
+    # tokens to completion + expiry, so each row can say invited/done/expired.
+    live_map = {}
+    async for li in db.live_interviews.find(
+            {"job_id": str(job["_id"])},
+            {"public_token": 1, "completed_sessions": 1, "expires_at": 1}):
+        live_map[li["public_token"]] = li
+    now = _dt.utcnow()
     rows, hist = [], {}
     counts = {"held": 0, "advanced": 0, "released": 0, "awaiting_test": 0}
     async for a in db.applications.find(
             {"job_id": str(job["_id"]), "funnel": "mcq"},
             {"name": 1, "email": 1, "status": 1, "mcq_score": 1, "mcq_total": 1,
-             "submitted_at": 1, "screening_id": 1}).sort("submitted_at", 1).limit(2000):
+             "submitted_at": 1, "screening_id": 1, "interview_token": 1,
+             "invited_at": 1, "invite_deadline": 1, "viva_capped": 1}) \
+            .sort("submitted_at", 1).limit(2000):
         sc = a.get("mcq_score")
         st = a.get("status")
         if sc is None:
@@ -4096,11 +4117,25 @@ async def mcq_funnel_view(request: Request, job_id: str):
             counts["released"] += 1
         else:
             counts["advanced"] += 1   # pending / scoring / scored / stored_unscored
+        iv = "none"
+        if a.get("interview_token"):
+            li = live_map.get(a["interview_token"]) or {}
+            if int(li.get("completed_sessions") or 0) >= 1:
+                iv = "done"
+            elif li.get("expires_at") and li["expires_at"] < now:
+                iv = "expired"
+            else:
+                iv = "invited"
+        elif a.get("viva_capped"):
+            iv = "capped"
         rows.append({"application_id": str(a["_id"]),
                      "name": str(a.get("name") or "")[:60],
                      "email": str(a.get("email") or "")[:80],
                      "mcq_score": sc, "mcq_total": a.get("mcq_total") or total_q,
                      "status": st, "screened": bool(a.get("screening_id")),
+                     "interview": iv,
+                     "invited_at": str(a.get("invited_at") or "")[:10],
+                     "invite_deadline": str(a.get("invite_deadline") or "")[:10],
                      "submitted_at": str(a.get("submitted_at") or "")})
     rows.sort(key=lambda r: (-(r["mcq_score"] if r["mcq_score"] is not None else -1),
                              r["submitted_at"]))
@@ -4141,6 +4176,43 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
           + (f" capped_by={capped_by}" if capped_by else ""))
     return {"success": True, "advanced": advanced, "requested": n,
             "held_remaining": max(0, len(held) - advanced), "capped_by": capped_by}
+
+
+@app.post("/api/jobs/{job_id}/mcq-reinvite")
+async def mcq_funnel_reinvite(request: Request, job_id: str,
+                              application_id: str = Form(...)):
+    """One-click re-invite for an EXPIRED (or failed-delivery) funnel invite:
+    kills the old link permanently, clears the launch stamps, and runs the
+    normal invite path again — fresh link, fresh window, new email. Refused
+    when the interview was already completed."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    from bson import ObjectId as _OID
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found.")
+    app_doc = await db.applications.find_one({"_id": aid, "job_id": str(job["_id"]),
+                                              "funnel": "mcq"})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Not found.")
+    tok = app_doc.get("interview_token")
+    if tok:
+        li = await db.live_interviews.find_one({"public_token": tok},
+                                               {"completed_sessions": 1})
+        if li and int(li.get("completed_sessions") or 0) >= 1:
+            raise HTTPException(status_code=409, detail="This candidate already completed their interview.")
+        # Kill the old link for good, then clear the stamps so the shared
+        # launch path can mint a fresh one.
+        await db.live_interviews.update_one({"public_token": tok},
+                                            {"$set": {"active": False}})
+        await db.applications.update_one(
+            {"_id": aid}, {"$unset": {"interview_token": "", "viva_minting": ""}})
+    out = await invite_funnel_candidate(job, application_id)
+    if not out.get("invited"):
+        raise HTTPException(status_code=409,
+                            detail=f"Could not re-invite ({next(iter(out.values()), 'unknown')}).")
+    return {"success": True, "email_sent": out.get("email_sent")}
 
 
 @app.post("/api/jobs/{job_id}/mcq-release")
@@ -4323,6 +4395,174 @@ async def admin_update_demo_status(req_id: str, status: str = Form(...),
     return {"success": True, "status": status}
 
 
+async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
+    """The ONE interview-launch path (factored from the poll route, Part 2):
+    atomic viva_minting claim, daily-cap reservation with the qualified-but-
+    capped flag, config built from the job's APPROVED set only, live-interview
+    mint, application stamping. Callers: the candidate status poll (behavior
+    unchanged) and the funnel auto-invite.
+
+    Returns {"token": t} on launch, {"busy": True} while another caller holds
+    the claim (or the app already has a token), {"capped": True} when the
+    daily budget is spent, {"failed": True} on error (claim released)."""
+    from bson import ObjectId as _OID
+    aid = app_doc["_id"] if not isinstance(app_doc.get("_id"), str) else _OID(app_doc["_id"])
+    application_id = str(app_doc["_id"])
+    viva = job.get("viva") or {}
+
+    claimed = await db.applications.find_one_and_update(
+        {"_id": aid, "interview_token": {"$exists": False}, "viva_minting": {"$ne": True}},
+        {"$set": {"viva_minting": True}},
+    )
+    if claimed is None:
+        return {"busy": True}
+
+    try:
+        cap = max(1, min(200, int(viva.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
+    except Exception:
+        cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
+    if not await reserve_viva_launch(str(job["_id"]), cap):
+        # Qualified but the day's interview budget is spent. Invisible to the
+        # candidate; flagged for the recruiter so nobody qualified is lost.
+        # Stamped on the screening too — that's the doc the Candidates page
+        # renders, so the badge needs no join.
+        await db.applications.update_one(
+            {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
+        try:
+            if app_doc.get("screening_id"):
+                await db.screenings.update_one(
+                    {"_id": _OID(str(app_doc["screening_id"]))},
+                    {"$set": {"viva_capped": True}})
+        except Exception:
+            pass
+        print(f"[VIVA] daily launch cap reached — application {application_id} qualified, not launched")
+        return {"capped": True}
+
+    try:
+        cfg = _validated_viva_config(dict(viva.get("config") or {}))
+        if not cfg.get("job_title"):
+            cfg["job_title"] = str(job.get("title") or "")[:120]
+        # The interview language is a JOB setting (interview_language), so carry it
+        # onto the launched interview's config regardless of the manual viva config.
+        cfg["language"] = "bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"
+        # Job-based questions: the APPROVED set (and only the approved set —
+        # drafts never reach a candidate) replaces the manual config's
+        # questions. Turn budget: every main question plus 2 spoken adaptive
+        # follow-ups, unless the manual setting was already higher.
+        approved = ((job.get("interview_questions") or {}).get("approved") or {})
+        jqs = _normalize_questions(approved.get("questions"))
+        jtopics = _normalize_topics(approved.get("topics"))
+        jsc = _normalize_scenario(approved.get("scenario"))
+        scen_turns = _scen_turns(jsc)
+        if jtopics:
+            # Topic-structured set: fully scripted, budget EXACT. This is the
+            # count-mismatch fix — the old path added "+2 adaptive follow-ups"
+            # ON TOP of the approved count, so a 10-question set asked 12.
+            cfg["topics"] = jtopics
+            cfg["questions"] = _flatten_topics(jtopics)
+            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
+                                   len(cfg["questions"]) + scen_turns)
+        elif jqs:
+            # Legacy flat set keeps its documented "+2 adaptive follow-ups".
+            cfg["questions"] = jqs
+            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
+                                   max(int(cfg.get("max_turns", 4)),
+                                       len(jqs) + 2 + scen_turns))
+        if jsc:
+            cfg["scenario"] = jsc
+        live_doc = await create_live_interview(str(job.get("user_id") or ""), cfg)
+        await db.live_interviews.update_one(
+            {"public_token": live_doc["public_token"]},
+            {"$set": {"application_id": application_id, "job_id": str(job["_id"]),
+                      "source": "apply_flow"}},
+        )
+        await db.applications.update_one(
+            {"_id": aid},
+            {"$set": {"interview_token": live_doc["public_token"],
+                      "viva_launched_at": _dt.utcnow()},
+             "$unset": {"viva_minting": ""}},
+        )
+        return {"token": live_doc["public_token"]}
+    except Exception as e:
+        # Release the claim so a later attempt can retry; fail closed meanwhile.
+        print(f"[VIVA] launch failed for {application_id}: {e}")
+        try:
+            await db.applications.update_one({"_id": aid}, {"$unset": {"viva_minting": ""}})
+        except Exception:
+            pass
+        return {"failed": True}
+
+
+async def invite_funnel_candidate(job: dict, application_id: str) -> dict:
+    """Part 2 automated invite: FUNNEL candidates only. Qualification is the
+    EXISTING gate (scored + overall_score >= job.viva.threshold) — this adds
+    delivery, not a new gate. Launches via the shared helper, stamps the
+    invite window on the live doc, and emails the link. Idempotent: an app
+    that already holds a token is left alone (busy)."""
+    from bson import ObjectId as _OID
+    app_doc = await db.applications.find_one({"_id": _OID(str(application_id))})
+    if not app_doc or app_doc.get("funnel") != "mcq":
+        return {"skipped": "not_funnel"}
+    viva = job.get("viva") or {}
+    if not viva.get("enabled"):
+        return {"skipped": "viva_off"}
+    if app_doc.get("status") != "scored" or app_doc.get("interview_token"):
+        return {"skipped": "state"}
+    score = None
+    if app_doc.get("screening_id"):
+        try:
+            s = await db.screenings.find_one(
+                {"_id": _OID(str(app_doc["screening_id"]))}, {"overall_score": 1})
+            if s is not None:
+                score = int(s.get("overall_score", 0))
+        except Exception:
+            score = None
+    try:
+        threshold = max(0, min(100, int(viva.get("threshold", VIVA_THRESHOLD_DEFAULT))))
+    except Exception:
+        threshold = VIVA_THRESHOLD_DEFAULT
+    if score is None or score < threshold:
+        return {"skipped": "below_threshold"}
+
+    out = await _launch_viva_for_application(job, app_doc)
+    if not out.get("token"):
+        return out   # capped (flag stamped; the daily sweep retries) / busy / failed
+
+    # Invite window: recruiter-set per job, default 5 days.
+    try:
+        days = max(1, min(30, int(viva.get("invite_window_days", 5))))
+    except Exception:
+        days = 5
+    deadline = _dt.utcnow() + _td(days=days)
+    await db.live_interviews.update_one(
+        {"public_token": out["token"]},
+        {"$set": {"expires_at": deadline, "invite_window_days": days}})
+
+    owner = await get_user_by_id(str(job.get("user_id") or ""))
+    company = (owner or {}).get("company_name") or "the hiring team"
+    from email_service import send_interview_invite_email
+    sent, info = send_interview_invite_email(
+        to_email=str(app_doc.get("email") or ""),
+        candidate_name=str(app_doc.get("name") or ""),
+        company=company,
+        job_title=str(job.get("title") or "the role"),
+        link=f"{APP_URL}/interview/{out['token']}",
+        deadline_str=deadline.strftime("%d %b %Y"),
+        days=days,
+        reply_to=(owner or {}).get("email") or "",
+        language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+    )
+    await db.applications.update_one(
+        {"_id": app_doc["_id"]},
+        {"$set": {"invited_at": _dt.utcnow(), "invite_deadline": deadline,
+                  "invite_email_sent": bool(sent),
+                  "invite_email_id": info if sent else None,
+                  "invite_email_error": None if sent else info}})
+    print(f"[INVITE] application={application_id} sent={sent} id={info if sent else '-'} "
+          f"deadline={deadline.date()}")
+    return {"invited": True, "email_sent": sent, "token": out["token"]}
+
+
 @app.get("/api/apply/{token}/status/{application_id}")
 async def public_apply_status(token: str, application_id: str):
     """The one-link flow's polling endpoint. Three flat payloads and nothing
@@ -4388,91 +4628,14 @@ async def public_apply_status(token: str, application_id: str):
     if score < threshold:
         return RECEIVED
 
-    # Passed. Claim the mint atomically so two concurrent polls can't launch
-    # two interviews — the loser sees "processing" and picks up the token on
-    # its next poll.
-    claimed = await db.applications.find_one_and_update(
-        {"_id": aid, "interview_token": {"$exists": False}, "viva_minting": {"$ne": True}},
-        {"$set": {"viva_minting": True}},
-    )
-    if claimed is None:
+    # Passed. Shared launch machinery (Part 2 factored it out; the behavior
+    # of THIS poll path is unchanged — same claim, cap, config, stamps).
+    out = await _launch_viva_for_application(job, app_doc)
+    if out.get("busy"):
         return {"state": "processing"}
-
-    try:
-        cap = max(1, min(200, int(viva.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
-    except Exception:
-        cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
-    if not await reserve_viva_launch(str(job["_id"]), cap):
-        # Qualified but the day's interview budget is spent. Invisible to the
-        # candidate; flagged for the recruiter so nobody qualified is lost.
-        # Stamped on the screening too — that's the doc the Candidates page
-        # renders, so the badge needs no join.
-        await db.applications.update_one(
-            {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
-        try:
-            if app_doc.get("screening_id"):
-                await db.screenings.update_one(
-                    {"_id": _OID(str(app_doc["screening_id"]))},
-                    {"$set": {"viva_capped": True}})
-        except Exception:
-            pass
-        print(f"[VIVA] daily launch cap reached — application {application_id} qualified, not launched")
-        return RECEIVED
-
-    try:
-        cfg = _validated_viva_config(dict(viva.get("config") or {}))
-        if not cfg.get("job_title"):
-            cfg["job_title"] = str(job.get("title") or "")[:120]
-        # The interview language is a JOB setting (interview_language), so carry it
-        # onto the launched interview's config regardless of the manual viva config.
-        cfg["language"] = "bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"
-        # Job-based questions: the APPROVED set (and only the approved set —
-        # drafts never reach a candidate) replaces the manual config's
-        # questions. Turn budget: every main question plus 2 spoken adaptive
-        # follow-ups, unless the manual setting was already higher.
-        approved = ((job.get("interview_questions") or {}).get("approved") or {})
-        jqs = _normalize_questions(approved.get("questions"))
-        jtopics = _normalize_topics(approved.get("topics"))
-        jsc = _normalize_scenario(approved.get("scenario"))
-        scen_turns = _scen_turns(jsc)
-        if jtopics:
-            # Topic-structured set: fully scripted, budget EXACT. This is the
-            # count-mismatch fix — the old path added "+2 adaptive follow-ups"
-            # ON TOP of the approved count, so a 10-question set asked 12.
-            cfg["topics"] = jtopics
-            cfg["questions"] = _flatten_topics(jtopics)
-            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
-                                   len(cfg["questions"]) + scen_turns)
-        elif jqs:
-            # Legacy flat set keeps its documented "+2 adaptive follow-ups".
-            cfg["questions"] = jqs
-            cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
-                                   max(int(cfg.get("max_turns", 4)),
-                                       len(jqs) + 2 + scen_turns))
-        if jsc:
-            cfg["scenario"] = jsc
-        live_doc = await create_live_interview(str(job.get("user_id") or ""), cfg)
-        await db.live_interviews.update_one(
-            {"public_token": live_doc["public_token"]},
-            {"$set": {"application_id": application_id, "job_id": str(job["_id"]),
-                      "source": "apply_flow"}},
-        )
-        await db.applications.update_one(
-            {"_id": aid},
-            {"$set": {"interview_token": live_doc["public_token"],
-                      "viva_launched_at": _dt.utcnow()},
-             "$unset": {"viva_minting": ""}},
-        )
-        return {"state": "interview",
-                "url": f"{APP_URL}/interview/{live_doc['public_token']}"}
-    except Exception as e:
-        # Release the claim so a later poll can retry; fail closed meanwhile.
-        print(f"[VIVA] launch failed for {application_id}: {e}")
-        try:
-            await db.applications.update_one({"_id": aid}, {"$unset": {"viva_minting": ""}})
-        except Exception:
-            pass
-        return RECEIVED
+    if out.get("token"):
+        return {"state": "interview", "url": f"{APP_URL}/interview/{out['token']}"}
+    return RECEIVED
 
 
 # ── Dashboard side ───────────────────────────────────────────
@@ -4501,6 +4664,14 @@ async def set_job_viva_config(request: Request, job_id: str):
         daily_cap = max(1, min(200, int(body.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
     except Exception:
         daily_cap = VIVA_DAILY_LAUNCH_CAP_DEFAULT
+    # Part 2: how long a FUNNEL invite link stays valid (days). Existing/
+    # non-funnel links never expire — the window only stamps invite launches.
+    try:
+        invite_window_days = max(1, min(30, int(
+            body.get("invite_window_days",
+                     ((job.get("viva") or {}).get("invite_window_days") or 5)))))
+    except Exception:
+        invite_window_days = 5
 
     # Two callers write here. The /viva-live attach card sends the full setup
     # (questions and all). The job modal sends only the gate fields — no
@@ -4533,6 +4704,7 @@ async def set_job_viva_config(request: Request, job_id: str):
         "enabled": True,
         "threshold": threshold,
         "daily_cap": daily_cap,
+        "invite_window_days": invite_window_days,
         "config": cfg,
         "updated_at": _dt.utcnow(),
     }

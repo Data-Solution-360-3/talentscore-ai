@@ -228,6 +228,83 @@ def send_team_invite_email(to_email: str, invited_by: str, company_name: str,
     return ok, info
 
 
+def send_interview_invite_email(to_email: str, candidate_name: str, company: str,
+                                job_title: str, link: str, deadline_str: str,
+                                days: int, reply_to: str = "",
+                                reminder: bool = False,
+                                language: str = "en") -> tuple[bool, str]:
+    """Automated AI-interview invite (funnel Part 2). Returns (ok, resend_id).
+
+    HONEST by construction: says what it is (a live AI interview, ~12 min),
+    the real deadline, and that a HUMAN reviews the results. No overclaiming.
+    `reminder=True` reuses the same body with a reminder subject/lead."""
+    if not RESEND_API_KEY:
+        print(f"[EMAIL] Resend not configured. Interview invite for {to_email} ({job_title})")
+        return False, "RESEND_API_KEY not set"
+
+    first = (candidate_name or "").strip().split(" ")[0] or "there"
+    subject = (f"Reminder: your interview for {job_title} at {company} — closes {deadline_str}"
+               if reminder else
+               f"Interview invitation — {job_title} at {company}")
+    lead = (f"A quick reminder: your interview link below closes on <strong>{deadline_str}</strong> — "
+            f"it takes about 12 minutes, whenever suits you before then."
+            if reminder else
+            f"Good news — after reviewing your application, <strong>{company}</strong> would like to "
+            f"invite you to the next step for the <strong>{job_title}</strong> role.")
+    lang_line = ("The interview is in English (Bangla is available in beta)."
+                 if language != "bn" else
+                 "The interview is available in Bangla (beta) and English.")
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Inter',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:24px 32px;text-align:center">
+          <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800">{company}</h1>
+          <p style="margin:4px 0 0;color:rgba(255,255,255,.85);font-size:12px">via TopCandidate.pro</p>
+        </td></tr>
+        <tr><td style="padding:30px 32px">
+          <h2 style="margin:0 0 12px;font-size:19px;color:#111;font-weight:700">Hi {first},</h2>
+          <p style="margin:0 0 16px;font-size:14px;color:#555;line-height:1.7">{lead}</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#555;line-height:1.7">
+            It's a <strong>live AI interview</strong> — about <strong>12 minutes</strong> of spoken and
+            written questions, taken on this link at any time that suits you.
+            Please complete it <strong>within {days} days (by {deadline_str})</strong>.
+            {lang_line}
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px">
+            <tr><td style="background:#F57C2E;border-radius:8px;padding:12px 28px;text-align:center">
+              <a href="{link}" style="color:#fff;font-size:15px;font-weight:700;text-decoration:none">Start your interview →</a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 6px;font-size:12px;color:#999;text-align:center">
+            Or copy this link: <a href="{link}" style="color:#F57C2E">{link}</a>
+          </p>
+          <p style="margin:14px 0 0;font-size:12px;color:#777;line-height:1.6">
+            <strong>What to expect:</strong> find a quiet spot with a working microphone; a camera is
+            requested for periodic still snapshots (never continuous video). The AI conducts the
+            conversation and a <strong>human at {company} reviews the results and makes every
+            hiring decision</strong> — the AI never decides anything on its own.
+            Details: <a href="{APP_URL}/privacy" style="color:#F57C2E">privacy policy</a>.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f9fafb;padding:14px 32px;text-align:center;border-top:1px solid #e5e7eb">
+          <p style="margin:0;font-size:11px;color:#aaa">© 2026 {APP_NAME} by LinkX360 · Dhaka, Bangladesh</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+    ok, info = _resend_send(to_email, subject, html=html, reply_to=reply_to)
+    if not ok:
+        print(f"[EMAIL] Failed to send interview invite to {to_email}: {info}")
+    return ok, info
+
+
 # ─────────────────────────────────────────────────────────────
 # CANDIDATE COMMUNICATION (interview invite, rejection, offer)
 # ─────────────────────────────────────────────────────────────
