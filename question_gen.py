@@ -197,6 +197,59 @@ Return JSON:
   "questions": ["...", ...]}}"""
 
 
+SCREENING_MCQ_PROMPT = """You are writing a short knowledge screen for a specific job.
+Write exactly {n} multiple-choice questions from the job description below.
+
+RULES
+- Each question tests PRACTICAL, role-relevant knowledge or judgment a
+  qualified candidate should have — not trivia, not vocabulary, not riddles.
+- Each question: 4 plausible options, exactly ONE clearly best answer.
+  Distractors must be believable choices a weaker candidate might pick.
+- Self-contained: answerable from general professional knowledge of the role.
+  No company-internal facts, nothing that depends on the employer.
+- {lang_rule}
+- NEVER ask about, or write questions around: age, religion, marital or family
+  status, pregnancy, health or disability, ethnicity, political views, or
+  anything a recruiter could not lawfully ask.
+
+Return JSON:
+{{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+
+
+async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
+                                  job_title: str = "", language: str = "en",
+                                  role_hint: str = "", usage_out: list | None = None
+                                  ) -> tuple[list | None, str | None]:
+    """MCQ pre-filter DRAFT set (high-volume funnel). Draft only — the caller
+    stores it for recruiter review; nothing generated here goes live without
+    an explicit approve. Returns (raw mcq list, None) or (None, error)."""
+    n = max(5, min(15, int(n)))
+    jd = (jd_text or "").strip()
+    if len(jd) < 40:
+        return None, "The job description is too short to generate questions from."
+    client = AsyncOpenAI(api_key=api_key)
+    try:
+        resp = await client.chat.completions.create(
+            model=GEN_MODEL,
+            temperature=0.4,
+            max_tokens=2400,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SCREENING_MCQ_PROMPT.format(n=n, lang_rule=_lang(language))},
+                {"role": "user", "content":
+                    f"JOB TITLE: {job_title or 'not specified'}\n"
+                    + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+                    + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
+            ],
+        )
+        if usage_out is not None:   # cost observability — measurement only
+            usage_out.append(getattr(resp, "usage", None))
+        raw = json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return None, f"Generation call failed: {str(e)[:200]}"
+    return (raw or {}).get("mcq") or [], None
+
+
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
                                     k: int = 3, language: str = "en", role_hint: str = "",
                                     usage_out: list | None = None

@@ -182,6 +182,10 @@ def main():
                 ("PUT",    f"/api/jobs/{job_b}",                {"title": "hijack"}),
                 ("DELETE", f"/api/jobs/{job_b}",                {}),
                 ("GET",    f"/api/jobs/{job_b}/applications",   {}),
+                ("GET",    f"/api/jobs/{job_b}/mcq-funnel",     {}),
+                ("POST",   f"/api/jobs/{job_b}/mcq-advance",    {"n": "5"}),
+                ("POST",   f"/api/jobs/{job_b}/mcq-release",
+                           {"application_id": "0" * 24, "action": "release"}),
             ]
             for method, path, data in probes:
                 r = c.request(method, path, headers=hdr(t_owner_a),

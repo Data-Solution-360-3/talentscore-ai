@@ -4348,6 +4348,20 @@ function renderPublicLink(job, spend){
           </div>
         </div>`; })()}
 
+      ${(()=>{ // MCQ pre-filter (high-volume funnel Part 1): apply -> MCQ ->
+        // recruiter advances top N -> auto CV screening on only those N.
+        window._mcqfState = { jobId: job._id, mf: job.mcq_filter || null,
+                              editing: false, work: null, funnel: null };
+        setTimeout(mcqfRender, 0);
+        return `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">MCQ pre-filter — high-volume funnel</div>
+            <span id="mcqf-chip"></span>
+          </div>
+          <div id="mcqf-body"></div>
+        </div>`; })()}
+
       ${(()=>{ // Job-based interview questions: none -> draft -> approved.
         // Draft and approved are separate slots server-side; candidates only
         // ever get the approved set. Rendering happens in iqRender() so edits
@@ -4718,6 +4732,157 @@ async function iqDiscard(){
 // key — the server then keeps the interview setup already stored on the job
 // (or applies defaults if none was ever saved). Same never-fail-quietly
 // discipline as the public-link toggle.
+// ── MCQ PRE-FILTER (funnel Part 1): review-approve-toggle + ranked funnel ──
+function mcqfQs(){ const st=window._mcqfState; return st.editing ? st.work
+  : ((st.mf&&st.mf.draft&&st.mf.draft.questions) || (st.mf&&st.mf.approved&&st.mf.approved.questions) || []); }
+function mcqfRender(){
+  const st=window._mcqfState; if(!st) return;
+  const body=document.getElementById('mcqf-body'), chip=document.getElementById('mcqf-chip');
+  if(!body) return;
+  const mf=st.mf||{}, appr=mf.approved, draft=mf.draft, on=!!mf.enabled;
+  if(chip) chip.innerHTML = on
+    ? '<span style="font-size:11px;font-weight:700;color:var(--green)">ON — '+((appr&&appr.count)||0)+' approved questions</span>'
+    : (appr ? '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — '+appr.count+' questions approved</span>'
+            : '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — no approved set</span>');
+  let html=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
+      <input type="checkbox" ${on?'checked':''} onchange="mcqfToggle(this.checked)"> ${on?'Filter ON — applicants take the test; CVs held unscreened until you advance':'Filter off — normal apply flow'}
+    </label>
+    <button class="btn btn-xs" onclick="mcqfGenerate()">✨ Generate draft (AI)</button>
+    ${(draft||appr)?`<button class="btn btn-xs" onclick="mcqfEdit()">✎ Review / edit</button>`:''}
+    ${st.editing?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve set</button>
+    <button class="btn btn-xs" onclick="mcqfSaveDraft()">Save draft</button>`:
+      (draft?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve draft</button>`:'')}
+  </div>
+  <div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin-bottom:6px">
+    Candidates apply + take a short test; grading is automatic and free. You then advance the top N —
+    <b>CV screening spend happens only on the advanced set</b>. AI drafts are never live until YOU review the
+    correct answers and approve. Held candidates are held, not rejected.
+  </div>`;
+  if(st.editing){
+    html += st.work.map((m,i)=>`
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.6rem .7rem;margin-bottom:6px">
+        <input value="${escapeHtml(m.q)}" onchange="window._mcqfState.work[${i}].q=this.value"
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;font-weight:700;margin-bottom:5px">
+        ${m.options.map((o,oi)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:3px">
+            <label title="Mark correct" style="display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:${m.correct===oi?'var(--green)':'var(--t3)'};cursor:pointer;flex-shrink:0">
+              <input type="radio" name="mcqf-c-${i}" ${m.correct===oi?'checked':''} onchange="window._mcqfState.work[${i}].correct=${oi};mcqfRender()">${String.fromCharCode(65+oi)}${m.correct===oi?' ✓':''}
+            </label>
+            <input value="${escapeHtml(o)}" onchange="window._mcqfState.work[${i}].options[${oi}]=this.value"
+              style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11.5px">
+          </div>`).join('')}
+        <button class="btn btn-xs" onclick="window._mcqfState.work.splice(${i},1);mcqfRender()" style="color:var(--red)">Remove</button>
+      </div>`).join('')
+      + `<button class="btn btn-xs" onclick="window._mcqfState.work.push({q:'',options:['','','',''],correct:0});mcqfRender()">+ Add question</button>`;
+  }else if(appr||draft){
+    const qs=(appr&&appr.questions)||(draft&&draft.questions)||[];
+    html += `<div style="font-size:11px;color:var(--t2)">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions. `
+      + qs.slice(0,3).map((m,i)=>`<div style="margin-top:3px;color:var(--t3)">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')
+      + (qs.length>3?`<div style="color:var(--t3);margin-top:2px">…and ${qs.length-3} more — Review / edit to see all.</div>`:'')+`</div>`;
+  }
+  if(on){
+    html += `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Funnel</div>
+        <button class="btn btn-xs" onclick="mcqFunnelLoad()">↻ Load ranked applicants</button>
+        <label style="font-size:11px;font-weight:600;color:var(--t2)">Advance top
+          <input id="mcqf-n" type="number" min="1" max="500" value="200" style="width:64px;margin:0 4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;font-weight:700">
+          <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button></label>
+      </div>
+      <div id="mcqf-funnel" style="font-size:11.5px;color:var(--t2)"></div>
+    </div>`;
+  }
+  body.innerHTML=html;
+  if(st.funnel) mcqFunnelRender();
+}
+async function mcqfApi(payload){
+  const st=window._mcqfState;
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-filter',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Failed',{type:'error'}); return null; }
+  st.mf=d.mcq_filter; if(window._currentJob) window._currentJob.mcq_filter=d.mcq_filter;
+  return d;
+}
+async function mcqfGenerate(){
+  toast('Generating a draft test from the job description…',{type:'success'});
+  const d=await mcqfApi({action:'generate',n:12});
+  if(d){ window._mcqfState.editing=true; window._mcqfState.work=JSON.parse(JSON.stringify(d.mcq_filter.draft.questions)); mcqfRender();
+    toast('Draft ready — REVIEW the marked answers before approving.',{type:'warning',duration:8000}); }
+}
+function mcqfEdit(){
+  const st=window._mcqfState;
+  st.editing=true;
+  st.work=JSON.parse(JSON.stringify(mcqfQs()));
+  mcqfRender();
+}
+async function mcqfSaveDraft(){
+  const d=await mcqfApi({action:'save_draft',questions:window._mcqfState.work});
+  if(d){ window._mcqfState.editing=false; mcqfRender(); toast('Draft saved.',{type:'success'}); }
+}
+async function mcqfApprove(){
+  const st=window._mcqfState;
+  const qs=st.editing?st.work:null;
+  const d=await mcqfApi(qs?{action:'approve',questions:qs}:{action:'approve'});
+  if(d){ st.editing=false; mcqfRender(); toast('MCQ set approved — you can turn the filter on.',{type:'success'}); }
+}
+async function mcqfToggle(want){
+  const d=await mcqfApi({action:'toggle',enabled:want});
+  mcqfRender();
+  if(d) toast(want?'MCQ filter ON — new applicants take the test; CVs held until you advance.':'MCQ filter off — normal apply flow.',{type:'success'});
+}
+async function mcqFunnelLoad(){
+  const st=window._mcqfState;
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-funnel',{credentials:'include'});
+  if(!r.ok){ toast('Could not load funnel',{type:'error'}); return; }
+  st.funnel=await r.json(); mcqFunnelRender();
+}
+function mcqFunnelRender(){
+  const st=window._mcqfState, f=st.funnel, el=document.getElementById('mcqf-funnel');
+  if(!f||!el) return;
+  const c=f.counts||{};
+  let html=`<div style="margin-bottom:5px"><b>${c.held||0}</b> held · <b>${c.advanced||0}</b> advanced · <b>${c.released||0}</b> released · <b>${c.awaiting_test||0}</b> awaiting test</div>`;
+  const dist=f.distribution||[];
+  if(dist.length){
+    const mx=Math.max(...dist.map(d=>d.n));
+    html+=`<div style="display:flex;align-items:flex-end;gap:3px;height:52px;margin:4px 0 8px">`
+      +dist.map(d=>`<div title="${d.n} scored ${d.score}/${f.total_questions}" style="flex:1;max-width:26px;background:var(--indigo);opacity:.8;border-radius:3px 3px 0 0;height:${Math.max(8,Math.round(d.n/mx*100))}%"><div style="font-size:8.5px;text-align:center;color:var(--t3);margin-top:-13px">${d.score}</div></div>`).join('')
+      +`</div>`;
+  }
+  const rows=(f.rows||[]).slice(0,30);
+  if(rows.length){
+    html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th></th></tr></thead><tbody>`
+      +rows.map((r,i)=>`<tr><td style="color:var(--t3)">${i+1}</td><td>${escapeHtml(r.name||r.email||'—')}</td>
+        <td><b>${r.mcq_score==null?'—':r.mcq_score+'/'+r.mcq_total}</b></td>
+        <td>${r.status==='held'?'<span style="color:var(--amber,#B45309)">held — not advanced</span>'
+            :r.status==='released'?'<span style="color:var(--t3)">released</span>'
+            :'<span style="color:var(--green)">'+escapeHtml(r.status)+(r.screened?' ✓ screened':'')+'</span>'}</td>
+        <td>${r.status==='held'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')">Release</button>`
+            :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Re-hold</button>`:''}</td></tr>`).join('')
+      +`</tbody></table>${(f.rows||[]).length>30?`<div style="color:var(--t3);font-size:10.5px;margin-top:3px">Showing top 30 of ${f.rows.length}.</div>`:''}</div>`;
+  }else html+=`<div style="color:var(--t3)">No funnel applicants yet.</div>`;
+  el.innerHTML=html;
+}
+async function mcqfAdvance(){
+  const st=window._mcqfState;
+  const n=Math.max(1,Math.min(500,parseInt(document.getElementById('mcqf-n').value)||0));
+  if(!confirm('Advance the top '+n+' held candidates by MCQ score?\n\nThis starts AI CV screening on exactly those '+n+' (screening spend applies to them only).')) return;
+  const fd=new FormData(); fd.append('n',n);
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-advance',{method:'POST',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
+  toast('Advanced '+d.advanced+' candidate(s) — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
+  mcqFunnelLoad();
+}
+async function mcqfRelease(appId, action){
+  const st=window._mcqfState;
+  const fd=new FormData(); fd.append('application_id',appId); fd.append('action',action);
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-release',{method:'POST',body:fd,credentials:'include'});
+  if(!r.ok){ const d=await r.json().catch(()=>({})); toast(d.detail||'Failed',{type:'error'}); return; }
+  mcqFunnelLoad();
+}
+
 async function saveJobViva(jobId, enabled){
   const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
   const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));

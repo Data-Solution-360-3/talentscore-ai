@@ -193,6 +193,17 @@ input,select,textarea{max-width:100%}
     </div>
   </div>
 
+  <div id="mcq-view" style="display:none">
+    <div class="fc" style="text-align:left">
+      <div class="fc-title">One more step — a short questionnaire</div>
+      <div class="fc-sub">Your application is saved. Answer these {{JOB_TITLE}}-related multiple-choice questions to complete it — pick one answer per question.</div>
+      <div class="err" id="mcq-err"></div>
+      <div id="mcq-qs" style="margin-top:1rem"></div>
+      <button class="btn" id="mcq-btn" onclick="submitMcqTest()">Submit answers</button>
+      <p class="retention">Your answers are reviewed by the hiring team together with your CV. There are no trick questions.</p>
+    </div>
+  </div>
+
   <div id="proc-view">
     <div class="done">
       <div class="procspin"></div>
@@ -300,7 +311,11 @@ async function submitApp(e){
     // Duplicate application — generic, on-brand popup (never says email vs CV).
     if(res.status===409){ showDupModal(); btn.disabled=false; btn.textContent='Submit application'; return false; }
     if(!res.ok) throw new Error(data.detail||'Something went wrong. Please try again.');
-    if(data.application_id){
+    if(data.state==='mcq' && data.application_id){
+      // MCQ pre-filter job: the CV is stored; the short test completes the
+      // application. No processing spinner — nothing is being scored yet.
+      startMcq(data.application_id);
+    }else if(data.application_id){
       try{ sessionStorage.setItem(PENDING_KEY, data.application_id); }catch(_){}
       startProcessing(data.application_id);
     }else{
@@ -322,10 +337,58 @@ const PENDING_KEY = 'tc-pending-' + TOKEN;
 const POLL_MS = 3000, POLL_TIMEOUT_MS = 90000;
 
 function showView(id){
-  ['form-view','proc-view','done-view'].forEach(v=>{
+  ['form-view','proc-view','done-view','mcq-view'].forEach(v=>{
     document.getElementById(v).style.display = (v===id) ? 'block' : 'none';
   });
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── MCQ pre-filter step (only jobs that turned it ON reach this) ──
+let _mcqAppId=null, _mcqN=0;
+async function startMcq(appId){
+  _mcqAppId = appId;
+  try{
+    const r = await fetch('/api/apply/'+TOKEN+'/mcq');
+    if(!r.ok) throw new Error('unavailable');
+    const d = await r.json();
+    const qs = d.questions||[];
+    if(!qs.length) throw new Error('empty');
+    _mcqN = qs.length;
+    document.getElementById('mcq-qs').innerHTML = qs.map((q,i)=>`
+      <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:.9rem 1rem;margin-bottom:.8rem">
+        <div style="font-size:.92rem;font-weight:700;color:#142848;margin-bottom:.55rem">${i+1}. ${escq(q.q)}</div>
+        ${q.options.map((o,oi)=>`
+          <label style="display:flex;gap:.55rem;align-items:flex-start;padding:.35rem .2rem;font-size:.88rem;color:#33415c;cursor:pointer;line-height:1.5">
+            <input type="radio" name="mcq-${i}" value="${oi}" style="margin-top:3px;flex:none"> <span><b>${String.fromCharCode(65+oi)}.</b> ${escq(o)}</span>
+          </label>`).join('')}
+      </div>`).join('');
+    showView('mcq-view');
+  }catch(_){ showDone(); }   // filter unavailable: application is already saved
+}
+function escq(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+async function submitMcqTest(){
+  const err=document.getElementById('mcq-err');
+  err.style.display='none';
+  const choices=[];
+  for(let i=0;i<_mcqN;i++){
+    const sel=document.querySelector('input[name="mcq-'+i+'"]:checked');
+    if(!sel){ err.textContent='Please answer question '+(i+1)+'.'; err.style.display='block';
+      err.classList.add('on'); window.scrollTo({top:0,behavior:'smooth'}); return; }
+    choices.push(parseInt(sel.value));
+  }
+  const btn=document.getElementById('mcq-btn');
+  btn.disabled=true; btn.textContent='Submitting…';
+  try{
+    const r=await fetch('/api/apply/'+TOKEN+'/mcq/'+encodeURIComponent(_mcqAppId),{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({choices})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.detail||'Could not submit — please try again.');
+    showDone();
+  }catch(e){
+    err.textContent=e.message; err.style.display='block'; err.classList.add('on');
+    btn.disabled=false; btn.textContent='Submit answers';
+  }
 }
 function showDone(){
   try{ sessionStorage.removeItem(PENDING_KEY); }catch(_){}

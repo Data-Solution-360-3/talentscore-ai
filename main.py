@@ -3853,6 +3853,21 @@ async def public_apply_submit(
     await store_application_pdf(application_id, job_id, str(job.get("user_id") or ""),
                                 data, cv_file.filename or "cv.pdf")
 
+    # ── MCQ PRE-FILTER GATE (per-job, default OFF) ──
+    # When ON: the CV is stored but NOT screened — no reservation, no GPT
+    # call, $0 spent. The application goes to "held" and the candidate takes
+    # the approved MCQ test; screening happens only when the recruiter
+    # advances the top N. Jobs with the filter OFF never enter this branch —
+    # their flow below is byte-identical to before.
+    _mf = job.get("mcq_filter") or {}
+    if _mf.get("enabled") and ((_mf.get("approved") or {}).get("questions")):
+        await db.applications.update_one(
+            {"_id": __import__("bson").ObjectId(application_id)},
+            {"$set": {"status": "held", "funnel": "mcq"}},
+        )
+        return {"success": True, "message": "Application received",
+                "application_id": application_id, "state": "mcq"}
+
     # The reservation happens here, before anything is queued. If it fails the
     # application is kept and simply isn't scored — the candidate is never told.
     ok, blocked_by = await reserve_screening_slot(job_id)
@@ -3870,6 +3885,285 @@ async def public_apply_submit(
     # can't be distinguished from a first one.
     return {"success": True, "message": "Application received",
             "application_id": application_id}
+
+
+# ─────────────────────────────────────────────────────────────
+# MCQ PRE-FILTER (high-volume funnel, Part 1)
+#
+# Per-job, toggle default OFF. ON: apply stores the CV unscreened ($0),
+# the candidate takes a recruiter-APPROVED 10-15 question MCQ test,
+# grading is deterministic, and screening spend happens only when the
+# recruiter advances the top N. "Held" is never "rejected".
+# The answer key lives on the job and NEVER reaches the candidate page —
+# same protection as the interview MCQs.
+# ─────────────────────────────────────────────────────────────
+
+MCQ_FILTER_MIN, MCQ_FILTER_MAX = 5, 15
+
+
+def _normalize_mcq_set(raw) -> list:
+    """Same per-item rules as the interview MCQs (_normalize_scenario): one
+    question + EXACTLY four options + a valid 0-based correct index."""
+    out = []
+    for m in (raw or [])[:MCQ_FILTER_MAX]:
+        if not isinstance(m, dict):
+            continue
+        q = str(m.get("q") or m.get("question") or "").strip()[:300]
+        opts = [str(o).strip()[:200] for o in (m.get("options") or []) if str(o).strip()][:5]
+        try:
+            c = int(m.get("correct"))
+        except Exception:
+            continue
+        if q and len(opts) == 4 and 0 <= c < 4:
+            out.append({"q": q, "options": opts, "correct": c})
+    return out
+
+
+@app.get("/api/jobs/{job_id}/mcq-filter")
+async def mcq_filter_get(request: Request, job_id: str):
+    """Recruiter view of the filter config — INCLUDES the answer key (this is
+    the review surface; org-scoped by owned_job like every job route)."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    return {"mcq_filter": serialize_mongo(job.get("mcq_filter") or
+                                          {"enabled": False, "draft": None, "approved": None})}
+
+
+@app.post("/api/jobs/{job_id}/mcq-filter")
+async def mcq_filter_save(request: Request, job_id: str):
+    """action: 'generate' (AI DRAFT only — never live unreviewed),
+    'save_draft', 'approve' (validated draft -> approved), 'toggle' {enabled}.
+    Enabling requires an approved set — the guardrail against unreviewed keys."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    action = body.get("action")
+    mf = dict(job.get("mcq_filter") or {})
+
+    if action == "generate":
+        if not OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
+        if not await rate_limit_allows(f"mcqgen:{job_id}", 10, 86400):
+            raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
+        try:
+            n = max(MCQ_FILTER_MIN, min(MCQ_FILTER_MAX, int(body.get("n", 12))))
+        except Exception:
+            n = 12
+        from question_gen import generate_screening_mcqs, GEN_MODEL
+        _gu: list = []
+        raw, err = await generate_screening_mcqs(
+            job.get("description") or "", OPENAI_API_KEY, n=n,
+            job_title=job.get("title") or "",
+            language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+            usage_out=_gu)
+        if err or not raw:
+            raise HTTPException(status_code=502, detail=err or "Generation failed.")
+        qs = _normalize_mcq_set(raw)
+        if len(qs) < MCQ_FILTER_MIN:
+            raise HTTPException(status_code=502,
+                                detail="Generation produced too few valid questions — try again.")
+        from usage_meter import summarize_chat_usage
+        from database import log_api_usage
+        await log_api_usage({"purpose": "question_gen", "job_id": str(job["_id"]),
+                             **summarize_chat_usage(GEN_MODEL, _gu)})
+        mf["draft"] = {"questions": qs, "generated_at": _dt.utcnow(), "model": GEN_MODEL}
+        await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                 {"$set": {"mcq_filter": mf}})
+        return {"success": True, "mcq_filter": serialize_mongo(mf)}
+
+    if action == "save_draft":
+        qs = _normalize_mcq_set(body.get("questions"))
+        if not qs:
+            raise HTTPException(status_code=400,
+                                detail="Each question needs text, exactly 4 options, and a marked correct answer.")
+        mf["draft"] = {"questions": qs, "updated_at": _dt.utcnow()}
+        await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                 {"$set": {"mcq_filter": mf}})
+        return {"success": True, "mcq_filter": serialize_mongo(mf)}
+
+    if action == "approve":
+        qs = _normalize_mcq_set(body.get("questions") or (mf.get("draft") or {}).get("questions"))
+        if not MCQ_FILTER_MIN <= len(qs) <= MCQ_FILTER_MAX:
+            raise HTTPException(status_code=400,
+                                detail=f"An approved test needs {MCQ_FILTER_MIN}-{MCQ_FILTER_MAX} valid questions.")
+        mf["approved"] = {"questions": qs, "approved_at": _dt.utcnow(), "count": len(qs)}
+        mf["draft"] = None
+        await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                 {"$set": {"mcq_filter": mf}})
+        return {"success": True, "mcq_filter": serialize_mongo(mf)}
+
+    if action == "toggle":
+        want = bool(body.get("enabled"))
+        if want and not (mf.get("approved") or {}).get("questions"):
+            raise HTTPException(status_code=400,
+                                detail="Approve an MCQ set first — the filter never runs unreviewed questions.")
+        mf["enabled"] = want
+        await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                 {"$set": {"mcq_filter": mf}})
+        return {"success": True, "mcq_filter": serialize_mongo(mf)}
+
+    raise HTTPException(status_code=400, detail="Unknown action.")
+
+
+@app.get("/api/apply/{token}/mcq")
+async def apply_mcq_questions(token: str):
+    """Public-by-token: the approved questions + options ONLY. The correct
+    indices are stripped here and never rendered anywhere candidate-facing."""
+    job = await get_job_by_public_token(token)
+    if not job:
+        raise HTTPException(status_code=404, detail="Not available.")
+    mf = job.get("mcq_filter") or {}
+    qs = (mf.get("approved") or {}).get("questions") if mf.get("enabled") else None
+    if not qs:
+        raise HTTPException(status_code=404, detail="Not available.")
+    return {"questions": [{"q": q["q"], "options": q["options"]} for q in qs]}
+
+
+@app.post("/api/apply/{token}/mcq/{application_id}")
+async def apply_mcq_submit(request: Request, token: str, application_id: str):
+    """One-shot answer submission, graded deterministically server-side ($0).
+    The response never reveals the score or any per-question result."""
+    from bson import ObjectId as _OID
+    job = await get_job_by_public_token(token)
+    if not job:
+        raise HTTPException(status_code=404, detail="Not available.")
+    mf = job.get("mcq_filter") or {}
+    qs = (mf.get("approved") or {}).get("questions") or []
+    if not (mf.get("enabled") and qs):
+        raise HTTPException(status_code=404, detail="Not available.")
+    if not await rate_limit_allows(f"mcqsub:{application_id}", 5, 3600):
+        raise HTTPException(status_code=429, detail="Too many attempts.")
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not available.")
+    app_doc = await db.applications.find_one({"_id": aid, "job_id": str(job["_id"])})
+    if not app_doc or app_doc.get("funnel") != "mcq":
+        raise HTTPException(status_code=404, detail="Not available.")
+    if app_doc.get("mcq_score") is not None:
+        # One shot: a re-post cannot re-roll the grade.
+        return {"success": True, "state": "received"}
+    try:
+        body = await request.json()
+        choices = body.get("choices")
+    except Exception:
+        choices = None
+    if not isinstance(choices, list) or len(choices) != len(qs):
+        raise HTTPException(status_code=400, detail="Please answer every question.")
+    score = 0
+    clean = []
+    for i, q in enumerate(qs):
+        try:
+            c = int(choices[i])
+        except Exception:
+            c = -1
+        if not 0 <= c < 4:
+            raise HTTPException(status_code=400, detail="Please answer every question.")
+        clean.append(c)
+        if c == q["correct"]:
+            score += 1
+    await db.applications.update_one(
+        {"_id": aid, "mcq_score": {"$exists": False}},   # atomic one-shot
+        {"$set": {"mcq_score": score, "mcq_total": len(qs),
+                  "mcq_answers": clean, "mcq_taken_at": _dt.utcnow()}})
+    return {"success": True, "state": "received"}
+
+
+@app.get("/api/jobs/{job_id}/mcq-funnel")
+async def mcq_funnel_view(request: Request, job_id: str):
+    """Recruiter: ranked funnel + score distribution. Org-scoped via owned_job."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    total_q = len(((job.get("mcq_filter") or {}).get("approved") or {}).get("questions") or [])
+    rows, hist = [], {}
+    counts = {"held": 0, "advanced": 0, "released": 0, "awaiting_test": 0}
+    async for a in db.applications.find(
+            {"job_id": str(job["_id"]), "funnel": "mcq"},
+            {"name": 1, "email": 1, "status": 1, "mcq_score": 1, "mcq_total": 1,
+             "submitted_at": 1, "screening_id": 1}).sort("submitted_at", 1).limit(2000):
+        sc = a.get("mcq_score")
+        st = a.get("status")
+        if sc is None:
+            counts["awaiting_test"] += 1
+        else:
+            hist[sc] = hist.get(sc, 0) + 1
+        if st == "held":
+            counts["held"] += 1
+        elif st == "released":
+            counts["released"] += 1
+        else:
+            counts["advanced"] += 1   # pending / scoring / scored / stored_unscored
+        rows.append({"application_id": str(a["_id"]),
+                     "name": str(a.get("name") or "")[:60],
+                     "email": str(a.get("email") or "")[:80],
+                     "mcq_score": sc, "mcq_total": a.get("mcq_total") or total_q,
+                     "status": st, "screened": bool(a.get("screening_id")),
+                     "submitted_at": str(a.get("submitted_at") or "")})
+    rows.sort(key=lambda r: (-(r["mcq_score"] if r["mcq_score"] is not None else -1),
+                             r["submitted_at"]))
+    return {"total_questions": total_q, "rows": rows, "counts": counts,
+            "distribution": [{"score": s, "n": hist[s]} for s in sorted(hist)]}
+
+
+@app.post("/api/jobs/{job_id}/mcq-advance")
+async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
+                             job_id: str, n: int = Form(...)):
+    """Advance the top N HELD candidates by MCQ score: exactly the apply
+    flow's own reserve + score_application per candidate — screening spend
+    happens here and ONLY here for funnel jobs."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    n = max(1, min(500, int(n)))
+    held = []
+    async for a in db.applications.find(
+            {"job_id": str(job["_id"]), "funnel": "mcq", "status": "held",
+             "mcq_score": {"$ne": None}},
+            {"mcq_score": 1, "submitted_at": 1}).limit(2000):
+        held.append(a)
+    held.sort(key=lambda a: (-int(a.get("mcq_score") or 0), a.get("submitted_at") or _dt.min))
+    advanced, capped_by = 0, None
+    from bson import ObjectId as _OID
+    for a in held[:n]:
+        ok, blocked_by = await reserve_screening_slot(str(job["_id"]))
+        if not ok:
+            capped_by = blocked_by
+            break
+        await db.applications.update_one({"_id": a["_id"]},
+                                         {"$set": {"status": "pending",
+                                                   "advanced_at": _dt.utcnow(),
+                                                   "advanced_by": user["user_id"]}})
+        background.add_task(score_application, str(a["_id"]))
+        advanced += 1
+    print(f"[MCQ-FUNNEL] job={job_id} advanced={advanced} of n={n} by={user.get('email')}"
+          + (f" capped_by={capped_by}" if capped_by else ""))
+    return {"success": True, "advanced": advanced, "requested": n,
+            "held_remaining": max(0, len(held) - advanced), "capped_by": capped_by}
+
+
+@app.post("/api/jobs/{job_id}/mcq-release")
+async def mcq_funnel_release(request: Request, job_id: str,
+                             application_id: str = Form(...),
+                             action: str = Form("release")):
+    """Flip one held candidate to 'released' (a label, NOT a rejection —
+    reversible with action='hold')."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    from bson import ObjectId as _OID
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found.")
+    want_from, want_to = (("held", "released") if action == "release"
+                          else ("released", "held"))
+    r = await db.applications.update_one(
+        {"_id": aid, "job_id": str(job["_id"]), "funnel": "mcq", "status": want_from},
+        {"$set": {"status": want_to}})
+    if not r.modified_count:
+        raise HTTPException(status_code=409, detail="Candidate is not in that state.")
+    return {"success": True, "status": want_to}
 
 
 # ─────────────────────────────────────────────────────────────
