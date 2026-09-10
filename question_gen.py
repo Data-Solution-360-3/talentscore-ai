@@ -225,7 +225,11 @@ WHAT MAKES A QUESTION GOOD HERE
   with PARTIAL knowledge would genuinely pick — a real, common misconception,
   a plausible-but-inferior approach, or a right-sounding answer for a subtly
   different situation. A distractor a layperson can eliminate on sight is a
-  failure. No joke options, no obviously-absurd options.
+  failure. No joke options, no obviously-absurd options, and no
+  universally-bad-behavior options ("ignore it", "do nothing", "assume it
+  will resolve itself") — every option must be a choice a
+  reasonable-but-imperfect professional might actually make, ESPECIALLY in
+  judgment and soft-skills questions.
 - No two options may overlap in meaning, and the correct one must not be the
   longest, most detailed, or most hedged option (length/format must not leak
   the answer).
@@ -244,8 +248,14 @@ answer key. For EACH question, do two things IN ORDER:
    - OBVIOUS: the correct answer is guessable on sight, or format/length gives
      it away.
    - WEAK DISTRACTOR: any option a layperson (no role knowledge) could
-     eliminate immediately; distractors must reflect real partial-knowledge
-     misconceptions.
+     eliminate immediately. This INCLUDES universally-bad-behavior options —
+     "ignore it", "do nothing", "assume they'll figure it out", "skip the
+     check", "move on" — which nobody trying to pass would ever pick.
+     Judgment and soft-skills questions are the usual offenders: every
+     option must be a choice a reasonable-but-imperfect professional might
+     actually make. The test, option by option: would at least SOME real
+     candidates with partial knowledge pick it? If any option would attract
+     nobody, FAIL.
    - NOT GROUNDED: not clearly about this specific role's real work as
      described in the job description.
    - TRIVIA / RECALL: answerable by memorized definition, terminology, or
@@ -283,6 +293,7 @@ situation, then what to do / conclude / check first — never a lightly
 reworded recall stem. Same bar as before:
 - 4 options, ONE defensibly best answer, distractors = genuine
   partial-knowledge misconceptions, nothing a layperson can eliminate,
+  no universally-bad-behavior options ("ignore it", "do nothing"),
   no length/format leak, no recall-only stems, no ambiguity.
 {fairness}
 
