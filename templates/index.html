@@ -4751,6 +4751,8 @@ function mcqfRender(){
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
       <input type="checkbox" ${on?'checked':''} onchange="mcqfToggle(this.checked)"> ${on?'Filter ON — applicants take the test; CVs held unscreened until you advance':'Filter off — normal apply flow'}
     </label>
+    <label style="font-size:11px;font-weight:600;color:var(--t2)">Target
+      <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:48px;margin:0 3px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:700"></label>
     <button class="btn btn-xs" onclick="mcqfGenerate()">✨ Generate draft (AI)</button>
     ${(draft||appr)?`<button class="btn btn-xs" onclick="mcqfEdit()">✎ Review / edit</button>`:''}
     ${st.editing?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve set</button>
@@ -4764,7 +4766,12 @@ function mcqfRender(){
   </div>`;
   if(st.editing){
     html += st.work.map((m,i)=>`
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.6rem .7rem;margin-bottom:6px">
+      ${m.scenario && (i===0||st.work[i-1].scenario!==m.scenario) ? `
+      <div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.25);border-radius:var(--rs);padding:.55rem .7rem;margin:8px 0 4px">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--green);margin-bottom:3px">Scenario — shared by the questions below (editing updates the whole group)</div>
+        <textarea onchange="mcqfScenEdit(${i},this.value)" style="width:100%;min-height:56px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;line-height:1.5;resize:vertical">${escapeHtml(m.scenario)}</textarea>
+      </div>`:''}
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.6rem .7rem;margin-bottom:6px${m.scenario?';border-left:3px solid rgba(22,163,74,.45)':''}">
         <input value="${escapeHtml(m.q)}" onchange="window._mcqfState.work[${i}].q=this.value"
           style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;font-weight:700;margin-bottom:5px">
         ${m.options.map((o,oi)=>`
@@ -4780,7 +4787,9 @@ function mcqfRender(){
       + `<button class="btn btn-xs" onclick="window._mcqfState.work.push({q:'',options:['','','',''],correct:0});mcqfRender()">+ Add question</button>`;
   }else if(appr||draft){
     const qs=(appr&&appr.questions)||(draft&&draft.questions)||[];
-    html += `<div style="font-size:11px;color:var(--t2)">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions. `
+    const nScen=new Set(qs.filter(m=>m.scenario).map(m=>m.scenario)).size;
+    const nGrouped=qs.filter(m=>m.scenario).length;
+    html += `<div style="font-size:11px;color:var(--t2)">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions${nScen?` (${nScen} scenario group${nScen>1?'s':''} · ${nGrouped} grouped + ${qs.length-nGrouped} standalone)`:''}. `
       + qs.slice(0,3).map((m,i)=>`<div style="margin-top:3px;color:var(--t3)">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')
       + (qs.length>3?`<div style="color:var(--t3);margin-top:2px">…and ${qs.length-3} more — Review / edit to see all.</div>`:'')+`</div>`;
   }
@@ -4824,8 +4833,9 @@ async function mcqfApi(payload){
   return d;
 }
 async function mcqfGenerate(){
-  toast('Generating a draft test from the job description…',{type:'success'});
-  const d=await mcqfApi({action:'generate',n:12});
+  const nGen=Math.max(5,Math.min(20,parseInt(document.getElementById('mcqf-ngen')?.value)||15));
+  toast('Generating a draft test from the job description (multi-agent — can take a minute)…',{type:'success',duration:9000});
+  const d=await mcqfApi({action:'generate',n:nGen});
   if(d){ window._mcqfState.editing=true; window._mcqfState.work=JSON.parse(JSON.stringify(d.mcq_filter.draft.questions)); mcqfRender();
     toast('Draft ready — REVIEW the marked answers before approving.',{type:'warning',duration:8000}); }
 }
@@ -4899,6 +4909,12 @@ async function mcqfAdvance(){
   toast('Advanced '+d.advanced+' candidate(s) — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
   mcqFunnelLoad();
 }
+function mcqfScenEdit(startIdx, val){
+  // Propagate a scenario edit to every member of its group — consecutive
+  // items sharing the string ARE the group, so they must stay identical.
+  const w=window._mcqfState.work, old=w[startIdx].scenario;
+  for(let j=startIdx;j<w.length && w[j].scenario===old;j++) w[j].scenario=val;
+}
 async function mcqfSettings(){
   const d=await mcqfApi({action:'settings',
     paste_mode:document.getElementById('mcqf-pm').value,
@@ -4934,7 +4950,12 @@ async function mcqfReport(appId){
   </div>
   <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">Per-question analysis</div>
   <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Question</th><th>Answer</th><th>Result</th><th>Time</th><th>Returns</th><th>Changes</th></tr></thead><tbody>`;
+  let _lastScen=null;
   (d.questions||[]).forEach(q=>{
+    if(q.scenario && q.scenario!==_lastScen){
+      html+=`<tr><td colspan="7" style="background:rgba(22,163,74,.06);font-size:11px;color:var(--t2);line-height:1.5"><b style="color:var(--green)">Scenario:</b> ${escapeHtml(q.scenario)}</td></tr>`;
+    }
+    _lastScen=q.scenario||null;
     html+=`<tr><td style="color:var(--t3)">${q.n}</td>
       <td style="max-width:340px">${escapeHtml(q.question)}<div style="font-size:10.5px;color:var(--t3);margin-top:2px">${
         (q.options||[]).map((o,oi)=>(oi===q.correct_index?'<b style="color:var(--green)">✓ ':'')+String.fromCharCode(65+oi)+'. '+escapeHtml(o)+(oi===q.correct_index?'</b>':'')).join(' &nbsp; ')}</div></td>

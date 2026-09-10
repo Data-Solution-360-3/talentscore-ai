@@ -453,7 +453,17 @@ function _mcqShow(i){
   AssessMonitor.noteQuestion(i);
   const q=_mcq.qs[i];
   document.getElementById('mcq-prog').textContent = 'Question '+(i+1)+' of '+_mcq.qs.length;
-  document.getElementById('mcq-qbox').innerHTML = `
+  // Scenario-grouped questions: the situation stays PINNED above each of its
+  // questions (like the interview's case card), with a continuation marker
+  // when the previous question was about the same situation.
+  const scen = q.scenario || '';
+  const cont = scen && i>0 && _mcq.qs[i-1].scenario===scen;
+  const scenHtml = scen ? `
+    <div style="background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:12px;padding:.85rem 1rem;margin-bottom:.7rem">
+      <div style="font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#128A40;margin-bottom:.35rem">${cont?'Same situation — continued':'The situation'}</div>
+      <div style="font-size:.86rem;line-height:1.6;color:#1F2A24;white-space:pre-wrap">${escq(scen)}</div>
+    </div>` : '';
+  document.getElementById('mcq-qbox').innerHTML = scenHtml + `
     <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem">
       <div style="font-size:.95rem;font-weight:700;color:#142848;margin-bottom:.6rem">${escq(q.q)}</div>
       ${q.options.map((o,oi)=>`

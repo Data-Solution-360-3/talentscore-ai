@@ -203,14 +203,60 @@ Return JSON:
 # at most FOUR batched calls total (draft, critic, refine-failed, re-check),
 # never per-question calls, never a second refine round.
 
+def _mcq_lang(language: str) -> str:
+    """MCQ-LOCAL language rule. Deliberately NOT the shared _lang(): for 'bn'
+    the MCQs must read as natural BANGLISH — the way Bangladeshi professionals
+    actually write — never a formal-Bengali dictionary translation. The
+    interview generators keep their own behavior (out of scope here)."""
+    if (language or "en").lower() == "bn":
+        return (
+            "Write in NATURAL BANGLA-ENGLISH MIX (Banglish), exactly the way a "
+            "Bangladeshi professional writes at work: the SENTENCE language "
+            "(connectives, verbs, framing) in Bangla script, but ALL technical "
+            "terms, tool names, and standard English professional words stay in "
+            "ENGLISH — dashboard, SQL query, report, stakeholder, deadline, "
+            "data, analysis, meeting, follow-up, KPI, refresh, filter. NEVER "
+            "translate these into formal Bengali (no বিশ্লেষণ for analysis, no "
+            "উপাত্ত for data). Example of the CORRECT register: "
+            "\"আপনি একটা monthly sales report তৈরি করছেন। Manager আগামীকাল সকালে "
+            "presentation-এ regional trends দেখাতে চান — কোন approach টা best?\" "
+            "WRONG register (reject-worthy): pure English sentences, or "
+            "over-translated formal Bengali like \"তথ্য বিশ্লেষণের জন্য কোন "
+            "পদ্ধতি ব্যবহার করবেন\".")
+    return "Write everything in clear, professional ENGLISH — no other language."
+
+
+def _mcq_lang_checks(language: str) -> str:
+    """Critic criteria for the language register — only active for 'bn'."""
+    if (language or "en").lower() == "bn":
+        return (
+            "   - WRONG LANGUAGE REGISTER: this set must be natural BANGLISH "
+            "(Bangla sentence language + English technical/professional terms). "
+            "FAIL a question that is (a) written in pure English, OR (b) "
+            "over-translated into formal Bengali — technical terms like "
+            "dashboard, SQL query, report, data, analysis, stakeholder must "
+            "appear in ENGLISH, not as Bengali translations (বিশ্লেষণ, উপাত্ত "
+            "etc.). It must read like a real BD professional wrote it.\n")
+    return ""
+
+
 _MCQ_FAIRNESS_RULES = """- {lang_rule}
 - NEVER ask about, or write questions around: age, religion, marital or family
   status, pregnancy, health or disability, ethnicity, political views, or
   anything a recruiter could not lawfully ask."""
 
-MCQ_DRAFT_PROMPT = """You are writing a knowledge screen for a specific job. Draft exactly {n}
+MCQ_DRAFT_PROMPT = """You are writing a knowledge screen for a specific job. Draft {n}
 multiple-choice questions grounded in the ACTUAL day-to-day work this job
-description describes.
+description describes, in a MIXED STRUCTURE:
+
+STRUCTURE (both kinds, mixed)
+- SCENARIO GROUPS: {n_scen} realistic role scenarios — each a substantial
+  paragraph (a concrete situation with context: what's happening, who's
+  involved, real numbers/constraints where natural) — followed by 3-4 MCQs
+  ABOUT that scenario. The questions must genuinely depend on the scenario's
+  details, not merely sit next to it.
+- STANDALONE questions: the remainder — each self-framed as its own mini
+  work situation.
 
 WHAT MAKES A QUESTION GOOD HERE
 - Frame EVERY question as a realistic work SCENARIO for this role: a
@@ -234,19 +280,28 @@ WHAT MAKES A QUESTION GOOD HERE
   longest, most detailed, or most hedged option (length/format must not leak
   the answer).
 - Self-contained: answerable from professional knowledge of the role plus the
-  question itself. No company-internal facts.
+  question (and its scenario, for grouped ones). No company-internal facts.
 {fairness}
 
 Return JSON:
-{{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+{{"scenarios": [{{"scenario": "...paragraph...",
+                "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}, ...],
+  "standalone": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
 
 MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job. You are NOT given the
-answer key. For EACH question, do two things IN ORDER:
+answer key. Some questions belong to a SCENARIO (shown above them) — judge
+those WITH their scenario. For EACH question, do two things IN ORDER:
 
-1. SOLVE IT BLIND: pick the single best option yourself (best_index).
+1. SOLVE IT BLIND: pick the single best option yourself (best_index), and
+   honestly note HOW you got there.
 2. JUDGE IT against these criteria — fail it if ANY apply:
-   - OBVIOUS: the correct answer is guessable on sight, or format/length gives
-     it away.
+   - OBVIOUS: you could pick the correct answer CONFIDENTLY without any real
+     role knowledge — from wording, option shape or length, general common
+     sense, or one option simply standing out. The test is your own step 1:
+     if solving it felt easy and did NOT require weighing the situation with
+     role knowledge, FAIL it as OBVIOUS. A good question makes even you
+     hesitate between two defensible-looking options before role judgment
+     settles it.
    - WEAK DISTRACTOR: any option a layperson (no role knowledge) could
      eliminate immediately. This INCLUDES universally-bad-behavior options —
      "ignore it", "do nothing", "assume they'll figure it out", "skip the
@@ -274,7 +329,10 @@ answer key. For EACH question, do two things IN ORDER:
      as a task).
    - AMBIGUOUS: two options overlap, or more than one option is defensibly
      correct, or none clearly is.
-
+   - DETACHED (scenario questions only): the question does not actually
+     depend on its scenario's details — it could be answered identically
+     with the scenario deleted.
+{lang_checks}
 Be strict: a question that merely "seems fine" but tests recall instead of
 applied judgment must FAIL. When you are unsure between pass and fail, FAIL.
 
@@ -285,7 +343,9 @@ Return JSON:
 MCQ_REFINE_PROMPT = """You are fixing screening MCQs that failed review, for a specific job.
 For each item you get the question, its options, the intended correct index,
 and the reviewer's SPECIFIC reasons. Rewrite each question to FIX those
-reasons while keeping it grounded in this job's real work. You may rewrite
+reasons while keeping it grounded in this job's real work. A question shown
+WITH a scenario must stay about THAT scenario (revise the question, not the
+scenario). You may rewrite
 the stem, any option, or replace the question entirely with a better one on
 the same topic area. A question failed for TRIVIA/RECALL or NO SCENARIO must
 come back CONVERTED into a realistic work scenario on the same topic — a
@@ -326,16 +386,20 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                                   job_title: str = "", language: str = "en",
                                   role_hint: str = "", usage_out: list | None = None
                                   ) -> tuple[list | None, str | None]:
-    """MCQ pre-filter DRAFT set via the drafter→critic→refiner pipeline.
+    """Mixed-structure MCQ DRAFT set via the drafter→critic→refiner loop.
 
-    The critic BLIND-SOLVES every question (never sees the key); a mismatch
-    with the drafter's key fails the question as ambiguous/wrong-key — the
-    guard against a confident wrong answer key silently filtering good
-    candidates. Bounded: draft(n+6) → critic → refine failures once →
-    re-check once → done; survivors best-first, trimmed to n. Draft only —
-    the recruiter still reviews, edits, and approves before anything goes
-    live. Returns (mcq list, None) or (None, error)."""
-    n = max(5, min(15, int(n)))
+    Structure: scenario groups (a paragraph + 3-4 MCQs about it) + standalone
+    questions, carried as a FLAT list where grouped items share an optional
+    "scenario" string — grading, storage, and review stay index-based and
+    untouched. The critic BLIND-SOLVES every question (never sees the key):
+    a key mismatch fails it, and so does the critic finding it EASY without
+    role knowledge. Language: pure English, or natural Banglish for 'bn'
+    (critic rejects over-translation). Bounded: draft(target+8) → critic →
+    up to THREE refine+re-check rounds (the infinite-loop rail, not a cost
+    limit), stopping early once the target passes. Draft only — the
+    recruiter still reviews, edits, and approves before anything goes live.
+    Returns (mcq list, None) or (None, error)."""
+    n = max(5, min(20, int(n)))
     jd = (jd_text or "").strip()
     if len(jd) < 40:
         return None, "The job description is too short to generate questions from."
@@ -343,30 +407,55 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     job_ctx = (f"JOB TITLE: {job_title or 'not specified'}\n"
                + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
                + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
-    fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=_lang(language))
+    fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=_mcq_lang(language))
+    critic_prompt = MCQ_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language))
 
-    def _fmt(items):
-        return "\n\n".join(
-            f"[{i}] {m['question']}\n" + "\n".join(
-                f"   ({oi}) {o}" for oi, o in enumerate(m["options"]))
-            for i, m in enumerate(items))
+    def _fmt(items, with_keys=False, reasons=None):
+        lines, last_scen = [], None
+        for i, m in enumerate(items):
+            scen = m.get("scenario")
+            if scen and scen != last_scen:
+                lines.append(f"SCENARIO (for the following questions):\n{scen}")
+            last_scen = scen
+            block = (f"[{i}] {m['question']}\n" + "\n".join(
+                f"   ({oi}) {o}" for oi, o in enumerate(m["options"])))
+            if with_keys:
+                block += f"\n   intended correct: ({m['correct']})"
+            if reasons is not None:
+                block += "\n   reviewer reasons: " + "; ".join(reasons[i])
+            lines.append(block)
+        return "\n\n".join(lines)
 
-    # ── 1) DRAFT n+8 (over-draft so the stricter critic can discard freely) ──
+    # ── 1) DRAFT target+8, mixed structure, flattened with scenario refs ──
+    n_scen = 3 if n >= 12 else 2
     try:
         raw = await _gen_json(client,
-                              MCQ_DRAFT_PROMPT.format(n=n + 8, fairness=fairness),
-                              job_ctx, 0.5, 3600, usage_out)
+                              MCQ_DRAFT_PROMPT.format(n=n + 8, n_scen=n_scen,
+                                                      fairness=fairness),
+                              job_ctx, 0.5, 6000, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
-    drafts = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)][:n + 8]
+    drafts = []
+    for g in (raw.get("scenarios") or [])[:n_scen + 1]:
+        scen = str((g or {}).get("scenario") or "").strip()[:1200]
+        if not scen:
+            continue
+        for m in (g.get("mcq") or [])[:4]:
+            if _mcq_shape_ok(m):
+                m["scenario"] = scen
+                drafts.append(m)
+    for m in (raw.get("standalone") or []):
+        if _mcq_shape_ok(m):
+            drafts.append(m)
+    drafts = drafts[:n + 8]
     if len(drafts) < 3:
         return None, "Drafting produced too few valid questions — try again."
 
-    # ── 2) CRITIC: blind-solve + judge (one batched call, key never sent) ──
+    # ── 2) CRITIC: blind-solve + judge (batched; the key is never sent) ──
     async def _critic(items):
-        raw = await _gen_json(client, MCQ_CRITIC_PROMPT,
+        raw = await _gen_json(client, critic_prompt,
                               job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
-                              0.0, 2200, usage_out)
+                              0.0, 3000, usage_out)
         verdicts = {}
         for r in (raw.get("reviews") or []):
             try:
@@ -397,29 +486,54 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     except Exception as e:
         return None, f"Review call failed: {str(e)[:200]}"
 
-    # ── 3+4) REFINE the failures once, re-check once, then STOP ──
-    if failed and len(passed) < n:
-        fail_block = "\n\n".join(
-            f"[{i}] {m['question']}\n" + "\n".join(
-                f"   ({oi}) {o}" for oi, o in enumerate(m["options"]))
-            + f"\n   intended correct: ({m['correct']})"
-            + "\n   reviewer reasons: " + "; ".join(rs)
-            for i, (m, rs) in enumerate(failed))
+    # ── 3) REFINE loop: up to 3 rounds, stop early at target. The round cap
+    #      is the never-infinite rail; each round revises ONLY that round's
+    #      failures and re-checks them. Fail-soft throughout: trouble in a
+    #      round never loses questions that already passed. ──
+    for _round in range(3):
+        if not failed or len(passed) >= n:
+            break
+        items = [m for m, _ in failed]
+        rs = [r for _, r in failed]
         try:
             raw = await _gen_json(client,
                                   MCQ_REFINE_PROMPT.format(fairness=fairness),
-                                  job_ctx + "\n\nQUESTIONS TO FIX:\n" + fail_block,
-                                  0.4, 2800, usage_out)
-            refined = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)]
-            if refined:
-                re_passed, _ = await _critic(refined)
-                passed.extend(re_passed)
+                                  job_ctx + "\n\nQUESTIONS TO FIX:\n"
+                                  + _fmt(items, with_keys=True, reasons=rs),
+                                  0.4, 4000, usage_out)
+            refined = []
+            got = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)]
+            for i, m in enumerate(got[:len(items)]):
+                # The scenario is reattached FROM THE ORIGINAL — the refiner
+                # revises questions, never the scenario, and we don't trust
+                # it to echo the paragraph back byte-perfect.
+                if items[i].get("scenario"):
+                    m["scenario"] = items[i]["scenario"]
+                refined.append(m)
+            if not refined:
+                break
+            re_passed, failed = await _critic(refined)
+            passed.extend(re_passed)
         except Exception as e:
-            # Bounded and fail-soft: refinement trouble never loses the
-            # questions that already passed.
-            print(f"[MCQ-GEN] refine round failed (continuing with passers): {str(e)[:120]}")
+            print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
+            break
 
-    return passed[:n], None
+    # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
+    #    a scenario string are one group downstream), standalones follow. ──
+    groups: dict = {}
+    order: list = []
+    for m in passed:
+        key = m.get("scenario") or f"__solo_{id(m)}"
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(m)
+    final = []
+    for key in order:
+        if len(final) >= n:
+            break
+        final.extend(groups[key][:max(0, n - len(final))])
+    return final, None
 
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",

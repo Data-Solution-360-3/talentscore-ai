@@ -3909,7 +3909,7 @@ async def public_apply_submit(
 # same protection as the interview MCQs.
 # ─────────────────────────────────────────────────────────────
 
-MCQ_FILTER_MIN, MCQ_FILTER_MAX = 5, 15
+MCQ_FILTER_MIN, MCQ_FILTER_MAX = 5, 20
 
 # Activity-log flag types for the MCQ assessment = the interview's proctoring
 # whitelist plus the assessment-only events. One family, one honesty rule:
@@ -3966,7 +3966,10 @@ def _validate_mcq_timings(raw, n_questions: int) -> list:
 
 def _normalize_mcq_set(raw) -> list:
     """Same per-item rules as the interview MCQs (_normalize_scenario): one
-    question + EXACTLY four options + a valid 0-based correct index."""
+    question + EXACTLY four options + a valid 0-based correct index. An item
+    may carry an OPTIONAL scenario string — consecutive items sharing it are
+    one scenario group (display grouping only: grading, review, and the
+    approve guard stay index-based and never read it)."""
     out = []
     for m in (raw or [])[:MCQ_FILTER_MAX]:
         if not isinstance(m, dict):
@@ -3978,7 +3981,11 @@ def _normalize_mcq_set(raw) -> list:
         except Exception:
             continue
         if q and len(opts) == 4 and 0 <= c < 4:
-            out.append({"q": q, "options": opts, "correct": c})
+            item = {"q": q, "options": opts, "correct": c}
+            scen = str(m.get("scenario") or "").strip()[:1200]
+            if scen:
+                item["scenario"] = scen
+            out.append(item)
     return out
 
 
@@ -4012,9 +4019,9 @@ async def mcq_filter_save(request: Request, job_id: str):
         if not await rate_limit_allows(f"mcqgen:{job_id}", 10, 86400):
             raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
         try:
-            n = max(MCQ_FILTER_MIN, min(MCQ_FILTER_MAX, int(body.get("n", 12))))
+            n = max(MCQ_FILTER_MIN, min(MCQ_FILTER_MAX, int(body.get("n", 15))))
         except Exception:
-            n = 12
+            n = 15
         from question_gen import generate_screening_mcqs, GEN_MODEL
         _gu: list = []
         raw, err = await generate_screening_mcqs(
@@ -4099,7 +4106,11 @@ async def apply_mcq_questions(token: str):
     # The instruction screen renders its DISCLOSURE from these fields — the
     # candidate always learns the paste rule, the time limit, and what is
     # monitored, before question 1. Never the answer key.
-    return {"questions": [{"q": q["q"], "options": q["options"]} for q in qs],
+    # scenario is candidate-visible content (the situation the questions are
+    # about) — the correct index still never leaves the server.
+    return {"questions": [{"q": q["q"], "options": q["options"],
+                           **({"scenario": q["scenario"]} if q.get("scenario") else {})}
+                          for q in qs],
             "paste_mode": ("monitor" if mf.get("paste_mode") == "monitor" else "restrict"),
             "time_limit_minutes": int(mf.get("time_limit_minutes") or 0),
             "can_go_back": True}
@@ -4302,6 +4313,7 @@ async def mcq_assessment_report(request: Request, job_id: str, application_id: s
         t = timings.get(i) or {}
         per_q.append({
             "n": i + 1, "question": q["q"], "options": q["options"],
+            "scenario": q.get("scenario"),
             "chosen": c if isinstance(c, int) and c >= 0 else None,
             "correct_index": q["correct"],
             "is_correct": isinstance(c, int) and c == q["correct"],
