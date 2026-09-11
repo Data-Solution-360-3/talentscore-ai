@@ -238,6 +238,17 @@ def main():
             check("owner A's cost payload carries NO org-B reference",
                   org_b not in r.text and scr_b not in r.text)
 
+            print("\nBranding — owner-only edit, own org only (no cross-org parameter exists)")
+            r = c.post("/api/org/branding", headers=hdr(t_view_a),
+                       json={"primary_color": "#111111"})
+            check("viewer A cannot edit branding", r.status_code == 403, f"got {r.status_code}")
+            r = c.post("/api/org/branding", headers=hdr(t_rec_a),
+                       json={"primary_color": "#111111"})
+            check("recruiter A cannot edit branding (owner-only)", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.get("/api/org/branding", headers=hdr(t_owner_a))
+            check("owner A reads own branding", r.status_code == 200, f"got {r.status_code}")
+
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
                 r = c.get("/api/employees", headers=hdr(tok))

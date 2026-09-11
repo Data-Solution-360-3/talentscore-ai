@@ -53,10 +53,16 @@ async def run():
             continue
         owner = await db.users.find_one({"_id": ObjectId(str(job.get("user_id")))}) \
             if job.get("user_id") else None
+        # White-label: reminders carry the same branded header as the invite.
+        brand = await main._org_branding(str(job.get("org_id") or ""))
+        if brand and brand.get("logo_url"):
+            brand = {**brand, "logo_url": f"{main.APP_URL}{brand['logo_url']}"}
         ok, info = send_interview_invite_email(
             to_email=str(a.get("email") or ""),
             candidate_name=str(a.get("name") or ""),
-            company=(owner or {}).get("company_name") or "the hiring team",
+            company=(brand or {}).get("company_name")
+                    or (owner or {}).get("company_name") or "the hiring team",
+            brand=brand,
             job_title=str(job.get("title") or "the role"),
             link=f"{main.APP_URL}/interview/{a['interview_token']}",
             deadline_str=exp.strftime("%d %b %Y"),

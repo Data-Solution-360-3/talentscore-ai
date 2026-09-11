@@ -776,6 +776,8 @@ async def me(request: Request):
             "company": db_user.get("company_name", user.get("company", "")),
             "role": db_user.get("role", "client"),
             "org_role": db_user.get("org_role", "owner"),
+            # White-label: the caller's org branding (null = default look).
+            "branding": await _org_branding(str(db_user.get("org_id") or "")),
             "is_super_admin": bool(db_user.get("is_super_admin")),
             "plan": db_user.get("plan", "trial"),
             "screening_count": db_user.get("screening_count", 0),
@@ -1490,6 +1492,172 @@ async def erase_candidate_route(request: Request, screening_id: str,
     print(f"[ERASURE] org={user.get('org_id')} by={user.get('email')} "
           f"screening={screening_id} counts={counts}")
     return {"success": True, "deleted": counts}
+
+
+# ─────────────────────────────────────────────────────────────
+# WHITE-LABEL BRANDING (per-org theming — presentation ONLY).
+# Absent branding = today's TopCandidate look, byte-identical.
+# No DNS/nginx/SSL here — the subdomain is a separate step.
+# ─────────────────────────────────────────────────────────────
+
+import re as _brand_re
+_HEX_COLOR = _brand_re.compile(r"^#[0-9a-fA-F]{6}$")
+_LOGO_MAX_BYTES = 512 * 1024
+_LOGO_MAGIC = {  # magic-byte check — the only accepted types; no SVG (script risk)
+    "image/png": b"\x89PNG",
+    "image/jpeg": b"\xff\xd8\xff",
+    "image/webp": b"RIFF",
+}
+
+
+async def _org_branding(org_id: str) -> dict | None:
+    """Colors/name/logo-presence for an org (never the logo bytes)."""
+    if not org_id:
+        return None
+    from bson import ObjectId as _OID
+    try:
+        o = await db.orgs.find_one({"_id": _OID(str(org_id))},
+                                   {"branding.company_name": 1, "branding.primary_color": 1,
+                                    "branding.accent_color": 1, "branding.logo_mime": 1})
+    except Exception:
+        return None
+    b = (o or {}).get("branding") or None
+    if not b:
+        return None
+    return {"company_name": b.get("company_name") or "",
+            "primary_color": b.get("primary_color") or "",
+            "accent_color": b.get("accent_color") or "",
+            "logo_url": f"/org-logo/{org_id}" if b.get("logo_mime") else None}
+
+
+def _brand_css(b: dict | None) -> str:
+    """The candidate-page override: remaps the brand CSS variables. Empty
+    string (no branding) leaves every page exactly as it is today."""
+    if not b:
+        return ""
+    rules = []
+    p, a = b.get("primary_color"), b.get("accent_color")
+    if p and _HEX_COLOR.match(p):
+        rules.append(f"--ink:{p};--brand-primary:{p};--green:{p}")
+    if a and _HEX_COLOR.match(a):
+        rules.append(f"--orange:{a};--orange2:{a};--indigo:{a};--brand-accent:{a}")
+    if not rules:
+        return ""
+    return f"<style>:root{{{';'.join(rules)}}}</style>"
+
+
+_DEFAULT_MARK_SVG = ('<svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" style="flex-shrink:0">'
+                     '<rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>'
+                     '<circle cx="28" cy="23" r="8.6" fill="#639922"/>'
+                     '<path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>'
+                     '<circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>'
+                     '<circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>'
+                     '<path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" '
+                     'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+
+
+def _brand_mark(b: dict | None, name_cls: str) -> str:
+    """The header mark: the org's logo + name when branded, else today's
+    TopCandidate mark verbatim."""
+    if b and (b.get("logo_url") or b.get("company_name")):
+        img = (f'<img src="{b["logo_url"]}" alt="" style="height:28px;max-width:120px;'
+               f'object-fit:contain;border-radius:6px;flex-shrink:0">' if b.get("logo_url") else _DEFAULT_MARK_SVG)
+        name = _html.escape(b.get("company_name") or "")
+        return f'{img}\n  <span class="{name_cls}">{name}</span>' if name \
+            else f'{img}\n  <span class="{name_cls}">TopCandidate<span style="color:var(--orange)">.pro</span></span>'
+    return (f'{_DEFAULT_MARK_SVG}\n  <span class="{name_cls}">TopCandidate'
+            f'<span style="color:var(--orange)">.pro</span></span>')
+
+
+@app.get("/org-logo/{org_id}", include_in_schema=False)
+async def org_logo(org_id: str):
+    """Public logo bytes — a logo is public-facing presentation by definition
+    (it renders on the org's own candidate pages and emails)."""
+    from bson import ObjectId as _OID
+    try:
+        o = await db.orgs.find_one({"_id": _OID(org_id)},
+                                   {"branding.logo": 1, "branding.logo_mime": 1})
+    except Exception:
+        o = None
+    b = (o or {}).get("branding") or {}
+    if not b.get("logo"):
+        raise HTTPException(status_code=404, detail="No logo.")
+    return Response(content=bytes(b["logo"]), media_type=b.get("logo_mime") or "image/png",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+async def _require_branding_editor(request: Request) -> dict:
+    user = await get_current_user(request)
+    db_user = await get_user_by_id(user["user_id"])
+    is_admin = bool(db_user and db_user.get("role") == "admin")
+    if not is_admin and user.get("org_role") != "owner":
+        raise HTTPException(status_code=403, detail="Only the workspace owner can edit branding.")
+    if not user.get("org_id"):
+        raise HTTPException(status_code=409, detail="No organization on this account.")
+    return user
+
+
+@app.get("/api/org/branding")
+async def get_org_branding(request: Request):
+    """Owner/admin: the caller's OWN org branding (no org parameter exists —
+    nothing to point cross-org)."""
+    user = await _require_branding_editor(request)
+    return {"branding": await _org_branding(str(user["org_id"])) or None,
+            "defaults": {"primary_color": "#639922", "accent_color": "#EF9F27"}}
+
+
+@app.post("/api/org/branding")
+async def set_org_branding(request: Request):
+    """Owner/admin: set colors + company name, or action:'reset' to return the
+    org to the default TopCandidate look (logo included)."""
+    user = await _require_branding_editor(request)
+    from bson import ObjectId as _OID
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    oid = _OID(str(user["org_id"]))
+    if body.get("action") == "reset":
+        await db.orgs.update_one({"_id": oid}, {"$unset": {"branding": ""}})
+        return {"success": True, "branding": None}
+    updates = {"branding.updated_at": _dt.utcnow()}
+    name = str(body.get("company_name") or "").strip()[:120]
+    if name:
+        updates["branding.company_name"] = name
+    for k in ("primary_color", "accent_color"):
+        v = str(body.get(k) or "").strip()
+        if v:
+            if not _HEX_COLOR.match(v):
+                raise HTTPException(status_code=400, detail=f"{k} must be a hex color like #639922.")
+            updates[f"branding.{k}"] = v
+    await db.orgs.update_one({"_id": oid}, {"$set": updates})
+    return {"success": True, "branding": await _org_branding(str(user["org_id"]))}
+
+
+@app.post("/api/org/branding/logo")
+async def upload_org_logo(request: Request, logo: UploadFile = File(...)):
+    """Owner/admin: logo upload — magic-byte validated (png/jpeg/webp only),
+    size-capped, stored as binary on the org doc. No filesystem writes."""
+    user = await _require_branding_editor(request)
+    from bson import ObjectId as _OID
+    data = await logo.read(_LOGO_MAX_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > _LOGO_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Logo must be under 512KB.")
+    mime = None
+    for m, magic in _LOGO_MAGIC.items():
+        if data.startswith(magic):
+            mime = m
+            break
+    if mime == "image/webp" and data[8:12] != b"WEBP":
+        mime = None
+    if not mime:
+        raise HTTPException(status_code=400, detail="Logo must be a PNG, JPEG, or WebP image.")
+    await db.orgs.update_one({"_id": _OID(str(user["org_id"]))},
+                             {"$set": {"branding.logo": data, "branding.logo_mime": mime,
+                                       "branding.updated_at": _dt.utcnow()}})
+    return {"success": True, "logo_url": f"/org-logo/{user['org_id']}"}
 
 
 @app.get("/api/usage/cost")
@@ -3325,6 +3493,10 @@ async def candidate_interview_page(token: str):
     # manual links (the line hides).
     owner = await get_user_by_id(str(live.get("user_id") or "")) if live.get("user_id") else None
     company = (owner or {}).get("company_name") or "the hiring team"
+    # White-label: the interview link's org branding (empty = today's look).
+    brand = await _org_branding(str(live.get("org_id") or (owner or {}).get("org_id") or ""))
+    if brand and brand.get("company_name"):
+        company = brand["company_name"]
     deadline = ""
     if live.get("expires_at"):
         try:
@@ -3337,6 +3509,8 @@ async def candidate_interview_page(token: str):
 
     page = read_template("interview.html")
     for key, val in {
+        "{{BRAND_CSS}}": _brand_css(brand),
+        "{{BRAND_MARK}}": _brand_mark(brand, ""),
         "{{TOKEN}}": esc(token),
         "{{COMPANY}}": esc(company),
         "{{DEADLINE}}": esc(deadline, ""),
@@ -3634,12 +3808,19 @@ async def public_apply_page(token: str):
 
     owner = await get_user_by_id(str(job.get("user_id"))) if job.get("user_id") else None
     company = (owner or {}).get("company_name") or "this company"
+    # White-label: the JOB'S org branding (empty for unbranded orgs — the
+    # page then renders byte-identical to today).
+    brand = await _org_branding(str(job.get("org_id") or ""))
+    if brand and brand.get("company_name"):
+        company = brand["company_name"]
 
     def esc(v, fallback=""):
         return _html.escape(str(v if v not in (None, "") else fallback))
 
     page = read_template("apply.html")
     for key, val in {
+        "{{BRAND_CSS}}": _brand_css(brand),
+        "{{BRAND_MARK}}": _brand_mark(brand, "tb-name"),
         "{{JOB_TITLE}}": esc(job.get("title"), "Open position"),
         "{{COMPANY}}": esc(company),
         "{{LOCATION}}": esc(job.get("loc") or job.get("location"), "Not specified"),
@@ -4924,6 +5105,14 @@ async def invite_funnel_candidate(job: dict, application_id: str) -> dict:
 
     owner = await get_user_by_id(str(job.get("user_id") or ""))
     company = (owner or {}).get("company_name") or "the hiring team"
+    # White-label: the org's branding drives the email header (absolute logo
+    # URL for mail clients); unbranded orgs keep the standard header.
+    brand = await _org_branding(str(job.get("org_id") or ""))
+    if brand:
+        if brand.get("company_name"):
+            company = brand["company_name"]
+        if brand.get("logo_url"):
+            brand = {**brand, "logo_url": f"{APP_URL}{brand['logo_url']}"}
     from email_service import send_interview_invite_email
     sent, info = send_interview_invite_email(
         to_email=str(app_doc.get("email") or ""),
@@ -4935,6 +5124,7 @@ async def invite_funnel_candidate(job: dict, application_id: str) -> dict:
         days=days,
         reply_to=(owner or {}).get("email") or "",
         language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+        brand=brand,
     )
     await db.applications.update_one(
         {"_id": app_doc["_id"]},

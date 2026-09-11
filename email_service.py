@@ -232,7 +232,8 @@ def send_interview_invite_email(to_email: str, candidate_name: str, company: str
                                 job_title: str, link: str, deadline_str: str,
                                 days: int, reply_to: str = "",
                                 reminder: bool = False,
-                                language: str = "en") -> tuple[bool, str]:
+                                language: str = "en",
+                                brand: dict | None = None) -> tuple[bool, str]:
     """Automated AI-interview invite (funnel Part 2). Returns (ok, resend_id).
 
     HONEST by construction: says what it is (a live AI interview, ~12 min),
@@ -255,6 +256,18 @@ def send_interview_invite_email(to_email: str, candidate_name: str, company: str
                  if language != "bn" else
                  "The interview is available in Bangla (beta) and English.")
 
+    # White-label header: the org's primary color + logo when branding is set;
+    # otherwise the standard TopCandidate green — unchanged.
+    b = brand or {}
+    hdr_color = b.get("primary_color") if str(b.get("primary_color") or "").startswith("#") else None
+    hdr_bg = (f"background:{hdr_color}" if hdr_color
+              else "background:linear-gradient(135deg,#639922,#128A40)")
+    hdr_logo = (f'<img src="{b["logo_url"]}" alt="" height="34" '
+                f'style="display:block;margin:0 auto 8px;border:0;max-width:140px">'
+                if b.get("logo_url") else "")
+    hdr_via = ("" if b.get("logo_url") or hdr_color
+               else '<p style="margin:4px 0 0;color:rgba(255,255,255,.85);font-size:12px">via TopCandidate.pro</p>')
+
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
@@ -262,9 +275,9 @@ def send_interview_invite_email(to_email: str, candidate_name: str, company: str
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-        <tr><td style="background:linear-gradient(135deg,#639922,#128A40);padding:24px 32px;text-align:center">
-          <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800">{company}</h1>
-          <p style="margin:4px 0 0;color:rgba(255,255,255,.85);font-size:12px">via TopCandidate.pro</p>
+        <tr><td style="{hdr_bg};padding:24px 32px;text-align:center">
+          {hdr_logo}<h1 style="margin:0;color:#fff;font-size:20px;font-weight:800">{company}</h1>
+          {hdr_via}
         </td></tr>
         <tr><td style="padding:30px 32px">
           <h2 style="margin:0 0 12px;font-size:19px;color:#111;font-weight:700">Hi {first},</h2>

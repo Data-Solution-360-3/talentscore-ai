@@ -1709,6 +1709,31 @@ function applyModeAccess(isSuper){
   initMode();
 }
 
+// ── WHITE-LABEL: apply the org's branding to the dashboard chrome.
+//    null branding = the default TopCandidate look, untouched. Presentation
+//    only — nothing about data or behavior changes with the theme. ──
+function applyOrgBranding(b){
+  if(!b) return;
+  const r=document.documentElement.style;
+  if(/^#[0-9a-fA-F]{6}$/.test(b.primary_color||'')){
+    r.setProperty('--green', b.primary_color);
+    r.setProperty('--brand-primary', b.primary_color);
+  }
+  if(/^#[0-9a-fA-F]{6}$/.test(b.accent_color||'')){
+    r.setProperty('--orange', b.accent_color);
+    r.setProperty('--orange2', b.accent_color);
+    r.setProperty('--brand-accent', b.accent_color);
+  }
+  if(b.logo_url || b.company_name){
+    const el=document.querySelector('.t-logo');
+    if(el){
+      const img=b.logo_url?`<img src="${b.logo_url}" alt="" style="height:30px;max-width:120px;object-fit:contain;border-radius:6px;flex-shrink:0">`:'';
+      const nm=(b.company_name||'').replace(/</g,'&lt;');
+      el.innerHTML = img + (nm?`<span class="t-name">${nm}</span>`:el.querySelector('.t-name')?.outerHTML||'');
+    }
+  }
+}
+
 // ── MODALS ──
 // ── MODAL HELPERS ──
 // open/close maintain a stack so ESC closes the topmost modal (not all at once).
@@ -5836,6 +5861,7 @@ async function loadFromDB(){
     if(me.org_role === 'owner' || me.role === 'admin'){
       document.getElementById('btn-erase')?.style.removeProperty('display');
     }
+    applyOrgBranding(me.branding);
 
     // Fetch screenings, jobs in parallel - don't let stats failure block
     const [screenRes,jobsRes]=await Promise.all([

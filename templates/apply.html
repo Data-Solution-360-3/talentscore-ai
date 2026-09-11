@@ -19,31 +19,31 @@
    English jobs load nothing extra; this rule is inert without the class.
    Inter stays in the stack so English technical terms keep their face. */
 .bn-assess #mcq-view{font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif}
-/* ── MCQ assessment — TopCandidate brand (green #639922/#173404, orange
-   #EF9F27/#F57C2E, white/greys — no navy). Mobile-first: full-width tap
+/* ── MCQ assessment — TopCandidate brand (green var(--brand-primary,#639922)/var(--brand-deep,#173404), orange
+   var(--brand-accent,#EF9F27)/#F57C2E, white/greys — no navy). Mobile-first: full-width tap
    targets, min-width:0 everywhere flexible. ── */
 .mcq-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:.55rem;flex-wrap:wrap}
-.mcq-progt{font-size:.82rem;font-weight:800;color:#173404}
+.mcq-progt{font-size:.82rem;font-weight:800;color:var(--brand-deep,#173404)}
 .mcq-progbar{height:6px;background:#EDF2E4;border-radius:999px;overflow:hidden;margin-bottom:.9rem}
-.mcq-progbar i{display:block;height:100%;background:linear-gradient(90deg,#639922,#8FBF4D);border-radius:999px;transition:width .25s}
-.mcq-clock{font-size:.85rem;font-weight:800;color:#173404;background:#F4FAF6;border:1.5px solid #BFE3CE;border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mcq-progbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand-primary,#639922),#8FBF4D);border-radius:999px;transition:width .25s}
+.mcq-clock{font-size:.85rem;font-weight:800;color:var(--brand-deep,#173404);background:#F4FAF6;border:1.5px solid #BFE3CE;border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mcq-clock.warn{color:#B4232C;background:#FDF2F2;border-color:#F3C1C1}
-.mcq-scen{background:linear-gradient(180deg,#F6FAF0,#EFF6E6);border:1.5px solid #CFE3B4;border-left:4px solid #639922;border-radius:14px;padding:.9rem 1rem;margin-bottom:.75rem}
-.mcq-scen .t{font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#639922;margin-bottom:.35rem}
+.mcq-scen{background:linear-gradient(180deg,#F6FAF0,#EFF6E6);border:1.5px solid #CFE3B4;border-left:4px solid var(--brand-primary,#639922);border-radius:14px;padding:.9rem 1rem;margin-bottom:.75rem}
+.mcq-scen .t{font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--brand-primary,#639922);margin-bottom:.35rem}
 .mcq-scen .b{font-size:.87rem;line-height:1.65;color:#25350F;white-space:pre-wrap}
 .mcq-card{background:#fff;border:1.5px solid #E4E8E0;border-radius:16px;padding:1.1rem 1.15rem;box-shadow:0 3px 14px rgba(23,52,4,.06)}
-.mcq-q{font-size:1rem;font-weight:800;color:#173404;line-height:1.5;margin-bottom:.8rem}
+.mcq-q{font-size:1rem;font-weight:800;color:var(--brand-deep,#173404);line-height:1.5;margin-bottom:.8rem}
 .mcq-opt{display:flex;gap:.65rem;align-items:flex-start;width:100%;text-align:left;padding:.7rem .8rem;margin-bottom:.5rem;border:1.5px solid #E4E8E0;border-radius:12px;background:#FAFBF8;cursor:pointer;font-family:inherit;font-size:.92rem;color:#33401F;line-height:1.5;transition:.12s;min-width:0}
 .mcq-opt:hover{border-color:#BFE3CE}
-.mcq-opt.sel{border-color:#639922;background:#F1F8E9;box-shadow:0 0 0 2px rgba(99,153,34,.18)}
-.mcq-opt .lt{flex:none;width:26px;height:26px;border-radius:50%;background:#EDF2E4;color:#476B15;font-weight:800;font-size:.8rem;display:grid;place-items:center;margin-top:1px}
-.mcq-opt.sel .lt{background:#639922;color:#fff}
+.mcq-opt.sel{border-color:var(--brand-primary,#639922);background:#F1F8E9;box-shadow:0 0 0 2px rgba(99,153,34,.18)}
+.mcq-opt .lt{flex:none;width:26px;height:26px;border-radius:50%;background:#EDF2E4;color:var(--brand-deep,#476B15);font-weight:800;font-size:.8rem;display:grid;place-items:center;margin-top:1px}
+.mcq-opt.sel .lt{background:var(--brand-primary,#639922);color:#fff}
 .mcq-opt span.tx{min-width:0}
-.btn-mcqprev{background:#F1F4EE !important;color:#173404 !important;box-shadow:none !important}
-.btn-mcqsubmit{background:linear-gradient(135deg,#EF9F27,#F57C2E) !important}
+.btn-mcqprev{background:#F1F4EE !important;color:var(--brand-deep,#173404) !important;box-shadow:none !important}
+.btn-mcqsubmit{background:linear-gradient(135deg,var(--brand-accent,#EF9F27),#F57C2E) !important}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --ink:#128A40;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
+  --ink:var(--brand-primary,#128A40);--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
   --og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);--ig:rgba(245,124,46,.08);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
   --border:#E4E8F0;--border2:#D5DCE8;
@@ -135,12 +135,12 @@ input,select,textarea{max-width:100%}
   .jc-body,.formcard{padding:1.75rem}
 }
 </style>
+{{BRAND_CSS}}
 </head>
 <body>
 
 <div class="topbar">
-  <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" style="flex-shrink:0"><rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/><circle cx="28" cy="23" r="8.6" fill="#639922"/><path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/><circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/><circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/><path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <span class="tb-name">TopCandidate<span style="color:var(--orange)">.pro</span></span>
+  {{BRAND_MARK}}
   <span class="tb-tag">Secure application</span>
 </div>
 

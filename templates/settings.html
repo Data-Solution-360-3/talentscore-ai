@@ -251,6 +251,50 @@ img,video{max-width:100%}
           <button class="btn btn-primary" onclick="saveProfile()">Save profile</button>
         </div>
       </div>
+
+      <!-- ── WHITE-LABEL BRANDING (owner/admin only; hidden otherwise) ── -->
+      <div class="card" id="brand-card" style="display:none">
+        <div class="card-hd"><div class="card-title">Branding — white label</div>
+          <span class="card-sub">Your logo, colors &amp; name on candidate pages and this dashboard</span></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Brand company name</label>
+            <input class="form-input" id="br-name" placeholder="Your Company"></div>
+          <div class="form-group"><label class="form-label">Logo (PNG/JPEG/WebP, max 512KB)</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <img id="br-logo-prev" src="" alt="" style="height:36px;max-width:110px;object-fit:contain;border-radius:6px;border:1px solid var(--border);display:none">
+              <input type="file" id="br-logo" accept="image/png,image/jpeg,image/webp" style="font-size:12px">
+            </div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Primary color <span style="font-weight:400;color:var(--t3)">(buttons, headings — default green)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="color" id="br-primary" value="#639922" style="width:44px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;cursor:pointer">
+              <input class="form-input" id="br-primary-hex" value="#639922" style="width:110px;font-family:monospace"></div></div>
+          <div class="form-group"><label class="form-label">Accent color <span style="font-weight:400;color:var(--t3)">(highlights, links — default orange)</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="color" id="br-accent" value="#EF9F27" style="width:44px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;cursor:pointer">
+              <input class="form-input" id="br-accent-hex" value="#EF9F27" style="width:110px;font-family:monospace"></div></div>
+        </div>
+        <div class="form-group"><label class="form-label">Live preview</label>
+          <div id="br-preview" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            <div id="brp-bar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid var(--border)">
+              <img id="brp-logo" src="" alt="" style="height:22px;max-width:80px;object-fit:contain;display:none">
+              <b id="brp-name" style="font-size:13px;color:#173404">Your Company</b>
+              <span style="margin-left:auto;font-size:10.5px;color:#8a93a5">Secure application</span>
+            </div>
+            <div style="padding:12px 14px;background:#FAFBFC;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button type="button" id="brp-btn" style="border:none;border-radius:8px;padding:8px 16px;font-family:inherit;font-size:12.5px;font-weight:700;color:#fff;background:#EF9F27;cursor:default">Submit application</button>
+              <span id="brp-chip" style="border-radius:999px;padding:4px 12px;font-size:11px;font-weight:700;color:#fff;background:#639922">Question 3 of 15</span>
+              <span id="br-contrast" style="font-size:11.5px;font-weight:700;color:var(--amber,#B45309);display:none">⚠ White text on this color may be hard to read</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-ghost" onclick="brandReset()">Reset to default</button>
+          <button class="btn btn-primary" onclick="brandSave()">Save branding</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">Applies to your candidates' apply/test/interview pages, their invite emails, and this dashboard. Orgs without branding keep the standard TopCandidate look.</div>
+      </div>
     </div>
 
     <!-- ── SECURITY ── -->
@@ -962,6 +1006,7 @@ async function refreshUsage(){
   }catch(e){console.warn('[USAGE]',e);}
   loadCostDashboard();
 }
+brandLoad();
 
 // ── OpenAI spend dashboard (owner/admin only — the server 403s everyone
 //    else, and this card simply stays hidden for them). READ-ONLY. ──
@@ -1254,6 +1299,88 @@ async function manageBilling(){
   const res=await fetch('/api/payments/portal',{method:'POST',credentials:'include'});
   const data=await res.json();
   if(data.url)window.location.href=data.url;
+}
+
+// ── WHITE-LABEL BRANDING (owner/admin; the server 403s everyone else and
+//    the card stays hidden for them). Presentation only. ──
+function _brHex(v){ return /^#[0-9a-fA-F]{6}$/.test(v||''); }
+function _brLum(hex){ // relative luminance for the contrast warning
+  const n=parseInt(hex.slice(1),16), c=[(n>>16)&255,(n>>8)&255,n&255].map(v=>{
+    v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+  return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+}
+function brPreview(){
+  const p=document.getElementById('br-primary-hex').value.trim();
+  const a=document.getElementById('br-accent-hex').value.trim();
+  const nm=document.getElementById('br-name').value.trim();
+  if(_brHex(p)){ document.getElementById('brp-chip').style.background=p;
+    document.getElementById('brp-name').style.color=p;
+    document.getElementById('br-primary').value=p; }
+  if(_brHex(a)){ document.getElementById('brp-btn').style.background=a;
+    document.getElementById('br-accent').value=a; }
+  document.getElementById('brp-name').textContent = nm || 'Your Company';
+  // Contrast: warn when white-on-primary OR white-on-accent falls under ~3:1
+  const warn = (_brHex(p) && (1.05/(_brLum(p)+0.05))<3) || (_brHex(a) && (1.05/(_brLum(a)+0.05))<3);
+  document.getElementById('br-contrast').style.display = warn ? '' : 'none';
+}
+async function brandLoad(){
+  let r;
+  try{ r = await fetch('/api/org/branding',{credentials:'include'}); }catch(_){ return; }
+  if(!r.ok) return;   // recruiters/viewers: card stays hidden
+  const d = await r.json();
+  document.getElementById('brand-card').style.display='';
+  const b = d.branding || {};
+  if(b.company_name) document.getElementById('br-name').value = b.company_name;
+  if(_brHex(b.primary_color)) document.getElementById('br-primary-hex').value = b.primary_color;
+  if(_brHex(b.accent_color)) document.getElementById('br-accent-hex').value = b.accent_color;
+  if(b.logo_url){
+    const img=document.getElementById('br-logo-prev'); img.src=b.logo_url+'?t='+Date.now(); img.style.display='';
+    const pl=document.getElementById('brp-logo'); pl.src=img.src; pl.style.display='';
+  }
+  ['br-name','br-primary-hex','br-accent-hex'].forEach(id=>
+    document.getElementById(id).addEventListener('input', brPreview));
+  ['br-primary','br-accent'].forEach(id=>
+    document.getElementById(id).addEventListener('input', e=>{
+      document.getElementById(id+'-hex').value=e.target.value; brPreview(); }));
+  document.getElementById('br-logo').addEventListener('change', brandLogoUpload);
+  brPreview();
+}
+async function brandSave(){
+  const p=document.getElementById('br-primary-hex').value.trim();
+  const a=document.getElementById('br-accent-hex').value.trim();
+  if((p&&!_brHex(p))||(a&&!_brHex(a))){ toast('Colors must be hex like #639922.',{type:'error'}); return; }
+  const r=await fetch('/api/org/branding',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({company_name:document.getElementById('br-name').value.trim(),
+                         primary_color:p, accent_color:a})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Could not save branding',{type:'error'}); return; }
+  toast('Branding saved — candidates and your dashboard now use it. Hard-refresh to see it here.',{type:'success',duration:8000});
+}
+async function brandLogoUpload(){
+  const f=document.getElementById('br-logo').files[0];
+  if(!f) return;
+  if(f.size>512*1024){ toast('Logo must be under 512KB.',{type:'error'}); return; }
+  const fd=new FormData(); fd.append('logo',f);
+  const r=await fetch('/api/org/branding/logo',{method:'POST',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Logo upload failed',{type:'error'}); return; }
+  const img=document.getElementById('br-logo-prev'); img.src=d.logo_url+'?t='+Date.now(); img.style.display='';
+  const pl=document.getElementById('brp-logo'); pl.src=img.src; pl.style.display='';
+  toast('Logo uploaded.',{type:'success'});
+}
+async function brandReset(){
+  if(!confirm('Remove your branding and return to the standard TopCandidate look?')) return;
+  const r=await fetch('/api/org/branding',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})});
+  if(!r.ok){ toast('Reset failed',{type:'error'}); return; }
+  toast('Branding reset to default.',{type:'success'});
+  ['br-name'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('br-primary-hex').value='#639922';
+  document.getElementById('br-accent-hex').value='#EF9F27';
+  document.getElementById('br-logo-prev').style.display='none';
+  document.getElementById('brp-logo').style.display='none';
+  brPreview();
 }
 
 // ── TEAM ──
