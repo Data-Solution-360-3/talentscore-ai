@@ -19,6 +19,28 @@
    English jobs load nothing extra; this rule is inert without the class.
    Inter stays in the stack so English technical terms keep their face. */
 .bn-assess #mcq-view{font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif}
+/* ── MCQ assessment — TopCandidate brand (green #639922/#173404, orange
+   #EF9F27/#F57C2E, white/greys — no navy). Mobile-first: full-width tap
+   targets, min-width:0 everywhere flexible. ── */
+.mcq-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:.55rem;flex-wrap:wrap}
+.mcq-progt{font-size:.82rem;font-weight:800;color:#173404}
+.mcq-progbar{height:6px;background:#EDF2E4;border-radius:999px;overflow:hidden;margin-bottom:.9rem}
+.mcq-progbar i{display:block;height:100%;background:linear-gradient(90deg,#639922,#8FBF4D);border-radius:999px;transition:width .25s}
+.mcq-clock{font-size:.85rem;font-weight:800;color:#173404;background:#F4FAF6;border:1.5px solid #BFE3CE;border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mcq-clock.warn{color:#B4232C;background:#FDF2F2;border-color:#F3C1C1}
+.mcq-scen{background:linear-gradient(180deg,#F6FAF0,#EFF6E6);border:1.5px solid #CFE3B4;border-left:4px solid #639922;border-radius:14px;padding:.9rem 1rem;margin-bottom:.75rem}
+.mcq-scen .t{font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#639922;margin-bottom:.35rem}
+.mcq-scen .b{font-size:.87rem;line-height:1.65;color:#25350F;white-space:pre-wrap}
+.mcq-card{background:#fff;border:1.5px solid #E4E8E0;border-radius:16px;padding:1.1rem 1.15rem;box-shadow:0 3px 14px rgba(23,52,4,.06)}
+.mcq-q{font-size:1rem;font-weight:800;color:#173404;line-height:1.5;margin-bottom:.8rem}
+.mcq-opt{display:flex;gap:.65rem;align-items:flex-start;width:100%;text-align:left;padding:.7rem .8rem;margin-bottom:.5rem;border:1.5px solid #E4E8E0;border-radius:12px;background:#FAFBF8;cursor:pointer;font-family:inherit;font-size:.92rem;color:#33401F;line-height:1.5;transition:.12s;min-width:0}
+.mcq-opt:hover{border-color:#BFE3CE}
+.mcq-opt.sel{border-color:#639922;background:#F1F8E9;box-shadow:0 0 0 2px rgba(99,153,34,.18)}
+.mcq-opt .lt{flex:none;width:26px;height:26px;border-radius:50%;background:#EDF2E4;color:#476B15;font-weight:800;font-size:.8rem;display:grid;place-items:center;margin-top:1px}
+.mcq-opt.sel .lt{background:#639922;color:#fff}
+.mcq-opt span.tx{min-width:0}
+.btn-mcqprev{background:#F1F4EE !important;color:#173404 !important;box-shadow:none !important}
+.btn-mcqsubmit{background:linear-gradient(135deg,#EF9F27,#F57C2E) !important}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --ink:#128A40;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
@@ -252,18 +274,21 @@ input,select,textarea{max-width:100%}
           <button class="btn" onclick="mcqBegin()">Assessment শুরু করুন</button>
         </div>
       </div>
-      <!-- One-question pager -->
+      <!-- One-question pager — brand-styled; the clock ALWAYS ticks
+           (countdown with a limit, elapsed without) so a silent screen can
+           never read as broken. -->
       <div id="mcq-quiz" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
-          <div style="font-size:.82rem;font-weight:800;color:#142848" id="mcq-prog">Question 1</div>
-          <div style="font-size:.82rem;font-weight:800;color:#B4232C;display:none" id="mcq-clock"></div>
+        <div class="mcq-top">
+          <div class="mcq-progt" id="mcq-prog">Question 1</div>
+          <div class="mcq-clock" id="mcq-clock">⏱ 0:00</div>
         </div>
+        <div class="mcq-progbar"><i id="mcq-bar" style="width:0%"></i></div>
         <div class="err" id="mcq-err"></div>
         <div id="mcq-qbox"></div>
         <div style="display:flex;gap:.6rem;margin-top:1rem">
-          <button class="btn" id="mcq-prev" style="background:#EDF0F5;color:#142848" onclick="mcqNav(-1)">← Previous</button>
+          <button class="btn btn-mcqprev" id="mcq-prev" onclick="mcqNav(-1)">← Previous</button>
           <button class="btn" id="mcq-next" onclick="mcqNav(1)">Next →</button>
-          <button class="btn" id="mcq-btn" style="display:none" onclick="submitMcqTest(false)">Submit answers</button>
+          <button class="btn btn-mcqsubmit" id="mcq-btn" style="display:none" onclick="submitMcqTest(false)">Submit answers</button>
         </div>
         <p class="retention" id="mcq-unanswered" style="display:none"></p>
       </div>
@@ -481,19 +506,26 @@ function mcqBegin(){
 }
 function _mcqResume(){
   AssessMonitor.start({pasteMode:_mcq.mode, storageKey:_mcqKey()});
-  if(_mcq.limitMin){
-    _mcq.deadline = _mcq.started + _mcq.limitMin*60000;
-    document.getElementById('mcq-clock').style.display='block';
-    _mcq.clock = setInterval(_mcqTick, 1000); _mcqTick();
-  }
+  // The clock ALWAYS runs: a countdown when the job set a limit (auto-submit
+  // at zero — the only automatic action, disclosed on the instruction page),
+  // an elapsed timer otherwise.
+  if(_mcq.limitMin) _mcq.deadline = _mcq.started + _mcq.limitMin*60000;
+  _mcq.clock = setInterval(_mcqTick, 1000); _mcqTick();
   _mcqShow(_mcq.cur);
   _mcqSave();
 }
+function _mcqmmss(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function _mcqTick(){
-  const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
-  document.getElementById('mcq-clock').textContent =
-    '⏱ '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+' left';
-  if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
+  const el = document.getElementById('mcq-clock');
+  if(_mcq.limitMin){
+    const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
+    el.textContent = '⏱ '+_mcqmmss(left)+' left';
+    el.classList.toggle('warn', left<=60);
+    if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
+  }else{
+    el.textContent = '⏱ '+_mcqmmss((Date.now()-_mcq.started)/1000);
+    el.classList.remove('warn');
+  }
 }
 function _mcqCloseTiming(){
   if(_mcq.activeSince){
@@ -512,24 +544,24 @@ function _mcqShow(i){
   AssessMonitor.noteQuestion(i);
   const q=_mcq.qs[i];
   document.getElementById('mcq-prog').textContent = 'Question '+(i+1)+' of '+_mcq.qs.length;
+  document.getElementById('mcq-bar').style.width = Math.round(((i+1)/_mcq.qs.length)*100)+'%';
   // Scenario-grouped questions: the situation stays PINNED above each of its
   // questions (like the interview's case card), with a continuation marker
   // when the previous question was about the same situation.
   const scen = q.scenario || '';
   const cont = scen && i>0 && _mcq.qs[i-1].scenario===scen;
   const scenHtml = scen ? `
-    <div style="background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:12px;padding:.85rem 1rem;margin-bottom:.7rem">
-      <div style="font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#128A40;margin-bottom:.35rem">${cont?'Same situation — continued':'The situation'}</div>
-      <div style="font-size:.86rem;line-height:1.6;color:#1F2A24;white-space:pre-wrap">${escq(scen)}</div>
+    <div class="mcq-scen">
+      <div class="t">${cont?'Same situation — continued':'The situation'}</div>
+      <div class="b">${escq(scen)}</div>
     </div>` : '';
   document.getElementById('mcq-qbox').innerHTML = scenHtml + `
-    <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem">
-      <div style="font-size:.95rem;font-weight:700;color:#142848;margin-bottom:.6rem">${escq(q.q)}</div>
+    <div class="mcq-card">
+      <div class="mcq-q">${escq(q.q)}</div>
       ${q.options.map((o,oi)=>`
-        <label style="display:flex;gap:.55rem;align-items:flex-start;padding:.4rem .2rem;font-size:.9rem;color:#33415c;cursor:pointer;line-height:1.5">
-          <input type="radio" name="mcq-q" value="${oi}" ${_mcq.answers[i]===oi?'checked':''} onchange="mcqPick(${oi})" style="margin-top:3px;flex:none">
-          <span><b>${String.fromCharCode(65+oi)}.</b> ${escq(o)}</span>
-        </label>`).join('')}
+        <button type="button" class="mcq-opt${_mcq.answers[i]===oi?' sel':''}" onclick="mcqPick(${oi})">
+          <span class="lt">${String.fromCharCode(65+oi)}</span><span class="tx">${escq(o)}</span>
+        </button>`).join('')}
     </div>`;
   document.getElementById('mcq-prev').style.visibility = i>0?'visible':'hidden';
   const last = i===_mcq.qs.length-1;
@@ -545,7 +577,15 @@ function mcqPick(oi){
   if(_mcq.answers[_mcq.cur]>=0 && _mcq.answers[_mcq.cur]!==oi) _mcq.timings[_mcq.cur].answer_changes++;
   _mcq.answers[_mcq.cur]=oi;
   _mcqSave();
-  if(_mcq.cur===_mcq.qs.length-1) _mcqShow(_mcq.cur);   // refresh unanswered note
+  // Toggle the selected state in place — no re-render, so the timing
+  // counters (returns) can't be bumped by merely picking an option.
+  document.querySelectorAll('#mcq-qbox .mcq-opt').forEach((b,bi)=>b.classList.toggle('sel', bi===oi));
+  const un=_mcq.answers.filter(a=>a<0).length;
+  const unEl=document.getElementById('mcq-unanswered');
+  if(_mcq.cur===_mcq.qs.length-1){
+    unEl.style.display = un?'block':'none';
+    if(un) unEl.textContent = un+' question(s) still unanswered — use Previous to go back before submitting.';
+  }
 }
 function mcqNav(d){ _mcqShow(Math.max(0, Math.min(_mcq.qs.length-1, _mcq.cur+d))); }
 async function submitMcqTest(timedOut){

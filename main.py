@@ -4214,7 +4214,9 @@ async def mcq_funnel_view(request: Request, job_id: str):
             {"job_id": str(job["_id"]), "funnel": "mcq"},
             {"name": 1, "email": 1, "status": 1, "mcq_score": 1, "mcq_total": 1,
              "submitted_at": 1, "screening_id": 1, "interview_token": 1,
-             "invited_at": 1, "invite_deadline": 1, "viva_capped": 1}) \
+             "invited_at": 1, "invite_deadline": 1, "viva_capped": 1,
+             "assessment_total_seconds": 1, "assessment_timed_out": 1,
+             "assessment_activity.flags": 1}) \
             .sort("submitted_at", 1).limit(2000):
         sc = a.get("mcq_score")
         st = a.get("status")
@@ -4247,6 +4249,9 @@ async def mcq_funnel_view(request: Request, job_id: str):
                      "interview": iv,
                      "invited_at": str(a.get("invited_at") or "")[:10],
                      "invite_deadline": str(a.get("invite_deadline") or "")[:10],
+                     "assessment_seconds": a.get("assessment_total_seconds"),
+                     "activity_flags": len(((a.get("assessment_activity") or {}).get("flags")) or []),
+                     "timed_out": bool(a.get("assessment_timed_out")),
                      "submitted_at": str(a.get("submitted_at") or "")})
     rows.sort(key=lambda r: (-(r["mcq_score"] if r["mcq_score"] is not None else -1),
                              r["submitted_at"]))
