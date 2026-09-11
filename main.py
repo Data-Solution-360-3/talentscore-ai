@@ -4294,6 +4294,116 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
             "held_remaining": max(0, len(held) - advanced), "capped_by": capped_by}
 
 
+@app.get("/api/jobs/{job_id}/pipeline")
+async def job_pipeline_view(request: Request, job_id: str):
+    """Unified stage pipeline (presentation layer ONLY — a read-side mapping
+    over the existing application + screening objects; no new stored states,
+    no writes). One current-stage tag per candidate by the approved
+    precedence: Hired > Rejected > Shortlisted > Viva done > Viva invited
+    (incl. the manual move-to-interview stage, noted) > CV Screened >
+    MCQ held/released (awaiting advance — NEVER rendered as rejected) >
+    Applied. Works for funnel and non-funnel jobs alike (non-funnel simply
+    has nobody in the MCQ stage). Org-scoped via owned_job."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    from bson import ObjectId as _OID
+    jid = str(job["_id"])
+
+    live_map = {}
+    async for li in db.live_interviews.find(
+            {"job_id": jid}, {"public_token": 1, "completed_sessions": 1, "expires_at": 1}):
+        live_map[li["public_token"]] = li
+    scr_by_id = {}
+    scr_appless = []
+    async for s in db.screenings.find(
+            {"job_id": jid},
+            {"candidate_name": 1, "applicant_email": 1, "overall_score": 1,
+             "overall_combined": 1, "interview_score": 1, "interview_status": 1,
+             "stage": 1, "application_id": 1, "created_at": 1}):
+        s["_id"] = str(s["_id"])
+        if s.get("application_id"):
+            scr_by_id[str(s["application_id"])] = s
+        else:
+            scr_appless.append(s)
+
+    now = _dt.utcnow()
+
+    def resolve(app_doc, scr):
+        """(stage_key, note) per the approved precedence."""
+        note = ""
+        if scr:
+            st = scr.get("stage")
+            if st == "hire":
+                return "hired", ""
+            if st == "rejected":
+                return "rejected", ""
+            if st == "shortlisted":
+                return "shortlisted", ""
+            if scr.get("interview_score") is not None or scr.get("interview_status"):
+                return "viva_done", ""
+            if st == "interview":
+                return "viva_invited", "moved manually"
+        if app_doc:
+            tok = app_doc.get("interview_token")
+            if tok:
+                li = live_map.get(tok) or {}
+                if int(li.get("completed_sessions") or 0) >= 1:
+                    return "viva_done", ""
+                if li.get("expires_at") and li["expires_at"] < now:
+                    return "viva_invited", "invite expired"
+                return "viva_invited", ""
+            if app_doc.get("viva_capped"):
+                return "viva_invited", "queued (daily cap)"
+        if scr:
+            return "screened", ""
+        if app_doc:
+            if app_doc.get("status") == "released" :
+                return "mcq_released", ""
+            if app_doc.get("mcq_score") is not None:
+                return "mcq_held", "awaiting advance"
+            return "applied", ("test not taken yet" if app_doc.get("funnel") == "mcq"
+                               else {"pending": "screening queued", "scoring": "screening…",
+                                     "stored_unscored": "stored, not scored"}.get(
+                                         app_doc.get("status"), ""))
+        return "applied", ""
+
+    rows = []
+
+    def _row(app_doc, scr):
+        stage, note = resolve(app_doc, scr)
+        return {
+            "application_id": str(app_doc["_id"]) if app_doc else None,
+            "screening_id": (scr or {}).get("_id"),
+            "name": str((app_doc or {}).get("name")
+                        or (scr or {}).get("candidate_name") or "")[:60],
+            "email": str((app_doc or {}).get("email")
+                         or (scr or {}).get("applicant_email") or "")[:80],
+            "mcq_score": (app_doc or {}).get("mcq_score"),
+            "mcq_total": (app_doc or {}).get("mcq_total"),
+            "cv_score": (scr or {}).get("overall_score"),
+            "overall": (scr or {}).get("overall_combined") or (scr or {}).get("overall_score"),
+            "interview_score": (scr or {}).get("interview_score"),
+            "stage": stage, "note": note,
+            "at": str((app_doc or {}).get("submitted_at")
+                      or (scr or {}).get("created_at") or "")[:16],
+        }
+
+    async for a in db.applications.find({"job_id": jid}).sort("submitted_at", -1).limit(2000):
+        rows.append(_row(a, scr_by_id.get(str(a["_id"]))))
+    for s in scr_appless:
+        rows.append(_row(None, s))
+
+    order = ["applied", "mcq_held", "mcq_released", "screened",
+             "viva_invited", "viva_done", "shortlisted", "hired", "rejected"]
+    counts = {k: 0 for k in order}
+    for r in rows:
+        counts[r["stage"]] = counts.get(r["stage"], 0) + 1
+    has_mcq = bool((job.get("mcq_filter") or {}).get("enabled")) or any(
+        r["mcq_score"] is not None for r in rows)
+    return {"total_applicants": len(rows), "has_mcq": has_mcq,
+            "counts": counts, "stage_order": order, "rows": rows}
+
+
 @app.get("/api/jobs/{job_id}/mcq-report/{application_id}")
 async def mcq_assessment_report(request: Request, job_id: str, application_id: str):
     """Recruiter's per-candidate ASSESSMENT REPORT (org-scoped via owned_job):
@@ -5693,6 +5803,25 @@ async def list_jobs(request: Request):
         pass
     for j in jobs:
         j["_pending"] = pending_by_job.get(str(j.get("_id")), 0)
+
+    # Real applicant counts (Part A fix): a human counts from the moment they
+    # APPLY — the union of application rows (funnel candidates included, held
+    # or not) and batch-uploaded screenings that have no application row.
+    # The old screening-derived count made held funnel applicants invisible.
+    try:
+        apps_by_job, batch_by_job = {}, {}
+        async for row in db.applications.aggregate([
+                {"$group": {"_id": "$job_id", "n": {"$sum": 1}}}]):
+            apps_by_job[row["_id"]] = row["n"]
+        async for row in db.screenings.aggregate([
+                {"$match": {"application_id": {"$exists": False}}},
+                {"$group": {"_id": "$job_id", "n": {"$sum": 1}}}]):
+            batch_by_job[row["_id"]] = row["n"]
+        for j in jobs:
+            jid = str(j.get("_id"))
+            j["applicant_count"] = apps_by_job.get(jid, 0) + batch_by_job.get(jid, 0)
+    except Exception:
+        pass
 
     return {"jobs": jobs, "count": len(jobs)}
 

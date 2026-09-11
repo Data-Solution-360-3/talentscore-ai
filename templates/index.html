@@ -4027,7 +4027,10 @@ function renderJobs(){
     // job_id only. The old title/company fallbacks made every duplicate job document
     // claim both jobs' candidates, so two "Data Analyst" rows each reported the union.
     const st = CandidateStats.compute(CandidateStats.forJob(allResults, j._id));
-    return Object.assign({}, j, { _applicants: st.total, _avg: st.avgScore, _shl: st.youShortlisted });
+    // Part A fix: the server's applicant_count is the union of application
+    // rows (held funnel candidates included) + batch screenings — real humans
+    // from the moment they apply. Screening-derived total is the fallback.
+    return Object.assign({}, j, { _applicants: (j.applicant_count!=null ? j.applicant_count : st.total), _avg: st.avgScore, _shl: st.youShortlisted });
   });
 
   const sorted = applySort(enriched, 'jobs-tbl');
@@ -4113,7 +4116,7 @@ async function viewJobDetails(jobId){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Applicants</div>
-        <div style="font-size:22px;font-weight:800;color:var(--text)">${st.total}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--text)" id="jd-applicants">${j.applicant_count!=null?j.applicant_count:st.total}</div>
       </div>
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
         <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg overall</div>
@@ -4128,6 +4131,10 @@ async function viewJobDetails(jobId){
         <div style="font-size:22px;font-weight:800;color:var(--red)">${st.byStage.rejected}</div>
       </div>
     </div>
+
+    <!-- Unified stage pipeline (Part B): every applicant, one stage tag,
+         mapped read-only over applications + screenings. -->
+    <div id="job-pipeline" style="margin-bottom:14px"><div class="notice">Loading pipeline…</div></div>
 
     <!-- Public application link. Two separate controls on purpose: the toggle
          pauses a link and keeps the URL you already posted; rotate destroys
@@ -4227,6 +4234,82 @@ async function viewJobDetails(jobId){
   window._currentSpend = null;
   renderPublicLink(full, null);
   loadPendingApplications(jobId);
+  jobPipelineLoad(jobId);
+}
+
+// ── UNIFIED STAGE PIPELINE (read-only presentation over applications +
+//    screenings; the server resolves ONE stage per candidate). Brand colors
+//    only — green/orange/greys. "Held" is awaiting advance, never rejected. ──
+const JP_STAGES = {
+  applied:      {label:'Applied',          bg:'#F1F4EE', fg:'#4A5443', bd:'#DDE3D6'},
+  mcq_held:     {label:'MCQ taken — held', bg:'#FDF4E3', fg:'#9A6210', bd:'#F3DFB5'},
+  mcq_released: {label:'MCQ — released',   bg:'#F1F4EE', fg:'#7A8471', bd:'#DDE3D6'},
+  screened:     {label:'CV Screened',      bg:'#F1F8E9', fg:'#476B15', bd:'#CFE3B4'},
+  viva_invited: {label:'Viva invited',     bg:'#FEF0E2', fg:'#B45A12', bd:'#F5D3AE'},
+  viva_done:    {label:'Viva done',        bg:'#FDEBDC', fg:'#A34A0B', bd:'#F0C39A'},
+  shortlisted:  {label:'Shortlisted',      bg:'#E8F3D8', fg:'#3F6212', bd:'#B9D68C'},
+  hired:        {label:'Hired',            bg:'#173404', fg:'#FFFFFF', bd:'#173404'},
+  rejected:     {label:'Rejected',         bg:'#FBEFEF', fg:'#A03636', bd:'#EBC9C9'},
+};
+function jpTag(stage, note){
+  const s=JP_STAGES[stage]||JP_STAGES.applied;
+  return `<span style="display:inline-block;background:${s.bg};color:${s.fg};border:1px solid ${s.bd};border-radius:999px;padding:2px 10px;font-size:10.5px;font-weight:700;white-space:nowrap">${s.label}${note?` <i style="font-weight:500;opacity:.8">· ${escapeHtml(note)}</i>`:''}</span>`;
+}
+async function jobPipelineLoad(jobId){
+  const box=document.getElementById('job-pipeline');
+  if(!box) return;
+  let d;
+  try{
+    const r=await fetch('/api/jobs/'+jobId+'/pipeline',{credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    d=await r.json();
+  }catch(e){ box.innerHTML='<div class="notice">Could not load the pipeline — '+escapeHtml(e.message)+'</div>'; return; }
+  window._jp={jobId, d, filter:null};
+  const el=document.getElementById('jd-applicants');
+  if(el) el.textContent=d.total_applicants;
+  jpRender();
+}
+function jpFilter(stage){
+  const jp=window._jp; if(!jp) return;
+  jp.filter = (jp.filter===stage) ? null : stage;
+  jpRender();
+}
+function jpRender(){
+  const jp=window._jp, box=document.getElementById('job-pipeline');
+  if(!jp||!box) return;
+  const d=jp.d;
+  // Non-funnel jobs: the MCQ stages are hidden entirely.
+  const order=(d.stage_order||[]).filter(k=>(k!=='mcq_held'&&k!=='mcq_released')||d.has_mcq);
+  const chips=order.map(k=>{
+    const n=(d.counts||{})[k]||0;
+    const s=JP_STAGES[k]||JP_STAGES.applied;
+    const act=jp.filter===k;
+    return `<button type="button" onclick="jpFilter('${k}')" title="${n} candidate(s) — click to filter"
+      style="font-family:inherit;cursor:pointer;background:${act?s.fg:s.bg};color:${act?(k==='hired'?'#EF9F27':'#fff'):s.fg};border:1.5px solid ${s.bd};border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;white-space:nowrap">
+      ${s.label} <b>${n}</b></button>`;
+  }).join('<span style="color:var(--t3);font-size:11px">→</span>');
+  const rows=(d.rows||[]).filter(r=>!jp.filter||r.stage===jp.filter);
+  let html=`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">Pipeline — every applicant, by stage${jp.filter?` <button class="btn btn-xs" onclick="jpFilter(null)" style="margin-left:6px">clear filter</button>`:''}</div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">${chips}</div>`;
+  if(rows.length){
+    html+=`<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="tbl"><thead><tr>
+      <th>Candidate</th>${d.has_mcq?'<th>MCQ</th>':''}<th>CV / Overall</th><th>Viva</th><th>Stage</th><th>Applied</th></tr></thead><tbody>`
+      +rows.map(r=>{
+        const open = r.screening_id
+          ? `closeModal('job-detail-modal');openCandModal('${r.screening_id}')`
+          : (r.mcq_score!=null?`mcqfReport('${r.application_id}')`:'');
+        return `<tr ${open?`style="cursor:pointer" onclick="${open}"`:''}>
+          <td style="font-weight:600">${escapeHtml(r.name||r.email||'—')}</td>
+          ${d.has_mcq?`<td>${r.mcq_score!=null?`<b>${r.mcq_score}/${r.mcq_total}</b>`:'<span style="color:var(--t3)">—</span>'}</td>`:''}
+          <td>${r.overall!=null?`<b style="color:${gc(r.overall)}">${r.overall}</b>`:'<span style="color:var(--t3)">—</span>'}</td>
+          <td>${r.interview_score!=null?`<b>${r.interview_score}</b>`:'<span style="color:var(--t3)">—</span>'}</td>
+          <td>${jpTag(r.stage, r.note)}</td>
+          <td style="color:var(--t3);font-size:11px;white-space:nowrap">${escapeHtml((r.at||'').replace('T',' '))}</td></tr>`;
+      }).join('')+`</tbody></table></div>`;
+  }else{
+    html+=`<div style="color:var(--t3);font-size:12px">${jp.filter?'No candidates at this stage.':'No applicants yet.'}</div>`;
+  }
+  box.innerHTML=html;
 }
 
 // ─────────────────────────────────────────────────────────────
