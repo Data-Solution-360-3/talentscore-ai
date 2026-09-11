@@ -733,6 +733,15 @@ img,svg,video{max-width:100%}
 #cand-modal .modal-footer .btn-amber:hover{background:#E16A1F}
 #cand-modal .modal-footer .btn-green{background:#639922;color:#fff;border:none}
 #cand-modal .modal-footer .btn-green:hover{background:#4F7C1B}
+/* ── Job-setup tabs (Link / MCQ / CV / Viva) — brand green/orange, no navy.
+   Horizontal scroll on narrow screens keeps them usable on a phone. ── */
+.jtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.jtab{font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t3);background:none;border:none;border-bottom:3px solid transparent;padding:9px 16px;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:.12s}
+.jtab:hover{color:#476B15;background:#F6FAF0;border-radius:8px 8px 0 0}
+.jtab.act{color:#173404;border-bottom-color:#639922;background:#F6FAF0;border-radius:8px 8px 0 0}
+.jt-pane{display:none}
+.jt-pane.act{display:block;animation:jtfade .18s ease}
+@keyframes jtfade{from{opacity:.4}to{opacity:1}}
 </style>
 </head>
 <body>
@@ -4132,19 +4141,60 @@ async function viewJobDetails(jobId){
       </div>
     </div>
 
-    <!-- Unified stage pipeline (Part B): every applicant, one stage tag,
-         mapped read-only over applications + screenings. -->
-    <div id="job-pipeline" style="margin-bottom:14px"><div class="notice">Loading pipeline…</div></div>
+    <!-- 4-tab job setup: every control relocated, none re-wired. Panes hide
+         with display:none so every input keeps its id and its existing save
+         path. Tiles above stay always-visible. -->
+    <div class="jtabs">
+      <button type="button" class="jtab act" data-jt="link" onclick="jobTab('link')">🔗 Link</button>
+      <button type="button" class="jtab" data-jt="mcq" onclick="jobTab('mcq')">☑ MCQ</button>
+      <button type="button" class="jtab" data-jt="cv" onclick="jobTab('cv')">📄 CV</button>
+      <button type="button" class="jtab" data-jt="viva" onclick="jobTab('viva')">🎙 Viva</button>
+    </div>
 
-    <!-- Public application link. Two separate controls on purpose: the toggle
-         pauses a link and keeps the URL you already posted; rotate destroys
-         that URL permanently. Conflating them means you cannot kill a leaked
-         link without losing the posting. -->
-    <div id="public-link-box" style="margin-bottom:14px"></div>
+    <div id="jt-link" class="jt-pane act">
+      <!-- Public application link. Two separate controls on purpose: the toggle
+           pauses a link and keeps the URL you already posted; rotate destroys
+           that URL permanently. -->
+      <div id="public-link-box" style="margin-bottom:14px"></div>
+      <!-- Duplicate-application guard: grant a candidate ONE re-apply on this job -->
+      <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
+        <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span style="font-weight:400;color:var(--t3);font-size:11px">— candidates can normally apply only once per job</span></summary>
+        <div style="padding:4px 12px 12px">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
+            <button class="btn btn-ghost btn-sm" onclick="allowReapply('${jobId}')">Allow re-apply</button>
+          </div>
+          <div id="reapply-msg" style="font-size:11.5px;margin-top:7px"></div>
+        </div>
+      </details>
+    </div>
 
-    <!-- Pending applications from the public link -->
-    <div id="pending-box" style="margin-bottom:14px"></div>
+    <div id="jt-mcq" class="jt-pane">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">MCQ pre-filter — high-volume funnel</div>
+        <span id="mcqf-chip"></span>
+      </div>
+      <div id="mcqf-body"></div>
+    </div>
 
+    <div id="jt-cv" class="jt-pane">
+      <div id="cv-threshold-box" style="margin-bottom:14px"></div>
+      <!-- Pending applications from the public link -->
+      <div id="pending-box" style="margin-bottom:14px"></div>
+      <div id="jt-cv-static"></div>
+    </div>
+
+    <div id="jt-viva" class="jt-pane">
+      <div id="viva-box" style="margin-bottom:14px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Interview questions</div>
+        <span id="iq-chip"></span>
+      </div>
+      <div id="iq-body"></div>
+    </div>
+
+    <div id="jt-cv-tpl" style="display:none">
     <!-- Job description -->
     <div style="margin-bottom:14px">
       <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">Job description</div>
@@ -4198,19 +4248,7 @@ async function viewJobDetails(jobId){
             body: 'Use the Screen CVs button (top right) to evaluate CVs against this role.',
           })}
     </div>
-
-    <!-- Duplicate-application guard: grant a candidate ONE re-apply on this job -->
-    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
-      <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span style="font-weight:400;color:var(--t3);font-size:11px">— candidates can normally apply only once per job</span></summary>
-      <div style="padding:4px 12px 12px">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
-          <button class="btn btn-ghost btn-sm" onclick="allowReapply('${jobId}')">Allow re-apply</button>
-        </div>
-        <div id="reapply-msg" style="font-size:11.5px;margin-top:7px"></div>
-      </div>
-    </details>
+    </div><!-- /jt-cv-tpl -->
 
     <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
       <button class="btn btn-ghost" onclick="closeModal('job-detail-modal')">Close</button>
@@ -4234,82 +4272,18 @@ async function viewJobDetails(jobId){
   window._currentSpend = null;
   renderPublicLink(full, null);
   loadPendingApplications(jobId);
-  jobPipelineLoad(jobId);
+  // Move the statically-built CV blocks (description / weights / top-5) into
+  // the CV pane — content is unchanged, it just lives in a tab now.
+  const _tpl = document.getElementById('jt-cv-tpl');
+  const _cvs = document.getElementById('jt-cv-static');
+  if(_tpl && _cvs){ _cvs.innerHTML = _tpl.innerHTML; _tpl.remove(); }
 }
 
-// ── UNIFIED STAGE PIPELINE (read-only presentation over applications +
-//    screenings; the server resolves ONE stage per candidate). Brand colors
-//    only — green/orange/greys. "Held" is awaiting advance, never rejected. ──
-const JP_STAGES = {
-  applied:      {label:'Applied',          bg:'#F1F4EE', fg:'#4A5443', bd:'#DDE3D6'},
-  mcq_held:     {label:'MCQ taken — held', bg:'#FDF4E3', fg:'#9A6210', bd:'#F3DFB5'},
-  mcq_released: {label:'MCQ — released',   bg:'#F1F4EE', fg:'#7A8471', bd:'#DDE3D6'},
-  screened:     {label:'CV Screened',      bg:'#F1F8E9', fg:'#476B15', bd:'#CFE3B4'},
-  viva_invited: {label:'Viva invited',     bg:'#FEF0E2', fg:'#B45A12', bd:'#F5D3AE'},
-  viva_done:    {label:'Viva done',        bg:'#FDEBDC', fg:'#A34A0B', bd:'#F0C39A'},
-  shortlisted:  {label:'Shortlisted',      bg:'#E8F3D8', fg:'#3F6212', bd:'#B9D68C'},
-  hired:        {label:'Hired',            bg:'#173404', fg:'#FFFFFF', bd:'#173404'},
-  rejected:     {label:'Rejected',         bg:'#FBEFEF', fg:'#A03636', bd:'#EBC9C9'},
-};
-function jpTag(stage, note){
-  const s=JP_STAGES[stage]||JP_STAGES.applied;
-  return `<span style="display:inline-block;background:${s.bg};color:${s.fg};border:1px solid ${s.bd};border-radius:999px;padding:2px 10px;font-size:10.5px;font-weight:700;white-space:nowrap">${s.label}${note?` <i style="font-weight:500;opacity:.8">· ${escapeHtml(note)}</i>`:''}</span>`;
-}
-async function jobPipelineLoad(jobId){
-  const box=document.getElementById('job-pipeline');
-  if(!box) return;
-  let d;
-  try{
-    const r=await fetch('/api/jobs/'+jobId+'/pipeline',{credentials:'include'});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    d=await r.json();
-  }catch(e){ box.innerHTML='<div class="notice">Could not load the pipeline — '+escapeHtml(e.message)+'</div>'; return; }
-  window._jp={jobId, d, filter:null};
-  const el=document.getElementById('jd-applicants');
-  if(el) el.textContent=d.total_applicants;
-  jpRender();
-}
-function jpFilter(stage){
-  const jp=window._jp; if(!jp) return;
-  jp.filter = (jp.filter===stage) ? null : stage;
-  jpRender();
-}
-function jpRender(){
-  const jp=window._jp, box=document.getElementById('job-pipeline');
-  if(!jp||!box) return;
-  const d=jp.d;
-  // Non-funnel jobs: the MCQ stages are hidden entirely.
-  const order=(d.stage_order||[]).filter(k=>(k!=='mcq_held'&&k!=='mcq_released')||d.has_mcq);
-  const chips=order.map(k=>{
-    const n=(d.counts||{})[k]||0;
-    const s=JP_STAGES[k]||JP_STAGES.applied;
-    const act=jp.filter===k;
-    return `<button type="button" onclick="jpFilter('${k}')" title="${n} candidate(s) — click to filter"
-      style="font-family:inherit;cursor:pointer;background:${act?s.fg:s.bg};color:${act?(k==='hired'?'#EF9F27':'#fff'):s.fg};border:1.5px solid ${s.bd};border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;white-space:nowrap">
-      ${s.label} <b>${n}</b></button>`;
-  }).join('<span style="color:var(--t3);font-size:11px">→</span>');
-  const rows=(d.rows||[]).filter(r=>!jp.filter||r.stage===jp.filter);
-  let html=`<div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">Pipeline — every applicant, by stage${jp.filter?` <button class="btn btn-xs" onclick="jpFilter(null)" style="margin-left:6px">clear filter</button>`:''}</div>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">${chips}</div>`;
-  if(rows.length){
-    html+=`<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table class="tbl"><thead><tr>
-      <th>Candidate</th>${d.has_mcq?'<th>MCQ</th>':''}<th>CV / Overall</th><th>Viva</th><th>Stage</th><th>Applied</th></tr></thead><tbody>`
-      +rows.map(r=>{
-        const open = r.screening_id
-          ? `closeModal('job-detail-modal');openCandModal('${r.screening_id}')`
-          : (r.mcq_score!=null?`mcqfReport('${r.application_id}')`:'');
-        return `<tr ${open?`style="cursor:pointer" onclick="${open}"`:''}>
-          <td style="font-weight:600">${escapeHtml(r.name||r.email||'—')}</td>
-          ${d.has_mcq?`<td>${r.mcq_score!=null?`<b>${r.mcq_score}/${r.mcq_total}</b>`:'<span style="color:var(--t3)">—</span>'}</td>`:''}
-          <td>${r.overall!=null?`<b style="color:${gc(r.overall)}">${r.overall}</b>`:'<span style="color:var(--t3)">—</span>'}</td>
-          <td>${r.interview_score!=null?`<b>${r.interview_score}</b>`:'<span style="color:var(--t3)">—</span>'}</td>
-          <td>${jpTag(r.stage, r.note)}</td>
-          <td style="color:var(--t3);font-size:11px;white-space:nowrap">${escapeHtml((r.at||'').replace('T',' '))}</td></tr>`;
-      }).join('')+`</tbody></table></div>`;
-  }else{
-    html+=`<div style="color:var(--t3);font-size:12px">${jp.filter?'No candidates at this stage.':'No applicants yet.'}</div>`;
-  }
-  box.innerHTML=html;
+function jobTab(t){
+  document.querySelectorAll('#job-detail-modal .jtab').forEach(b=>b.classList.toggle('act', b.dataset.jt===t));
+  ['link','mcq','cv','viva'].forEach(k=>{
+    const p=document.getElementById('jt-'+k); if(p) p.classList.toggle('act', k===t);
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4384,87 +4358,98 @@ function renderPublicLink(job, spend){
           </div>
         </div>` : ''}
 
-      ${(()=>{ // Live-interview gate (the one-link flow). Reads/writes job.viva.
-        const v   = job.viva || null;
-        const von = !!(v && v.enabled);
-        const cfg = (v && v.config) || null;
-        const iqa = (job.interview_questions||{}).approved || null;
-        const cfgLine = iqa
-          ? `this job's APPROVED question set (${iqa.count} questions, ~70/30 spoken/typed) · ${(cfg&&cfg.vad)||'patient'} pace · proctoring ${(cfg&&cfg.proctoring)||'off'}`
-          : (cfg
-            ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
-            : `Default setup — one general question, 4 turns, patient pace, proctoring off.`);
-        return `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${von?'8px':'0'}">
-            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
-              Live interview after CV
-            </div>
-            <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${von?'var(--green)':'var(--t3)'}">
-              <input type="checkbox" id="viva-toggle" ${von?'checked':''}
-                     onchange="toggleJobViva('${job._id}', this.checked)" style="cursor:pointer">
-              ${von ? 'On — qualifying applicants flow into a live interview' : 'Off — applications are CV-only'}
-            </label>
-          </div>
-          <div id="viva-fields" style="display:${von?'block':'none'}">
-            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-              <label style="font-size:11px;font-weight:600;color:var(--t2)">CV score threshold
-                <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}"
-                       style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-              <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
-                <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
-                       style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-              <label title="How long a funnel invite link stays valid" style="font-size:11px;font-weight:600;color:var(--t2)">Invite window (days)
-                <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}"
-                       style="width:56px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-              <label style="font-size:11px;font-weight:600;color:var(--t2)">Proctoring
-                <select id="viva-proc" style="margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
-                  <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
-                  <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
-                  <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
-                </select></label>
-              <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
-            </div>
-            <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
-              Applicants scoring at or above the threshold go straight into the interview, same sitting.
-              Everyone else sees the normal received page — no hint a gate exists.<br>
-              Interview setup: <strong>${cfgLine}</strong> — edit questions &amp; pace on
-              <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> and use its &ldquo;attach to a job&rdquo; card; this toggle keeps whatever setup is saved there.
-            </div>
-          </div>
-        </div>`; })()}
-
-      ${(()=>{ // MCQ pre-filter (high-volume funnel Part 1): apply -> MCQ ->
-        // recruiter advances top N -> auto CV screening on only those N.
-        window._mcqfState = { jobId: job._id, mf: job.mcq_filter || null,
-                              editing: false, work: null, funnel: null };
-        setTimeout(mcqfRender, 0);
-        return `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">MCQ pre-filter — high-volume funnel</div>
-            <span id="mcqf-chip"></span>
-          </div>
-          <div id="mcqf-body"></div>
-        </div>`; })()}
-
-      ${(()=>{ // Job-based interview questions: none -> draft -> approved.
-        // Draft and approved are separate slots server-side; candidates only
-        // ever get the approved set. Rendering happens in iqRender() so edits
-        // can re-render without rebuilding the whole modal.
-        const iq = job.interview_questions || {};
-        window._iqState = { jobId: job._id, draft: iq.draft || null,
-                            approved: iq.approved || null, editing: false, work: null };
-        setTimeout(iqRender, 0);   // runs right after this string is inserted
-        return `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Interview questions</div>
-            <span id="iq-chip"></span>
-          </div>
-          <div id="iq-body"></div>
-        </div>`; })()}
     </div>`;
+  // The viva / CV-threshold / MCQ / interview-question cards now live in
+  // their tabs — same controls, same ids, same save paths. Rendering them
+  // from here keeps every existing re-render call site working unchanged.
+  renderJobConfigTabs(job);
+}
+
+// ── The tabbed job-setup cards (pure relocation — no wiring changes). ──
+function renderJobConfigTabs(job){
+  const v   = job.viva || null;
+  const von = !!(v && v.enabled);
+  const cfg = (v && v.config) || null;
+
+  // CV tab: the CV score threshold (saved by the SAME saveJobViva action;
+  // the Save here is just a second trigger for it, per the approved mapping).
+  const thBox = document.getElementById('cv-threshold-box');
+  if(thBox){
+    thBox.innerHTML = `
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">CV screening — interview threshold</div>
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:11px;font-weight:600;color:var(--t2)">CV score threshold
+            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'}
+                   style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+          ${von
+            ? `<button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>`
+            : `<span style="font-size:11px;color:var(--t3)">Turn on the live interview (Viva tab) to use the threshold.</span>`}
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
+          Applicants scoring at or above the threshold go straight into the interview.
+          Everyone else sees the normal received page — no hint a gate exists.
+        </div>
+      </div>`;
+  }
+
+  // Viva tab: the live-interview gate (threshold input lives on the CV tab).
+  const vBox = document.getElementById('viva-box');
+  if(vBox){
+    const iqa = (job.interview_questions||{}).approved || null;
+    const cfgLine = iqa
+      ? `this job's APPROVED question set (${iqa.count} questions, ~70/30 spoken/typed) · ${(cfg&&cfg.vad)||'patient'} pace · proctoring ${(cfg&&cfg.proctoring)||'off'}`
+      : (cfg
+        ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
+        : `Default setup — one general question, 4 turns, patient pace, proctoring off.`);
+    vBox.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${von?'8px':'0'}">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
+          Live interview after CV
+        </div>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${von?'var(--green)':'var(--t3)'}">
+          <input type="checkbox" id="viva-toggle" ${von?'checked':''}
+                 onchange="toggleJobViva('${job._id}', this.checked)" style="cursor:pointer">
+          ${von ? 'On — qualifying applicants flow into a live interview' : 'Off — applications are CV-only'}
+        </label>
+      </div>
+      <div id="viva-fields" style="display:${von?'block':'none'}">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
+            <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
+                   style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+          <label title="How long a funnel invite link stays valid" style="font-size:11px;font-weight:600;color:var(--t2)">Invite window (days)
+            <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}"
+                   style="width:56px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+          <label style="font-size:11px;font-weight:600;color:var(--t2)">Proctoring
+            <select id="viva-proc" style="margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
+              <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
+              <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
+              <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
+            </select></label>
+          <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
+          The CV score threshold that gates the interview lives on the <strong>CV tab</strong>.<br>
+          Interview setup: <strong>${cfgLine}</strong> — edit questions &amp; pace on
+          <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> and use its &ldquo;attach to a job&rdquo; card; this toggle keeps whatever setup is saved there.
+        </div>
+      </div>`;
+  }
+
+  // MCQ tab: state init + render into the pane's static header/body.
+  if(document.getElementById('mcqf-body')){
+    window._mcqfState = { jobId: job._id, mf: job.mcq_filter || null,
+                          editing: false, work: null, funnel: null };
+    mcqfRender();
+  }
+  // Viva tab: interview-question set (draft/approve), unchanged machinery.
+  if(document.getElementById('iq-body')){
+    const iq = job.interview_questions || {};
+    window._iqState = { jobId: job._id, draft: iq.draft || null,
+                        approved: iq.approved || null, editing: false, work: null };
+    iqRender();
+  }
 }
 
 // ── Job-based interview questions (generate → review → approve) ──
