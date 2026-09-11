@@ -372,6 +372,30 @@ async def no_html_cache(request: Request, call_next):
     return resp
 
 
+@app.middleware("http")
+async def subdomain_router(request: Request, call_next):
+    """White-label subdomains: slug.topcandidate.pro serves the SAME app with
+    that org's branding on the public pages. Cosmetic routing only — auth and
+    tenancy are untouched (every API call authenticates exactly as on the
+    apex; the Host header never grants or scopes data access). A subdomain
+    matching no org's slug bounces to the apex instead of erroring; a DB
+    hiccup during lookup serves the page unbranded rather than bouncing."""
+    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+    request.state.host_org_id = ""
+    if host.endswith("." + _BASE_DOMAIN) and host != "www." + _BASE_DOMAIN:
+        slug = host[:-(len(_BASE_DOMAIN) + 1)]
+        if slug and "." not in slug:
+            try:
+                org_id = await _org_id_by_subdomain(slug)
+            except Exception:
+                return await call_next(request)
+            if org_id:
+                request.state.host_org_id = org_id
+                return await call_next(request)
+        return RedirectResponse(APP_URL, status_code=302)
+    return await call_next(request)
+
+
 # ─────────────────────────────────────────────────────────────
 # SEO — robots.txt, sitemap.xml, favicon. Static content only:
 # no database, no query, no auth. Serves the crawler, nothing else.
@@ -580,7 +604,11 @@ def read_template(name: str) -> str:
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/landing", response_class=HTMLResponse)
-async def landing_page():
+async def landing_page(request: Request):
+    # On a client subdomain the TopCandidate marketing page is the wrong
+    # front door — send visitors straight to the (branded) sign-in.
+    if getattr(request.state, "host_org_id", ""):
+        return RedirectResponse("/login")
     return read_template("landing.html")
 
 
@@ -589,7 +617,25 @@ async def login_page(request: Request):
     token = get_token_from_request(request)
     if token and decode_token(token):
         return RedirectResponse("/app")
-    return read_template("login.html")
+    page = read_template("login.html")
+    # White-label: on slug.topcandidate.pro the sign-in carries that org's
+    # branding; on the apex every placeholder resolves to today's exact
+    # markup, so the page stays byte-identical.
+    brand = None
+    host_org = getattr(request.state, "host_org_id", "")
+    if host_org:
+        brand = await _org_branding(host_org)
+    if brand:
+        head = _brand_css(brand) + _BRANDED_LOGIN_CSS
+        logo = _login_logo_mark(brand)
+        welcome = "Welcome back" + (f" to {_html.escape(brand['company_name'])}"
+                                    if brand.get("company_name") else "")
+    else:
+        head, logo, welcome = "", _LOGIN_DEFAULT_LOGO, "Welcome back to TopCandidate"
+    for k, v in {"{{BRAND_HEAD}}": head, "{{LOGIN_LOGO}}": logo,
+                 "{{LOGIN_WELCOME}}": welcome}.items():
+        page = page.replace(k, v)
+    return HTMLResponse(page)
 
 
 @app.get("/app", response_class=HTMLResponse)
@@ -1602,7 +1648,11 @@ async def get_org_branding(request: Request):
     """Owner/admin: the caller's OWN org branding (no org parameter exists —
     nothing to point cross-org)."""
     user = await _require_branding_editor(request)
+    from bson import ObjectId as _OID
+    org = await db.orgs.find_one({"_id": _OID(str(user["org_id"]))}, {"subdomain": 1})
     return {"branding": await _org_branding(str(user["org_id"])) or None,
+            "subdomain": (org or {}).get("subdomain") or "",
+            "base_domain": _BASE_DOMAIN,
             "defaults": {"primary_color": "#639922", "accent_color": "#EF9F27"}}
 
 
@@ -1630,8 +1680,33 @@ async def set_org_branding(request: Request):
             if not _HEX_COLOR.match(v):
                 raise HTTPException(status_code=400, detail=f"{k} must be a hex color like #639922.")
             updates[f"branding.{k}"] = v
-    await db.orgs.update_one({"_id": oid}, {"$set": updates})
-    return {"success": True, "branding": await _org_branding(str(user["org_id"]))}
+    # Subdomain slug — only acted on when the key is present in the payload.
+    # Empty string clears it; a value must pass shape + reserved + uniqueness.
+    # Routing identity lives top-level on the org (NOT under branding), so a
+    # branding reset never silently kills the org's live URL.
+    sub_unset = False
+    if "subdomain" in body:
+        slug = str(body.get("subdomain") or "").strip().lower()
+        if not slug:
+            sub_unset = True
+        else:
+            if not _SUBDOMAIN_RE.match(slug) or slug in _RESERVED_SUBDOMAINS:
+                raise HTTPException(status_code=400, detail=(
+                    "Subdomain must be 2-40 lowercase letters, digits or hyphens "
+                    "(no leading/trailing hyphen), and not a reserved word."))
+            clash = await db.orgs.find_one({"subdomain": slug, "_id": {"$ne": oid}}, {"_id": 1})
+            if clash:
+                raise HTTPException(status_code=409, detail="That subdomain is already taken by another workspace.")
+            updates["subdomain"] = slug
+    op: dict = {"$set": updates}
+    if sub_unset:
+        op["$unset"] = {"subdomain": ""}
+    await db.orgs.update_one({"_id": oid}, op)
+    if "subdomain" in body:
+        _SUBDOMAIN_CACHE.clear()   # take effect immediately, incl. negative entries
+    org = await db.orgs.find_one({"_id": oid}, {"subdomain": 1})
+    return {"success": True, "branding": await _org_branding(str(user["org_id"])),
+            "subdomain": (org or {}).get("subdomain") or ""}
 
 
 @app.post("/api/org/branding/logo")
@@ -1658,6 +1733,73 @@ async def upload_org_logo(request: Request, logo: UploadFile = File(...)):
                              {"$set": {"branding.logo": data, "branding.logo_mime": mime,
                                        "branding.updated_at": _dt.utcnow()}})
     return {"success": True, "logo_url": f"/org-logo/{user['org_id']}"}
+
+
+# ── Per-org SUBDOMAIN (white-label routing — cosmetic, never an auth
+#    boundary). orgs.subdomain = "pathao" serves pathao.topcandidate.pro.
+#    Optional: orgs without a slug keep plain topcandidate.pro links. ──
+
+_BASE_DOMAIN = "topcandidate.pro"
+# 2–40 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen
+_SUBDOMAIN_RE = _brand_re.compile(r"^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$")
+_RESERVED_SUBDOMAINS = {
+    "www", "app", "api", "mail", "email", "smtp", "imap", "pop", "mx",
+    "ns", "ns1", "ns2", "ns3", "ftp", "admin", "root", "static", "cdn",
+    "assets", "files", "img", "images", "status", "support", "help",
+    "docs", "blog", "dev", "staging", "beta", "internal", "vpn",
+    "autodiscover", "webmail", "topcandidate", "login", "dashboard",
+}
+_SUBDOMAIN_CACHE: dict[str, tuple[str | None, float]] = {}
+_SUBDOMAIN_CACHE_TTL = 60.0
+
+
+async def _org_id_by_subdomain(slug: str) -> str | None:
+    """slug -> org_id, 60s-cached (positives AND negatives — an unknown
+    subdomain being scanned must not turn into a per-request DB query)."""
+    import time as _time
+    hit = _SUBDOMAIN_CACHE.get(slug)
+    if hit and hit[1] > _time.time():
+        return hit[0]
+    o = await db.orgs.find_one({"subdomain": slug}, {"_id": 1})
+    org_id = str(o["_id"]) if o else None
+    if len(_SUBDOMAIN_CACHE) > 500:   # cap: random-scan slugs can't grow it unbounded
+        _SUBDOMAIN_CACHE.clear()
+    _SUBDOMAIN_CACHE[slug] = (org_id, _time.time() + _SUBDOMAIN_CACHE_TTL)
+    return org_id
+
+
+# The login page's default wordmark — must stay BYTE-IDENTICAL to what
+# login.html shipped before the {{LOGIN_LOGO}} placeholder existed.
+_LOGIN_DEFAULT_LOGO = ('''<svg height="30" viewBox="0 0 372 64" xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="TopCandidate.pro">
+      <rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/>
+      <circle cx="28" cy="23" r="8.6" fill="#639922"/>
+      <path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/>
+      <circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/>
+      <circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/>
+      <path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="80" y="42" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="31" font-weight="800" letter-spacing="-0.8" fill="#ffffff">TopCandidate<tspan fill="#ffffff" opacity="0.85">.pro</tspan></text>
+    </svg>''')
+
+# Branded sign-in extras: hide TopCandidate marketing chrome (nav links,
+# self-serve register CTAs) and retint the top band from the brand primary.
+# color-mix degrades gracefully — unsupported browsers keep the default band.
+_BRANDED_LOGIN_CSS = (
+    "<style>.lp-links,.lp-actions .nav-btn.solid,.switch-link{display:none}"
+    ".topband{background:linear-gradient(180deg,var(--green) 0%,"
+    "color-mix(in srgb,var(--green) 60%,transparent) 40%,"
+    "color-mix(in srgb,var(--green) 16%,transparent) 74%,transparent 100%)}"
+    "</style>")
+
+
+def _login_logo_mark(b: dict) -> str:
+    """Branded nav mark for the sign-in page (white text on the band)."""
+    img = (f'<img src="{b["logo_url"]}" alt="" style="height:30px;max-width:130px;'
+           f'object-fit:contain;border-radius:6px;background:#fff;padding:2px">'
+           if b.get("logo_url") else "")
+    name = _html.escape(b.get("company_name") or "")
+    span = (f'<span style="font-weight:800;font-size:22px;letter-spacing:-.5px;'
+            f'color:#fff;margin-left:10px">{name}</span>' if name else "")
+    return (img + span) or _LOGIN_DEFAULT_LOGO
 
 
 @app.get("/api/usage/cost")

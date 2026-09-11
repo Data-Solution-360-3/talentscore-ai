@@ -249,6 +249,28 @@ def main():
             r = c.get("/api/org/branding", headers=hdr(t_owner_a))
             check("owner A reads own branding", r.status_code == 200, f"got {r.status_code}")
 
+            print("\nSubdomain slug — unique across orgs, reserved words blocked")
+            r = c.post("/api/org/branding", headers=hdr(t_owner_a),
+                       json={"subdomain": "tnc-gate-slug"})
+            check("owner A claims a subdomain slug", r.status_code == 200
+                  and r.json().get("subdomain") == "tnc-gate-slug", f"got {r.status_code}")
+            r = c.post("/api/org/branding", headers=hdr(t_owner_b),
+                       json={"subdomain": "tnc-gate-slug"})
+            check("owner B cannot claim org A's slug (409)", r.status_code == 409,
+                  f"got {r.status_code}")
+            r = c.post("/api/org/branding", headers=hdr(t_owner_a),
+                       json={"subdomain": "www"})
+            check("reserved word 'www' refused (400)", r.status_code == 400,
+                  f"got {r.status_code}")
+            r = c.post("/api/org/branding", headers=hdr(t_owner_a),
+                       json={"subdomain": "Bad_Slug!"})
+            check("invalid slug shape refused (400)", r.status_code == 400,
+                  f"got {r.status_code}")
+            r = c.post("/api/org/branding", headers=hdr(t_owner_a),
+                       json={"subdomain": ""})
+            check("owner A clears the slug again", r.status_code == 200
+                  and r.json().get("subdomain") == "", f"got {r.status_code}")
+
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
                 r = c.get("/api/employees", headers=hdr(tok))

@@ -275,6 +275,13 @@ img,video{max-width:100%}
               <input type="color" id="br-accent" value="#EF9F27" style="width:44px;height:34px;border:1px solid var(--border);border-radius:6px;padding:2px;cursor:pointer">
               <input class="form-input" id="br-accent-hex" value="#EF9F27" style="width:110px;font-family:monospace"></div></div>
         </div>
+        <div class="form-group"><label class="form-label">Branded subdomain <span style="font-weight:400;color:var(--t3)">(optional)</span></label>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <input class="form-input" id="br-subdomain" placeholder="yourcompany" style="width:190px;font-family:monospace" autocapitalize="none" autocomplete="off" spellcheck="false">
+            <span style="font-size:13px;color:var(--t3);font-family:monospace">.topcandidate.pro</span>
+          </div>
+          <div id="br-sub-note" style="font-size:11.5px;color:var(--t3);margin-top:5px;line-height:1.5">Lowercase letters, numbers and hyphens. Your candidates and team can then use e.g. <b id="br-sub-example">yourcompany.topcandidate.pro</b> — same system, your name on the URL. Leave empty to use topcandidate.pro.</div>
+        </div>
         <div class="form-group"><label class="form-label">Live preview</label>
           <div id="br-preview" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
             <div id="brp-bar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid var(--border)">
@@ -1337,6 +1344,11 @@ async function brandLoad(){
     const img=document.getElementById('br-logo-prev'); img.src=b.logo_url+'?t='+Date.now(); img.style.display='';
     const pl=document.getElementById('brp-logo'); pl.src=img.src; pl.style.display='';
   }
+  const sub=document.getElementById('br-subdomain');
+  sub.value = d.subdomain || '';
+  const subEx=()=>{ document.getElementById('br-sub-example').textContent =
+    (sub.value.trim().toLowerCase()||'yourcompany')+'.topcandidate.pro'; };
+  sub.addEventListener('input', subEx); subEx();
   ['br-name','br-primary-hex','br-accent-hex'].forEach(id=>
     document.getElementById(id).addEventListener('input', brPreview));
   ['br-primary','br-accent'].forEach(id=>
@@ -1349,13 +1361,16 @@ async function brandSave(){
   const p=document.getElementById('br-primary-hex').value.trim();
   const a=document.getElementById('br-accent-hex').value.trim();
   if((p&&!_brHex(p))||(a&&!_brHex(a))){ toast('Colors must be hex like #639922.',{type:'error'}); return; }
+  const sub=document.getElementById('br-subdomain').value.trim().toLowerCase();
   const r=await fetch('/api/org/branding',{method:'POST',credentials:'include',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({company_name:document.getElementById('br-name').value.trim(),
-                         primary_color:p, accent_color:a})});
+                         primary_color:p, accent_color:a, subdomain:sub})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok){ toast(d.detail||'Could not save branding',{type:'error'}); return; }
-  toast('Branding saved — candidates and your dashboard now use it. Hard-refresh to see it here.',{type:'success',duration:8000});
+  toast('Branding saved — candidates and your dashboard now use it. Hard-refresh to see it here.'
+        +(d.subdomain?(' Your branded address: '+d.subdomain+'.topcandidate.pro'):''),
+        {type:'success',duration:8000});
 }
 async function brandLogoUpload(){
   const f=document.getElementById('br-logo').files[0];
