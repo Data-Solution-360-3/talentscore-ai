@@ -2677,14 +2677,17 @@ def _build_live_instructions(questions: list, max_turns: int,
     # generated in Bangla; here we only tell the model which language to speak.
     lang_bn = (language or "en").lower() == "bn"
     conduct_line = (
-        "You are conducting a live spoken screening interview, in BANGLA (Bengali) only — ask every "
-        "question and hold the whole conversation in Bangla. "
+        "You are conducting a live spoken screening interview in natural BANGLA-ENGLISH working "
+        "speech (Banglish), the way Bangladeshi professionals talk at work: the conversation in "
+        "Bangla, but ALL technical terms, tool names, and standard professional words stay in "
+        "ENGLISH — pivot table, DAX, data model, dashboard, SQL query, deadline, report. Never "
+        "translate technical terms into formal Bengali. "
         if lang_bn else
         "You are conducting a live spoken screening interview, in ENGLISH only. ")
     lang_rule_line = (
-        "- Bangla only: speak and ask only in Bangla. If the candidate switches to another language, "
-        "gently ask them to continue in Bangla. The questions below are written in Bangla — read them "
-        "as written.\n"
+        "- Banglish register: converse in Bangla with technical/professional terms in English. If "
+        "the candidate switches fully to another language, gently ask them to continue in Bangla. "
+        "The scripted questions below are written in this register — read them as written.\n"
         if lang_bn else
         "- English only; if the candidate speaks another language, gently ask them to continue in English.\n")
 
@@ -2751,12 +2754,29 @@ def _build_live_instructions(questions: list, max_turns: int,
                            "that you are returning to spoken questions, then continue with Spoken "
                            "Block 2 below.\n")
         middle = (
-            f"- This interview is FULLY SCRIPTED: you ask EXACTLY {max_turns} questions total, one per "
-            "turn, then close. Never add, merge, skip, reorder, or invent questions — the exact count "
+            f"- The question COUNT is fixed: you ask EXACTLY {max_turns} questions total, one per "
+            "turn, then close. Never add, merge, skip, or reorder question slots — the exact count "
             "is a promise made to the recruiter.\n"
             + ("- The order is FIXED: Spoken Block 1, then the written scenario in the middle, then "
                "Spoken Block 2.\n" if scenario and b2 else "")
-            + "- Within each topic ask the main question, then its follow-ups, exactly as written.\n"
+            + "- Within each topic, ask the MAIN question EXACTLY as written — the same for every "
+            "candidate, never changed.\n"
+            "- FOLLOW-UP slots — DIG INTO WHAT THE CANDIDATE ACTUALLY SAID. Before each follow-up, "
+            "look at their last answer:\n"
+            "  * They named a specific tool, technique, or claim (say 'pivot tables', or 'DAX')? You "
+            "may REPLACE that ONE scripted follow-up with ONE deeper question about that specific "
+            "thing — how exactly, what they built, what went wrong, what trade-off they made — still "
+            "inside this topic.\n"
+            "  * Their answer was surface-level or generic? Use the slot to ask for substance: one "
+            "concrete example from their own work, or exactly how they would do it, step by step.\n"
+            "  * Otherwise, ask the scripted follow-up as written.\n"
+            "  A replacement CONSUMES that follow-up slot — never ask both, never add extra "
+            "questions; the total count, the topics, and their order never change. Follow-ups in the "
+            "written scenario section are never replaced.\n"
+            "- DEPTH IS ABOUT SUBSTANCE, NEVER LANGUAGE: many candidates are nervous or speak this "
+            "language as a second language. Keep every question you ask short and simply worded; "
+            "give them time; never press on grammar, accent, or fluency. A candidate who cannot go "
+            "deeper simply answers what they can — probe kindly, then move on.\n"
             "- If an answer is unclear or dodges, you may rephrase THAT question once in simpler words "
             "— a rephrase is the same question, never a new one.\n"
             "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
@@ -2775,9 +2795,14 @@ def _build_live_instructions(questions: list, max_turns: int,
             f"- Opening questions — ask these first, in this order:\n{numbered}\n"
             "- Once the opening questions are used, every further question is an ADAPTIVE follow-up "
             "decided from what the candidate actually said:\n"
-            "  * vague or generic answer -> ask for one specific, concrete example\n"
+            "  * they named a specific tool, technique, or claim (say 'pivot tables', or 'DAX') -> "
+            "ask ONE deeper question about that specific thing: how exactly, what they built, what "
+            "went wrong, what trade-off they made\n"
+            "  * vague or generic answer -> ask for one specific, concrete example from their own work\n"
             "  * strong, specific answer -> go one level deeper into its most interesting detail\n"
             "  * an answer that dodged the question -> rephrase the question once, simply\n"
+            "  Depth is about SUBSTANCE, never language: keep questions short and simply worded, "
+            "never press on grammar or fluency.\n"
             "- Ask exactly ONE question per turn. Keep each spoken turn to one or two short sentences — "
             "this is a phone conversation, not an essay.\n")
 

@@ -12,22 +12,28 @@ import json
 from openai import AsyncOpenAI
 
 GEN_MODEL = "gpt-4o"
-GEN_VERSION = "qgen-1.0"
+GEN_VERSION = "qgen-2.0"
 
 WRITTEN_RATIO = 0.3   # ~30% of questions answered in writing
 
 # The one language rule injected into every generation prompt. English is the
-# default and unchanged. Bangla (BETA) tells the model to write the entire set
-# in Bengali script — questions are then asked + shown in Bangla, and the
-# candidate answers in Bangla (typed answers are exact; spoken is transcript-BETA).
+# default and unchanged. Bangla (BETA) = natural BANGLISH (the same register the
+# MCQ generator and the instruction pages use): Bangla sentence language,
+# technical/professional terms kept in English — never formal-Bengali
+# dictionary translations. Candidates answer in the same mix.
 LANG_RULE = {
     "en": ("Write in simple, clear English. Many candidates speak English as a second or "
            "third language: short sentences, no idioms, no cultural references. A question "
            "that is hard to parse measures English, not competence."),
-    "bn": ("Write ENTIRELY in simple, clear Bangla (Bengali script). Use short sentences and "
-           "everyday words; no idioms, no cultural references, and avoid English loanwords "
-           "where a common Bangla word exists. Every piece of text you output — topics, "
-           "questions, and any scenario — must be in Bangla. A question that is hard to parse "
+    "bn": ("Write in NATURAL BANGLA-ENGLISH MIX (Banglish) — the way Bangladeshi "
+           "professionals actually speak at work: the sentence language (connectives, "
+           "verbs, framing) in Bangla script, but ALL technical terms, tool names, and "
+           "standard English professional words in ENGLISH — dashboard, pivot table, "
+           "SQL query, data model, report, stakeholder, deadline, KPI. NEVER translate "
+           "these into formal Bengali (no বিশ্লেষণ for analysis, no উপাত্ত for data). "
+           "Correct register example: \"আপনার team-এর জন্য আপনি একটা sales dashboard "
+           "design করেছিলেন — data model টা কীভাবে সাজিয়েছিলেন, step by step বলুন।\" "
+           "Keep sentences short and words simple — a question that is hard to parse "
            "measures language, not competence."),
 }
 
@@ -81,7 +87,7 @@ def enforce_split(questions: list[dict], n: int) -> list[dict]:
     return questions
 
 
-TOPIC_PROMPT = """You are writing the SPOKEN part of a screening interview for a specific job. You are
+TOPIC_DRAFT_PROMPT = """You are writing the SPOKEN part of a screening interview for a specific job. You are
 given the job description. Produce exactly {t} topics. Each topic has ONE main
 question and exactly {f} follow-up questions that probe deeper into the SAME
 topic.
@@ -91,9 +97,24 @@ STRUCTURE
   and context in the description (for example "Building dashboards" or
   "Working with stakeholders") — never generic filler that fits any job.
 - The main question opens the topic from the candidate's own experience.
-- Each follow-up digs further into the same topic: specifics, decisions,
-  trade-offs, outcomes. Every follow-up must stand alone as a complete question
-  (the interviewer reads it exactly as written) while staying on its topic.
+- Each follow-up digs further into the same topic and must stand alone as a
+  complete question (the interviewer reads it exactly as written).
+
+WHAT MAKES A QUESTION DEEP ENOUGH — every question must pass this bar
+- It must force the candidate to DEMONSTRATE real experience: walk through how
+  they built, designed, or fixed something; what they decided and why; what
+  broke and how they found it; what trade-off they took; what the result was.
+- Name the SPECIFIC tools, techniques, and situations of THIS role. Not
+  "do you know Power BI?" but "walk me through how you would design a data
+  model in Power BI when two tables have a many-to-many relationship — what
+  exactly do you build, and what goes wrong if you skip it?"
+- BANNED: yes/no questions; "do you know / have you used X"; anything a
+  one-line generic answer fully satisfies ("I would communicate with the
+  team"); definition or vocabulary asks; questions that fit any job.
+- Deep does NOT mean long or complicated wording. Keep the words simple and
+  the sentence short — the depth is in what the ANSWER must contain, not in
+  the question's language. A nervous or second-language candidate must
+  understand the question instantly.
 
 RULES
 - Every question must be answerable from the candidate's own experience and
@@ -109,12 +130,59 @@ RULES
 Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups": ["...", ...]}}, ...]}}"""
 
 
+TOPIC_CRITIC_PROMPT = """You are reviewing spoken interview questions for a specific job, as a harsh
+quality bar. Judge EVERY question independently against one standard: it must
+force the candidate to demonstrate real, role-specific experience.
+
+FAIL a question for ANY of these:
+   - SHALLOW: a candidate can fully answer it with one generic sentence, or
+     with yes/no ("do you know X", "have you worked with X").
+   - GENERIC: it would fit almost any job — nothing in it names this role's
+     actual tools, duties, or situations.
+   - NO DEPTH REQUIRED: it does not demand walking through real work (no how
+     exactly / why / what broke / what trade-off) — someone who only read
+     about the topic could answer as well as someone who has done it.
+   - TWO-PART: it asks more than one thing.
+   - UNLAWFUL/UNFAIR: it touches age, religion, family, health, ethnicity,
+     politics, or anything a recruiter could not lawfully ask.
+   - HARD TO PARSE: the wording itself is long, idiomatic, or convoluted —
+     depth must live in the required answer, never in the sentence.
+{lang_checks}
+If you are UNSURE whether a question passes, FAIL it.
+
+Return JSON: {{"reviews": [{{"id": "<the bracketed id exactly as given>",
+"pass": true|false, "reasons": ["<short reason>", ...]}}, ...]}} — one review
+per question, every id covered."""
+
+
+TOPIC_REFINE_PROMPT = """You are deepening interview questions that failed review, for a specific job.
+For each question you get its id, its topic, the current text, and the
+reviewer's reasons. Rewrite EACH question so it passes review:
+- force a demonstration of real experience — how exactly, what they decided,
+  what broke, what trade-off, what the result was — grounded in THIS role's
+  actual tools and situations from the job description;
+- stay on the SAME topic, and keep it ONE question (no two-part questions);
+- keep the wording simple and the sentence short — the depth belongs in the
+  required answer, not the question's language.
+{fairness}
+
+Return JSON: {{"fixes": [{{"id": "<same id>", "text": "<rewritten question>"}},
+...]}} — every id you were given, exactly once each."""
+
+
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
                                    n_topics: int = 2, followups: int = 3,
                                    language: str = "en", role_hint: str = "",
                                    usage_out: list | None = None
                                    ) -> tuple[list | None, str | None]:
-    """The spoken part in topic clusters.
+    """Deep spoken topic clusters via the drafter -> critic -> refiner loop
+    (the same bounded pattern as the MCQ multi-agent). The critic fails
+    shallow / generic / no-depth questions (and, for 'bn', over-translation
+    out of the Banglish register); failures are refined IN PLACE — the topic
+    structure and slot counts never change — and re-checked, up to THREE
+    rounds. After the cap the latest refined text stands (bounded best-effort,
+    never an infinite loop). Draft only — the recruiter still reviews, edits,
+    and approves before anything reaches a candidate.
     Returns ([{"topic","main","followups"}], None) or (None, error)."""
     n_topics = max(1, min(4, int(n_topics)))
     followups = max(1, min(5, int(followups)))
@@ -123,37 +191,106 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
         return None, "The job description is too short to generate questions from."
 
     client = AsyncOpenAI(api_key=api_key)
+    job_ctx = (f"JOB TITLE: {job_title or 'not specified'}\n"
+               + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+               + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
+    lang_rule = _lang(language)
+    critic_prompt = TOPIC_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language))
+
+    # ── 1) DRAFT the full structure in one call ──
     try:
-        resp = await client.chat.completions.create(
-            model=GEN_MODEL,
-            temperature=0.4,
-            max_tokens=1800,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": TOPIC_PROMPT.format(t=n_topics, f=followups, lang_rule=_lang(language))},
-                {"role": "user", "content":
-                    f"JOB TITLE: {job_title or 'not specified'}\n"
-                    + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
-                    + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
-            ],
-        )
-        if usage_out is not None:   # cost observability — measurement only
-            usage_out.append(getattr(resp, "usage", None))
-        raw = json.loads(resp.choices[0].message.content)
+        raw = await _gen_json(client,
+                              TOPIC_DRAFT_PROMPT.format(t=n_topics, f=followups,
+                                                        lang_rule=lang_rule),
+                              job_ctx, 0.4, 2200, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
-
-    out = []
+    topics = []
     for t in (raw or {}).get("topics", [])[:n_topics]:
         topic = str((t or {}).get("topic", "")).strip()[:80]
         main = str((t or {}).get("main", "")).strip()[:300]
         fups = [str(f).strip()[:300] for f in (t or {}).get("followups", [])
                 if str(f).strip()][:followups]
         if main and fups:
-            out.append({"topic": topic or "Topic", "main": main, "followups": fups})
-    if len(out) < n_topics:
-        return None, f"The model returned only {len(out)} usable topic(s) — try again."
-    return out, None
+            topics.append({"topic": topic or "Topic", "main": main, "followups": fups})
+    if len(topics) < n_topics:
+        return None, f"The model returned only {len(topics)} usable topic(s) — try again."
+
+    # Stable slot ids ("t0.main", "t0.f1", ...) — the structure is fixed, so
+    # critique and refinement address questions in place, never add/drop slots.
+    def _slots():
+        out = []
+        for ti, t in enumerate(topics):
+            out.append((f"t{ti}.main", t["topic"], t["main"]))
+            for fi, f in enumerate(t["followups"]):
+                out.append((f"t{ti}.f{fi}", t["topic"], f))
+        return out
+
+    def _set(qid: str, text: str):
+        ti, part = qid.split(".")
+        t = topics[int(ti[1:])]
+        if part == "main":
+            t["main"] = text
+        else:
+            t["followups"][int(part[1:])] = text
+
+    async def _critic(ids):
+        cur = {qid: (topic, text) for qid, topic, text in _slots()}
+        listing = "\n".join(f"[{qid}] (topic: {cur[qid][0]}) {cur[qid][1]}"
+                            for qid in ids)
+        raw = await _gen_json(client, critic_prompt,
+                              job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + listing,
+                              0.0, 1800, usage_out)
+        verdicts = {str((r or {}).get("id")): r for r in (raw.get("reviews") or [])
+                    if isinstance(r, dict)}
+        failed = []
+        for qid in ids:
+            v = verdicts.get(qid)
+            reasons = [str(x)[:160] for x in ((v or {}).get("reasons") or [])][:4]
+            if v is None or not bool(v.get("pass")):
+                failed.append((qid, reasons or ["not reviewed — treated as failed"]))
+        return failed
+
+    # ── 2) CRITIC everything. Fail-soft: a broken critic call returns the
+    #      uncritiqued draft rather than nothing (the recruiter still reviews). ──
+    try:
+        failed = await _critic([qid for qid, _, _ in _slots()])
+    except Exception as e:
+        print(f"[VIVA-GEN] critic call failed — returning uncritiqued draft: {str(e)[:120]}")
+        return topics, None
+
+    # ── 3) REFINE loop: up to 3 rounds, failures rewritten in place and
+    #      re-checked. The round cap is the never-infinite rail. ──
+    fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=lang_rule)
+    for _round in range(3):
+        if not failed:
+            break
+        cur = {qid: (topic, text) for qid, topic, text in _slots()}
+        listing = "\n".join(
+            f"[{qid}] (topic: {cur[qid][0]}) {cur[qid][1]}\n   reviewer reasons: " + "; ".join(rs)
+            for qid, rs in failed)
+        try:
+            raw = await _gen_json(client, TOPIC_REFINE_PROMPT.format(fairness=fairness),
+                                  job_ctx + "\n\nQUESTIONS TO FIX:\n" + listing,
+                                  0.4, 1800, usage_out)
+            valid = {qid for qid, _ in failed}
+            fixed_ids = []
+            for fx in (raw.get("fixes") or []):
+                qid = str((fx or {}).get("id", ""))
+                text = str((fx or {}).get("text", "")).strip()[:300]
+                if qid in valid and text:
+                    _set(qid, text)
+                    fixed_ids.append(qid)
+            if not fixed_ids:
+                break
+            failed = await _critic(fixed_ids)
+        except Exception as e:
+            print(f"[VIVA-GEN] refine round {_round + 1} failed (keeping current text): {str(e)[:120]}")
+            break
+    if failed:
+        print(f"[VIVA-GEN] {len(failed)} question(s) still flagged after refinement — "
+              "latest version kept: " + ", ".join(qid for qid, _ in failed))
+    return topics, None
 
 
 SCENARIO_PROMPT = """You are writing ONE substantial business case for a specific job interview. You
