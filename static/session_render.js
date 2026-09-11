@@ -99,7 +99,21 @@ window.SessionRender = (function(){
       <span>${s.recoveries||0} network drop(s) survived</span>
       <span>${s.barge_ins||0} barge-in(s)</span>
       <span>patience: ${esc((s.config&&s.config.vad)||'—')}</span>
-      <span>${esc(s.status||'')}</span></div>` + costHTML(s);
+      <span>${esc(s.status||'')}</span></div>` + timingsHTML(s) + costHTML(s);
+  }
+
+  // ── Per-answer timing — NEUTRAL behavioral data for the reviewer. Fast is
+  //    not good, slow is not bad; it never feeds the score and never flags.
+  //    Absent on legacy sessions -> renders nothing (no fabricated zeros). ──
+  function timingsHTML(s){
+    const qt = s.question_timings;
+    if(!Array.isArray(qt) || !qt.length) return '';
+    const fmt = sec => sec>=60 ? Math.floor(sec/60)+'m '+String(sec%60).padStart(2,'0')+'s' : sec+'s';
+    const icon = m => m==='typed' ? '⌨' : (m==='mcq' ? '☑' : '🎙');
+    return `<div class="evrow" style="margin:-.3rem 0 .6rem;font-size:11px;color:var(--t3);flex-wrap:wrap">
+      <span>⏱ Answer time</span>
+      ${qt.map(t=>`<span title="${esc(t.mode)} answer — question presented to answer finished">Q${+t.q||0} ${fmt(Math.max(0,+t.seconds||0))} ${icon(t.mode)}</span>`).join('')}
+      <span style="opacity:.65">informational only — not part of the score</span></div>`;
   }
 
   // ── Owner-only cost telemetry. Both surfaces that call this (recruiter
@@ -213,5 +227,5 @@ window.SessionRender = (function(){
     }catch(_){ wrap.textContent = 'Could not load stored frames.'; }
   }
 
-  return {scoresHTML, statsHTML, costHTML, transcriptHTML, proctoringHTML, loadSnapshots, esc};
+  return {scoresHTML, statsHTML, costHTML, timingsHTML, transcriptHTML, proctoringHTML, loadSnapshots, esc};
 })();

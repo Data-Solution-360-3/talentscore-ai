@@ -96,6 +96,24 @@ input,select,textarea{max-width:100%}
 @keyframes soft{50%{box-shadow:0 0 0 6px rgba(0,0,0,.04);opacity:.75}}
 @media (prefers-reduced-motion:reduce){.presence i{animation:none}}
 
+/* "What we're hearing" — read-only live view of the candidate's own words.
+   Narrow screens: a compact block under the presence pill. Wide screens: a
+   fixed right rail clear of the question column and the self-view corner.
+   Never shown while the typed/MCQ box is open (mic is muted there). */
+#hear{display:none;max-width:640px;width:100%;margin-top:1.1rem;background:var(--surface);border:1px solid rgba(22,163,74,.25);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:.8rem .95rem;text-align:left}
+#hear.on{display:block}
+.hear-hd{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--green);margin-bottom:.45rem}
+.hear-hd i{width:8px;height:8px;border-radius:50%;background:var(--green);animation:soft 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.hear-hd i{animation:none}}
+#hear-text{font-size:13.5px;line-height:1.65;color:var(--t2);max-height:110px;overflow-y:auto;white-space:pre-wrap;user-select:none}
+.hear-note{margin-top:.5rem;font-size:11px;color:var(--t3);line-height:1.45}
+body.lang-bn #hear-text,body.lang-bn #hear-label,body.lang-bn .hear-note{font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif}
+.written-mode #hear{display:none !important}
+@media(min-width:1240px){
+  #hear.on{position:fixed;right:1.6rem;top:19vh;width:280px;max-height:42vh;display:flex;flex-direction:column;margin:0;z-index:35}
+  #hear.on #hear-text{flex:1;max-height:none}
+}
+
 .selfview{position:fixed;right:1.6rem;bottom:1.6rem;width:210px;aspect-ratio:4/3;border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-xl);border:1px solid var(--border);background:#111827;z-index:40;display:none}
 .selfview.on{display:block}
 .selfview video{width:100%;height:100%;object-fit:cover;display:block}
@@ -246,6 +264,14 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
   <div class="q-label" id="q-label">Getting ready…</div>
   <div class="question" id="question"><span class="caret"></span></div>
   <div class="presence think" id="presence"><i></i><span id="presence-t">Connecting…</span></div>
+  <!-- Live "what we're hearing" panel — READ-ONLY display of the same
+       input STT the record already uses. Orientation only: not authoritative,
+       never editable, never posted from. Hidden in typed/MCQ mode (mic muted). -->
+  <div id="hear" aria-live="polite">
+    <div class="hear-hd"><i></i><span id="hear-label">What we're hearing</span></div>
+    <div id="hear-text"></div>
+    <div class="hear-note" id="hear-note">Live text is approximate — a person reviews your full interview. You don't need to correct anything.</div>
+  </div>
   <div id="scen" style="display:none;margin:10px 0;background:linear-gradient(180deg,#F4FAF6,#EDF6F0);border:2px solid #BFE3CE;border-radius:16px;padding:12px 14px;text-align:left;box-shadow:0 2px 10px rgba(22,163,74,.08);max-height:44vh;overflow:hidden">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span style="background:#16A34A;color:#fff;border-radius:9999px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.6px">📋 CASE STUDY</span>
@@ -348,6 +374,10 @@ function applyLang(){
   set('ans-lang', 'বাংলা');
   const ta = document.getElementById('typed-ta');
   if(ta) ta.placeholder = 'এখানে আপনার উত্তর লিখুন…';
+  // "What we're hearing" panel — Banglish, and extra-gentle: Bangla live STT
+  // is rougher than English, and this panel must never cause panic.
+  set('hear-label', 'আপনার কথা যা শুনতে পাচ্ছি');
+  set('hear-note', 'এই live text আনুমানিক — ভুল শব্দ দেখলে চিন্তা করবেন না। আপনার পুরো interview একজন মানুষ review করবেন, কিছু ঠিক করার দরকার নেই।');
   const bn = document.getElementById('beta-note');
   const bt = document.getElementById('beta-note-txt');
   if(bn && bt){
@@ -369,6 +399,20 @@ let pc=null, dc=null, micStream=null;
 let manualStop=false, resuming=false, graceTimer=null;
 let transcript=[], aiBuf='';
 let questionsAsked=0, skipNextCount=false, closing=false, closingDone=false;
+// "What we're hearing" — read-only mirror of the SAME input STT the record
+// uses. Display only: never editable, never posted, cleared per question.
+let hearBuf='', hearLines=[];
+// Per-answer timing — NEUTRAL behavioral data for the human reviewer (like
+// the MCQ per-question timing). Never a score input, never auto-flags.
+// start = the question counts; end = last answer activity (speech/submit).
+let qTimings=[], qStart=0, qMode='spoken', lastAnswerAt=0;
+function finalizeTiming(){
+  if(!qStart || !questionsAsked) return;
+  const end = lastAnswerAt > qStart ? lastAnswerAt : Date.now();
+  qTimings.push({q: questionsAsked, mode: qMode,
+                 seconds: Math.max(0, Math.round((end - qStart)/1000))});
+  qStart = 0;
+}
 // Per-response markers for QUESTION counting (reset at every response.done):
 // a typed question announces itself via the begin_typed_answer tool or by
 // opening the typed box mid-stream; show_scenario marks the transition
@@ -501,6 +545,18 @@ function setPresence(k, txt){
 function renderQuestionStream(){
   $('question').innerHTML = escapeHtml(aiBuf)+'<span class="caret"></span>';
 }
+// Panel shows finished utterances for the CURRENT question + the in-flight
+// delta buffer. Empty -> hidden; typed/MCQ mode -> hidden (mic is muted).
+function hearRender(){
+  const el = $('hear'); if(!el) return;
+  const text = (hearLines.join(' ') + (hearBuf ? ' ' + hearBuf : '')).trim();
+  if(!text || typing || mcqActive || closing || closingDone){ el.classList.remove('on'); return; }
+  el.classList.add('on');
+  const t = $('hear-text');
+  t.textContent = text;
+  t.scrollTop = t.scrollHeight;
+}
+function hearReset(){ hearLines = []; hearBuf = ''; hearRender(); }
 function renderQuestionFinal(text){
   $('question').textContent = text;
 }
@@ -730,6 +786,7 @@ function submitTyped(){
                             : {role:'you', text, mode:'typed'};
   if(_pasted) _entry.pasted = true;   // recruiter metadata; NOT a scoring rule
   transcript.push(_entry);
+  lastAnswerAt = Date.now(); finalizeTiming();   // typed answer done = clock stops
   if(proc) proc.typedPasted = false;
   try{ sessionStorage.removeItem(TYPED_KEY); }catch(_){}
   ta.value='';
@@ -832,6 +889,7 @@ function submitMcq(){
   // choice index + the question (mq) — the server grades by matching mq to
   // the config MCQ, so an out-of-order ask can never cross-grade answers
   transcript.push({role:'you', text:textAns, mode:'mcq', scen:1, choice:mcqSel, mq:mcqQuestion});
+  lastAnswerAt = Date.now(); finalizeTiming();   // choice submitted = clock stops
   $('mcqbox').style.display='none'; mcqActive=false;
   // section-complete check — same rule as typed submits (MCQs come first in
   // practice, so this is a safety net, not the normal exit)
@@ -887,9 +945,22 @@ function onEvent(ev){
         awaitingQ=false;
       }else if(!typing) renderQuestionFinal(text);
     }
-  }else if(t.includes('input_audio_transcription') && (t.includes('completed')||t.includes('done'))){
-    const text = (msg.transcript || '').trim();
-    if(text) transcript.push({role:'you', text});
+  }else if(t.includes('input_audio_transcription')){
+    if(t.includes('delta')){
+      // word-by-word live view when the API streams input transcription
+      hearBuf += (msg.delta || '');
+      hearRender();
+    }else if(t.includes('completed') || t.includes('done')){
+      const text = (msg.transcript || '').trim();
+      if(text) transcript.push({role:'you', text});   // the record — unchanged
+      if(text){ hearLines.push(text); if(hearLines.length > 8) hearLines.shift(); }
+      hearBuf = '';
+      hearRender();
+      lastAnswerAt = Date.now();   // timing: latest spoken-answer activity
+    }else if(t.includes('failed')){
+      hearBuf = '';                // one utterance failed to transcribe — drop
+      hearRender();                // the live view of it, never fake text
+    }
   }
 
   // the mode switch: the model finished a begin_typed_answer tool call
@@ -921,6 +992,7 @@ function onEvent(ev){
     if(aiSpeaking){ bargeIns++; aiSpeaking=false; }
     setPresence('you','Listening to you — take your time');
   }else if(t.includes('speech_stopped')){
+    lastAnswerAt = Date.now();   // timing: they just finished saying something
     setPresence('think','One moment…');
   }else if((t.includes('audio') && t.includes('delta') && !t.includes('transcript')) || t==='output_audio_buffer.started'){
     aiSpeaking = true;
@@ -966,7 +1038,15 @@ function onEvent(ev){
       }
       if(counts){
         if(skipNextCount){ skipNextCount = false; }
-        else { questionsAsked++; }
+        else {
+          finalizeTiming();          // close the PREVIOUS question's clock
+          questionsAsked++;
+          // open this question's clock; its mode is already known here
+          // (enterTyped/enterMcq ran during this same response)
+          qStart = Date.now(); lastAnswerAt = 0;
+          qMode = typing ? 'typed' : (mcqActive ? 'mcq' : 'spoken');
+          hearReset();               // the panel shows the CURRENT question only
+        }
       }
       sendControlNote();
       // during the typed/MCQ phase the turn still counts (the ask IS a
@@ -1360,11 +1440,13 @@ async function saveSession(status, violations){
   // question — the recruiter must see why the link died.
   if(sessionSaved || (status!=='policy_violation' && (!transcript.length || questionsAsked===0))) return;
   sessionSaved = true;
+  finalizeTiming();   // close the final question's clock (wrap-up path)
   try{
     await fetch('/api/interview/'+TOKEN+'/session', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         transcript, status,
+        question_timings: qTimings.slice(0, 20),
         questions_asked: questionsAsked, recoveries, barge_ins: bargeIns,
         duration_seconds: startedAtMs? Math.round((Date.now()-startedAtMs)/1000):0,
         proctoring: window._procSummary || {enabled:false},

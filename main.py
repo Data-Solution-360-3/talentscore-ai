@@ -3785,6 +3785,30 @@ async def candidate_session_token(request: Request, token: str):
     return out
 
 
+def _validate_interview_timings(raw) -> list:
+    """Per-ANSWER timing for the live interview (NEUTRAL behavioral data —
+    never a score input, never auto-flags; the human reviewer decides what,
+    if anything, it means). Mirrors _validate_mcq_timings: clamped, mode
+    whitelisted, capped at 20 rows. Scorers never read this field."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for t in raw[:20]:
+        if not isinstance(t, dict):
+            continue
+        try:
+            q = int(t.get("q"))
+            secs = int(t.get("seconds"))
+        except Exception:
+            continue
+        if not (1 <= q <= 20):
+            continue
+        out.append({"q": q,
+                    "mode": t.get("mode") if t.get("mode") in ("spoken", "typed", "mcq") else "spoken",
+                    "seconds": max(0, min(7200, secs))})
+    return out
+
+
 @app.post("/api/interview/{token}/session")
 async def candidate_session_save(request: Request, background: BackgroundTasks, token: str):
     """Candidate's finished session — saved against the RECRUITER's account
@@ -3875,6 +3899,11 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "status": body.get("status") if body.get("status") in ("completed", "abandoned", "policy_violation") else "abandoned",
         "score_status": "pending",
     }
+    # Per-answer timing — stored BESIDE the transcript, never inside anything
+    # a scorer reads. Absent for legacy sessions (the view renders nothing).
+    _qt = _validate_interview_timings(body.get("question_timings"))
+    if _qt:
+        doc["question_timings"] = _qt
     if doc["status"] == "policy_violation":
         doc["score_status"] = "not_scored_policy"
         v = body.get("violations") if isinstance(body.get("violations"), dict) else {}
