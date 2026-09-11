@@ -14,6 +14,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+/* Bangla typeface for bn-language assessments ONLY. The stylesheet is
+   injected at runtime when the job's language is bn (see startMcq), so
+   English jobs load nothing extra; this rule is inert without the class.
+   Inter stays in the stack so English technical terms keep their face. */
+.bn-assess #mcq-view{font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --ink:#128A40;--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
@@ -437,6 +442,17 @@ async function startMcq(appId){
     // hand-written templates; the job's language picks one, and the dynamic
     // slots (count / time limit / paste rule) are filled per language.
     const bn = d.language === 'bn';
+    if(bn){
+      // Lazy-load the Bangla face only for bn jobs — English jobs never
+      // fetch it. display=swap keeps text readable while it loads.
+      if(!document.getElementById('bn-font')){
+        const l=document.createElement('link');
+        l.id='bn-font'; l.rel='stylesheet';
+        l.href='https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap';
+        document.head.appendChild(l);
+      }
+      document.body.classList.add('bn-assess');
+    }
     const block = document.getElementById(bn ? 'mi-bn' : 'mi-en');
     document.getElementById('mi-en').style.display = bn ? 'none' : 'block';
     document.getElementById('mi-bn').style.display = bn ? 'block' : 'none';
