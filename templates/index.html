@@ -742,6 +742,16 @@ img,svg,video{max-width:100%}
 .jt-pane{display:none}
 .jt-pane.act{display:block;animation:jtfade .18s ease}
 @keyframes jtfade{from{opacity:.4}to{opacity:1}}
+/* Job-setup tab CONTENT — one shared treatment (the CV section is the bar):
+   deep readable text, aligned label+input rows, consistent card rhythm. */
+.jt-sec{font-size:11px;color:#173404;text-transform:uppercase;font-weight:800;letter-spacing:.06em;margin-bottom:8px}
+.jt-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:14px}
+.jt-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;min-width:0}
+.jt-row+.jt-row{margin-top:12px}
+.jt-label{font-size:12px;font-weight:600;color:#2E401B;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.jt-label input,.jt-label select{padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12.5px;font-weight:700;color:#173404;background:#fff}
+.jt-help{font-size:12px;color:#4A5443;line-height:1.65;margin-top:9px}
+.jt-note{font-size:12px;color:#4A5443;line-height:1.65}
 </style>
 </head>
 <body>
@@ -4160,7 +4170,7 @@ async function viewJobDetails(jobId){
       <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
         <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span style="font-weight:400;color:var(--t3);font-size:11px">— candidates can normally apply only once per job</span></summary>
         <div style="padding:4px 12px 12px">
-          <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
+          <div class="jt-note" style="margin-bottom:8px">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
             <button class="btn btn-ghost btn-sm" onclick="allowReapply('${jobId}')">Allow re-apply</button>
@@ -4171,8 +4181,8 @@ async function viewJobDetails(jobId){
     </div>
 
     <div id="jt-mcq" class="jt-pane">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">MCQ pre-filter — high-volume funnel</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="jt-sec" style="margin-bottom:0">MCQ pre-filter — high-volume funnel</div>
         <span id="mcqf-chip"></span>
       </div>
       <div id="mcqf-body"></div>
@@ -4187,8 +4197,8 @@ async function viewJobDetails(jobId){
 
     <div id="jt-viva" class="jt-pane">
       <div id="viva-box" style="margin-bottom:14px"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Interview questions</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 8px">
+        <div class="jt-sec" style="margin-bottom:0">Interview questions</div>
         <span id="iq-chip"></span>
       </div>
       <div id="iq-body"></div>
@@ -4305,8 +4315,8 @@ function renderPublicLink(job, spend){
     const pct  = s.cap ? Math.min(100, Math.round(s.used / s.cap * 100)) : 0;
     const full = s.used >= s.cap;
     const col  = full ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)';
-    return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t2);margin-top:5px">
-      <span style="min-width:56px;font-weight:600">${label}</span>
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#2E401B;margin-top:6px">
+      <span style="min-width:72px;font-weight:600">${label}</span>
       <span style="flex:1;height:4px;background:var(--s3);border-radius:9999px;overflow:hidden">
         <span style="display:block;height:100%;width:${pct}%;background:${col}"></span>
       </span>
@@ -4317,8 +4327,8 @@ function renderPublicLink(job, spend){
   };
 
   box.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:10px;flex-wrap:wrap">
-      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Public application link</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+      <div class="jt-sec" style="margin-bottom:0">Public application link</div>
       <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
         <input type="checkbox" id="pub-toggle" ${on?'checked':''}
                onchange="togglePublic('${job._id}', this.checked)" style="cursor:pointer">
@@ -4335,26 +4345,21 @@ function renderPublicLink(job, spend){
       </div>
 
       ${on
-        ? `<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.55">
-             Paste this into a LinkedIn or BDJobs post. Turning it off pauses the link and keeps this URL.
-             <strong>Rotate</strong> issues a new URL and kills this one for good — use it if the link gets abused.
+        ? `<div class="jt-help">
+             Paste into your job post. Off pauses the link and keeps the URL; <strong>Rotate</strong> kills it for good.
            </div>`
-        : `<div style="font-size:11px;color:var(--amber);margin-top:8px;line-height:1.55">
-             <strong>Not accepting applications yet</strong> — turn the switch on to activate this link.
-             Anyone opening it now sees a closed page.
+        : `<div class="jt-help" style="color:var(--amber);font-weight:600">
+             Not accepting applications yet — turn the switch on to activate this link.
            </div>`}
 
       ${spend ? `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
-            Spend caps — scoring stops here, uploads still stored
-          </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div class="jt-sec">Spend caps</div>
           ${capRow('This job', spend.job)}
           ${capRow('Today',    spend.day)}
           ${capRow('This month', spend.month)}
-          <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
-            ~$0.054 per CV. Past a cap, applications are still received and stored — they just
-            wait for you to score them, and the candidate is never told anything is different.
+          <div class="jt-help">
+            Past a cap, applications are still received and stored — they wait for you to score them.
           </div>
         </div>` : ''}
 
@@ -4376,17 +4381,16 @@ function renderJobConfigTabs(job){
   const thBox = document.getElementById('cv-threshold-box');
   if(thBox){
     thBox.innerHTML = `
-      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">CV screening — interview threshold</div>
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <label style="font-size:11px;font-weight:600;color:var(--t2)">CV score threshold
-            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'}
-                   style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
+      <div class="jt-sec">CV screening — interview threshold</div>
+      <div class="jt-card" style="margin-bottom:0">
+        <div class="jt-row">
+          <label class="jt-label">CV score threshold
+            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'} style="width:64px"></label>
           ${von
             ? `<button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>`
-            : `<span style="font-size:11px;color:var(--t3)">Turn on the live interview (Viva tab) to use the threshold.</span>`}
+            : `<span class="jt-note">Turn on the live interview (Viva tab) to use the threshold.</span>`}
         </div>
-        <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
+        <div class="jt-help">
           Applicants scoring at or above the threshold go straight into the interview.
           Everyone else sees the normal received page — no hint a gate exists.
         </div>
@@ -4403,37 +4407,35 @@ function renderJobConfigTabs(job){
         ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
         : `Default setup — one general question, 4 turns, patient pace, proctoring off.`);
     vBox.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${von?'8px':'0'}">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">
-          Live interview after CV
-        </div>
-        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${von?'var(--green)':'var(--t3)'}">
+      <div class="jt-card" style="margin-bottom:0">
+      <div class="jt-row" style="justify-content:space-between">
+        <div class="jt-sec" style="margin-bottom:0">Live interview after CV</div>
+        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;color:${von?'var(--green)':'#4A5443'}">
           <input type="checkbox" id="viva-toggle" ${von?'checked':''}
                  onchange="toggleJobViva('${job._id}', this.checked)" style="cursor:pointer">
           ${von ? 'On — qualifying applicants flow into a live interview' : 'Off — applications are CV-only'}
         </label>
       </div>
-      <div id="viva-fields" style="display:${von?'block':'none'}">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <label style="font-size:11px;font-weight:600;color:var(--t2)">Daily interview cap
-            <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"
-                   style="width:60px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-          <label title="How long a funnel invite link stays valid" style="font-size:11px;font-weight:600;color:var(--t2)">Invite window (days)
-            <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}"
-                   style="width:56px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-          <label style="font-size:11px;font-weight:600;color:var(--t2)">Proctoring
-            <select id="viva-proc" style="margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:11.5px;font-weight:600">
+      <div id="viva-fields" style="display:${von?'block':'none'};margin-top:12px">
+        <div class="jt-row">
+          <label class="jt-label">Daily interview cap
+            <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}" style="width:64px"></label>
+          <label class="jt-label" title="How long a funnel invite link stays valid">Invite window (days)
+            <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}" style="width:58px"></label>
+          <label class="jt-label">Proctoring
+            <select id="viva-proc">
               <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
               <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
               <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
             </select></label>
           <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
         </div>
-        <div style="font-size:10.5px;color:var(--t3);margin-top:7px;line-height:1.5">
-          The CV score threshold that gates the interview lives on the <strong>CV tab</strong>.<br>
-          Interview setup: <strong>${cfgLine}</strong> — edit questions &amp; pace on
-          <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> and use its &ldquo;attach to a job&rdquo; card; this toggle keeps whatever setup is saved there.
+        <div class="jt-help">
+          The CV score threshold that gates the interview lives on the <strong>CV tab</strong>.
+          Setup: <strong>${cfgLine}</strong> · edit on
+          <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> → &ldquo;attach to a job&rdquo;.
         </div>
+      </div>
       </div>`;
   }
 
@@ -4815,22 +4817,24 @@ function mcqfRender(){
     ? '<span style="font-size:11px;font-weight:700;color:var(--green)">ON — '+((appr&&appr.count)||0)+' approved questions</span>'
     : (appr ? '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — '+appr.count+' questions approved</span>'
             : '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — no approved set</span>');
-  let html=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
-      <input type="checkbox" ${on?'checked':''} onchange="mcqfToggle(this.checked)"> ${on?'Filter ON — applicants take the test; CVs held unscreened until you advance':'Filter off — normal apply flow'}
+  let html=`<div class="jt-card" style="margin-bottom:12px">
+  <div class="jt-row">
+    <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;color:${on?'var(--green)':'#4A5443'}">
+      <input type="checkbox" ${on?'checked':''} onchange="mcqfToggle(this.checked)"> ${on?'Filter ON — applicants take the test; CVs held until you advance':'Filter off — normal apply flow'}
     </label>
-    <label style="font-size:11px;font-weight:600;color:var(--t2)">Target
-      <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:48px;margin:0 3px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:700"></label>
+  </div>
+  <div class="jt-row">
+    <label class="jt-label">Target
+      <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:52px"></label>
     <button class="btn btn-xs" onclick="mcqfGenerate()">✨ Generate draft (AI)</button>
     ${(draft||appr)?`<button class="btn btn-xs" onclick="mcqfEdit()">✎ Review / edit</button>`:''}
     ${st.editing?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve set</button>
     <button class="btn btn-xs" onclick="mcqfSaveDraft()">Save draft</button>`:
       (draft?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve draft</button>`:'')}
   </div>
-  <div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin-bottom:6px">
-    Candidates apply + take a short test; grading is automatic and free. You then advance the top N —
-    <b>CV screening spend happens only on the advanced set</b>. AI drafts are never live until YOU review the
-    correct answers and approve. Held candidates are held, not rejected.
+  <div class="jt-help">
+    Applicants take the test; you advance the top N — <b>screening spend lands only on the advanced set</b>.
+    Drafts go live only after you review the answer keys and approve.
   </div>`;
   if(st.editing){
     html += st.work.map((m,i)=>`
@@ -4857,37 +4861,40 @@ function mcqfRender(){
     const qs=(appr&&appr.questions)||(draft&&draft.questions)||[];
     const nScen=new Set(qs.filter(m=>m.scenario).map(m=>m.scenario)).size;
     const nGrouped=qs.filter(m=>m.scenario).length;
-    html += `<div style="font-size:11px;color:var(--t2)">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions${nScen?` (${nScen} scenario group${nScen>1?'s':''} · ${nGrouped} grouped + ${qs.length-nGrouped} standalone)`:''}. `
-      + qs.slice(0,3).map((m,i)=>`<div style="margin-top:3px;color:var(--t3)">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')
-      + (qs.length>3?`<div style="color:var(--t3);margin-top:2px">…and ${qs.length-3} more — Review / edit to see all.</div>`:'')+`</div>`;
+    html += `<div class="jt-note" style="margin-top:10px">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions${nScen?` (${nScen} scenario group${nScen>1?'s':''} · ${nGrouped} grouped + ${qs.length-nGrouped} standalone)`:''}
+      ${qs.slice(0,3).map((m,i)=>`<div style="margin-top:4px;color:#4A5443">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')}
+      ${qs.length>3?`<div style="color:#5B6650;margin-top:3px">…and ${qs.length-3} more — Review / edit to see all.</div>`:''}</div>`;
   }
+  html += `</div>`;   // close the setup card
   if(appr){
     const pm=(mf.paste_mode==='monitor')?'monitor':'restrict';
-    html += `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:11px;font-weight:600;color:var(--t2)">
-      <label>Copy/paste
-        <select id="mcqf-pm" style="margin-left:4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:600">
-          <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
-          <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
-        </select></label>
-      <label>Time limit (min, 0=none)
-        <input id="mcqf-tl" type="number" min="0" max="180" value="${mf.time_limit_minutes||0}"
-          style="width:56px;margin-left:4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:11px;font-weight:700"></label>
-      <button class="btn btn-xs" onclick="mcqfSettings()">Save settings</button>
+    html += `<div class="jt-card" style="margin-bottom:12px">
+      <div class="jt-sec">Test settings</div>
+      <div class="jt-row">
+        <label class="jt-label">Copy/paste
+          <select id="mcqf-pm">
+            <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
+            <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
+          </select></label>
+        <label class="jt-label">Time limit (min, 0 = none)
+          <input id="mcqf-tl" type="number" min="0" max="180" value="${mf.time_limit_minutes||0}" style="width:60px"></label>
+        <button class="btn btn-xs btn-primary" onclick="mcqfSettings()">Save settings</button>
+      </div>
       ${(mf.paste_mode==null && mf.time_limit_minutes==null)
-        ? `<span style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted, no time limit, so no countdown shows). Click Save settings to persist.</span>`
-        : `<span style="font-weight:500;color:var(--t3)">Candidates are told the active rules on the instruction screen — no silent blocking or recording.</span>`}
+        ? `<div class="jt-help" style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted, no time limit, so no countdown shows). Click Save settings to persist.</div>`
+        : `<div class="jt-help">The instruction screen shows candidates these exact rules.</div>`}
     </div>`;
   }
   if(on){
-    html += `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Funnel</div>
-        <button class="btn btn-xs" onclick="mcqFunnelLoad()">↻ Load ranked applicants</button>
-        <label style="font-size:11px;font-weight:600;color:var(--t2)">Advance top
-          <input id="mcqf-n" type="number" min="1" max="500" value="200" style="width:64px;margin:0 4px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;font-weight:700">
+    html += `<div style="margin-top:2px">
+      <div class="jt-row" style="margin-bottom:8px">
+        <div class="jt-sec" style="margin-bottom:0">Funnel</div>
+        <button class="btn btn-xs" onclick="mcqFunnelLoad()">↻ Refresh</button>
+        <label class="jt-label">Advance top
+          <input id="mcqf-n" type="number" min="1" max="500" value="200" style="width:66px">
           <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button></label>
       </div>
-      <div id="mcqf-funnel" style="font-size:11.5px;color:var(--t2)"></div>
+      <div id="mcqf-funnel" style="font-size:12px;color:#2E401B"></div>
     </div>`;
   }
   body.innerHTML=html;
