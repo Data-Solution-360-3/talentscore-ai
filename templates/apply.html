@@ -195,24 +195,57 @@ input,select,textarea{max-width:100%}
 
   <div id="mcq-view" style="display:none">
     <div class="fc" style="text-align:left">
-      <!-- INSTRUCTION + DISCLOSURE screen: shown BEFORE question 1, always. -->
+      <!-- INSTRUCTION + DISCLOSURE page (Pathao #1): shown BEFORE question 1,
+           always. TWO hand-written templates — pure English, and natural
+           Banglish (Bangla sentence language, technical terms in English) —
+           never machine-translated. Every stated rule is filled from THIS
+           job's real settings, so the page can't drift from behavior. -->
       <div id="mcq-intro">
-        <div class="fc-title">One more step — a short questionnaire</div>
-        <div class="fc-sub">Your application is saved. This test completes it.</div>
-        <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.88rem;color:#33415c;line-height:1.75">
-          <b>How it works</b><br>
-          • <span id="mi-count">—</span> multiple-choice questions, one at a time — pick one answer each.<br>
-          • You <b>can go back</b> and change answers before submitting.<br>
-          • <span id="mi-time">No time limit — take the time you need.</span><br>
-          • <span id="mi-paste">Copy and paste are <b>disabled</b> during the test.</span><br>
-          • On the last question, press <b>Submit answers</b>. You'll see a confirmation — then the hiring team reviews your test together with your CV.<br>
-          <span style="display:block;margin-top:.5rem;color:#4A5970;font-size:.82rem">
-          <b>Monitoring notice:</b> while the test is open we record tab switches, window focus changes,
-          copy/paste attempts, and time spent per question. These are <b>review signals read by a human</b> —
-          nothing here automatically disqualifies you, and switching tabs doesn't end your test.
-          Details: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>.</span>
+        <div id="mi-en" style="display:none">
+          <div class="fc-title">One more step — a short assessment</div>
+          <div class="fc-sub">Your application is saved. Completing this test finishes it.</div>
+          <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.88rem;color:#33415c;line-height:1.8">
+            <b>How it works</b><br>
+            • You'll see <b>one question at a time</b> — read it and pick one of the four options.<br>
+            • <b><span class="mi-count">—</span> multiple-choice questions</b> in total.<br>
+            • You <b>can go back</b> to any previous question and change your answer, any time before submitting.<br>
+            • <span class="mi-time">No time limit — take the time you need.</span><br>
+            • <span class="mi-paste"></span><br>
+            • Switching browser tabs or windows will <b>not end your test</b> — but when you leave and how long you're away is recorded.<br>
+            • <b>To submit:</b> on the last question press <b>Submit answers</b> — you'll see a confirmation screen, and you're done.<br>
+            • <b>After you submit:</b> a person on the {{COMPANY}} hiring team reviews your test together with your CV. Strong results may be invited to an interview.
+            <span style="display:block;margin-top:.6rem;color:#4A5970;font-size:.82rem">
+            <b>Monitoring notice:</b> while the test is open we record tab/window switches, copy-paste
+            attempts, long inactivity, page reloads, and the time you spend on each question. These are
+            <b>review signals read by a human</b> — nothing automatically disqualifies you, and speed alone
+            means nothing. No camera is used in this assessment.
+            Details: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>.</span>
+          </div>
+          <button class="btn" onclick="mcqBegin()">Start the assessment</button>
         </div>
-        <button class="btn" onclick="mcqBegin()">Start the questionnaire</button>
+        <div id="mi-bn" style="display:none">
+          <div class="fc-title">আর একটা step — ছোট একটা assessment</div>
+          <div class="fc-sub">আপনার application save হয়ে গেছে। এই test টা complete করলেই application সম্পূর্ণ।</div>
+          <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.9rem;color:#33415c;line-height:1.9">
+            <b>যেভাবে কাজ করে</b><br>
+            • একবারে <b>একটা করে question</b> দেখবেন — পড়ে চারটা option থেকে একটা বেছে নিন।<br>
+            • মোট <b><span class="mi-count">—</span> টা multiple-choice question</b>।<br>
+            • Submit করার আগ পর্যন্ত <b>আগের যেকোনো question এ ফিরে গিয়ে</b> answer change করতে পারবেন।<br>
+            • <span class="mi-time">কোনো time limit নেই — আপনার প্রয়োজনমতো সময় নিন।</span><br>
+            • <span class="mi-paste"></span><br>
+            • অন্য tab বা window তে গেলে test <b>বন্ধ হয়ে যাবে না</b> — তবে কখন গেলেন আর কতক্ষণ বাইরে ছিলেন, সেটা record হয়।<br>
+            • <b>Submit করবেন যেভাবে:</b> শেষ question এ গিয়ে <b>Submit answers</b> button চাপুন — confirmation screen দেখলেই আপনার কাজ শেষ।<br>
+            • <b>Submit এর পরে:</b> {{COMPANY}} এর hiring team এর একজন মানুষ আপনার test আর CV একসাথে review করবেন। ভালো করলে interview এর invitation পেতে পারেন।
+            <span style="display:block;margin-top:.6rem;color:#4A5970;font-size:.84rem">
+            <b>Monitoring notice:</b> test চলার সময় tab/window switch, copy-paste attempt, লম্বা inactivity,
+            page reload আর প্রতিটা question এ আপনি কত সময় নিলেন — এগুলো record হয়। এগুলো শুধুই
+            <b>review signal, যেটা একজন মানুষ দেখে বিবেচনা করবেন</b> — কোনো কিছুই আপনাকে automatically
+            disqualify করবে না, আর তাড়াতাড়ি বা ধীরে answer করা নিজে থেকে কিছুই প্রমাণ করে না।
+            এই assessment এ কোনো camera ব্যবহার হয় না।
+            বিস্তারিত: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>।</span>
+          </div>
+          <button class="btn" onclick="mcqBegin()">Assessment শুরু করুন</button>
+        </div>
       </div>
       <!-- One-question pager -->
       <div id="mcq-quiz" style="display:none">
@@ -400,14 +433,24 @@ async function startMcq(appId){
         if(Array.isArray(saved.timings) && saved.timings.length===qs.length) _mcq.timings=saved.timings;
         _mcq.started=saved.started||0;
       } }catch(_){}
-    // Disclosure text reflects the ACTUAL settings — no silent rules.
-    document.getElementById('mi-count').textContent = qs.length;
-    document.getElementById('mi-time').innerHTML = _mcq.limitMin
-      ? 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — the remaining time is shown; when it runs out, your answers so far are submitted automatically.'
-      : 'No time limit — take the time you need.';
-    document.getElementById('mi-paste').innerHTML = _mcq.mode==='monitor'
-      ? 'Copy and paste are <b>allowed</b>, but every use is recorded for the hiring team.'
-      : 'Copy and paste are <b>disabled</b> during the test (attempts are recorded).';
+    // Disclosure text reflects the ACTUAL settings — no silent rules. Two
+    // hand-written templates; the job's language picks one, and the dynamic
+    // slots (count / time limit / paste rule) are filled per language.
+    const bn = d.language === 'bn';
+    const block = document.getElementById(bn ? 'mi-bn' : 'mi-en');
+    document.getElementById('mi-en').style.display = bn ? 'none' : 'block';
+    document.getElementById('mi-bn').style.display = bn ? 'block' : 'none';
+    block.querySelectorAll('.mi-count').forEach(el => el.textContent = qs.length);
+    block.querySelectorAll('.mi-time').forEach(el => el.innerHTML = _mcq.limitMin
+      ? (bn ? 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — remaining time screen এ দেখা যাবে; সময় শেষ হয়ে গেলে তখন পর্যন্ত দেওয়া answers <b>automatically submit</b> হয়ে যাবে।'
+            : 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — the remaining time is shown on screen; when it runs out, your answers so far are <b>submitted automatically</b>.')
+      : (bn ? 'কোনো time limit নেই — আপনার প্রয়োজনমতো সময় নিন।'
+            : 'No time limit — take the time you need.'));
+    block.querySelectorAll('.mi-paste').forEach(el => el.innerHTML = _mcq.mode==='monitor'
+      ? (bn ? 'Copy-paste <b>allowed</b> — তবে প্রতিবার ব্যবহার করলে সেটা hiring team এর জন্য record হবে।'
+            : 'Copy and paste are <b>allowed</b>, but every use is recorded for the hiring team.')
+      : (bn ? 'Copy-paste এই test এ <b>disabled</b> — চেষ্টা করলে সেটাও record হয়।'
+            : 'Copy and paste are <b>disabled</b> during the test (attempts are recorded).'));
     showView('mcq-view');
     document.getElementById('mcq-intro').style.display = _mcq.started ? 'none' : 'block';
     document.getElementById('mcq-quiz').style.display = _mcq.started ? 'block' : 'none';

@@ -4113,7 +4113,10 @@ async def apply_mcq_questions(token: str):
                           for q in qs],
             "paste_mode": ("monitor" if mf.get("paste_mode") == "monitor" else "restrict"),
             "time_limit_minutes": int(mf.get("time_limit_minutes") or 0),
-            "can_go_back": True}
+            "can_go_back": True,
+            # Drives the instruction page's language: pure English, or the
+            # hand-written Banglish template (never machine-translated).
+            "language": ("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en")}
 
 
 @app.post("/api/apply/{token}/mcq/{application_id}")
