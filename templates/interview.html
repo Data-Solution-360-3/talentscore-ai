@@ -202,6 +202,27 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
       <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>A short pause to think is completely fine</div>
     </div>
     <div class="beta-note" id="beta-note"><span class="beta-tag">BETA</span><span id="beta-note-txt"></span></div>
+
+    <!-- INTERVIEW GUIDELINES (Pathao #10): two hand-written templates —
+         pure English / natural Banglish — toggled by the job's language,
+         filled with THIS link's real values. Never machine-translated. -->
+    <div class="expect" id="guide-en" style="display:none;background:#F8FAF5;border:1px solid #E4E8E0;border-radius:14px;padding:1rem 1.1rem;font-size:.85rem;line-height:1.8;color:#33401F">
+      <div style="font-size:.7rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#639922;margin-bottom:.35rem">Before you begin</div>
+      <div>• <b>You'll need:</b> a device with a working <b>microphone</b><span class="g-cam"> (and <b>camera</b> — used for a few still snapshots, never video)</span>, stable internet, and a quiet, well-lit spot. A modern browser — <b>Chrome recommended</b>.</div>
+      <div>• <b>Prepare:</b> be ready to talk about your own experience — real examples from your work beat rehearsed answers. Some questions are spoken, a few are typed.</div>
+      <div>• <b>Rules:</b> stay on this tab during the interview — switching away doesn't end it, but it's recorded for review. The AI asks the questions; <b>a person at {{COMPANY}} reviews everything and makes every decision</b>.</div>
+      <div class="g-dl">• <b>Deadline:</b> complete it any time before <b>{{DEADLINE}}</b> using this same link.</div>
+      <div>• <b>Help:</b> reply to your invitation email to reach the {{COMPANY}} recruiter.</div>
+    </div>
+    <div class="expect" id="guide-bn" style="display:none;background:#F8FAF5;border:1px solid #E4E8E0;border-radius:14px;padding:1rem 1.1rem;font-size:.88rem;line-height:1.9;color:#33401F;font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif">
+      <div style="font-size:.7rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#639922;margin-bottom:.35rem">শুরুর আগে</div>
+      <div>• <b>যা লাগবে:</b> কাজ করে এমন <b>microphone</b><span class="g-cam"> (আর <b>camera</b> — শুধু কয়েকটা still snapshot এর জন্য, video না)</span>, stable internet, আর একটা শান্ত, আলো-ভালো জায়গা। Modern browser — <b>Chrome recommended</b>।</div>
+      <div>• <b>প্রস্তুতি:</b> নিজের experience নিয়ে কথা বলার জন্য তৈরি থাকুন — মুখস্থ উত্তরের চেয়ে কাজের real example অনেক ভালো। কিছু প্রশ্ন spoken, কয়েকটা typed।</div>
+      <div>• <b>নিয়ম:</b> interview চলার সময় এই tab এই থাকুন — অন্য tab এ গেলে interview বন্ধ হবে না, তবে সেটা review এর জন্য record হয়। প্রশ্ন করবে AI; <b>সব কিছু review করে সিদ্ধান্ত নেবেন {{COMPANY}} এর একজন মানুষ</b>।</div>
+      <div class="g-dl">• <b>Deadline:</b> এই link দিয়েই <b>{{DEADLINE}}</b> এর মধ্যে যেকোনো সময় complete করুন।</div>
+      <div>• <b>সাহায্য লাগলে:</b> আপনার invitation email এ reply করলেই {{COMPANY}} এর recruiter পাবেন।</div>
+    </div>
+
     <div class="notice hidden" id="proc-notice"><b>Monitoring:</b> this interview takes periodic still snapshots from your camera<span id="proc-scr-note"> and screen</span> (up to 12 images, kept 30 days) and keeps a text transcript for 12 months. Tab switches, paste attempts, and camera changes are flagged for <b>human</b> review — no continuous video is stored, and no automatic decision is made. <a href="/privacy" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Privacy policy</a></div>
     <button class="btn-begin" id="btn-begin" type="button">I'm ready — begin interview</button>
     <div class="foot">Your microphone<span id="perm-note"></span> will be requested next.</div>
@@ -300,6 +321,23 @@ function typedPhaseStart(){
 }
 const PROCTORING = "{{PROCTORING}}";      // off | S | M — disclosure, not a control
 const LANG = ("{{LANG}}" === "bn") ? "bn" : "en";   // interview language (Bangla = BETA)
+
+// ── Interview guidelines (Pathao #10): pick the language block, hide the
+//    camera clause when proctoring is off and the deadline line when the
+//    link has no expiry — the page states only what is true for THIS link.
+(function(){
+  const g = document.getElementById(LANG === 'bn' ? 'guide-bn' : 'guide-en');
+  if(!g) return;
+  g.style.display = 'block';
+  if(PROCTORING === 'off') g.querySelectorAll('.g-cam').forEach(el => el.remove());
+  if(!"{{DEADLINE}}") g.querySelectorAll('.g-dl').forEach(el => el.remove());
+  if(LANG === 'bn' && !document.getElementById('bn-font')){
+    const l = document.createElement('link');
+    l.id = 'bn-font'; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap';
+    document.head.appendChild(l);
+  }
+})();
 
 // Bangla (BETA): swap candidate-facing copy + font, and show the honest banner.
 // Everything else (mechanics, mint, scoring) is language-agnostic.

@@ -3320,6 +3320,17 @@ async def candidate_interview_page(token: str):
     if not live:
         return _closed_link_page()
     cfg = live.get("config") or {}
+    # Guidelines block (Pathao #10): company + deadline are display values —
+    # the deadline is the link's real expires_at (funnel invites), blank for
+    # manual links (the line hides).
+    owner = await get_user_by_id(str(live.get("user_id") or "")) if live.get("user_id") else None
+    company = (owner or {}).get("company_name") or "the hiring team"
+    deadline = ""
+    if live.get("expires_at"):
+        try:
+            deadline = live["expires_at"].strftime("%d %b %Y")
+        except Exception:
+            deadline = ""
 
     def esc(v, fallback=""):
         return _html.escape(str(v if v not in (None, "") else fallback))
@@ -3327,6 +3338,8 @@ async def candidate_interview_page(token: str):
     page = read_template("interview.html")
     for key, val in {
         "{{TOKEN}}": esc(token),
+        "{{COMPANY}}": esc(company),
+        "{{DEADLINE}}": esc(deadline, ""),
         "{{IV_NAME}}": esc(cfg.get("interviewer_name"), "AI Interviewer"),
         "{{IV_INITIAL}}": esc((cfg.get("interviewer_name") or "A").strip()[:1].upper(), "A"),
         "{{JOB_TITLE}}": esc(cfg.get("job_title"), ""),
