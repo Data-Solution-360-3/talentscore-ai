@@ -76,7 +76,77 @@
       M.inactTimer = setInterval(inactTick, 10000);
     },
     noteQuestion: function(i){ M.currentQ = i; bump(); },
+    /* FULL proctoring level (per-job, recruiter-chosen, DISCLOSED on the
+       instruction page): camera + screen requested, periodic still snapshots
+       (<=12, alternating cam/scr) uploaded to `uploadUrl`. The interview's
+       exact approach. DENIAL FLAGS, NEVER BLOCKS — the test always continues;
+       a human reviews the flags. Light level never calls this. */
+    startMedia: async function(uploadUrl){
+      M.media = { cam:null, scr:null, camV:null, scrV:null, up:0, tick:0, timer:null };
+      function vid(stream){
+        var v = document.createElement('video');
+        v.muted = true; v.playsInline = true; v.style.display = 'none';
+        v.srcObject = stream; document.body.appendChild(v); v.play().catch(function(){});
+        return v;
+      }
+      try {
+        M.media.cam = await navigator.mediaDevices.getUserMedia(
+          {video: {width: {ideal: 640}, height: {ideal: 480}}});
+        M.media.camV = vid(M.media.cam);
+        var ct = M.media.cam.getVideoTracks()[0];
+        if (ct){
+          ct.addEventListener('ended', function(){ flag('camera_off', 'camera turned off during the assessment'); });
+          ct.addEventListener('mute',  function(){ flag('camera_off', 'camera muted during the assessment'); });
+        }
+      } catch(_){ flag('camera_off', 'camera denied or unavailable at start'); }
+      try {
+        M.media.scr = await navigator.mediaDevices.getDisplayMedia(
+          {video: {displaySurface: 'monitor', frameRate: {ideal: 2}}});
+        M.media.scrV = vid(M.media.scr);
+        var st = M.media.scr.getVideoTracks()[0];
+        var surf = (st && st.getSettings && st.getSettings().displaySurface) || '';
+        if (surf && surf !== 'monitor') flag('partial_share', 'shared a ' + surf + ', not the full monitor');
+        if (st) st.addEventListener('ended', function(){ flag('share_stopped', 'screen share stopped'); });
+      } catch(_){ flag('share_stopped', 'screen share declined'); }
+      function grab(v){
+        if (!v || !v.videoWidth) return null;
+        var c = document.createElement('canvas');
+        c.width = 320; c.height = Math.round(320 * v.videoHeight / v.videoWidth);
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.6);
+      }
+      async function up(kind, v){
+        if (M.media.up >= 12) return;
+        var d = grab(v); if (!d) return;
+        try {
+          var r = await fetch(uploadUrl, {method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({img: d, kind: kind})});
+          if (r.ok){
+            var j = await r.json().catch(function(){ return {}; });
+            if (j.stored) M.media.up++;
+            else if (j.cap_reached) M.media.up = 12;
+          }
+        } catch(_){}
+      }
+      async function snapTick(){
+        M.media.tick++;
+        await up('cam', M.media.camV);
+        if (M.media.tick % 2 === 0) await up('scr', M.media.scrV);
+      }
+      M.media.timer = setInterval(snapTick, 90000);
+      setTimeout(snapTick, 8000);
+    },
     summary: function(){
+      if (M.media){
+        try { clearInterval(M.media.timer); } catch(_){}
+        ['cam','scr'].forEach(function(k){
+          try { (M.media[k] && M.media[k].getTracks() || []).forEach(function(t){ t.stop(); }); } catch(_){}
+        });
+      }
+      return this._summarize();
+    },
+    _summarize: function(){
       onBack();   // close any open away-stretch into the totals
       return {
         enabled: true, flags_schema: 1, mode: M.pasteMode,

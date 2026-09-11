@@ -190,6 +190,7 @@ def main():
                            {"application_id": "0" * 24}),
                 ("GET",    f"/api/jobs/{job_b}/mcq-report/{'0' * 24}", {}),
                 ("GET",    f"/api/jobs/{job_b}/pipeline",       {}),
+                ("GET",    f"/api/jobs/{job_b}/mcq-snapshots/{'0' * 24}", {}),
             ]
             for method, path, data in probes:
                 r = c.request(method, path, headers=hdr(t_owner_a),

@@ -4080,11 +4080,17 @@ async def mcq_filter_save(request: Request, job_id: str):
         # instruction screen, always (no silent blocking or recording).
         if body.get("paste_mode") in ("restrict", "monitor"):
             mf["paste_mode"] = body["paste_mode"]
-        if "time_limit_minutes" in body:
+        # Timer model: an OVERALL budget of question_count x seconds_per_question
+        # (default 45s) — the candidate spends it freely across questions.
+        if "seconds_per_question" in body:
             try:
-                mf["time_limit_minutes"] = max(0, min(180, int(body.get("time_limit_minutes") or 0)))
+                mf["seconds_per_question"] = max(15, min(120, int(body.get("seconds_per_question") or 45)))
             except Exception:
-                mf["time_limit_minutes"] = 0
+                mf["seconds_per_question"] = 45
+        # Proctoring level: light (default — no camera) or full (camera +
+        # screen snapshots, the interview's machinery; denial FLAGS, never blocks).
+        if body.get("proctor_level") in ("light", "full"):
+            mf["proctor_level"] = body["proctor_level"]
         await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
                                  {"$set": {"mcq_filter": mf}})
         return {"success": True, "mcq_filter": serialize_mongo(mf)}
@@ -4108,11 +4114,18 @@ async def apply_mcq_questions(token: str):
     # monitored, before question 1. Never the answer key.
     # scenario is candidate-visible content (the situation the questions are
     # about) — the correct index still never leaves the server.
+    try:
+        spq = max(15, min(120, int(mf.get("seconds_per_question") or 45)))
+    except Exception:
+        spq = 45
     return {"questions": [{"q": q["q"], "options": q["options"],
                            **({"scenario": q["scenario"]} if q.get("scenario") else {})}
                           for q in qs],
             "paste_mode": ("monitor" if mf.get("paste_mode") == "monitor" else "restrict"),
-            "time_limit_minutes": int(mf.get("time_limit_minutes") or 0),
+            # OVERALL time budget: count x seconds_per_question, spent freely.
+            "seconds_per_question": spq,
+            "total_seconds": len(qs) * spq,
+            "proctor_level": ("full" if mf.get("proctor_level") == "full" else "light"),
             "can_go_back": True,
             # Drives the instruction page's language: pure English, or the
             # hand-written Banglish template (never machine-translated).
@@ -4150,11 +4163,10 @@ async def apply_mcq_submit(request: Request, token: str, application_id: str):
         body, choices = {}, None
     if not isinstance(choices, list) or len(choices) != len(qs):
         raise HTTPException(status_code=400, detail="Please answer every question.")
-    # Auto-submit on timeout (jobs WITH a time limit only): unanswered
-    # questions arrive as -1 and are simply incorrect. Jobs without a limit
-    # keep the strict all-answered rule — exactly the pre-existing behavior.
-    has_limit = int(mf.get("time_limit_minutes") or 0) > 0
-    timed_out = bool(body.get("timed_out")) and has_limit
+    # Auto-submit on timeout: every test now has a computed overall budget
+    # (count x seconds_per_question), so unanswered questions may arrive as
+    # -1 on a timeout and simply grade as incorrect.
+    timed_out = bool(body.get("timed_out"))
     score = 0
     clean = []
     for i, q in enumerate(qs):
@@ -4404,6 +4416,77 @@ async def job_pipeline_view(request: Request, job_id: str):
             "counts": counts, "stage_order": order, "rows": rows}
 
 
+@app.post("/api/apply/{token}/assessment-snapshot/{application_id}")
+async def assessment_snapshot_upload(request: Request, token: str, application_id: str):
+    """FULL-proctoring MCQ assessments only: the page uploads a periodic still
+    snapshot (camera or screen), exactly the interview's pattern — token-authed,
+    rate-limited, per-application capped, byte-capped. Snapshots ride the
+    existing proctor_snapshots store (30-day TTL) keyed by application_id."""
+    from bson import ObjectId as _OID
+    job = await get_job_by_public_token(token)
+    if not job:
+        raise HTTPException(status_code=404, detail="Not available.")
+    mf = job.get("mcq_filter") or {}
+    if not (mf.get("enabled") and mf.get("proctor_level") == "full"):
+        raise HTTPException(status_code=404, detail="Not available.")
+    if not await rate_limit_allows(f"asnap:{application_id}", 20, 600):
+        raise HTTPException(status_code=429, detail="Too many uploads.")
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not available.")
+    app_doc = await db.applications.find_one({"_id": aid, "job_id": str(job["_id"])},
+                                             {"funnel": 1, "mcq_score": 1})
+    if not app_doc or app_doc.get("funnel") != "mcq" or app_doc.get("mcq_score") is not None:
+        # Unknown, non-funnel, or already-submitted test: nothing to store.
+        raise HTTPException(status_code=404, detail="Not available.")
+    try:
+        body = await request.json()
+        img = str(body.get("img", ""))
+        kind = "scr" if body.get("kind") == "scr" else "cam"
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    prefix = "data:image/jpeg;base64,"
+    if not img.startswith(prefix):
+        raise HTTPException(status_code=400, detail="JPEG data URL required.")
+    import base64
+    try:
+        data = base64.b64decode(img[len(prefix):], validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image data.")
+    if not data or len(data) > SNAPSHOT_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Snapshot too large.")
+    if await db.proctor_snapshots.count_documents({"application_id": application_id}) >= 12:
+        return {"stored": False, "cap_reached": True}
+    await save_proctor_snapshot(f"mcq:{token}", str(job.get("user_id") or ""),
+                                application_id, kind, data, "")
+    return {"stored": True}
+
+
+@app.get("/api/jobs/{job_id}/mcq-snapshots/{application_id}")
+async def mcq_assessment_snapshots(request: Request, job_id: str, application_id: str):
+    """Recruiter: stored FULL-proctoring frames for one assessment. Org-scoped
+    via owned_job — same access discipline as the interview snapshots."""
+    user = await get_current_user(request)
+    job = await owned_job(job_id, user)
+    from bson import ObjectId as _OID
+    try:
+        aid = _OID(application_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found.")
+    if not await db.applications.find_one({"_id": aid, "job_id": str(job["_id"])}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Not found.")
+    import base64
+    out = []
+    async for s in db.proctor_snapshots.find({"application_id": application_id}) \
+            .sort("created_at", 1).limit(20):
+        if s.get("data"):
+            out.append({"kind": s.get("kind"),
+                        "created_at": s["created_at"].isoformat() if s.get("created_at") else None,
+                        "img": "data:image/jpeg;base64," + base64.b64encode(s["data"]).decode()})
+    return {"snapshots": out}
+
+
 @app.get("/api/jobs/{job_id}/mcq-report/{application_id}")
 async def mcq_assessment_report(request: Request, job_id: str, application_id: str):
     """Recruiter's per-candidate ASSESSMENT REPORT (org-scoped via owned_job):
@@ -4454,7 +4537,10 @@ async def mcq_assessment_report(request: Request, job_id: str, application_id: s
             "taken_at": str(a.get("mcq_taken_at") or ""),
             "total_seconds": a.get("assessment_total_seconds"),
             "timed_out": bool(a.get("assessment_timed_out")),
-            "time_limit_minutes": int((job.get("mcq_filter") or {}).get("time_limit_minutes") or 0),
+            "seconds_per_question": int((job.get("mcq_filter") or {}).get("seconds_per_question") or 45),
+            "budget_seconds": len(qs) * int((job.get("mcq_filter") or {}).get("seconds_per_question") or 45),
+            "proctor_level": ("full" if (job.get("mcq_filter") or {}).get("proctor_level") == "full"
+                              else "light"),
             "paste_mode": ("monitor" if (job.get("mcq_filter") or {}).get("paste_mode") == "monitor"
                            else "restrict"),
         },

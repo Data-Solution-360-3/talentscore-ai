@@ -1508,6 +1508,7 @@ img,svg,video{max-width:100%}
       <button class="btn btn-ghost btn-sm" onclick="actionAddEmployee()" title="Create an employee record pre-filled from this candidate">＋ Add as employee</button>
       <button class="btn btn-ghost btn-sm" onclick="openEmailComposer()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>Send email</button>
       <button class="btn btn-ghost btn-sm" id="open-full-report">Open full report</button>
+      <button class="btn btn-ghost btn-sm" id="btn-assess" style="display:none" onclick="candAssessReport()" title="MCQ assessment report — per-question times, marks, activity log">☑ Assessment</button>
       <button class="btn btn-ghost btn-sm" id="btn-erase" style="display:none;color:var(--red,#dc2626)" onclick="eraseCandidate()" title="Permanently delete ALL of this candidate's data (privacy erasure) — irreversible">Erase data…</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('cand-modal')">Close</button>
     </div>
@@ -2493,6 +2494,12 @@ function openCandModal(id){
   const risks=(rep&&rep.hiringRisks)?rep.hiringRisks:(r.hiring_risks||[]).filter(x=>String(x).toLowerCase()!=='none identified');
 
   document.getElementById('cand-modal-name').textContent=(r.candidate_name||'Candidate')+' — AI Report';
+  // Funnel candidates carry their application — the MCQ assessment report
+  // (times, marks, activity) opens straight from here now, not only from
+  // the job modal's funnel table.
+  window._candApp = r.application_id ? {appId:String(r.application_id), jobId:String(r.job_id||'')} : null;
+  const _ba=document.getElementById('btn-assess');
+  if(_ba) _ba.style.display = window._candApp ? '' : 'none';
   document.getElementById('open-full-report').onclick=()=>{window.location.href='/candidate?id='+id;};
   document.getElementById('cand-modal-body').innerHTML=`
     ${r.viva_capped ? `
@@ -4444,6 +4451,9 @@ function renderJobConfigTabs(job){
     window._mcqfState = { jobId: job._id, mf: job.mcq_filter || null,
                           editing: false, work: null, funnel: null };
     mcqfRender();
+    // The funnel (and its per-candidate Reports) AUTO-LOADS — an empty panel
+    // behind a manual Refresh is how the assessment reports went invisible.
+    if((job.mcq_filter||{}).enabled) mcqFunnelLoad();
   }
   // Viva tab: interview-question set (draft/approve), unchanged machinery.
   if(document.getElementById('iq-body')){
@@ -4876,13 +4886,18 @@ function mcqfRender(){
             <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
             <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
           </select></label>
-        <label class="jt-label">Time limit (min, 0 = none)
-          <input id="mcqf-tl" type="number" min="0" max="180" value="${mf.time_limit_minutes||0}" style="width:60px"></label>
+        <label class="jt-label" title="The test's total time = question count × this">Sec / question
+          <input id="mcqf-spq" type="number" min="15" max="120" value="${mf.seconds_per_question||45}" style="width:56px"></label>
+        <label class="jt-label">Proctoring
+          <select id="mcqf-pl">
+            <option value="light" ${mf.proctor_level!=='full'?'selected':''}>Light — tab/paste/timing only, no camera</option>
+            <option value="full" ${mf.proctor_level==='full'?'selected':''}>Full — camera + screen snapshots (disclosed)</option>
+          </select></label>
         <button class="btn btn-xs btn-primary" onclick="mcqfSettings()">Save settings</button>
       </div>
-      ${(mf.paste_mode==null && mf.time_limit_minutes==null)
-        ? `<div class="jt-help" style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted, no time limit, so no countdown shows). Click Save settings to persist.</div>`
-        : `<div class="jt-help">The instruction screen shows candidates these exact rules.</div>`}
+      ${(mf.paste_mode==null && mf.seconds_per_question==null)
+        ? `<div class="jt-help" style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted · 45s/question · Light). Click Save settings to persist.</div>`
+        : `<div class="jt-help">Total time = questions × sec/question (e.g. 15 × 45s ≈ 11 min), spent freely. The instruction screen shows candidates these exact rules${mf.proctor_level==='full'?' — including the camera + screen request; denial flags, never blocks':''}.</div>`}
     </div>`;
   }
   if(on){
@@ -4995,17 +5010,22 @@ function mcqfScenEdit(startIdx, val){
 async function mcqfSettings(){
   const d=await mcqfApi({action:'settings',
     paste_mode:document.getElementById('mcqf-pm').value,
-    time_limit_minutes:parseInt(document.getElementById('mcqf-tl').value)||0});
+    seconds_per_question:parseInt(document.getElementById('mcqf-spq').value)||45,
+    proctor_level:document.getElementById('mcqf-pl').value});
   if(d){ mcqfRender(); toast('Assessment settings saved — the instruction screen now shows these rules.',{type:'success'}); }
 }
 // ── Per-candidate ASSESSMENT REPORT (Pathao #9): assessment info,
 //    per-question analysis, and the written activity log. Review data for a
 //    human — nothing here auto-disqualifies. ──
-async function mcqfReport(appId){
-  const st=window._mcqfState;
-  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-report/'+appId,{credentials:'include'});
+function candAssessReport(){
+  if(!window._candApp){ toast('No MCQ assessment for this candidate.',{type:'warning'}); return; }
+  mcqfReport(window._candApp.appId, window._candApp.jobId);
+}
+async function mcqfReport(appId, jobId){
+  const jid = jobId || (window._mcqfState&&window._mcqfState.jobId);
+  const r=await fetch('/api/jobs/'+jid+'/mcq-report/'+appId,{credentials:'include'});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok){ toast(d.detail||'Could not load report',{type:'error'}); return; }
+  if(!r.ok){ toast(r.status===404?'No MCQ assessment for this candidate.':(d.detail||'Could not load report'),{type:r.status===404?'warning':'error'}); return; }
   if(!document.getElementById('mcqr-modal')){
     document.body.insertAdjacentHTML('beforeend',
       `<div class="modal-overlay" id="mcqr-modal"><div class="modal modal-lg">
@@ -5020,7 +5040,8 @@ async function mcqfReport(appId){
   const mmss=s=>{s=Math.round(+s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
   let html=`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-bottom:.7rem">
     <span>Score <b>${a.score??'—'}/${a.total??'—'}${a.pct!=null?' ('+a.pct+'%)':''}</b></span>
-    <span>Duration <b>${a.total_seconds!=null?mmss(a.total_seconds):'—'}</b>${a.time_limit_minutes?' of '+a.time_limit_minutes+' min limit':''}</span>
+    <span>Duration <b>${a.total_seconds!=null?mmss(a.total_seconds):'—'}</b>${a.budget_seconds?' of '+mmss(a.budget_seconds)+' budget ('+((d.questions||[]).length)+'×'+(a.seconds_per_question||45)+'s)':''}</span>
+    ${a.proctor_level==='full'?'<span style="color:var(--orange2)"><b>Full proctoring</b> (camera+screen)</span>':''}
     ${a.timed_out?'<span style="color:var(--amber,#B45309)"><b>auto-submitted at timeout</b></span>':''}
     <span>Mode: <b>${a.paste_mode==='monitor'?'copy/paste allowed (recorded)':'copy/paste restricted'}</b></span>
     <span style="color:var(--t3)">submitted ${escapeHtml((a.taken_at||'').slice(0,16).replace('T',' '))}</span>
@@ -5056,8 +5077,23 @@ async function mcqfReport(appId){
   }else{
     html+=`<div style="background:var(--s2);border:1px dashed var(--border);border-radius:var(--rs);padding:.7rem .9rem;font-size:.83rem;color:var(--t2)">No activity log stored — this assessment was taken before activity monitoring shipped (11 Sep 2026). The absence of flags is a storage gap, not a clean signal.</div>`;
   }
+  if(a.proctor_level==='full'){
+    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.8rem 0 .4rem">Stored frames <span style="text-transform:none;letter-spacing:0;font-weight:500">— ≤12 stills, 30-day retention</span></div>
+    <div id="mcqr-snaps" style="display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--t3)">Loading…</div>`;
+  }
   document.getElementById('mcqr-body').innerHTML=html;
   openModal('mcqr-modal');
+  if(a.proctor_level==='full'){
+    try{
+      const sr=await fetch('/api/jobs/'+jid+'/mcq-snapshots/'+appId,{credentials:'include'});
+      const sd=sr.ok?await sr.json():{snapshots:[]};
+      const wrap=document.getElementById('mcqr-snaps');
+      const snaps=sd.snapshots||[];
+      wrap.innerHTML=snaps.length
+        ? snaps.map(sn=>`<figure style="margin:0"><img src="${sn.img}" style="height:92px;border-radius:8px;border:1px solid var(--border);display:block" alt="assessment frame"><figcaption style="font-size:9.5px;color:var(--t3);margin-top:2px">${escapeHtml((sn.created_at||'').replace('T',' ').slice(5,16))} · ${sn.kind==='scr'?'screen':'camera'}</figcaption></figure>`).join('')
+        : 'No frames stored — camera/screen was denied or unavailable (see the flags above), or the frames passed their 30-day retention.';
+    }catch(_){}
+  }
 }
 async function mcqfReinvite(appId){
   if(!confirm('Send a fresh interview invite? The old link is permanently killed and the candidate gets a new email with a new deadline.')) return;

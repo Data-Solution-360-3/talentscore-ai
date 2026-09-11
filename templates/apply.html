@@ -238,6 +238,7 @@ input,select,textarea{max-width:100%}
             • You <b>can go back</b> to any previous question and change your answer, any time before submitting.<br>
             • <span class="mi-time">No time limit — take the time you need.</span><br>
             • <span class="mi-paste"></span><br>
+            <span class="mi-proc" style="display:none">• <span class="mi-proc-t"></span><br></span>
             • Switching browser tabs or windows will <b>not end your test</b> — but when you leave and how long you're away is recorded.<br>
             • <b>To submit:</b> on the last question press <b>Submit answers</b> — you'll see a confirmation screen, and you're done.<br>
             • <b>After you submit:</b> a person on the {{COMPANY}} hiring team reviews your test together with your CV. Strong results may be invited to an interview.
@@ -260,6 +261,7 @@ input,select,textarea{max-width:100%}
             • Submit করার আগ পর্যন্ত <b>আগের যেকোনো question এ ফিরে গিয়ে</b> answer change করতে পারবেন।<br>
             • <span class="mi-time">কোনো time limit নেই — আপনার প্রয়োজনমতো সময় নিন।</span><br>
             • <span class="mi-paste"></span><br>
+            <span class="mi-proc" style="display:none">• <span class="mi-proc-t"></span><br></span>
             • অন্য tab বা window তে গেলে test <b>বন্ধ হয়ে যাবে না</b> — তবে কখন গেলেন আর কতক্ষণ বাইরে ছিলেন, সেটা record হয়।<br>
             • <b>Submit করবেন যেভাবে:</b> শেষ question এ গিয়ে <b>Submit answers</b> button চাপুন — confirmation screen দেখলেই আপনার কাজ শেষ।<br>
             • <b>Submit এর পরে:</b> {{COMPANY}} এর hiring team এর একজন মানুষ আপনার test আর CV একসাথে review করবেন। ভালো করলে interview এর invitation পেতে পারেন।
@@ -324,7 +326,7 @@ input,select,textarea{max-width:100%}
   </div>
 </div>
 
-<script src="/static/assessment_monitor.js?v=1"></script>
+<script src="/static/assessment_monitor.js?v=2"></script>
 <script>
 const TOKEN = "{{TOKEN}}";
 const MAX_BYTES = {{MAX_MB}} * 1024 * 1024;
@@ -453,7 +455,10 @@ async function startMcq(appId){
     const d = await r.json();
     const qs = d.questions||[];
     if(!qs.length) throw new Error('empty');
-    _mcq = {appId, qs, mode:d.paste_mode||'restrict', limitMin:d.time_limit_minutes||0,
+    _mcq = {appId, qs, mode:d.paste_mode||'restrict',
+            budget: d.total_seconds || (qs.length * (d.seconds_per_question||45)),
+            spq: d.seconds_per_question || 45,
+            level: d.proctor_level === 'full' ? 'full' : 'light',
             cur:0, answers:qs.map(()=>-1),
             timings:qs.map(()=>({first_opened_at:null,total_ms:0,returns:0,answer_changes:0,visited:false})),
             started:0, activeSince:0, deadline:0, clock:null};
@@ -482,11 +487,18 @@ async function startMcq(appId){
     document.getElementById('mi-en').style.display = bn ? 'none' : 'block';
     document.getElementById('mi-bn').style.display = bn ? 'block' : 'none';
     block.querySelectorAll('.mi-count').forEach(el => el.textContent = qs.length);
-    block.querySelectorAll('.mi-time').forEach(el => el.innerHTML = _mcq.limitMin
-      ? (bn ? 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — remaining time screen এ দেখা যাবে; সময় শেষ হয়ে গেলে তখন পর্যন্ত দেওয়া answers <b>automatically submit</b> হয়ে যাবে।'
-            : 'Time limit: <b>'+_mcq.limitMin+' minutes</b> — the remaining time is shown on screen; when it runs out, your answers so far are <b>submitted automatically</b>.')
-      : (bn ? 'কোনো time limit নেই — আপনার প্রয়োজনমতো সময় নিন।'
-            : 'No time limit — take the time you need.'));
+    // OVERALL budget = questions x seconds-per-question, spent freely.
+    const bm = Math.floor(_mcq.budget/60), bs = _mcq.budget%60;
+    const bstr = bm + (bs ? ':'+String(bs).padStart(2,'0') : '') + ' min';
+    block.querySelectorAll('.mi-time').forEach(el => el.innerHTML =
+      bn ? 'Time limit: <b>'+bstr+' total</b> ('+qs.length+' questions × '+_mcq.spq+'s) — পুরো সময়টা আপনার ইচ্ছামতো ভাগ করে নিন, কোনো প্রশ্নে বেশি, কোনোটায় কম। সময় শেষ হলে তখন পর্যন্ত দেওয়া answers <b>automatically submit</b> হয়ে যাবে।'
+         : 'Time limit: <b>'+bstr+' total</b> ('+qs.length+' questions × '+_mcq.spq+'s) — spend it however you like across questions. When it runs out, your answers so far are <b>submitted automatically</b>.');
+    if(_mcq.level === 'full'){
+      block.querySelectorAll('.mi-proc').forEach(el => el.style.display = '');
+      block.querySelectorAll('.mi-proc-t').forEach(el => el.innerHTML =
+        bn ? 'এই test এ <b>camera এবং full screen share</b> চাওয়া হবে — সর্বোচ্চ 12 টা still snapshot নেওয়া হয় (30 দিন রাখা হয়; কোনো continuous video না)। Camera/screen দিতে না পারলেও test চলবে — hiring team শুধু একটা flag দেখবে।'
+         : 'This test asks for your <b>camera and full screen share</b> — up to 12 still snapshots are taken (kept 30 days; never continuous video). If you can\'t share them, the test still continues — the hiring team just sees a flag.');
+    }
     block.querySelectorAll('.mi-paste').forEach(el => el.innerHTML = _mcq.mode==='monitor'
       ? (bn ? 'Copy-paste <b>allowed</b> — তবে প্রতিবার ব্যবহার করলে সেটা hiring team এর জন্য record হবে।'
             : 'Copy and paste are <b>allowed</b>, but every use is recorded for the hiring team.')
@@ -504,12 +516,17 @@ function mcqBegin(){
   document.getElementById('mcq-quiz').style.display='block';
   _mcqResume();
 }
-function _mcqResume(){
+async function _mcqResume(){
   AssessMonitor.start({pasteMode:_mcq.mode, storageKey:_mcqKey()});
-  // The clock ALWAYS runs: a countdown when the job set a limit (auto-submit
-  // at zero — the only automatic action, disclosed on the instruction page),
-  // an elapsed timer otherwise.
-  if(_mcq.limitMin) _mcq.deadline = _mcq.started + _mcq.limitMin*60000;
+  // FULL proctoring level: camera + screen requested BEFORE question 1
+  // (disclosed on the instruction page). Denial only flags — never blocks.
+  if(_mcq.level === 'full' && window.AssessMonitor.startMedia){
+    try{ await AssessMonitor.startMedia('/api/apply/'+TOKEN+'/assessment-snapshot/'+encodeURIComponent(_mcq.appId)); }catch(_){}
+  }
+  // One overall countdown for the whole test: budget = questions x seconds
+  // per question, spent freely. Auto-submit at zero is the only automatic
+  // action, disclosed on the instruction page.
+  _mcq.deadline = _mcq.started + _mcq.budget*1000;
   _mcq.clock = setInterval(_mcqTick, 1000); _mcqTick();
   _mcqShow(_mcq.cur);
   _mcqSave();
@@ -517,15 +534,10 @@ function _mcqResume(){
 function _mcqmmss(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function _mcqTick(){
   const el = document.getElementById('mcq-clock');
-  if(_mcq.limitMin){
-    const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
-    el.textContent = '⏱ '+_mcqmmss(left)+' left';
-    el.classList.toggle('warn', left<=60);
-    if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
-  }else{
-    el.textContent = '⏱ '+_mcqmmss((Date.now()-_mcq.started)/1000);
-    el.classList.remove('warn');
-  }
+  const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
+  el.textContent = '⏱ '+_mcqmmss(left)+' left';
+  el.classList.toggle('warn', left<=60);
+  if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
 }
 function _mcqCloseTiming(){
   if(_mcq.activeSince){
