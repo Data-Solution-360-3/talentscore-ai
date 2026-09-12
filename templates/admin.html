@@ -232,6 +232,12 @@ img,video{max-width:100%}
       <span class="sb-badge" id="sb-demos-cnt">0</span>
     </button>
 
+    <div class="sb-section">Billing</div>
+    <button class="sb-item" onclick="nav('billing')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Usage &amp; Billing
+    </button>
+
     <div class="sb-section">Content Editor</div>
     <button class="sb-item" onclick="nav('edit-landing')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -287,6 +293,47 @@ img,video{max-width:100%}
             <thead><tr><th>Company</th><th>Email</th><th>Plan</th><th>Screenings</th><th>Joined</th><th>Status</th></tr></thead>
             <tbody id="recent-tbl"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USAGE & BILLING (super-admin) — client PRICE at set rates.
+         Estimate view only, never an invoice; separate from the OpenAI meter. -->
+    <div class="page" id="page-billing">
+      <div class="page-hd-row">
+        <div class="page-hd"><h1>Usage &amp; Billing</h1><p>Usage &amp; cost summary — an estimate of usage × current rates. <b>Not an invoice.</b></p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadBilling()">↻ Refresh</button>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">Per-unit rates (Taka)</div>
+          <span class="card-sub">MCQ test taken · CV scored · interview completed — stored exactly (integer paisa)</span></div>
+        <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Scope</label>
+            <select id="bl-scope" onchange="blScopeChange()" style="min-width:180px"><option value="default">Platform default</option></select></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">MCQ (৳ each)</label>
+            <input id="bl-mcq" placeholder="0.5" style="width:90px"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">CV scored (৳ each)</label>
+            <input id="bl-cv" placeholder="3" style="width:90px"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Interview (৳ each)</label>
+            <input id="bl-iv" placeholder="20" style="width:90px"></div>
+          <button class="btn btn-sm" onclick="blSaveRates()">Save rates</button>
+          <button class="btn btn-ghost btn-sm" id="bl-clear" style="display:none" onclick="blClearOverride()">Clear override (use default)</button>
+        </div>
+        <div id="bl-rates-msg" style="font-size:11.5px;margin-top:8px;color:var(--t3,#6B7280)"></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Usage by client</div><span class="card-sub" id="bl-grand"></span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Client / Job</th><th>MCQ taken</th><th>CVs scored</th><th>Interviews</th><th>৳ MCQ</th><th>৳ CV</th><th>৳ Interview</th><th>৳ Total</th></tr></thead>
+            <tbody id="bl-tbl"><tr><td colspan="8" class="tbl-empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:11px;color:var(--t3,#6B7280);margin-top:8px;line-height:1.5">
+          Billable events, each counted exactly once: an MCQ counts when the candidate <b>completed</b> the test (retakes are impossible);
+          a CV counts per <b>scoring run</b> that produced a verdict (re-viewing never counts; a genuine re-score counts again);
+          an interview counts only when the session <b>completed</b> (abandoned and ejected sessions never count).
+          This summary is your internal price view — clients never see it. It is separate from the OpenAI cost meter.
         </div>
       </div>
     </div>
@@ -571,6 +618,79 @@ function nav(id){
   if(id==='edit-landing')loadLandingContent();
   if(id==='settings')loadSettings();
   if(id==='demos')loadDemos();
+  if(id==='billing')loadBilling();
+}
+
+// ── USAGE & BILLING (super-admin) — client-price view. All money strings
+//    come preformatted from the server's integer-paisa math; this JS never
+//    does arithmetic on Taka amounts. ──
+let _blRates=null, _blUsage=null;
+async function loadBilling(){
+  try{
+    const [r1,r2]=await Promise.all([tFetch('/api/admin/billing/rates'),tFetch('/api/admin/billing/usage')]);
+    if(!r1.ok||!r2.ok) throw new Error('load failed');
+    _blRates=await r1.json(); _blUsage=await r2.json();
+  }catch(e){
+    document.getElementById('bl-tbl').innerHTML='<tr><td colspan="8" class="tbl-empty" style="color:#f43f5e">Failed to load <button class="btn btn-xs" onclick="loadBilling()">Retry</button></td></tr>';
+    return;
+  }
+  // scope dropdown: default + every org seen in usage
+  const sel=document.getElementById('bl-scope'), cur=sel.value;
+  sel.innerHTML='<option value="default">Platform default</option>'
+    +(_blUsage.orgs||[]).filter(o=>o.org_id).map(o=>`<option value="${o.org_id}">${escBl(o.name)}</option>`).join('');
+  if([...sel.options].some(op=>op.value===cur)) sel.value=cur;
+  blScopeChange();
+  // usage table
+  const rows=[];
+  (_blUsage.orgs||[]).forEach(o=>{
+    rows.push(`<tr style="background:rgba(99,153,34,.06);font-weight:700"><td>${escBl(o.name)}${o.rates_source==='override'?' <span class="badge b-amber" title="Uses its own override rates">custom rates</span>':''}</td>
+      <td>${o.counts.mcq}</td><td>${o.counts.cv}</td><td>${o.counts.interview}</td>
+      <td>৳${o.cost_tk.mcq}</td><td>৳${o.cost_tk.cv}</td><td>৳${o.cost_tk.interview}</td><td>৳${o.total_tk}</td></tr>`);
+    (o.jobs||[]).forEach(j=>{
+      rows.push(`<tr><td style="padding-left:26px;color:#4A5443">${escBl(j.title)}</td>
+        <td>${j.counts.mcq}</td><td>${j.counts.cv}</td><td>${j.counts.interview}</td>
+        <td>৳${j.cost_tk.mcq}</td><td>৳${j.cost_tk.cv}</td><td>৳${j.cost_tk.interview}</td><td>৳${j.total_tk}</td></tr>`);
+    });
+  });
+  document.getElementById('bl-tbl').innerHTML=rows.join('')||'<tr><td colspan="8" class="tbl-empty">No billable usage yet.</td></tr>';
+  document.getElementById('bl-grand').textContent='Grand total: ৳'+(_blUsage.grand_total_tk||'0')+' · estimate at current rates';
+}
+function escBl(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function blScopeChange(){
+  const sc=document.getElementById('bl-scope').value;
+  const msg=document.getElementById('bl-rates-msg');
+  document.getElementById('bl-clear').style.display = sc==='default'?'none':'';
+  if(sc==='default'){
+    const d=(_blRates&&_blRates.default)||{};
+    setBl(d.mcq_tk,d.cv_tk,d.interview_tk);
+    msg.textContent='Platform default — applies to every client without an override.';
+  }else{
+    const ov=((_blRates&&_blRates.overrides)||[]).find(o=>o.org_id===sc);
+    if(ov){ setBl(ov.mcq_tk,ov.cv_tk,ov.interview_tk); msg.textContent='This client has OVERRIDE rates.'; }
+    else{ const d=(_blRates&&_blRates.default)||{}; setBl(d.mcq_tk,d.cv_tk,d.interview_tk);
+      msg.textContent='No override — showing the default. Saving here creates an override for this client.'; }
+  }
+}
+function setBl(a,b,c){ document.getElementById('bl-mcq').value=a||'0';
+  document.getElementById('bl-cv').value=b||'0'; document.getElementById('bl-iv').value=c||'0'; }
+async function blSaveRates(){
+  const sc=document.getElementById('bl-scope').value;
+  const body={scope:sc, mcq_tk:document.getElementById('bl-mcq').value.trim(),
+              cv_tk:document.getElementById('bl-cv').value.trim(),
+              interview_tk:document.getElementById('bl-iv').value.trim()};
+  const r=await fetch('/api/admin/billing/rates',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ document.getElementById('bl-rates-msg').innerHTML='<span style="color:#f43f5e">'+escBl(d.detail||'Save failed')+'</span>'; return; }
+  document.getElementById('bl-rates-msg').textContent='Saved — MCQ ৳'+d.mcq_tk+' · CV ৳'+d.cv_tk+' · Interview ৳'+d.interview_tk+'. Totals recomputed.';
+  loadBilling();
+}
+async function blClearOverride(){
+  const sc=document.getElementById('bl-scope').value;
+  if(sc==='default'||!confirm('Remove this client\'s override — they will use the platform default rates?')) return;
+  await fetch('/api/admin/billing/rates',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:sc,action:'clear_override'})});
+  loadBilling();
 }
 
 // ── MODALS ──

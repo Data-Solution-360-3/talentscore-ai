@@ -6464,6 +6464,194 @@ async def admin_list_users(request: Request):
     return {"users": users, "count": len(users)}
 
 
+# ─────────────────────────────────────────────────────────────
+# CLIENT USAGE & BILLING (super-admin ONLY) — what each client's usage COSTS
+# at the platform-set per-unit rates. Read-side counting over records that
+# already exist; INTEGER PAISA arithmetic throughout — a Taka amount never
+# passes through a float, so 0.5 Tk × 1000 is exactly 500 Tk. This is an
+# ESTIMATE view ("usage × current rates"), never an invoice — and it is the
+# CLIENT-PRICE view, entirely separate from the OpenAI cost meter (our cost).
+#
+# Billable rules (approved 2026-09-12):
+#   MCQ       = test COMPLETED — mcq_score exists; the apply-side atomic
+#               one-shot guard makes a retake impossible, so exactly-once
+#               is enforced by the database, not by this query.
+#   CV        = a scoring RUN that produced a verdict (overall_score set).
+#               One screening doc per run: a genuine re-score is a new doc
+#               and bills again; viewing a result is a read and never bills.
+#   INTERVIEW = COMPLETED sessions only. Abandoned and ejected
+#               (policy_violation) sessions never bill.
+# ─────────────────────────────────────────────────────────────
+
+_BILL_STAGES = ("mcq", "cv", "interview")
+
+
+def _parse_tk_to_paisa(v) -> int:
+    """'0.5' -> 50, '3' -> 300, '20.25' -> 2025. String parsing ONLY — the
+    amount never touches a float. Up to 2 decimals; bad input -> ValueError."""
+    s = str(v if v is not None else "").strip()
+    if not s:
+        return 0
+    m = _brand_re.match(r"^(\d{1,7})(?:\.(\d{1,2}))?$", s)
+    if not m:
+        raise ValueError(f"'{s}' is not a valid Taka amount (digits, up to 2 decimals).")
+    return int(m.group(1)) * 100 + int((m.group(2) or "").ljust(2, "0") or 0)
+
+
+def _paisa_to_tk_str(p: int) -> str:
+    """Integer paisa -> exact Taka string ('50000' paisa -> '500';
+    '2025' -> '20.25'). Pure integer arithmetic."""
+    p = int(p)
+    sign, p = ("-", -p) if p < 0 else ("", p)
+    return f"{sign}{p // 100}" + (f".{p % 100:02d}" if p % 100 else "")
+
+
+async def _billing_rates(org_id: str | None = None) -> dict:
+    """Merged per-unit rates in paisa: the org's override if one exists,
+    else the platform default. Zero when nothing is configured yet."""
+    base = await db.billing_rates.find_one({"_id": "default"}) or {}
+    rates = {k: int(base.get(f"{k}_paisa") or 0) for k in _BILL_STAGES}
+    source = "default"
+    if org_id:
+        o = await db.billing_rates.find_one({"_id": f"org:{org_id}"})
+        if o:
+            rates = {k: int(o.get(f"{k}_paisa") or 0) for k in _BILL_STAGES}
+            source = "override"
+    return {"rates_paisa": rates, "source": source}
+
+
+@app.get("/api/admin/billing/rates")
+async def admin_billing_rates_get(request: Request):
+    await require_admin(request)
+    default = await db.billing_rates.find_one({"_id": "default"}) or {}
+    name_map = {str(o["_id"]): str(o.get("name") or "") async for o in
+                db.orgs.find({}, {"name": 1})}
+    overrides = []
+    async for o in db.billing_rates.find({"_id": {"$regex": "^org:"}}):
+        oid = str(o["_id"])[4:]
+        overrides.append({"org_id": oid, "name": name_map.get(oid) or oid,
+                          **{f"{k}_tk": _paisa_to_tk_str(int(o.get(f"{k}_paisa") or 0))
+                             for k in _BILL_STAGES}})
+    return {"default": {f"{k}_tk": _paisa_to_tk_str(int(default.get(f"{k}_paisa") or 0))
+                        for k in _BILL_STAGES},
+            "overrides": overrides}
+
+
+@app.post("/api/admin/billing/rates")
+async def admin_billing_rates_set(request: Request):
+    """Set the default rates, an org override, or clear an override.
+    Rates arrive as Taka strings ('0.5') and are stored as integer paisa."""
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    scope = str(body.get("scope") or "default").strip()
+    if scope != "default":
+        from bson import ObjectId as _OID
+        try:
+            org = await db.orgs.find_one({"_id": _OID(scope)}, {"_id": 1})
+        except Exception:
+            org = None
+        if not org:
+            raise HTTPException(status_code=404, detail="Organization not found.")
+    key = "default" if scope == "default" else f"org:{scope}"
+    if body.get("action") == "clear_override":
+        if scope == "default":
+            raise HTTPException(status_code=400, detail="The default rates cannot be cleared, only changed.")
+        await db.billing_rates.delete_one({"_id": key})
+        return {"success": True, "cleared": scope}
+    doc = {"updated_at": _dt.utcnow(), "updated_by": str(user.get("email") or "")}
+    try:
+        for k in _BILL_STAGES:
+            doc[f"{k}_paisa"] = _parse_tk_to_paisa(body.get(f"{k}_tk"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await db.billing_rates.update_one({"_id": key}, {"$set": doc}, upsert=True)
+    return {"success": True, "scope": scope,
+            **{f"{k}_tk": _paisa_to_tk_str(doc[f"{k}_paisa"]) for k in _BILL_STAGES}}
+
+
+@app.get("/api/admin/billing/usage")
+async def admin_billing_usage(request: Request):
+    """Per-client (org) usage counts x rates, with a per-job breakdown.
+    Counting is aggregation-only — nothing here writes, and nothing here
+    reads the OpenAI meter. Rows missing an org/job stamp (pre-tenancy
+    legacy data, or sessions from manual links) are shown honestly in
+    their own buckets rather than silently dropped."""
+    await require_admin(request)
+    per: dict = {}   # org_id -> job_id -> {mcq, cv, interview}
+
+    def bump(org_id, job_id, stage, n):
+        j = per.setdefault(org_id, {}).setdefault(job_id, dict.fromkeys(_BILL_STAGES, 0))
+        j[stage] += int(n)
+
+    async for r in db.applications.aggregate([
+            {"$match": {"mcq_score": {"$ne": None}}},
+            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
+        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "mcq", r["n"])
+    async for r in db.screenings.aggregate([
+            {"$match": {"overall_score": {"$ne": None}}},
+            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
+        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "cv", r["n"])
+    async for r in db.interview_sessions.aggregate([
+            {"$match": {"status": "completed"}},
+            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
+        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "interview", r["n"])
+
+    # Names for orgs and jobs (one query each; buckets keep working when a
+    # name is missing).
+    from bson import ObjectId as _OID
+    org_names = {str(o["_id"]): str(o.get("name") or "") async for o in
+                 db.orgs.find({}, {"name": 1})}
+    job_ids = [j for jobs in per.values() for j in jobs if j]
+    oids = []
+    for j in set(job_ids):
+        try:
+            oids.append(_OID(j))
+        except Exception:
+            pass
+    job_titles = {str(j["_id"]): str(j.get("title") or "") async for j in
+                  db.jobs.find({"_id": {"$in": oids}}, {"title": 1})}
+
+    orgs_out = []
+    grand_paisa = 0
+    for org_id, jobs in per.items():
+        rr = await _billing_rates(org_id or None)
+        rates = rr["rates_paisa"]
+        org_counts = dict.fromkeys(_BILL_STAGES, 0)
+        job_rows = []
+        for jid, counts in jobs.items():
+            cost = {k: counts[k] * rates[k] for k in _BILL_STAGES}
+            total_p = sum(cost.values())
+            for k in _BILL_STAGES:
+                org_counts[k] += counts[k]
+            job_rows.append({"job_id": jid,
+                             "title": (job_titles.get(jid) or "(deleted job)") if jid
+                                      else "(no job link — manual links / legacy)",
+                             "counts": counts,
+                             "cost_tk": {k: _paisa_to_tk_str(cost[k]) for k in _BILL_STAGES},
+                             "total_paisa": total_p,
+                             "total_tk": _paisa_to_tk_str(total_p)})
+        job_rows.sort(key=lambda r: -r["total_paisa"])
+        org_cost = {k: org_counts[k] * rates[k] for k in _BILL_STAGES}
+        org_total = sum(org_cost.values())
+        grand_paisa += org_total
+        orgs_out.append({"org_id": org_id,
+                         "name": (org_names.get(org_id) or (org_id[:8] + "…" if org_id else "(no org — legacy)")),
+                         "rates_source": rr["source"],
+                         "rates_tk": {k: _paisa_to_tk_str(rates[k]) for k in _BILL_STAGES},
+                         "counts": org_counts,
+                         "cost_tk": {k: _paisa_to_tk_str(org_cost[k]) for k in _BILL_STAGES},
+                         "total_paisa": org_total,
+                         "total_tk": _paisa_to_tk_str(org_total),
+                         "jobs": job_rows})
+    orgs_out.sort(key=lambda o: -o["total_paisa"])
+    return {"orgs": orgs_out,
+            "grand_total_tk": _paisa_to_tk_str(grand_paisa),
+            "note": "Usage & cost summary — an estimate of usage × current rates. Not an invoice."}
+
+
 @app.get("/api/admin/screenings")
 async def admin_list_screenings(request: Request, limit: int = 100, skip: int = 0):
     """Cross-tenant screenings for the admin portal: projected, paginated,

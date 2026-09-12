@@ -271,6 +271,21 @@ def main():
             check("owner A clears the slug again", r.status_code == 200
                   and r.json().get("subdomain") == "", f"got {r.status_code}")
 
+            print("\nBilling (client-price view) — super-admin ONLY, never org members")
+            for name, tok in (("owner A", t_owner_a), ("recruiter A", t_rec_a),
+                              ("viewer A", t_view_a)):
+                r = c.get("/api/admin/billing/rates", headers=hdr(tok))
+                check(f"{name} cannot read billing rates", r.status_code == 403,
+                      f"got {r.status_code}")
+                r = c.get("/api/admin/billing/usage", headers=hdr(tok))
+                check(f"{name} cannot read billing usage", r.status_code == 403,
+                      f"got {r.status_code}")
+            r = c.post("/api/admin/billing/rates", headers=hdr(t_owner_a),
+                       json={"scope": "default", "mcq_tk": "1", "cv_tk": "1",
+                             "interview_tk": "1"})
+            check("owner A cannot set billing rates", r.status_code == 403,
+                  f"got {r.status_code}")
+
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
                 r = c.get("/api/employees", headers=hdr(tok))
