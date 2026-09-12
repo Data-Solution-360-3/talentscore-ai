@@ -504,10 +504,15 @@ img,video{max-width:100%}
 
     <!-- ── USAGE ── -->
     <div class="page" id="page-usage">
-      <div class="page-hd"><h1>Usage</h1><p>Your screening usage and limits this month</p></div>
-      <!-- ── USAGE & COST SUMMARY (owner/admin; server 403s others and the
-           card stays hidden). READ-ONLY client PRICE at platform-set rates —
-           an estimate, never an invoice. -->
+      <div class="page-hd"><h1>Usage &amp; Billing</h1><p>Your usage and its cost at the current rates</p></div>
+      <!-- ── USAGE & COST SUMMARY (owner/admin; server 403s others). The
+           page's ONE content: READ-ONLY client PRICE at platform-set rates —
+           an estimate, never an invoice. The OpenAI cost tracker that used
+           to live here was removed 2026-09-12 (UI only — the usage LOGGING
+           ledger stays; internal cost lives outside the product). -->
+      <div class="card" id="bill-denied" style="display:none">
+        <div style="font-size:13px;color:var(--t2);line-height:1.7">Usage &amp; billing details are visible to the workspace owner.</div>
+      </div>
       <div class="card" id="bill-card" style="display:none">
         <div class="card-hd"><div class="card-title">Usage &amp; Cost Summary</div>
           <span class="card-sub">your usage × current rates — an estimate, not an invoice</span></div>
@@ -519,43 +524,6 @@ img,video{max-width:100%}
           Counted once each, ever: an MCQ when the candidate completes the test, a CV per AI scoring run, an interview when the session completes.
           Rates are set by TopCandidate and shown here for transparency — they are not editable from this page.
         </div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Screenings this month</div><span class="card-sub" id="usage-reset">Resets monthly</span></div>
-        <div class="usage-bar-wrap">
-          <div class="usage-bar-hd">
-            <span id="usage-count">0 used</span>
-            <span id="usage-limit">of 10</span>
-          </div>
-          <div class="usage-bar-bg">
-            <div class="usage-bar-fill" id="usage-bar" style="width:0%;background:var(--green,#639922)"></div>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--t3);margin-top:6px" id="usage-note">Upgrade your plan to screen more candidates.</div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">All-time stats</div></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
-            <div style="font-size:24px;font-weight:800;color:var(--indigo)" id="us-total">0</div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Total screened</div>
-          </div>
-          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
-            <div style="font-size:24px;font-weight:800;color:var(--green)" id="us-hires">0</div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Strong hires</div>
-          </div>
-          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:1rem;text-align:center">
-            <div style="font-size:24px;font-weight:800;color:var(--orange)" id="us-avg">—</div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:3px">Avg score</div>
-          </div>
-        </div>
-      </div>
-      <!-- ── OpenAI USAGE & COST (owner/admin only; server enforces) ── -->
-      <div class="card" id="cost-card" style="display:none">
-        <div class="card-hd"><div class="card-title">OpenAI Usage &amp; Cost <span style="font-weight:600;font-size:11px;color:var(--t3)">— estimated</span></div>
-          <span class="card-sub" id="cost-scope"></span></div>
-        <div id="cost-note" style="font-size:11.5px;color:var(--t3);line-height:1.55;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.6rem .8rem;margin-bottom:.8rem"></div>
-        <div id="cost-body">Loading…</div>
       </div>
     </div>
 
@@ -1026,7 +994,6 @@ async function refreshUsage(){
     if(noteEl)noteEl.textContent=remaining>0?'You have '+remaining+' screenings remaining this month.':'Monthly limit reached. Upgrade your plan to screen more.';
     if(noteEl)noteEl.style.color=remaining===0?'var(--red)':'var(--t3)';
   }catch(e){console.warn('[USAGE]',e);}
-  loadCostDashboard();
   loadBillingSummary();
 }
 brandLoad();
@@ -1039,12 +1006,14 @@ async function loadBillingSummary(){
   const card=document.getElementById('bill-card');
   if(!card)return;
   let d;
+  const denied=document.getElementById('bill-denied');
   try{
     const r=await fetch('/api/org/billing-usage',{credentials:'include'});
-    if(!r.ok){card.style.display='none';return;}
+    if(!r.ok){card.style.display='none';if(denied)denied.style.display='';return;}
     d=await r.json();
   }catch(_){card.style.display='none';return;}
   card.style.display='';
+  if(denied)denied.style.display='none';
   const rows=[['mcq','MCQ tests taken'],['cv','CVs screened (AI-scored)'],['interview','Interviews completed']]
     .map(([k,lbl])=>`<tr><td>${lbl}</td>
       <td style="text-align:right;font-weight:700">${(d.counts||{})[k]||0}</td>
@@ -1055,91 +1024,15 @@ async function loadBillingSummary(){
        <td style="text-align:right;font-weight:800;font-size:14px;color:var(--green,#639922)">৳${d.total_tk||'0'}</td></tr>`;
 }
 
-// ── OpenAI spend dashboard (PLATFORM ADMIN only — with real client orgs,
-//    our OpenAI cost must never sit next to a client's price; the server
-//    403s everyone else and this card stays hidden for them). READ-ONLY. ──
-const COST_LABELS={cv_scoring:'CV scoring', interview_audio:'Interview audio (Realtime)',
-  interview_scoring:'Interview transcript scoring', question_gen:'Question generation',
-  jd_parse:'JD parsing'};
-function money(u,bdt){return '$'+(+u||0).toFixed(3)+' <span style="color:var(--t3);font-weight:500">(৳'+((+u||0)*bdt).toFixed(1)+')</span>';}
-function ktok(n){n=+n||0;return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1000?(n/1000).toFixed(1)+'k':String(n);}
-async function loadCostDashboard(){
-  const card=document.getElementById('cost-card');
-  if(!card)return;
-  let d;
-  try{
-    const r=await fetch('/api/usage/cost',{credentials:'include'});
-    if(!r.ok){card.style.display='none';return;}   // recruiters/viewers: hidden
-    d=await r.json();
-  }catch(_){card.style.display='none';return;}
-  card.style.display='';
-  const bdt=d.bdt_per_usd||122.85;
-  document.getElementById('cost-scope').textContent=d.scope==='all_orgs'?'All organizations (super-admin view)':'Your organization only';
-  document.getElementById('cost-note').textContent=d.estimate_note||'';
-  const t=d.totals||{}, row=(lbl,x)=>`<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:.9rem;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:var(--indigo)">${money((x||{}).est_usd,bdt)}</div>
-      <div style="font-size:10.5px;color:var(--t3);margin-top:2px">${ktok((x||{}).input_tokens)} in · ${ktok((x||{}).output_tokens)} out tok</div>
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:4px">${lbl}</div></div>`;
-  let html=`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:1rem">${row('Today',t.today)}${row('This month',t.month)}${row('All-time',t.all)}</div>`;
-
-  const comps=d.components||{};
-  const order=['cv_scoring','interview_audio','interview_scoring','question_gen','jd_parse'];
-  html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">By component</div>
-  <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Component</th><th>Today</th><th>This month</th><th>All-time</th><th>Tokens in/out</th><th>Ops</th></tr></thead><tbody>`;
-  order.concat(Object.keys(comps).filter(k=>!order.includes(k))).forEach(k=>{
-    const c=comps[k]; if(!c)return;
-    const hot=k==='interview_scoring';
-    html+=`<tr${hot?' style="background:rgba(245,124,46,.07)"':''}><td>${COST_LABELS[k]||k}${hot?' <span style="font-size:10px;color:var(--orange);font-weight:700">← the previously invisible spend</span>':''}</td>
-      <td>${money(c.today_usd,bdt)}</td><td>${money(c.month_usd,bdt)}</td><td><b>${money(c.all_usd,bdt)}</b></td>
-      <td style="color:var(--t3)">${ktok(c.input_tokens)} / ${ktok(c.output_tokens)}</td><td style="color:var(--t3)">${c.operations||0}</td></tr>`;
-  });
-  html+=`</tbody></table></div>`;
-
-  const models=d.models||{};
-  if(Object.keys(models).length){
-    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .4rem">By model</div>
-    <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Model</th><th>Est. cost</th><th>Tokens in/out</th></tr></thead><tbody>`;
-    Object.entries(models).sort((a,b)=>b[1].est_usd-a[1].est_usd).forEach(([m,v])=>{
-      html+=`<tr><td>${m}</td><td>${money(v.est_usd,bdt)}</td><td style="color:var(--t3)">${ktok(v.input_tokens)} / ${ktok(v.output_tokens)}</td></tr>`;});
-    html+=`</tbody></table></div>`;
-  }
-
-  html+=`<div style="margin:.9rem 0 .4rem;font-size:12.5px;color:var(--t2)"><b>Per-candidate average:</b> ${money(d.per_candidate_avg_usd,bdt)} across ${d.candidates_metered||0} metered candidate(s)</div>`;
-  if((d.top_candidates||[]).length){
-    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">Most expensive candidates</div>
-    <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Candidate</th><th>Total</th><th>CV</th><th>Audio</th><th>Scoring</th></tr></thead><tbody>`;
-    d.top_candidates.forEach(c=>{
-      html+=`<tr><td>${(c.candidate_name||'Unknown').replace(/</g,'&lt;')}</td><td><b>${money(c.est_usd,bdt)}</b></td>
-        <td>${money(c.cv_usd,bdt)}</td><td>${money(c.audio_usd,bdt)}</td><td>${money(c.scoring_usd,bdt)}</td></tr>`;});
-    html+=`</tbody></table></div>`;
-  }
-
-  if(d.per_org && d.per_org.length){
-    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .4rem">By organization (super-admin)</div>
-    <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Organization</th><th>Est. cost</th><th>Breakdown</th></tr></thead><tbody>`;
-    d.per_org.forEach(o=>{
-      const parts=Object.entries(o.components||{}).map(([k,v])=>`${COST_LABELS[k]||k}: $${(+v).toFixed(3)}`).join(' · ');
-      html+=`<tr><td>${(o.name||o.org_id).replace(/</g,'&lt;')}</td><td><b>${money(o.est_usd,bdt)}</b></td><td style="color:var(--t3);font-size:11px">${parts}</td></tr>`;});
-    html+=`</tbody></table></div>`;
-  }
-  if(!(d.candidates_metered||0) && !Object.keys(comps).length){
-    html=`<div style="color:var(--t3);font-size:13px">No metered activity yet — cost capture began 10 Sep 2026. Numbers appear here from the next screened candidate or interview onward.</div>`+html;
-  }
-  document.getElementById('cost-body').innerHTML=html;
-}
 
 async function loadUser(){
   try{
-    const [meRes,screenRes,statsRes,payRes]=await Promise.all([
+    const [meRes,payRes]=await Promise.all([
       fetch('/api/auth/me',{credentials:'include'}),
-      fetch('/api/screenings?limit=500',{credentials:'include'}),
-      fetch('/api/stats',{credentials:'include'}),
       fetch('/api/payments',{credentials:'include'}),
     ]);
     if(meRes.status===401){window.location.href='/login';return;}
     userData=await meRes.json();
-    const screenData=await screenRes.json();
-    const statsData=await statsRes.json();
     const payData=payRes.ok?await payRes.json():{payments:[]};
 
     // Profile tab
@@ -1182,22 +1075,8 @@ async function loadUser(){
         </tr>`).join('')
       :'<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No payment history yet</td></tr>';
 
-    // Usage tab
-    const screenings=screenData.screenings||[];
-    const limits={trial:10,starter:100,pro:500,enterprise:999999};
-    const limit=limits[plan]||10;
-    const used=userData.screening_count||0;
-    const pct=Math.min(100,Math.round(used/limit*100));
-    document.getElementById('usage-count').textContent=used+' used';
-    document.getElementById('usage-limit').textContent='of '+limit;
-    document.getElementById('usage-bar').style.width=pct+'%';
-    document.getElementById('usage-bar').style.background=pct>80?'var(--red)':pct>60?'var(--amber)':'var(--indigo)';
-    document.getElementById('usage-note').textContent=plan==='trial'?'Upgrade to Starter for 100 screenings/month.':'You have '+(limit-used)+' screenings remaining this month.';
-
-    const allScreenings=screenData.screenings||[];
-    document.getElementById('us-total').textContent=allScreenings.length;
-    document.getElementById('us-hires').textContent=allScreenings.filter(s=>s.recommendation==='STRONG HIRE').length;
-    document.getElementById('us-avg').textContent=statsData.avg_score||'—';
+    // (The old Usage-tab plan bar + stats + OpenAI cost tracker were removed
+    //  2026-09-12 — the page now shows the client Usage & Cost Summary only.)
 
     // Session info
     document.getElementById('session-browser').textContent=navigator.userAgent.includes('Chrome')?'Chrome':'Current browser';
