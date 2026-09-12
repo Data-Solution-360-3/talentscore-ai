@@ -94,16 +94,55 @@ SKILL_SYNONYMS = {
     # roles
     "software engineer": ["software developer", "swe"],
     "data scientist": ["ds"],
+    # office / workspace tooling — BD JDs write these as prose ("good knowledge
+    # of microsoft excel"); after qualifier-stripping these variants remain.
+    "excel": ["microsoft excel", "ms excel"],
+    "google sheets": ["google sheet"],
+    "google docs": ["google doc"],
+    "google drive": [],
+    "google forms": ["google form"],
+    "google workspace": ["g suite", "gsuite"],
+    "microsoft word": ["ms word"],
+    "powerpoint": ["microsoft powerpoint", "ms powerpoint"],
 }
+
+
+# (Q5 fix) Prose JD requirements ("good knowledge of microsoft excel",
+# "coordination skills") never string-matched CV skill tokens, so the
+# hard-gap detector saw 0/N and fired a false penalty. These wrappers are
+# stripped IN A LOOP (they stack) before synonym resolution. Symmetric on
+# both sides by construction (_normalize_skill is the one entry point);
+# it recovers the actual required skill — it never expands or weakens a
+# requirement, and the T3 no-JD-side-expansion rule is untouched.
+_SKILL_QUALIFIER_PREFIX = re.compile(
+    r"^(?:good|strong|basic|excellent|solid|sound|proven|advanced|working|"
+    r"hands[- ]on|proficient|demonstrated|deep|thorough)\s+")
+_SKILL_WRAPPER_PREFIX = re.compile(
+    r"^(?:knowledge of|proficiency in|proficient in|experience (?:with|in|of)|"
+    r"familiarity with|familiar with|expertise in|understanding of|command of|"
+    r"ability to (?:use|work with)|skills? in)\s+")
+_SKILL_SUFFIX = re.compile(r"\s+skills?$")
+
+
+def _strip_skill_qualifiers(key: str) -> str:
+    prev = None
+    while prev != key:
+        prev = key
+        key = _SKILL_QUALIFIER_PREFIX.sub("", key)
+        key = _SKILL_WRAPPER_PREFIX.sub("", key)
+        key = _SKILL_SUFFIX.sub("", key)
+    return key.strip()
 
 
 def _normalize_skill(s: str) -> str:
     """Reduce a skill string to a canonical key. Lowercase, strip punctuation/extra
-    whitespace, and resolve known synonyms to a single canonical form."""
+    whitespace and qualifier wrappers, and resolve known synonyms to a single
+    canonical form."""
     if not s:
         return ""
     key = re.sub(r"[^\w\s.+/-]", " ", s.lower())
     key = re.sub(r"\s+", " ", key).strip()
+    key = _strip_skill_qualifiers(key)
     for canonical, aliases in SKILL_SYNONYMS.items():
         if key == canonical or key in aliases:
             return canonical
@@ -1024,6 +1063,30 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
         averaged_dims.append(avg_dim)
     result["dimensions"] = averaged_dims
 
+    # (Q5 fix) CONSISTENCY GUARD — the deterministic skills hard-gap must not
+    # override the model's own semantic judgment. Both passes independently
+    # estimate skills coverage; if that reading contradicts the literal
+    # string-match count, the literal count is a parsing artifact:
+    #   semantic >= 50%          -> suppress the skills gap (penalty 0, kept
+    #                               in the details with an honest note)
+    #   30% <= semantic < 50%    -> halve it (ambiguous — keep a real signal)
+    #   semantic < 30% / absent  -> UNCHANGED: semantic agrees with literal,
+    #                               genuine zero-coverage keeps the full hit.
+    # Skills-kind gaps only; experience gaps are never touched.
+    _sem_cov = float(blend(strict.get("skills_coverage_pct", 0),
+                           upside.get("skills_coverage_pct", 0)) or 0)
+    _guarded = []
+    for g in hard_gaps:
+        if g.get("kind") == "skills" and _sem_cov >= 50:
+            g = {**g, "penalty": 0, "suppressed": True,
+                 "note": (f"suppressed — the model's semantic coverage ({_sem_cov:.0f}%) "
+                          "contradicts the literal string-match count")}
+        elif g.get("kind") == "skills" and _sem_cov >= 30:
+            g = {**g, "penalty": max(0, int(g.get("penalty", 0)) // 2),
+                 "note": f"downgraded — semantic coverage {_sem_cov:.0f}% partially contradicts the literal count"}
+        _guarded.append(g)
+    hard_gaps = _guarded
+
     # Apply hard-gap penalties. Cap at 35 — per user spec: "lower significantly,
     # don't auto-reject". 35 is enough to flip HIRE → REJECT but won't nuke a
     # genuinely promising adjacent candidate.
@@ -1037,10 +1100,15 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
     final_score = max(0, min(100, int(round(weighted_pre_penalty - total_penalty))))
     result["overall_score"] = final_score
 
-    # Merge critical_gaps — prepend hard gaps for visibility
+    # Merge critical_gaps — prepend hard gaps for visibility. Suppressed gaps
+    # (penalty 0 via the consistency guard) are NOT listed here: their
+    # "matched 0/N" text is exactly the misleading artifact; they stay
+    # visible with their note in score_breakdown.hard_gap_details.
     gpt_gaps = result.get("critical_gaps", []) or []
     hard_gap_lines = []
     for g in hard_gaps:
+        if g.get("suppressed"):
+            continue
         line = f"[{g['kind'].upper()}] {g['requirement']}"
         if g.get("missing"):
             line += f" — missing: {', '.join(g['missing'])}"
@@ -1138,7 +1206,9 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
         "hard_gap_penalty":   total_penalty,
         "final":              final_score,
         "hard_gap_details":   [
-            {"requirement": g.get("requirement"), "penalty": g.get("penalty"), "kind": g.get("kind")}
+            {"requirement": g.get("requirement"), "penalty": g.get("penalty"), "kind": g.get("kind"),
+             **({"suppressed": True} if g.get("suppressed") else {}),
+             **({"note": g["note"]} if g.get("note") else {})}
             for g in hard_gaps
         ],
     }
