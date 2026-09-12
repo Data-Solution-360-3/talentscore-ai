@@ -268,30 +268,28 @@ class DuplicateJobError(Exception):
         super().__init__(f"A job titled '{title}' already exists.")
 
 
-async def save_job(job: dict) -> str:
-    """Insert a job, refusing a second active job with the same title for the same user.
+async def next_job_code(org_id: str) -> str:
+    """Human-readable unique Job ID: JOB-YYYY-NNNN, PER-ORG sequence per year.
+    Uniqueness is guaranteed by an atomic find_one_and_update counter (the same
+    primitive as the spend counters) — two simultaneous creates get consecutive
+    numbers, never the same one. Per-org: each tenant counts from their own
+    JOB-<year>-0001, and an ID leaks nothing about other tenants' volume."""
+    year = datetime.utcnow().year
+    key = f"jobseq:{org_id or 'noorg'}:{year}"
+    row = await db.counters.find_one_and_update(
+        {"_id": key}, {"$inc": {"n": 1}}, upsert=True, return_document=True)
+    n = int((row or {}).get("n") or 1)
+    return f"JOB-{year}-{n:04d}"
 
-    Two "Data Analyst" documents is how the Jobs page ended up double-counting: each
-    duplicate claimed both jobs' candidates through the old title-matching filter.
-    Case-insensitive and whitespace-trimmed, since 'Data Analyst ' and 'data analyst'
-    are the same role to a recruiter.
-    NOTE: this is a read-then-write check, not a database constraint — two truly
-    simultaneous requests can still both pass it. A unique partial index on
-    (user_id, lowercased title, active) is the airtight fix; see the Stage 2 notes.
-    """
+
+async def save_job(job: dict) -> str:
+    """Insert a job. Duplicate titles are ALLOWED (2026-09-13, approved): the
+    per-org job_code now disambiguates re-posted roles, which is exactly what
+    the old same-title refusal existed to protect against. The code also lands
+    back on the passed-in dict so the create endpoint can return it."""
     title = (job.get("title") or "").strip()
     if not title:
         raise ValueError("Job title is required.")
-    existing = await db.jobs.find_one(
-        {
-            "user_id": job.get("user_id"),
-            "active": True,
-            "title": {"$regex": f"^{re.escape(title)}$", "$options": "i"},
-        },
-        {"_id": 1},
-    )
-    if existing:
-        raise DuplicateJobError(str(existing["_id"]), title)
 
     # Minted at creation, not on first toggle: the workflow is create job -> copy
     # link -> paste into a job board, and making the link appear only after
@@ -300,6 +298,9 @@ async def save_job(job: dict) -> str:
            "active": True, "is_public": False, "public_token": generate_public_token()}
     doc.pop("_id", None)
     doc = await stamp_org(doc)
+    doc["job_code"] = await next_job_code(str(doc.get("org_id") or ""))
+    job["job_code"] = doc["job_code"]          # visible to the caller
+    job["created_at"] = doc["created_at"]
     inserted = await db.jobs.insert_one(doc)
     return str(inserted.inserted_id)
 

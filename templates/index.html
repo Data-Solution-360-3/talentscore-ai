@@ -1633,40 +1633,47 @@ img,svg,video{max-width:100%}
 <!-- JOB MODAL -->
 <div class="modal-overlay" id="job-modal">
   <div class="modal">
-    <div class="modal-hd"><h3 class="modal-title" id="job-modal-title">Create job posting</h3><button class="modal-close" onclick="closeModal('job-modal')">✕</button></div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Job title *</label><input class="form-input" id="j-title" placeholder="e.g. Senior Data Engineer"></div>
-      <div class="form-group"><label class="form-label">Department</label><input class="form-input" id="j-dept" placeholder="e.g. Engineering"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="j-loc" placeholder="e.g. Dhaka, Remote"></div>
-      <div class="form-group"><label class="form-label">Employment type</label>
-        <select class="form-select" id="j-type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Remote</option><option>Internship</option></select>
+    <div class="modal-hd" style="align-items:flex-start">
+      <div>
+        <h3 class="modal-title" id="job-modal-title">Create job posting</h3>
+        <div id="j-jobid-chip" style="display:none;align-items:center;gap:8px;margin-top:7px;font-size:12.5px;color:#6f7b68">
+          <span id="j-jobid-chip-code" style="font-family:ui-monospace,monospace;font-weight:600;color:#173404;background:#eef5e2;padding:3px 9px;border-radius:6px;font-size:12px"></span>
+          <span id="j-jobid-chip-date"></span>
+        </div>
       </div>
+      <button class="modal-close" onclick="closeModal('job-modal')">✕</button>
     </div>
-    <div class="form-group"><label class="form-label">Required skills (comma separated)</label><input class="form-input" id="j-skills" placeholder="Python, SQL, Machine Learning, Data Analysis"></div>
-    <div class="form-group"><label class="form-label">Job description *</label><textarea class="form-textarea" id="j-desc" rows="5" placeholder="Paste the full job description here — this will be auto-filled on the batch screening page when you select this job."></textarea><div class="form-hint">This description will automatically fill the JD field when screening CVs for this role.</div></div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Min experience (years)</label><input class="form-input" id="j-exp" type="number" placeholder="2" oninput="if(selectedRoleCat==='technical')selectRoleCat('technical')"></div>
-      <div class="form-group"><label class="form-label">Status</label>
-        <select class="form-select" id="j-status"><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select>
+    <div class="jm-grid" style="margin-bottom:18px">
+      <div class="jm-f"><label>Job title <span style="color:var(--orange2,#F57C2E)">*</span></label><input id="j-title" placeholder="Senior Data Engineer"></div>
+      <div class="jm-f"><label>Department</label><input id="j-dept" placeholder="Engineering"></div>
+      <div class="jm-f"><label>Location</label><input id="j-loc" placeholder="Dhaka, Remote"></div>
+      <div class="jm-f"><label>Employment type</label>
+        <select id="j-type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Remote</option><option>Internship</option></select></div>
+      <div class="jm-f full"><label>Job description <span style="color:var(--orange2,#F57C2E)">*</span></label>
+        <textarea id="j-desc" rows="5" style="resize:vertical;min-height:110px;line-height:1.55;padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13.5px;color:var(--text)" placeholder="Paste the full job description here."></textarea>
+        <span class="jm-hint">Fills the JD automatically when you screen CVs for this role.</span></div>
+      <div class="jm-f"><label>Minimum experience <span class="jm-hint">· years</span></label>
+        <input id="j-exp" type="number" placeholder="2" oninput="if(selectedRoleCat==='technical')selectRoleCat('technical')"></div>
+      <div class="jm-f"><label>Status</label>
+        <select id="j-status"><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select></div>
+      <div class="jm-f"><label>Job ID <span class="jm-hint">· auto-generated</span></label>
+        <input id="j-jobcode" readonly placeholder="Assigned when you create" style="background:#f6f8f3;color:#6f7b68;font-family:ui-monospace,monospace;font-size:13px;cursor:default"></div>
+      <div class="jm-f"><label>Your reference code <span class="jm-hint">· optional</span></label>
+        <input id="j-refcode" maxlength="40" placeholder="e.g. OPS-Q3-2026"></div>
+      <div class="jm-f full"><label>Interview language</label>
+        <select id="j-ivlang">
+          <option value="en">English</option>
+          <option value="bn">Bangla (beta)</option>
+        </select>
+        <div style="font-size:12.5px;color:#6f7b68;line-height:1.55;background:#fef6e8;border:1px solid #f5e3c0;border-radius:10px;padding:11px 13px;margin-top:4px"><b style="color:#3c4a38;font-weight:650">Bangla is in beta.</b> Questions are asked and answered in Bangla; spoken transcription is imperfect, so typed answers are the reliable record. Regenerate the interview questions after changing this.</div>
       </div>
-    </div>
-
-    <div class="form-group"><label class="form-label">Interview language</label>
-      <select class="form-select" id="j-ivlang">
-        <option value="en">English</option>
-        <option value="bn">Bangla (Bengali) — BETA</option>
-      </select>
-      <div class="form-hint">Bangla is a <b>BETA</b>: questions are asked in Bangla and candidates answer in Bangla. Spoken Bangla transcription is imperfect — <b>typed</b> answers are the reliable, scored record, so read the transcript before trusting the number. Regenerate the interview questions after changing this.</div>
     </div>
 
     <!-- Role-category picker: picking a card applies one of the REAL scoring
          presets (shown + still editable in the weights section below) and
-         flavors interview-question generation. The note says exactly what
-         changed — transparent by design, never cosmetic. -->
+         flavors interview-question generation. -->
     <div class="form-group">
-      <label class="form-label">What role are you hiring for? <span style="font-weight:400;color:var(--t3)">(optional — sets the scoring rubric + interview flavor)</span></label>
+      <label style="font-size:13px;font-weight:600;color:#3c4a38">What role are you hiring for? <span class="jm-hint">· optional — sets the scoring rubric + interview flavor</span></label>
       <div id="rc-grid" class="rc-grid"></div>
       <div id="rc-note" class="form-hint" style="display:none;margin-top:6px"></div>
     </div>
@@ -1705,7 +1712,7 @@ img,svg,video{max-width:100%}
 
     <div class="modal-footer">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('job-modal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="job-save-btn" onclick="saveJob()">Save job posting</button>
+      <button class="btn btn-primary btn-sm" id="job-save-btn" onclick="saveJob()">Create job</button>
     </div>
   </div>
 </div>
@@ -4159,6 +4166,7 @@ function renderJobs(){
         <span style="color:var(--orange)">${j.title}</span>
         ${j.is_public ? `<span class="badge b-green" style="margin-left:6px;font-size:9px" title="Accepting public applications">LIVE</span>` : ''}
         ${j._pending ? `<span class="badge b-amber" style="margin-left:4px;font-size:9px" title="${j._pending} application(s) not yet scored">${j._pending} pending</span>` : ''}
+        <div style="font-size:10.5px;font-weight:600;color:var(--t3);margin-top:3px;font-family:ui-monospace,monospace">${j.job_code||''}${j.reference_code?` · ${escapeHtml(j.reference_code)}`:''}${j.created_at?` <span style="font-family:inherit;font-weight:400">· ${new Date(j.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span>`:''}</div>
       </td>
       <td>${j.dept||'—'}</td><td>${j.loc||'—'}</td><td>${j.type||'Full-time'}</td>
       <td style="font-weight:600;color:var(--orange)">${j._applicants}</td>
@@ -4219,13 +4227,16 @@ async function viewJobDetails(jobId){
       <h3 class="modal-title">${full.title||j.title}</h3>
       <button class="modal-close" onclick="closeModal('job-detail-modal')">✕</button>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;font-size:11px;color:var(--t2)">
-      <span>📂 ${full.department||j.dept||'—'}</span>
-      <span>•</span>
-      <span>📍 ${full.location||j.loc||'—'}</span>
-      <span>•</span>
-      <span>💼 ${full.employment_type||j.type||'Full-time'}</span>
-      ${full.min_experience?`<span>•</span><span>${full.min_experience} exp</span>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:11.5px;color:var(--t2)">
+      ${(full.job_code||j.job_code)?`<span style="font-family:ui-monospace,monospace;font-weight:600;color:#173404;background:#eef5e2;padding:2px 8px;border-radius:6px;font-size:11px">${full.job_code||j.job_code}</span>`:''}
+      ${(full.reference_code||j.reference_code)?`<span style="font-family:ui-monospace,monospace;color:var(--t3)">ref ${escapeHtml(full.reference_code||j.reference_code)}</span><span>·</span>`:''}
+      ${(full.created_at||j.created_at)?`<span>Created ${new Date(full.created_at||j.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span><span>·</span>`:''}
+      <span>${full.department||j.dept||'—'}</span>
+      <span>·</span>
+      <span>${full.location||j.loc||'—'}</span>
+      <span>·</span>
+      <span>${full.employment_type||j.type||'Full-time'}</span>
+      ${full.min_experience?`<span>·</span><span>${full.min_experience} yrs</span>`:''}
     </div>
 
     <!-- Per-job key stats (jm tiles) -->
@@ -5742,7 +5753,10 @@ function openJobModal(){
   // Fresh "Create" flow — reset state + clear form
   editingJobId=null;
   document.getElementById('job-modal-title').textContent='Create job posting';
-  ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>{
+  const _sb=document.getElementById('job-save-btn'); if(_sb) _sb.textContent='Create job';
+  const _chip=document.getElementById('j-jobid-chip'); if(_chip) _chip.style.display='none';
+  const _jc=document.getElementById('j-jobcode'); if(_jc) _jc.value='';
+  ['j-title','j-dept','j-loc','j-desc','j-exp','j-refcode'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   const typeEl=document.getElementById('j-type');       if(typeEl)   typeEl.selectedIndex=0;
@@ -5764,6 +5778,7 @@ async function editJob(id){
   // Pre-populate modal with the existing job's data, then open in "edit" mode
   editingJobId=id;
   document.getElementById('job-modal-title').textContent='Edit job posting';
+  const _sb2=document.getElementById('job-save-btn'); if(_sb2) _sb2.textContent='Save changes';
   try{
     const res=await fetch('/api/jobs/'+id+'/details',{credentials:'include'});
     if(!res.ok)throw new Error('Could not load job');
@@ -5771,9 +5786,18 @@ async function editJob(id){
     document.getElementById('j-title').value   = j.title||'';
     document.getElementById('j-dept').value    = j.department||'';
     document.getElementById('j-loc').value     = j.location||'';
-    document.getElementById('j-skills').value  = Array.isArray(j.skills)?j.skills.join(', '):(j.skills||'');
     document.getElementById('j-desc').value    = j.description||'';
     document.getElementById('j-exp').value     = j.min_experience||'';
+    const _jc=document.getElementById('j-jobcode'); if(_jc) _jc.value=j.job_code||'';
+    const _rc=document.getElementById('j-refcode'); if(_rc) _rc.value=j.reference_code||'';
+    const _chip=document.getElementById('j-jobid-chip');
+    if(_chip){
+      if(j.job_code){
+        document.getElementById('j-jobid-chip-code').textContent=j.job_code;
+        document.getElementById('j-jobid-chip-date').textContent=j.created_at?('· Created '+new Date(j.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})):'';
+        _chip.style.display='inline-flex';
+      }else _chip.style.display='none';
+    }
     const typeEl=document.getElementById('j-type');
     if(typeEl&&j.employment_type){
       [...typeEl.options].forEach((o,i)=>{ if(o.value===j.employment_type||o.text===j.employment_type) typeEl.selectedIndex=i; });
@@ -5802,12 +5826,8 @@ async function saveJob(){
   if(_savingJob) return;
   const title=document.getElementById('j-title').value.trim();
   if(!title){ toast('Please enter a job title', {type:'warning'}); return; }
-
-  // Catch the duplicate before the round-trip so the user gets an instant answer.
-  if(!editingJobId){
-    const clash=allJobs.find(j=>(j.title||'').trim().toLowerCase()===title.toLowerCase());
-    if(clash){ toast('You already have a job titled "'+clash.title+'"', {type:'warning'}); return; }
-  }
+  // Duplicate titles are ALLOWED (2026-09-13): the auto Job ID (JOB-YYYY-NNNN)
+  // now distinguishes re-posted roles, so the old same-title block is gone.
   _savingJob=true;
   const saveBtn=document.getElementById('job-save-btn');
   if(saveBtn) saveBtn.disabled=true;
@@ -5817,7 +5837,7 @@ async function saveJob(){
   fd.append('department',document.getElementById('j-dept').value);
   fd.append('location',document.getElementById('j-loc').value);
   fd.append('employment_type',document.getElementById('j-type').value);
-  fd.append('skills',document.getElementById('j-skills').value);
+  fd.append('reference_code',(document.getElementById('j-refcode')||{value:''}).value.trim());
   fd.append('description',desc);
   fd.append('min_experience',document.getElementById('j-exp').value||'');
   fd.append('status',document.getElementById('j-status').value||'active');
@@ -5852,7 +5872,7 @@ async function saveJob(){
     }
     closeModal('job-modal');renderJobs();renderOverview();
     editingJobId=null;
-    ['j-title','j-dept','j-loc','j-skills','j-desc','j-exp'].forEach(id=>document.getElementById(id).value='');
+    ['j-title','j-dept','j-loc','j-desc','j-exp','j-refcode'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     toast(editingJobId===null ? 'Job saved' : 'Job created: '+title, {type:'success'});
   }catch(e){ toast('Failed: '+e.message, {type:'error'}); }
   finally{ _savingJob=false; const b=document.getElementById('job-save-btn'); if(b) b.disabled=false; }

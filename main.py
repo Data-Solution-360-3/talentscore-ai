@@ -6402,6 +6402,7 @@ async def create_job_endpoint(
     interview_language: str = Form("en"),   # 'en' (default) or 'bn' (Bangla, BETA)
     weights: str = Form(""),   # JSON-encoded dict of {dim_name: float}
     role_category: str = Form(""),   # key from scorer.ROLE_CATEGORIES; "" = none
+    reference_code: str = Form(""),   # the client's own optional code, free text
 ):
     user = await get_current_user(request)
     # Parse weights JSON if provided. Invalid JSON → ignore (job will use default weights at score time).
@@ -6423,6 +6424,7 @@ async def create_job_endpoint(
         "status": status,
         "interview_language": "bn" if (interview_language or "en").lower() == "bn" else "en",
         "user_id": user["user_id"], "company": user["company"],
+        "reference_code": reference_code.strip()[:40],
     }
     if weights_dict is not None:
         job["weights"] = weights_dict
@@ -6460,6 +6462,7 @@ async def update_job_endpoint(
     interview_language: str = Form(""),
     weights: str = Form(""),
     role_category: str = Form(""),
+    reference_code: str = Form(None),   # None = not submitted; "" = clear it
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
@@ -6481,6 +6484,10 @@ async def update_job_endpoint(
     if location:        updates["location"] = location
     if employment_type: updates["employment_type"] = employment_type
     if min_experience:  updates["min_experience"] = min_experience
+    # reference_code is the one field where empty means CLEAR (it's optional
+    # free text the client owns) — None means the form didn't send it.
+    if reference_code is not None:
+        updates["reference_code"] = reference_code.strip()[:40]
     if weights:
         try:
             import json as _json
