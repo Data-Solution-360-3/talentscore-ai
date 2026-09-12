@@ -735,27 +735,31 @@ img,svg,video{max-width:100%}
 #cand-modal .modal-footer .btn-green:hover{background:#4F7C1B}
 /* ── Job-setup tabs (Link / MCQ / CV / Viva) — brand green/orange, no navy.
    Horizontal scroll on narrow screens keeps them usable on a phone. ── */
-.jtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
-.jtab{font-family:inherit;font-size:12.5px;font-weight:700;color:var(--t3);background:none;border:none;border-bottom:3px solid transparent;padding:9px 16px;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:.12s}
-.jtab:hover{color:#476B15;background:#F6FAF0;border-radius:8px 8px 0 0}
-.jtab.act{color:#173404;border-bottom-color:#639922;background:#F6FAF0;border-radius:8px 8px 0 0}
+.jtabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.jtab{font-family:inherit;font-size:13px;font-weight:700;color:#5B6650;background:none;border:none;border-bottom:3px solid transparent;padding:10px 18px;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:.15s;border-radius:10px 10px 0 0}
+.jtab:hover{color:#476B15;background:#F6FAF0}
+.jtab.act{color:#173404;border-bottom-color:#639922;background:#F6FAF0}
 .jt-pane{display:none}
 .jt-pane.act{display:block;animation:jtfade .18s ease}
 @keyframes jtfade{from{opacity:.4}to{opacity:1}}
-/* Job-setup tab CONTENT — one shared treatment (the CV section is the bar):
-   deep readable text, aligned label+input rows, consistent card rhythm. */
-.jt-sec{font-size:11px;color:#173404;text-transform:uppercase;font-weight:800;letter-spacing:.06em;margin-bottom:8px}
-.jt-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:14px}
+/* Job-setup tab CONTENT — one shared premium treatment: white cards with
+   soft depth, green accent ticks, deep readable text, aligned rows on a
+   consistent rhythm. Styling only — every control keeps its wiring. */
+.jt-sec{display:flex;align-items:center;gap:7px;font-size:11px;color:#173404;text-transform:uppercase;font-weight:800;letter-spacing:.07em;margin-bottom:10px}
+.jt-sec::before{content:'';width:3px;height:12px;border-radius:2px;background:var(--green,#639922);flex-shrink:0}
+.jt-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(23,52,4,.05)}
 .jt-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;min-width:0}
-.jt-row+.jt-row{margin-top:12px}
+.jt-row+.jt-row{margin-top:14px}
 .jt-label{font-size:12px;font-weight:600;color:#2E401B;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
-.jt-label input,.jt-label select{padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12.5px;font-weight:700;color:#173404;background:#fff}
-.jt-help{font-size:12px;color:#4A5443;line-height:1.65;margin-top:9px}
-.jt-note{font-size:12px;color:#4A5443;line-height:1.65}
+.jt-label input,.jt-label select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px;font-weight:700;color:#173404;background:#fff;transition:border-color .12s,box-shadow .12s}
+.jt-help{font-size:12px;color:#4A5443;line-height:1.7;margin-top:10px}
+.jt-note{font-size:12px;color:#4A5443;line-height:1.7}
 /* label-above-control stack — the aligned grid for settings/advance rows */
 .jt-field{display:flex;flex-direction:column;gap:5px;min-width:0}
 .jt-field>span{font-size:10.5px;font-weight:800;color:#4A5443;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
-.jt-field select,.jt-field input{font-family:inherit;font-size:12px;color:#1f2937;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff}
+.jt-field select,.jt-field input{font-family:inherit;font-size:12px;color:#1f2937;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;transition:border-color .12s,box-shadow .12s}
+.jt-field input:focus,.jt-field select:focus,.jt-label input:focus,.jt-label select:focus{outline:none;border-color:var(--green,#639922);box-shadow:0 0 0 3px rgba(99,153,34,.14)}
+@media(max-width:720px){.jt-card{padding:13px 12px}.jtab{padding:9px 13px;font-size:12.5px}}
 </style>
 </head>
 <body>
@@ -4203,9 +4207,9 @@ async function viewJobDetails(jobId){
            that URL permanently. -->
       <div id="public-link-box" style="margin-bottom:14px"></div>
       <!-- Duplicate-application guard: grant a candidate ONE re-apply on this job -->
-      <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--s2)">
-        <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span style="font-weight:400;color:var(--t3);font-size:11px">— candidates can normally apply only once per job</span></summary>
-        <div style="padding:4px 12px 12px">
+      <details style="margin-bottom:16px;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(23,52,4,.05)">
+        <summary style="padding:12px 16px;cursor:pointer;font-size:12.5px;font-weight:700;color:#2E401B;user-select:none">Allow a re-apply <span style="font-weight:400;color:#5B6650;font-size:11.5px">— candidates can normally apply only once per job</span></summary>
+        <div style="padding:4px 16px 14px">
           <div class="jt-note" style="margin-bottom:8px">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
@@ -5002,11 +5006,11 @@ function mcqFunnelRender(){
   const dist=f.distribution||[];
   if(dist.length){
     const mx=Math.max(...dist.map(d=>d.n));
-    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Score distribution — everyone who took the test</div>
-      <div style="display:flex;align-items:flex-end;gap:4px;height:54px">`
-      +dist.map(d=>`<div title="${d.n} candidate(s) scored ${d.score}/${f.total_questions}" style="flex:1;max-width:30px;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="background:var(--green,#639922);border-radius:3px 3px 0 0;height:${Math.max(6,Math.round(d.n/mx*92))}%"></div></div>`).join('')
-      +`</div><div style="display:flex;gap:4px;margin:3px 0 12px">`
-      +dist.map(d=>`<div style="flex:1;max-width:30px;text-align:center;font-size:9.5px;font-weight:700;color:#5B6650">${d.score}</div>`).join('')
+    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:5px">Score distribution — everyone who took the test</div>
+      <div style="display:flex;align-items:flex-end;gap:5px;height:56px;border-bottom:1.5px solid var(--border);padding:0 2px">`
+      +dist.map(d=>`<div title="${d.n} candidate(s) scored ${d.score}/${f.total_questions}" style="flex:1;max-width:32px;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="background:var(--green,#639922);border-radius:3px 3px 0 0;height:${Math.max(6,Math.round(d.n/mx*92))}%;opacity:.9"></div></div>`).join('')
+      +`</div><div style="display:flex;gap:5px;margin:4px 0 12px;padding:0 2px">`
+      +dist.map(d=>`<div style="flex:1;max-width:32px;text-align:center;font-size:9.5px;font-weight:700;color:#5B6650">${d.score}</div>`).join('')
       +`</div>`;
   }
   // ── cumulative mark chips (held only — click sets the cutoff) ──
@@ -5018,16 +5022,24 @@ function mcqFunnelRender(){
         return `<button type="button" class="btn btn-xs" onclick="mcqfSetMark(${s})" style="font-weight:700;color:#173404">${s}+ · ${n}</button>`;}).join('')
       +`</div>`;
   }
-  // ── advance controls: cutoff mark (primary) + quota cap + live preview ──
-  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:11px 13px;margin-bottom:8px">
+  // ── advance controls: cutoff mark (primary) + quota cap + live preview.
+  //    Inputs initialize from the job's SAVED cutoff/quota (Save persists
+  //    them without advancing anyone); typed-but-unsaved values win within
+  //    this open session, and Advance always uses what's in the inputs. ──
+  const mfSaved=st.mf||{};
+  const initMark = st.mark!==undefined ? st.mark : (mfSaved.cutoff_mark!=null?mfSaved.cutoff_mark:null);
+  const initQuota = st.quota || mfSaved.quota_cap || 200;
+  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:12px 14px;margin-bottom:8px">
     <div class="jt-field">
       <span>Cutoff mark (≥ of ${f.total_questions||'—'})</span>
-      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${st.mark!=null?st.mark:''}" placeholder="none" style="width:78px" oninput="mcqfAdvPreview()">
+      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${initMark!=null?initMark:''}" placeholder="none" style="width:78px" oninput="mcqfAdvPreview()">
     </div>
     <div class="jt-field">
       <span>Quota cap</span>
-      <input id="mcqf-n" type="number" min="1" max="500" value="${st.quota||200}" style="width:78px" oninput="mcqfAdvPreview()">
+      <input id="mcqf-n" type="number" min="1" max="500" value="${initQuota}" style="width:78px" oninput="mcqfAdvPreview()">
     </div>
+    <button class="btn btn-xs" onclick="mcqfSaveAdvance()" title="Save the cutoff + quota on this job without advancing anyone">Save</button>
+    <span id="mcqf-adv-saved" style="display:none;font-size:11px;font-weight:800;color:var(--green,#639922);align-self:center">✓ Saved</span>
     <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button>
     <div id="mcqf-adv-preview" style="flex:1;min-width:200px;font-size:11.5px;color:#2E401B;line-height:1.55"></div>
   </div>
@@ -5041,7 +5053,7 @@ function mcqFunnelRender(){
             :r.status==='released'?'<span style="color:var(--t3)">released</span>'
             :'<span style="color:var(--green)">'+escapeHtml(r.status)+(r.screened?' ✓ screened':'')+'</span>'}</td>
         <td>${r.interview==='done'?'<span style="color:var(--green)">✓ done</span>'
-            :r.interview==='invited'?'<span style="color:var(--indigo)">invited '+escapeHtml(r.invited_at||'')+' · by '+escapeHtml(r.invite_deadline||'')+'</span>'
+            :r.interview==='invited'?'<span style="color:#476B15">invited '+escapeHtml(r.invited_at||'')+' · by '+escapeHtml(r.invite_deadline||'')+'</span>'
             :r.interview==='expired'?'<span style="color:var(--red,#DC2626)">expired</span>'
             :r.interview==='capped'?'<span style="color:var(--amber,#B45309)" title="Qualified; daily interview cap was full — retried automatically next day">capped — retrying</span>'
             :'<span style="color:var(--t3)">—</span>'}</td>
@@ -5075,6 +5087,17 @@ function mcqfAdvPreview(){
 function mcqfSetMark(s){
   const el=document.getElementById('mcqf-mark');
   if(el){ el.value=s; mcqfAdvPreview(); }
+}
+// Persist the cutoff + quota on the job WITHOUT advancing anyone — Advance
+// stays its own button. Rides the existing only-set-provided settings action.
+async function mcqfSaveAdvance(){
+  const raw=(document.getElementById('mcqf-mark')||{value:''}).value.trim();
+  const n=Math.max(1,Math.min(500,parseInt((document.getElementById('mcqf-n')||{}).value)||200));
+  const d=await mcqfApi({action:'settings',
+    cutoff_mark: raw===''?'':Math.max(0,parseInt(raw)||0), quota_cap:n});
+  if(!d) return;
+  const el=document.getElementById('mcqf-adv-saved');
+  if(el){ el.style.display='inline'; setTimeout(()=>{ el.style.display='none'; },2500); }
 }
 async function mcqfAdvance(){
   const st=window._mcqfState;

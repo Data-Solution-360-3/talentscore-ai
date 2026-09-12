@@ -4482,6 +4482,24 @@ async def mcq_filter_save(request: Request, job_id: str):
         # screen snapshots, the interview's machinery; denial FLAGS, never blocks).
         if body.get("proctor_level") in ("light", "full"):
             mf["proctor_level"] = body["proctor_level"]
+        # Funnel advance DEFAULTS — the recruiter saves a cutoff mark + quota
+        # now and advances later. Display defaults ONLY: nothing reads these
+        # to advance or filter automatically; Advance stays a separate,
+        # human-clicked action, and candidates never see these fields.
+        if "cutoff_mark" in body:
+            v = body.get("cutoff_mark")
+            if v in (None, ""):
+                mf.pop("cutoff_mark", None)   # cleared = plain top-N default
+            else:
+                try:
+                    mf["cutoff_mark"] = max(0, min(1000, int(v)))
+                except Exception:
+                    pass
+        if "quota_cap" in body:
+            try:
+                mf["quota_cap"] = max(1, min(500, int(body.get("quota_cap"))))
+            except Exception:
+                pass
         await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
                                  {"$set": {"mcq_filter": mf}})
         return {"success": True, "mcq_filter": serialize_mongo(mf)}
