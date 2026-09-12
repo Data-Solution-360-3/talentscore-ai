@@ -66,7 +66,22 @@ input,select,textarea{max-width:100%}
 @media (prefers-reduced-motion:reduce){.ivcard.speaking .voice i{animation:none;height:12px}}
 
 .q-label{font-size:11.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--t3);margin:2.2rem 0 1rem}
-.question{max-width:760px;text-align:center;font-size:clamp(1.35rem,2.8vw,2.15rem);font-weight:750;letter-spacing:-.7px;line-height:1.32;color:#1f2937;min-height:2.6em}
+/* (2026-09-13, mockup) Lighter, wider question: ~21px medium, full-width
+   left-to-right up to a readable line cap — not a tall bold narrow pile. */
+.question{max-width:min(72ch,94vw);text-align:center;font-size:clamp(1.05rem,1.8vw,1.32rem);font-weight:600;letter-spacing:-.3px;line-height:1.45;color:#1f2937;min-height:2.2em}
+/* Step rail — same grammar as the apply page; shown only when the link is
+   funnel-application-bound (RAIL flag), so it never promises fake stages. */
+.rail{position:fixed;top:60px;left:0;right:0;display:none;align-items:center;padding:10px 1.6rem;background:rgba(250,251,252,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:49}
+.rail.on{display:flex}
+.rail .rstep{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#9aa590}
+.rail .rstep .n{width:22px;height:22px;border-radius:50%;background:#e6ebe0;color:#6f7b68;display:grid;place-items:center;font-size:11px;flex:none}
+.rail .rstep.done .n{background:var(--green,#639922);color:#fff}
+.rail .rstep.done{color:#3c4a38}
+.rail .rstep.cur .n{background:var(--ink,#173404);color:#fff}
+.rail .rstep.cur{color:var(--ink,#173404)}
+.rail .rbar{flex:1;height:2px;background:#e6ebe0;margin:0 12px;max-width:120px}
+.rail .rbar.done{background:var(--green,#639922)}
+body.has-rail .stage{padding-top:132px}
 /* written/scenario mode: the top slot HIDES — the typed panel right above the
    textarea is the question's single display (plus the pinned case-study card),
    so the question is never repeated up and down the screen. Restored on the
@@ -191,6 +206,25 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
   </div>
 </div>
 
+<!-- Step rail — rendered only when this link is funnel-application-bound
+     (RAIL server flag); a direct link has no Apply/Test history to show. -->
+<div class="rail" id="rail"></div>
+<script>
+(function(){
+  const RAIL = "{{RAIL}}";
+  if(!RAIL) return;
+  const steps = RAIL === 'mcq'
+    ? [['Apply','done'],['Test','done'],['Interview','cur']]
+    : [['Apply','done'],['Interview','cur']];
+  const el = document.getElementById('rail');
+  el.innerHTML = steps.map(([label, st], i) =>
+    `<div class="rstep ${st}"><span class="n">${st==='done'?'✓':(i+1)}</span>${label}</div>`
+  ).join('<div class="rbar done"></div>');
+  el.classList.add('on');
+  document.body.classList.add('has-rail');
+})();
+</script>
+
 <div class="recon" id="recon"><span class="spin"></span><span id="recon-msg">Connection dropped — reconnecting…</span></div>
 <div id="proctor-prompt" role="status" aria-live="polite"></div>
 
@@ -209,7 +243,7 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
       <div class="ivatar">{{IV_INITIAL}}</div>
       <div style="text-align:left">
         <div class="ivname">{{IV_NAME}}</div>
-        <div class="ivrole">AI Interviewer{{JOB_TITLE}}</div>
+        <div class="ivrole">Interviewer{{JOB_TITLE}}</div>
       </div>
     </div>
     <h1>Ready for your interview?</h1>
@@ -257,7 +291,7 @@ body.lang-bn .question,body.lang-bn #typed-q,body.lang-bn .typed textarea,body.l
     <div class="ivatar">{{IV_INITIAL}}</div>
     <div>
       <div class="ivname">{{IV_NAME}}</div>
-      <div class="ivrole">AI Interviewer</div>
+      <div class="ivrole">Interviewer</div>
     </div>
     <div class="voice"><i></i><i></i><i></i><i></i></div>
   </div>

@@ -2672,8 +2672,21 @@ def _build_live_instructions(questions: list, max_turns: int,
     scenario — if any — as a final section.
     """
     has_typed = any(q["mode"] == "typed" for q in questions) or bool(scenario)
-    name_line = (f"Your name is {interviewer_name}. Introduce yourself by that name "
-                 "in your one greeting sentence. " if interviewer_name else "")
+    # (2026-09-13, approved) The old default name "AI Interviewer" combined
+    # with "introduce yourself by that name" made the model SAY "I am AI
+    # Interviewer" out loud. A REAL recruiter-set name still introduces
+    # itself; the generic default introduces no name at all — and in every
+    # case the model must never announce itself as an AI. Disclosure of the
+    # AI interview stays where it belongs: the ready-screen guidelines and
+    # the apply consent. This changes the greeting only, nothing else.
+    _generic_name = (interviewer_name or "").strip().lower() in ("", "ai interviewer", "interviewer")
+    name_line = (
+        "Do not state a name for yourself and NEVER call yourself an 'AI interviewer' or announce "
+        "that you are an AI — your one greeting sentence is a neutral, warm welcome to the interview "
+        "for this role, then go straight to the first question. "
+        if _generic_name else
+        f"Your name is {interviewer_name}. Introduce yourself by that name in your one greeting "
+        "sentence, and never describe yourself as an 'AI interviewer'. ")
     # Bangla (BETA): ask + converse entirely in Bangla. The questions are already
     # generated in Bangla; here we only tell the model which language to speak.
     lang_bn = (language or "en").lower() == "bn"
@@ -3675,15 +3688,34 @@ async def candidate_interview_page(token: str):
     def esc(v, fallback=""):
         return _html.escape(str(v if v not in (None, "") else fallback))
 
+    # Step rail (display only): shown ONLY for funnel-application-bound links
+    # — a manually-minted direct link has no Apply/Test history, so promising
+    # those stages would be false UI. "mcq" = Apply+Test done, "cv" = Apply
+    # done (no test on this job's path), "" = no rail.
+    rail = ""
+    if live.get("application_id"):
+        try:
+            from bson import ObjectId as _OID
+            _app = await db.applications.find_one(
+                {"_id": _OID(str(live["application_id"]))}, {"funnel": 1})
+            rail = "mcq" if (_app or {}).get("funnel") == "mcq" else "cv"
+        except Exception:
+            rail = "cv"
+
     page = read_template("interview.html")
     for key, val in {
+        "{{RAIL}}": rail,
         "{{BRAND_CSS}}": _brand_css(brand),
         "{{BRAND_MARK}}": _brand_mark(brand, ""),
         "{{TOKEN}}": esc(token),
         "{{COMPANY}}": esc(company),
         "{{DEADLINE}}": esc(deadline, ""),
-        "{{IV_NAME}}": esc(cfg.get("interviewer_name"), "AI Interviewer"),
-        "{{IV_INITIAL}}": esc((cfg.get("interviewer_name") or "A").strip()[:1].upper(), "A"),
+        # Neutral display: the stored generic default never renders as
+        # "AI Interviewer" on the candidate's screen (label-only change).
+        "{{IV_NAME}}": esc("Interviewer" if str(cfg.get("interviewer_name") or "").strip().lower()
+                           in ("", "ai interviewer") else cfg.get("interviewer_name")),
+        "{{IV_INITIAL}}": esc(("Interviewer" if str(cfg.get("interviewer_name") or "").strip().lower()
+                               in ("", "ai interviewer") else cfg.get("interviewer_name")).strip()[:1].upper(), "I"),
         "{{JOB_TITLE}}": esc(cfg.get("job_title"), ""),
         "{{MAX_TURNS}}": str(int(cfg.get("max_turns", 4))),
         # Duration estimate is derived client-side from the 12-minute auto-end
@@ -4027,6 +4059,10 @@ async def public_apply_page(token: str):
         "{{TOKEN}}": esc(token),
         "{{RETENTION_DAYS}}": str(APPLICATION_PDF_RETENTION_DAYS),
         "{{MAX_MB}}": str(MAX_APPLICATION_PDF_BYTES // (1024 * 1024)),
+        # Step-rail flags (display only): the rail shows ONLY stages this job
+        # actually has — never a promised Test/Interview that doesn't exist.
+        "{{HAS_TEST}}": "1" if ((job.get("mcq_filter") or {}).get("enabled")) else "",
+        "{{HAS_VIVA}}": "1" if ((job.get("viva") or {}).get("enabled")) else "",
     }.items():
         page = page.replace(key, val)
     return HTMLResponse(page)
