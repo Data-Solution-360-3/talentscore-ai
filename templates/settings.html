@@ -505,6 +505,21 @@ img,video{max-width:100%}
     <!-- ── USAGE ── -->
     <div class="page" id="page-usage">
       <div class="page-hd"><h1>Usage</h1><p>Your screening usage and limits this month</p></div>
+      <!-- ── USAGE & COST SUMMARY (owner/admin; server 403s others and the
+           card stays hidden). READ-ONLY client PRICE at platform-set rates —
+           an estimate, never an invoice. -->
+      <div class="card" id="bill-card" style="display:none">
+        <div class="card-hd"><div class="card-title">Usage &amp; Cost Summary</div>
+          <span class="card-sub">your usage × current rates — an estimate, not an invoice</span></div>
+        <div style="overflow-x:auto"><table class="tbl">
+          <thead><tr><th>Stage</th><th style="text-align:right">Used</th><th style="text-align:right">Rate</th><th style="text-align:right">Cost</th></tr></thead>
+          <tbody id="bill-tbl"></tbody>
+        </table></div>
+        <div style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.6">
+          Counted once each, ever: an MCQ when the candidate completes the test, a CV per AI scoring run, an interview when the session completes.
+          Rates are set by TopCandidate and shown here for transparency — they are not editable from this page.
+        </div>
+      </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Screenings this month</div><span class="card-sub" id="usage-reset">Resets monthly</span></div>
         <div class="usage-bar-wrap">
@@ -513,7 +528,7 @@ img,video{max-width:100%}
             <span id="usage-limit">of 10</span>
           </div>
           <div class="usage-bar-bg">
-            <div class="usage-bar-fill" id="usage-bar" style="width:0%;background:var(--indigo)"></div>
+            <div class="usage-bar-fill" id="usage-bar" style="width:0%;background:var(--green,#639922)"></div>
           </div>
         </div>
         <div style="font-size:12px;color:var(--t3);margin-top:6px" id="usage-note">Upgrade your plan to screen more candidates.</div>
@@ -1012,11 +1027,37 @@ async function refreshUsage(){
     if(noteEl)noteEl.style.color=remaining===0?'var(--red)':'var(--t3)';
   }catch(e){console.warn('[USAGE]',e);}
   loadCostDashboard();
+  loadBillingSummary();
 }
 brandLoad();
 
-// ── OpenAI spend dashboard (owner/admin only — the server 403s everyone
-//    else, and this card simply stays hidden for them). READ-ONLY. ──
+// ── USAGE & COST SUMMARY (client price at platform-set rates) — READ-ONLY.
+//    Owner/admin only (server 403s others; card stays hidden). Every money
+//    string arrives preformatted from the server's integer-paisa math —
+//    this JS never does arithmetic on Taka amounts. ──
+async function loadBillingSummary(){
+  const card=document.getElementById('bill-card');
+  if(!card)return;
+  let d;
+  try{
+    const r=await fetch('/api/org/billing-usage',{credentials:'include'});
+    if(!r.ok){card.style.display='none';return;}
+    d=await r.json();
+  }catch(_){card.style.display='none';return;}
+  card.style.display='';
+  const rows=[['mcq','MCQ tests taken'],['cv','CVs screened (AI-scored)'],['interview','Interviews completed']]
+    .map(([k,lbl])=>`<tr><td>${lbl}</td>
+      <td style="text-align:right;font-weight:700">${(d.counts||{})[k]||0}</td>
+      <td style="text-align:right;color:var(--t3)">৳${(d.rates_tk||{})[k]||'0'} each</td>
+      <td style="text-align:right;font-weight:700">৳${(d.cost_tk||{})[k]||'0'}</td></tr>`).join('');
+  document.getElementById('bill-tbl').innerHTML=rows
+    +`<tr style="background:rgba(99,153,34,.07)"><td style="font-weight:800;color:#173404">Total</td><td></td><td></td>
+       <td style="text-align:right;font-weight:800;font-size:14px;color:var(--green,#639922)">৳${d.total_tk||'0'}</td></tr>`;
+}
+
+// ── OpenAI spend dashboard (PLATFORM ADMIN only — with real client orgs,
+//    our OpenAI cost must never sit next to a client's price; the server
+//    403s everyone else and this card stays hidden for them). READ-ONLY. ──
 const COST_LABELS={cv_scoring:'CV scoring', interview_audio:'Interview audio (Realtime)',
   interview_scoring:'Interview transcript scoring', question_gen:'Question generation',
   jd_parse:'JD parsing'};

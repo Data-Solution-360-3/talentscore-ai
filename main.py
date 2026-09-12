@@ -1804,24 +1804,25 @@ def _login_logo_mark(b: dict) -> str:
 
 @app.get("/api/usage/cost")
 async def usage_cost_dashboard(request: Request):
-    """Owner/admin-only spend dashboard (READ-ONLY over the existing meter).
+    """PLATFORM-ADMIN-ONLY spend dashboard (READ-ONLY over the existing
+    meter). This is OUR OpenAI cost — with real client orgs on the platform
+    it must never sit in front of a client next to their price, so the old
+    org-owner access was removed (2026-09-12, approved): clients see only
+    /api/org/billing-usage (their price at the set rates), never this.
 
-    Scope is enforced SERVER-SIDE from the caller's own org — never from a
-    parameter — so one client can never query another's numbers. A super-admin
-    sees all orgs plus the per-org table. Double-count rule: CV scoring is
-    summed from screenings.api_usage; interview audio + transcript scoring
-    from interview_sessions (which also catches owner test sessions);
-    question-gen/jd-parse from the ledger, org-resolved via their job_id.
-    Everything here is an ESTIMATE from stored, dated rates.
+    Double-count rule: CV scoring is summed from screenings.api_usage;
+    interview audio + transcript scoring from interview_sessions (which also
+    catches owner test sessions); question-gen/jd-parse from the ledger,
+    org-resolved via their job_id. Everything here is an ESTIMATE from
+    stored, dated rates.
     """
     from datetime import datetime as _dtt
 
     user = await get_current_user(request)
     db_user = await get_user_by_id(user["user_id"])
-    is_admin = bool(db_user and db_user.get("role") == "admin")
-    is_super = bool(db_user and db_user.get("is_super_admin"))
-    if not is_admin and user.get("org_role") != "owner":
+    if not (db_user and db_user.get("role") == "admin"):
         raise HTTPException(status_code=403, detail="Not available for your role.")
+    is_super = bool(db_user.get("is_super_admin"))
     org = None if is_super else str(user.get("org_id") or "")
 
     now = _dtt.utcnow()
@@ -6485,6 +6486,15 @@ async def admin_list_users(request: Request):
 
 _BILL_STAGES = ("mcq", "cv", "interview")
 
+# ONE source of truth for what counts as a billable event — used by BOTH the
+# super-admin usage view and the client-facing summary, so the two can never
+# disagree on a count. stage -> (collection, match predicate).
+_BILL_MATCH = {
+    "mcq":       ("applications",       {"mcq_score": {"$ne": None}}),
+    "cv":        ("screenings",         {"overall_score": {"$ne": None}}),
+    "interview": ("interview_sessions", {"status": "completed"}),
+}
+
 
 def _parse_tk_to_paisa(v) -> int:
     """'0.5' -> 50, '3' -> 300, '20.25' -> 2025. String parsing ONLY — the
@@ -6586,18 +6596,11 @@ async def admin_billing_usage(request: Request):
         j = per.setdefault(org_id, {}).setdefault(job_id, dict.fromkeys(_BILL_STAGES, 0))
         j[stage] += int(n)
 
-    async for r in db.applications.aggregate([
-            {"$match": {"mcq_score": {"$ne": None}}},
-            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
-        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "mcq", r["n"])
-    async for r in db.screenings.aggregate([
-            {"$match": {"overall_score": {"$ne": None}}},
-            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
-        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "cv", r["n"])
-    async for r in db.interview_sessions.aggregate([
-            {"$match": {"status": "completed"}},
-            {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
-        bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), "interview", r["n"])
+    for stage, (coll, match) in _BILL_MATCH.items():
+        async for r in db[coll].aggregate([
+                {"$match": match},
+                {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
+            bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), stage, r["n"])
 
     # Names for orgs and jobs (one query each; buckets keep working when a
     # name is missing).
@@ -6649,6 +6652,42 @@ async def admin_billing_usage(request: Request):
     orgs_out.sort(key=lambda o: -o["total_paisa"])
     return {"orgs": orgs_out,
             "grand_total_tk": _paisa_to_tk_str(grand_paisa),
+            "note": "Usage & cost summary — an estimate of usage × current rates. Not an invoice."}
+
+
+@app.get("/api/org/billing-usage")
+async def org_billing_usage(request: Request):
+    """CLIENT-facing usage & cost summary — strictly READ-ONLY, and only the
+    caller's OWN org (org_id comes from the session; no org parameter exists,
+    so there is nothing to point cross-org). Org owner or platform admin only
+    (the same gate discipline as branding).
+
+    ONE source of truth with the super-admin view: the SAME _BILL_MATCH
+    predicates, the SAME _billing_rates, the SAME integer-paisa arithmetic —
+    this total cannot disagree with the admin's number for the org. This is
+    the client's PRICE at the platform-set rates; nothing here reads the
+    OpenAI meter, and rates are display-only (editing lives on the
+    admin-gated endpoints)."""
+    user = await _require_branding_editor(request)   # owner-or-admin + org required
+    org_id = str(user["org_id"])
+    from bson import ObjectId as _OID
+    # Match both storage forms of the org stamp — the admin view's grouping
+    # str()-merges them, so the client count must catch both to stay equal.
+    try:
+        org_keys = [org_id, _OID(org_id)]
+    except Exception:
+        org_keys = [org_id]
+    counts = {}
+    for stage, (coll, match) in _BILL_MATCH.items():
+        counts[stage] = await db[coll].count_documents(
+            {**match, "org_id": {"$in": org_keys}})
+    rates = (await _billing_rates(org_id))["rates_paisa"]
+    cost = {k: counts[k] * rates[k] for k in _BILL_STAGES}
+    total = sum(cost.values())
+    return {"counts": counts,
+            "rates_tk": {k: _paisa_to_tk_str(rates[k]) for k in _BILL_STAGES},
+            "cost_tk": {k: _paisa_to_tk_str(cost[k]) for k in _BILL_STAGES},
+            "total_tk": _paisa_to_tk_str(total),
             "note": "Usage & cost summary — an estimate of usage × current rates. Not an invoice."}
 
 

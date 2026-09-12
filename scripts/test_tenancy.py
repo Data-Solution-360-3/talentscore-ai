@@ -225,16 +225,32 @@ def main():
             check("recruiter A cannot invite (owner-only)", r.status_code == 403,
                   f"got {r.status_code}")
 
-            print("\nCost dashboard — owner-only, hard-scoped to the caller's org")
+            print("\nOpenAI cost dashboard — PLATFORM ADMIN only (clients never see our cost)")
             r = c.get("/api/usage/cost", headers=hdr(t_view_a))
             check("viewer A cannot read cost data", r.status_code == 403, f"got {r.status_code}")
             r = c.get("/api/usage/cost", headers=hdr(t_rec_a))
             check("recruiter A cannot read cost data", r.status_code == 403, f"got {r.status_code}")
             r = c.get("/api/usage/cost", headers=hdr(t_owner_a))
+            check("org owner A cannot read OpenAI cost (super-admin only since billing view)",
+                  r.status_code == 403, f"got {r.status_code}")
+
+            print("\nClient billing summary — own org, owner/admin only, read-only")
+            r = c.get("/api/org/billing-usage", headers=hdr(t_view_a))
+            check("viewer A cannot read the billing summary", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.get("/api/org/billing-usage", headers=hdr(t_rec_a))
+            check("recruiter A cannot read the billing summary", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
             body = r.json() if r.status_code == 200 else {}
-            check("owner A gets own-org scope", r.status_code == 200
-                  and body.get("scope") == "your_org" and body.get("per_org") is None,
-                  f"got {r.status_code} scope={body.get('scope')}")
+            check("owner A reads own-org billing summary", r.status_code == 200
+                  and set(body.get("counts") or {}) == {"mcq", "cv", "interview"}
+                  and "total_tk" in body,
+                  f"got {r.status_code}")
+            check("billing summary never leaks OpenAI cost fields",
+                  r.status_code == 200 and "est_usd" not in r.text
+                  and "openai" not in r.text.lower(),
+                  "cost fields present in client response")
             check("owner A's cost payload carries NO org-B reference",
                   org_b not in r.text and scr_b not in r.text)
 
