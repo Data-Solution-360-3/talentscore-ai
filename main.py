@@ -5733,12 +5733,15 @@ async def list_job_applications(request: Request, job_id: str):
     apps = await get_applications_for_job(job_id, user["user_id"])
     counts = await count_pending_applications(job_id)
     spend = await get_spend_state(job_id)
+    # (2026-09-12) The stale hardcoded cost_per_screening/estimated_cost
+    # fields were removed: $0.054 was the gpt-4o-era figure (~22x the
+    # measured mini cost), and OUR OpenAI cost has no place in a
+    # client-recruiter-facing response anyway — clients see only their
+    # price in the billing summary.
     return {
         "applications": apps,
         "counts": counts,
         "spend": spend,
-        "cost_per_screening": 0.054,
-        "estimated_cost": round(counts["pending"] * 0.054, 2),
     }
 
 

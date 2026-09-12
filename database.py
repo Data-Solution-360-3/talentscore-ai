@@ -886,7 +886,8 @@ from datetime import timedelta
 # candidate 30 days; if this constant moves, that sentence has to move with it.
 APPLICATION_PDF_RETENTION_DAYS = 30
 
-# Spend caps. Each screening is ~4 GPT-4o calls, ~$0.054.
+# Spend caps. A screening is ~3 gpt-4o-mini calls, measured ~$0.0027/CV
+# (2026-09-12 meter average; legacy gpt-4o-pinned runs were ~$0.06).
 CAP_PER_JOB = 200      # ~$10.80 per posting
 CAP_PER_DAY = 100      # ~$5.40/day
 CAP_PER_MONTH = 500    # ~$27/month — the one that bounds a card charge

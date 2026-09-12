@@ -5468,12 +5468,12 @@ async function loadPendingApplications(jobId){
         </div>
         ${c.pending ? `
           <button class="btn btn-sm btn-primary" id="screen-pending-btn" onclick="screenPending('${jobId}')" style="width:100%">
-            Score ${c.pending} pending — approx. $${d.estimated_cost.toFixed(2)}
+            Score ${c.pending} pending now
           </button>
           ${capNote.length ? `<div style="font-size:11px;color:var(--amber);margin-top:8px;line-height:1.5">
             ⚠ ${capNote.join(', ')}. New applications are still being accepted and stored — they just aren't scored automatically. Scoring them here counts against the per-job and monthly caps.
           </div>` : `<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">
-            Approximate cost at ~$0.054 per CV. Nothing is charged until you click.
+            Nothing runs until you click — scoring counts against the per-job and monthly caps.
           </div>`}
         ` : ''}
       </div>`;
