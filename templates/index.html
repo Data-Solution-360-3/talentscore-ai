@@ -752,6 +752,10 @@ img,svg,video{max-width:100%}
 .jt-label input,.jt-label select{padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12.5px;font-weight:700;color:#173404;background:#fff}
 .jt-help{font-size:12px;color:#4A5443;line-height:1.65;margin-top:9px}
 .jt-note{font-size:12px;color:#4A5443;line-height:1.65}
+/* label-above-control stack — the aligned grid for settings/advance rows */
+.jt-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.jt-field>span{font-size:10.5px;font-weight:800;color:#4A5443;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.jt-field select,.jt-field input{font-family:inherit;font-size:12px;color:#1f2937;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff}
 </style>
 </head>
 <body>
@@ -4905,20 +4909,23 @@ function mcqfRender(){
     const pm=(mf.paste_mode==='monitor')?'monitor':'restrict';
     html += `<div class="jt-card" style="margin-bottom:12px">
       <div class="jt-sec">Test settings</div>
-      <div class="jt-row">
-        <label class="jt-label">Copy/paste
+      <div class="jt-row" style="align-items:flex-end">
+        <div class="jt-field">
+          <span>Copy/paste</span>
           <select id="mcqf-pm">
             <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
             <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
-          </select></label>
-        <label class="jt-label" title="The test's total time = question count × this">Sec / question
-          <input id="mcqf-spq" type="number" min="15" max="120" value="${mf.seconds_per_question||45}" style="width:56px"></label>
-        <label class="jt-label">Proctoring
+          </select></div>
+        <div class="jt-field" title="The test's total time = question count × this">
+          <span>Sec / question</span>
+          <input id="mcqf-spq" type="number" min="15" max="120" value="${mf.seconds_per_question||45}" style="width:70px"></div>
+        <div class="jt-field">
+          <span>Proctoring</span>
           <select id="mcqf-pl">
             <option value="light" ${mf.proctor_level!=='full'?'selected':''}>Light — tab/paste/timing only, no camera</option>
             <option value="full" ${mf.proctor_level==='full'?'selected':''}>Full — camera + screen snapshots (disclosed)</option>
-          </select></label>
-        <button class="btn btn-xs btn-primary" onclick="mcqfSettings()">Save settings</button>
+          </select></div>
+        <button class="btn btn-xs btn-primary" onclick="mcqfSettings()" style="margin-left:auto">Save settings</button>
       </div>
       ${(mf.paste_mode==null && mf.seconds_per_question==null)
         ? `<div class="jt-help" style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted · 45s/question · Light). Click Save settings to persist.</div>`
@@ -4926,15 +4933,12 @@ function mcqfRender(){
     </div>`;
   }
   if(on){
-    html += `<div style="margin-top:2px">
-      <div class="jt-row" style="margin-bottom:8px">
-        <div class="jt-sec" style="margin-bottom:0">Funnel</div>
+    html += `<div class="jt-card" style="margin-bottom:0">
+      <div class="jt-row" style="justify-content:space-between;margin-bottom:10px">
+        <div class="jt-sec" style="margin-bottom:0">Funnel — advance to CV screening</div>
         <button class="btn btn-xs" onclick="mcqFunnelLoad()">↻ Refresh</button>
-        <label class="jt-label">Advance top
-          <input id="mcqf-n" type="number" min="1" max="500" value="200" style="width:66px">
-          <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button></label>
       </div>
-      <div id="mcqf-funnel" style="font-size:12px;color:#2E401B"></div>
+      <div id="mcqf-funnel" style="font-size:12px;color:#2E401B">Loading funnel…</div>
     </div>`;
   }
   body.innerHTML=html;
@@ -4987,14 +4991,47 @@ function mcqFunnelRender(){
   const st=window._mcqfState, f=st.funnel, el=document.getElementById('mcqf-funnel');
   if(!f||!el) return;
   const c=f.counts||{};
-  let html=`<div style="margin-bottom:5px"><b>${c.held||0}</b> held · <b>${c.advanced||0}</b> advanced · <b>${c.released||0}</b> released · <b>${c.awaiting_test||0}</b> awaiting test</div>`;
+  // What advancing actually acts on: HELD candidates with a score.
+  st.heldScores=(f.rows||[]).filter(r=>r.status==='held'&&r.mcq_score!=null).map(r=>r.mcq_score);
+  let html='';
+  // ── stat chips ──
+  const chip=(n,label,color)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:3px 11px;font-size:11px;color:#3A4433"><b style="color:${color};font-size:12.5px">${n||0}</b>${label}</span>`;
+  html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    ${chip(c.held,'held','var(--amber,#B45309)')}${chip(c.advanced,'advanced','var(--green,#639922)')}${chip(c.released,'released','#6B7280')}${chip(c.awaiting_test,'awaiting test','#6B7280')}</div>`;
+  // ── score distribution: green bars, labels UNDER the bars ──
   const dist=f.distribution||[];
   if(dist.length){
     const mx=Math.max(...dist.map(d=>d.n));
-    html+=`<div style="display:flex;align-items:flex-end;gap:3px;height:52px;margin:4px 0 8px">`
-      +dist.map(d=>`<div title="${d.n} scored ${d.score}/${f.total_questions}" style="flex:1;max-width:26px;background:var(--indigo);opacity:.8;border-radius:3px 3px 0 0;height:${Math.max(8,Math.round(d.n/mx*100))}%"><div style="font-size:8.5px;text-align:center;color:var(--t3);margin-top:-13px">${d.score}</div></div>`).join('')
+    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Score distribution — everyone who took the test</div>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:54px">`
+      +dist.map(d=>`<div title="${d.n} candidate(s) scored ${d.score}/${f.total_questions}" style="flex:1;max-width:30px;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="background:var(--green,#639922);border-radius:3px 3px 0 0;height:${Math.max(6,Math.round(d.n/mx*92))}%"></div></div>`).join('')
+      +`</div><div style="display:flex;gap:4px;margin:3px 0 12px">`
+      +dist.map(d=>`<div style="flex:1;max-width:30px;text-align:center;font-size:9.5px;font-weight:700;color:#5B6650">${d.score}</div>`).join('')
       +`</div>`;
   }
+  // ── cumulative mark chips (held only — click sets the cutoff) ──
+  if(st.heldScores.length){
+    const uniq=[...new Set(st.heldScores)].sort((a,b)=>b-a);
+    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Held candidates at or above each mark — click to set the cutoff</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">`
+      +uniq.map(s=>{const n=st.heldScores.filter(x=>x>=s).length;
+        return `<button type="button" class="btn btn-xs" onclick="mcqfSetMark(${s})" style="font-weight:700;color:#173404">${s}+ · ${n}</button>`;}).join('')
+      +`</div>`;
+  }
+  // ── advance controls: cutoff mark (primary) + quota cap + live preview ──
+  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:11px 13px;margin-bottom:8px">
+    <div class="jt-field">
+      <span>Cutoff mark (≥ of ${f.total_questions||'—'})</span>
+      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${st.mark!=null?st.mark:''}" placeholder="none" style="width:78px" oninput="mcqfAdvPreview()">
+    </div>
+    <div class="jt-field">
+      <span>Quota cap</span>
+      <input id="mcqf-n" type="number" min="1" max="500" value="${st.quota||200}" style="width:78px" oninput="mcqfAdvPreview()">
+    </div>
+    <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button>
+    <div id="mcqf-adv-preview" style="flex:1;min-width:200px;font-size:11.5px;color:#2E401B;line-height:1.55"></div>
+  </div>
+  <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:12px">Advancing starts AI CV screening on exactly the advanced candidates — spend applies to them only. Everyone else stays <b>held</b> (held is never rejected). Lower the mark any time to advance more; already-screened candidates are never re-screened.</div>`;
   const rows=(f.rows||[]).slice(0,30);
   if(rows.length){
     html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th>Interview</th><th></th></tr></thead><tbody>`
@@ -5014,16 +5051,49 @@ function mcqFunnelRender(){
       +`</tbody></table>${(f.rows||[]).length>30?`<div style="color:var(--t3);font-size:10.5px;margin-top:3px">Showing top 30 of ${f.rows.length}.</div>`:''}</div>`;
   }else html+=`<div style="color:var(--t3)">No funnel applicants yet.</div>`;
   el.innerHTML=html;
+  mcqfAdvPreview();
+}
+// The live "who would advance" line — recomputed on every mark/quota keystroke
+// from the HELD scores (the only rows advancing can touch). Honest counts:
+// never includes already-advanced people.
+function mcqfAdvPreview(){
+  const st=window._mcqfState, el=document.getElementById('mcqf-adv-preview');
+  if(!st||!el) return;
+  const markEl=document.getElementById('mcqf-mark'), nEl=document.getElementById('mcqf-n');
+  const raw=(markEl&&markEl.value.trim())||'';
+  const mark=raw===''?null:Math.max(0,parseInt(raw)||0);
+  const quota=Math.max(1,Math.min(500,parseInt(nEl&&nEl.value)||200));
+  st.mark=mark; st.quota=quota;
+  const scores=st.heldScores||[];
+  if(!scores.length){ el.innerHTML='<span style="color:#6B7280">No held candidates with a score yet.</span>'; return; }
+  const qual=(mark==null?scores:scores.filter(s=>s>=mark)).length;
+  const adv=Math.min(quota,qual);
+  el.innerHTML = mark==null
+    ? `No cutoff set — advancing the <b>top ${adv}</b> of ${scores.length} held, by score.`
+    : `At mark <b>${mark}+</b>: <b>${qual}</b> held qualify — advancing <b>${adv}</b>${adv<qual?' of them (quota cap)':''}${qual===0?' — lower the mark to include more':''}.`;
+}
+function mcqfSetMark(s){
+  const el=document.getElementById('mcqf-mark');
+  if(el){ el.value=s; mcqfAdvPreview(); }
 }
 async function mcqfAdvance(){
   const st=window._mcqfState;
   const n=Math.max(1,Math.min(500,parseInt(document.getElementById('mcqf-n').value)||0));
-  if(!confirm('Advance the top '+n+' held candidates by MCQ score?\n\nThis starts AI CV screening on exactly those '+n+' (screening spend applies to them only).')) return;
+  const raw=(document.getElementById('mcqf-mark')||{value:''}).value.trim();
+  const mark=raw===''?null:Math.max(0,parseInt(raw)||0);
+  const scores=st.heldScores||[];
+  const qual=(mark==null?scores:scores.filter(s=>s>=mark)).length;
+  const adv=Math.min(n,qual);
+  const msg = mark==null
+    ? 'Advance the top '+adv+' held candidates by MCQ score?'
+    : 'Advance everyone scoring '+mark+'+ ('+qual+' held qualify'+(adv<qual?', quota-capped to '+adv:'')+')?';
+  if(!confirm(msg+'\n\nAI CV screening starts on exactly the advanced candidates (spend applies to them only). The rest stay HELD — held is never rejected, and you can lower the mark later; already-screened candidates are never re-screened.')) return;
   const fd=new FormData(); fd.append('n',n);
+  if(mark!=null) fd.append('mark',mark);
   const r=await fetch('/api/jobs/'+st.jobId+'/mcq-advance',{method:'POST',body:fd,credentials:'include'});
   const d=await r.json().catch(()=>({}));
   if(!r.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
-  toast('Advanced '+d.advanced+' candidate(s) — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
+  toast('Advanced '+d.advanced+' candidate(s)'+(d.mark!=null?' at mark '+d.mark+'+ ('+d.qualified+' qualified)':'')+' — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
   mcqFunnelLoad();
 }
 function mcqfScenEdit(startIdx, val){

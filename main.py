@@ -4663,20 +4663,33 @@ async def mcq_funnel_view(request: Request, job_id: str):
 
 @app.post("/api/jobs/{job_id}/mcq-advance")
 async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
-                             job_id: str, n: int = Form(...)):
-    """Advance the top N HELD candidates by MCQ score: exactly the apply
-    flow's own reserve + score_application per candidate — screening spend
-    happens here and ONLY here for funnel jobs."""
+                             job_id: str, n: int = Form(...),
+                             mark: int = Form(None)):
+    """Advance HELD candidates into CV screening — exactly the apply flow's
+    own reserve + score_application per candidate; screening spend happens
+    here and ONLY here for funnel jobs.
+
+    Primary control: a CUTOFF MARK — everyone scoring AT OR ABOVE `mark`
+    qualifies, highest scores first, up to the quota cap `n`. No mark =
+    plain top-N (kept). Re-running with a lower mark is safe by construction:
+    only status "held" ever matches, and advancing flips a row to "pending",
+    so already-advanced candidates can never be re-screened. Held stays held
+    — a triage state, never a rejection."""
     user = await get_current_user(request)
     job = await owned_job(job_id, user)
     n = max(1, min(500, int(n)))
+    score_q: dict = {"$ne": None}
+    if mark is not None:
+        mark = max(0, min(1000, int(mark)))
+        score_q["$gte"] = mark
     held = []
     async for a in db.applications.find(
             {"job_id": str(job["_id"]), "funnel": "mcq", "status": "held",
-             "mcq_score": {"$ne": None}},
+             "mcq_score": score_q},
             {"mcq_score": 1, "submitted_at": 1}).limit(2000):
         held.append(a)
     held.sort(key=lambda a: (-int(a.get("mcq_score") or 0), a.get("submitted_at") or _dt.min))
+    qualified = len(held)
     advanced, capped_by = 0, None
     from bson import ObjectId as _OID
     for a in held[:n]:
@@ -4690,9 +4703,12 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
                                                    "advanced_by": user["user_id"]}})
         background.add_task(score_application, str(a["_id"]))
         advanced += 1
-    print(f"[MCQ-FUNNEL] job={job_id} advanced={advanced} of n={n} by={user.get('email')}"
+    print(f"[MCQ-FUNNEL] job={job_id} advanced={advanced} of n={n}"
+          + (f" mark>={mark} (qualified={qualified})" if mark is not None else "")
+          + f" by={user.get('email')}"
           + (f" capped_by={capped_by}" if capped_by else ""))
     return {"success": True, "advanced": advanced, "requested": n,
+            "mark": mark, "qualified": qualified,
             "held_remaining": max(0, len(held) - advanced), "capped_by": capped_by}
 
 
