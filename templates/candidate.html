@@ -381,6 +381,10 @@ function render(d){
   setTimeout(()=>{const f=document.getElementById('cov-fill');if(f&&cov!==null)f.style.width=cov+'%';},200);
 
   const grid=document.getElementById('sgrid');
+  // Per-job dimension renames (display-only): the detail response carries the
+  // job's CURRENT labels; canonical names stay underneath.
+  const _dl=d.dimension_labels||{};
+  Object.values(rep.breakdown||{}).forEach(dim=>{ dim.name=_dl[dim.name]||dim.name; });
   Object.values(rep.breakdown||{}).forEach(dim=>{
     const p=Math.round((dim.score/20)*100);const c=gc(p);
     const mp=(dim.matchedSkills||[]).slice(0,4).map(s=>'<span class="pg">'+s+'</span>').join('');

@@ -1434,12 +1434,40 @@ async def list_screenings(request: Request, limit: int = 2000):
 
     for s in screenings:
         _strip_cost_fields(s, user)
+    await _attach_dimension_labels(screenings)
     return {
         "screenings": screenings,
         "count": len(screenings),
         "total": total,
         "truncated": len(screenings) < total,
     }
+
+
+async def _attach_dimension_labels(screenings: list) -> None:
+    """Display metadata: each row gets its job's CURRENT dimension renames
+    (dimension_labels) so every UI shows the client's labels. Resolved at
+    read time — never stored on the screening, never seen by the scorer."""
+    try:
+        from bson import ObjectId as _OID
+        oids = []
+        for s in screenings:
+            try:
+                oids.append(_OID(str(s.get("job_id"))))
+            except Exception:
+                pass
+        if not oids:
+            return
+        label_map = {}
+        async for j in db.jobs.find({"_id": {"$in": oids},
+                                     "dimension_labels": {"$exists": True, "$ne": {}}},
+                                    {"dimension_labels": 1}):
+            label_map[str(j["_id"])] = j.get("dimension_labels") or {}
+        for s in screenings:
+            dl = label_map.get(str(s.get("job_id")))
+            if dl:
+                s["dimension_labels"] = dl
+    except Exception:
+        pass   # display metadata only — never fail a read over it
 
 
 @app.get("/api/screenings/{screening_id}/attempts")
@@ -1491,7 +1519,9 @@ async def get_screening(request: Request, screening_id: str):
     # Allow access if no user_id (legacy data) or if it belongs to this user
     if user["role"] != "admin" and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
-    return _strip_cost_fields(doc, user)
+    _strip_cost_fields(doc, user)
+    await _attach_dimension_labels([doc])
+    return doc
 
 
 @app.delete("/api/screenings/{screening_id}")
@@ -6424,6 +6454,45 @@ async def list_jobs(request: Request):
     return {"jobs": jobs, "count": len(jobs)}
 
 
+def _parse_dimension_labels(raw: str) -> dict | None:
+    """Per-job display RENAMES for the 6 canonical scoring dimensions.
+    Display-only by construction: only canonical keys are accepted (junk keys
+    dropped — a rename can never invent or remove a dimension), and the
+    labels never reach the scorer prompt, so what is SCORED cannot change.
+    Returns None when nothing was submitted; {} clears all renames."""
+    if raw is None or raw == "":
+        return None
+    from scorer import DIMENSION_NAMES
+    try:
+        import json as _json
+        parsed = _json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    out = {}
+    for k in DIMENSION_NAMES:
+        v = str(parsed.get(k) or "").strip()[:40]
+        if v and v != k:
+            out[k] = v
+    return out
+
+
+def _validate_weights_sum(weights_dict: dict | None):
+    """Weights must total 100 (fractions summing to 1.0, ±1%). The existing
+    slider UI normalizes before submit, so this only rejects genuinely broken
+    payloads — and gives the new CV-tab editor its server-side block."""
+    if weights_dict is None:
+        return
+    try:
+        s = sum(float(v) for v in weights_dict.values())
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid weights payload.")
+    if abs(s - 1.0) > 0.01:
+        raise HTTPException(status_code=400,
+                            detail=f"Weights must total 100 — currently at {round(s * 100)}.")
+
+
 @app.post("/api/jobs")
 async def create_job_endpoint(
     request: Request,
@@ -6451,6 +6520,7 @@ async def create_job_endpoint(
                 weights_dict = parsed
         except Exception:
             weights_dict = None
+    _validate_weights_sum(weights_dict)
     job = {
         "title": title, "department": department, "location": location,
         "employment_type": employment_type,
@@ -6499,6 +6569,7 @@ async def update_job_endpoint(
     weights: str = Form(""),
     role_category: str = Form(""),
     reference_code: str = Form(None),   # None = not submitted; "" = clear it
+    dimension_labels: str = Form(None),  # JSON renames; None = untouched, "{}" clears
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
@@ -6529,9 +6600,16 @@ async def update_job_endpoint(
             import json as _json
             parsed = _json.loads(weights)
             if isinstance(parsed, dict) and parsed:
+                _validate_weights_sum(parsed)
                 updates["weights"] = parsed
+        except HTTPException:
+            raise
         except Exception:
             pass   # silently ignore bad JSON — caller can retry
+    # Dimension renames — display-only labels ({} clears every rename).
+    _dl = _parse_dimension_labels(dimension_labels)
+    if dimension_labels is not None and dimension_labels != "":
+        updates["dimension_labels"] = _dl or {}
     if updates:
         result = await mongodb.jobs.update_one(
             {"_id": ObjectId(job_id), **org_match(user["user_id"])},

@@ -2268,7 +2268,7 @@ function renderResultCard(d){
     <div class="dim-grid">
       ${(d.dimensions||[]).slice(0,6).map(dim=>{const p=Math.round((dim.score/20)*100);const c=gc(p);
         return`<div class="dim-card"><div class="dim-top" style="background:${c}"></div>
-          <div class="dim-name">${dim.name}</div>
+          <div class="dim-name">${((d.dimension_labels||{})[dim.name])||dim.name}</div>
           <div class="dim-score" style="color:${c}">${dim.score.toFixed(1)}<span style="font-size:9px;opacity:.5;font-weight:400">/20</span></div>
           <div class="dim-bar-bg"><div class="dim-bar-fill" style="width:${p}%;background:${c}"></div></div>
           <div class="dim-fb">${(dim.feedback||'').slice(0,60)}${dim.feedback&&dim.feedback.length>60?'...':''}</div>
@@ -2671,7 +2671,7 @@ function openCandModal(id){
             return`
             <div>
               <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
-                <span style="color:var(--t2)">${d.name}${wt?` <span style="color:var(--t3)">· ${wt}%</span>`:''}</span>
+                <span style="color:var(--t2)">${((r.dimension_labels||{})[d.name])||d.name}${wt?` <span style="color:var(--t3)">· ${wt}%</span>`:''}</span>
                 <span style="font-weight:800;color:${c}">${(+d.score).toFixed(1)}/20</span>
               </div>
               <div class="cdx-bar"><i style="width:${p}%;background:${c}"></i></div>
@@ -4460,21 +4460,35 @@ function renderJobConfigTabs(job){
   // CV tab: read-only scoring-weight bars (display of the job's existing
   // weights — no editor, no new wiring) + the CV score threshold (saved by
   // the SAME saveJobViva action, per the approved mapping).
+  // Weight + rename EDITOR (Phase 1 custom rubric): weights feed the job's
+  // EXISTING weights field (the recompute already reads it); names are
+  // display labels only — the scorer prompt never sees them, so what is
+  // measured cannot change. Save is blocked until the total is exactly 100.
   const wBox = document.getElementById('cv-weights-box');
   if(wBox){
-    const DEFW = {"Skills Match":.25,"Experience Relevance":.20,"Education & Certifications":.10,
-                  "Achievement & Impact":.20,"Role Alignment":.15,"Stability & Tenure":.10};
-    const W = (job.weights && typeof job.weights==='object' && Object.keys(job.weights).length) ? job.weights : DEFW;
-    const NAMES = {"Skills Match":"Skills match","Experience Relevance":"Experience relevance",
-                   "Education & Certifications":"Education & certs","Achievement & Impact":"Achievement & impact",
-                   "Role Alignment":"Role alignment","Stability & Tenure":"Stability & tenure"};
-    const mx = Math.max(...Object.keys(NAMES).map(k=>+W[k]||DEFW[k]||0), .01);
+    const W = (job.weights && typeof job.weights==='object' && Object.keys(job.weights).length) ? job.weights : null;
+    const DL = job.dimension_labels || {};
+    window._dwJobId = job._id;
     wBox.innerHTML = `
       <div class="jm-card"><div class="jm-sec">
-        <div class="jm-st">Scoring weights <span class="soft">· how the CV score is weighed for this job</span></div>
-        ${Object.entries(NAMES).map(([k,label])=>{const val=+W[k]||DEFW[k]||0;
-          return `<div class="jm-dim"><span class="dn">${label}</span><div class="dt"><span style="width:${Math.round(val/mx*100)}%"></span></div><span class="dv">${Math.round(val*100)}%</span></div>`;}).join('')}
+        <div class="jm-st">Scoring weights &amp; names <span class="soft">· weights must total exactly 100 · a renamed dimension still measures the same thing</span></div>
+        ${Object.keys(DW_DEFAULTS).map(k=>{
+          const pct = W ? Math.round((+W[k]||0)*100) : DW_DEFAULTS[k];
+          return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+            <input class="dw-name" data-dim="${k}" value="${escapeHtml(DL[k]||k)}" maxlength="40" title="Display name — the underlying dimension (${k}) is scored identically" style="flex:1;min-width:130px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px;font-weight:600;color:#173404">
+            <input class="dw-w" data-dim="${k}" type="number" min="0" max="100" value="${pct}" oninput="dwTotal()" style="width:74px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;text-align:right">
+            <span style="font-size:12px;color:#9aa590">%</span>
+          </div>`;}).join('')}
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+          <span id="dw-total" style="font-size:13px;font-weight:800"></span>
+          <span id="dw-warn" style="font-size:12px;color:var(--amber,#B45309);font-weight:700"></span>
+          <span style="margin-left:auto;display:flex;gap:10px">
+            <button class="jm-btn-s" onclick="dwReset()">Reset to default</button>
+            <button class="jm-btn-save" id="dw-save" onclick="dwSave()">Save</button>
+          </span>
+        </div>
       </div></div>`;
+    dwTotal();
   }
   const thBox = document.getElementById('cv-threshold-box');
   if(thBox){
@@ -4546,6 +4560,44 @@ function renderJobConfigTabs(job){
                         approved: iq.approved || null, editing: false, work: null };
     iqRender();
   }
+}
+
+// ── Per-job scoring weights + dimension renames (CV-tab editor). Weights
+//    ride the EXISTING job.weights field; labels are display-only. ──
+const DW_DEFAULTS = {"Skills Match":25,"Experience Relevance":20,"Education & Certifications":10,
+                     "Achievement & Impact":20,"Role Alignment":15,"Stability & Tenure":10};
+function dwTotal(){
+  let t=0; document.querySelectorAll('#cv-weights-box .dw-w').forEach(i=>t+=parseInt(i.value)||0);
+  const tot=document.getElementById('dw-total'), warn=document.getElementById('dw-warn'), btn=document.getElementById('dw-save');
+  if(tot){
+    tot.textContent='Total: '+t+' / 100';
+    tot.style.color = t===100 ? 'var(--green,#639922)' : 'var(--amber,#B45309)';
+  }
+  if(warn) warn.textContent = t===100 ? '' : 'Weights must total 100 — currently at '+t+'.';
+  if(btn) btn.disabled = t!==100;
+  return t;
+}
+function dwReset(){
+  document.querySelectorAll('#cv-weights-box .dw-w').forEach(i=>{ i.value=DW_DEFAULTS[i.dataset.dim]; });
+  document.querySelectorAll('#cv-weights-box .dw-name').forEach(i=>{ i.value=i.dataset.dim; });
+  dwTotal();
+}
+async function dwSave(){
+  if(dwTotal()!==100){ toast('Weights must total 100.',{type:'warning'}); return; }
+  const jobId=window._dwJobId;
+  const w={}, dl={};
+  document.querySelectorAll('#cv-weights-box .dw-w').forEach(i=>{ w[i.dataset.dim]=(parseInt(i.value)||0)/100; });
+  document.querySelectorAll('#cv-weights-box .dw-name').forEach(i=>{ const v=i.value.trim(); if(v&&v!==i.dataset.dim) dl[i.dataset.dim]=v; });
+  const fd=new FormData();
+  fd.append('weights', JSON.stringify(w));
+  fd.append('dimension_labels', JSON.stringify(dl));
+  const r=await fetch('/api/jobs/'+jobId,{method:'PUT',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Could not save scoring weights',{type:'error'}); return; }
+  const cached=allJobs.find(x=>x._id===jobId);
+  if(cached){ cached.weights=w; cached.dimension_labels=dl; }
+  if(window._currentJob&&window._currentJob._id===jobId){ window._currentJob.weights=w; window._currentJob.dimension_labels=dl; }
+  toast('Scoring weights & names saved — new scorings use this blend; labels apply everywhere now.',{type:'success',duration:7000});
 }
 
 // ── Job-based interview questions (generate → review → approve) ──
