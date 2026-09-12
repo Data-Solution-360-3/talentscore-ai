@@ -760,6 +760,63 @@ img,svg,video{max-width:100%}
 .jt-field select,.jt-field input{font-family:inherit;font-size:12px;color:#1f2937;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;transition:border-color .12s,box-shadow .12s}
 .jt-field input:focus,.jt-field select:focus,.jt-label input:focus,.jt-label select:focus{outline:none;border-color:var(--green,#639922);box-shadow:0 0 0 3px rgba(99,153,34,.14)}
 @media(max-width:720px){.jt-card{padding:13px 12px}.jtab{padding:9px 13px;font-size:12.5px}}
+/* ── jm-*: the clean job-setup skin (mockup job_setup_4tabs_clean). Colors
+   flow from the dashboard's brand-driven vars (--green/--orange retinted by
+   applyOrgBranding), neutrals fixed — the clean STRUCTURE is what's pinned. */
+.jm-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.jm-tile{background:#fff;border:1px solid var(--border);border-radius:13px;padding:14px 16px}
+.jm-tile .n{font-size:24px;font-weight:750;letter-spacing:-.5px;color:var(--text)}
+.jm-tile .l{font-size:12px;color:#6f7b68;margin-top:3px}
+.jm-tabs{display:flex;gap:4px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:5px;margin-bottom:16px}
+.jm-tab{flex:1;text-align:center;padding:10px 6px;border-radius:8px;font-size:13.5px;font-weight:600;color:#6f7b68;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;background:none;border:none;font-family:inherit}
+.jm-tab svg{width:15px;height:15px;flex:none}
+.jm-tab.act{background:#eef5e2;color:#173404}
+.jm-card{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.jm-sec{padding:20px 22px;border-bottom:1px solid #eef2ea}.jm-sec:last-child{border-bottom:0}
+.jm-st{font-size:13px;font-weight:650;color:#6f7b68;margin-bottom:14px}
+.jm-st .soft{font-weight:400;color:#9aa590}
+.jm-actbar{display:flex;align-items:center;gap:12px;padding:16px 22px;background:linear-gradient(135deg,#fff6ec,#fdf1df);border-bottom:1px solid #eef2ea;flex-wrap:wrap}
+.jm-actbar .lead{flex:1;min-width:150px}.jm-actbar .lead b{font-size:14.5px;font-weight:650;display:block;color:var(--text)}.jm-actbar .lead span{font-size:12.5px;color:#6f7b68}
+.jm-big{font-family:inherit;font-weight:700;border-radius:11px;padding:11px 18px;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:0}
+.jm-big svg{width:16px;height:16px}
+.jm-big-gen{background:linear-gradient(135deg,var(--orange,#EF9F27),var(--orange2,#F57C2E));color:#fff;box-shadow:0 9px 22px -8px rgba(245,124,46,.5)}
+.jm-big-edit{background:#fff;color:var(--orange2,#F57C2E);border:1.5px solid #f6d9be}
+.jm-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}
+.jm-f{display:flex;flex-direction:column;gap:7px;min-width:0}
+.jm-f.full{grid-column:1/-1}
+.jm-f label{font-size:13px;font-weight:600;color:#3c4a38}
+.jm-hint{font-size:12px;color:#9aa590;font-weight:400}
+.jm-f select,.jm-f input{padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13.5px;color:var(--text);background:#fff;width:100%}
+.jm-f input:focus,.jm-f select:focus{outline:none;border-color:var(--green,#639922);box-shadow:0 0 0 3px rgba(99,153,34,.14)}
+.jm-save{margin-top:16px;display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap}
+.jm-btn-save{background:var(--green,#639922);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-family:inherit;font-weight:650;font-size:13.5px;cursor:pointer}
+.jm-btn-save:hover{filter:brightness(1.05)}
+.jm-btn-s{font-family:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:9px 14px;cursor:pointer;border:1px solid var(--border);background:#fff;color:#3c4a38}
+.jm-btn-s.primary{background:var(--green,#639922);color:#fff;border-color:var(--green,#639922)}
+.jm-linkrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.jm-linkrow input{flex:1;min-width:180px;font-family:ui-monospace,monospace;font-size:12.5px;color:#3c4a38;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.jm-cap{display:flex;align-items:center;gap:12px;margin-bottom:10px;font-size:13px}.jm-cap:last-of-type{margin-bottom:0}
+.jm-cap .cl{width:84px;color:#6f7b68;flex:none}
+.jm-cap .track{flex:1;height:7px;background:#eef2ea;border-radius:5px;overflow:hidden}.jm-cap .track span{display:block;height:100%;border-radius:5px}
+.jm-cap .cv{min-width:70px;text-align:right;font-weight:600;color:#3c4a38;flex:none;font-variant-numeric:tabular-nums}
+.jm-trow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.jm-trow .tl{min-width:0}.jm-trow .tl b{font-size:14px;font-weight:600;display:block;color:var(--text)}.jm-trow .tl span{font-size:12.5px;color:#6f7b68}
+.jm-swc{appearance:none;-webkit-appearance:none;width:44px;height:25px;border-radius:999px;background:#d5dce8;position:relative;cursor:pointer;flex:none;transition:background .15s;border:0;margin:0;outline:none}
+.jm-swc:checked{background:var(--green,#639922)}
+.jm-swc::after{content:'';position:absolute;width:19px;height:19px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.jm-swc:checked::after{left:22px}
+.jm-approved{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#173404;background:#eef5e2;padding:6px 13px;border-radius:999px}
+.jm-approved.draft{color:#8a5a12;background:#fdf1df}
+.jm-qmeta{font-size:12.5px;color:#9aa590;margin:10px 0 12px}
+.jm-qrow{display:flex;gap:12px;font-size:13.5px;color:#3c4a38;line-height:1.5;padding:10px 0;border-bottom:1px solid #eef2ea}.jm-qrow:last-child{border-bottom:0}
+.jm-qn{color:#9aa590;font-weight:600;width:18px;flex:none;text-align:right}
+.jm-qt{flex:1;min-width:0}
+.jm-qa{color:var(--green,#639922);font-weight:700;flex:none}
+.jm-dim{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid #eef2ea}.jm-dim:last-child{border-bottom:0}
+.jm-dim .dn{width:150px;font-size:13px;font-weight:500;flex:none;color:var(--text)}
+.jm-dim .dt{flex:1;height:7px;background:#eef2ea;border-radius:5px;overflow:hidden}.jm-dim .dt span{display:block;height:100%;background:var(--green,#639922);border-radius:5px}
+.jm-dim .dv{width:44px;text-align:right;font-weight:700;font-size:13px;flex:none;color:var(--text)}
+@media(max-width:640px){.jm-tiles{grid-template-columns:1fr 1fr}.jm-grid{grid-template-columns:1fr}.jm-sec{padding:16px 14px}.jm-actbar{padding:14px}.jm-dim .dn{width:104px}.jm-tab{font-size:12.5px;gap:5px}}
 </style>
 </head>
 <body>
@@ -4171,34 +4228,22 @@ async function viewJobDetails(jobId){
       ${full.min_experience?`<span>•</span><span>${full.min_experience} exp</span>`:''}
     </div>
 
-    <!-- Per-job key stats -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Applicants</div>
-        <div style="font-size:22px;font-weight:800;color:var(--text)" id="jd-applicants">${j.applicant_count!=null?j.applicant_count:st.total}</div>
-      </div>
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Avg overall</div>
-        <div style="font-size:22px;font-weight:800;color:${gc(st.avgScore)}">${st.avgScore||'—'}</div>
-      </div>
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Shortlisted</div>
-        <div style="font-size:22px;font-weight:800;color:var(--green)">${st.byStage.shortlisted}</div>
-      </div>
-      <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:700;letter-spacing:.05em">Rejected</div>
-        <div style="font-size:22px;font-weight:800;color:var(--red)">${st.byStage.rejected}</div>
-      </div>
+    <!-- Per-job key stats (jm tiles) -->
+    <div class="jm-tiles">
+      <div class="jm-tile"><div class="n" id="jd-applicants">${j.applicant_count!=null?j.applicant_count:st.total}</div><div class="l">Applicants</div></div>
+      <div class="jm-tile"><div class="n" style="color:${gc(st.avgScore)}">${st.avgScore||'—'}</div><div class="l">Avg overall</div></div>
+      <div class="jm-tile"><div class="n" style="color:var(--green)">${st.byStage.shortlisted}</div><div class="l">Shortlisted</div></div>
+      <div class="jm-tile"><div class="n" style="color:var(--red)">${st.byStage.rejected}</div><div class="l">Rejected</div></div>
     </div>
 
     <!-- 4-tab job setup: every control relocated, none re-wired. Panes hide
          with display:none so every input keeps its id and its existing save
          path. Tiles above stay always-visible. -->
-    <div class="jtabs">
-      <button type="button" class="jtab act" data-jt="link" onclick="jobTab('link')">🔗 Link</button>
-      <button type="button" class="jtab" data-jt="mcq" onclick="jobTab('mcq')">☑ MCQ</button>
-      <button type="button" class="jtab" data-jt="cv" onclick="jobTab('cv')">📄 CV</button>
-      <button type="button" class="jtab" data-jt="viva" onclick="jobTab('viva')">🎙 Viva</button>
+    <div class="jm-tabs">
+      <button type="button" class="jm-tab act" data-jt="link" onclick="jobTab('link')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Link</button>
+      <button type="button" class="jm-tab" data-jt="mcq" onclick="jobTab('mcq')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>MCQ</button>
+      <button type="button" class="jm-tab" data-jt="cv" onclick="jobTab('cv')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>CV</button>
+      <button type="button" class="jm-tab" data-jt="viva" onclick="jobTab('viva')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg>Viva</button>
     </div>
 
     <div id="jt-link" class="jt-pane act">
@@ -4207,9 +4252,9 @@ async function viewJobDetails(jobId){
            that URL permanently. -->
       <div id="public-link-box" style="margin-bottom:14px"></div>
       <!-- Duplicate-application guard: grant a candidate ONE re-apply on this job -->
-      <details style="margin-bottom:16px;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(23,52,4,.05)">
-        <summary style="padding:12px 16px;cursor:pointer;font-size:12.5px;font-weight:700;color:#2E401B;user-select:none">Allow a re-apply <span style="font-weight:400;color:#5B6650;font-size:11.5px">— candidates can normally apply only once per job</span></summary>
-        <div style="padding:4px 16px 14px">
+      <details class="jm-card" style="margin-bottom:14px">
+        <summary style="padding:16px 22px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text);user-select:none">Allow a re-apply <span class="jm-hint">· candidates can normally apply only once per job</span></summary>
+        <div style="padding:2px 22px 18px">
           <div class="jt-note" style="margin-bottom:8px">Enter a candidate's email to let them apply to this job <b>one more time</b>. Their next application is accepted and scored; after that, the once-per-job block returns.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <input id="reapply-email" type="email" placeholder="candidate@email.com" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--text)">
@@ -4221,27 +4266,28 @@ async function viewJobDetails(jobId){
     </div>
 
     <div id="jt-mcq" class="jt-pane">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        <div class="jt-sec" style="margin-bottom:0">MCQ pre-filter — high-volume funnel</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:650;color:#6f7b68">Screening test — high-volume funnel</div>
         <span id="mcqf-chip"></span>
       </div>
       <div id="mcqf-body"></div>
     </div>
 
     <div id="jt-cv" class="jt-pane">
-      <div id="cv-threshold-box" style="margin-bottom:14px"></div>
+      <div id="cv-weights-box"></div>
+      <div id="cv-threshold-box"></div>
       <!-- Pending applications from the public link -->
       <div id="pending-box" style="margin-bottom:14px"></div>
       <div id="jt-cv-static"></div>
     </div>
 
     <div id="jt-viva" class="jt-pane">
-      <div id="viva-box" style="margin-bottom:14px"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 8px">
-        <div class="jt-sec" style="margin-bottom:0">Interview questions</div>
+      <div id="viva-box"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 10px">
+        <div style="font-size:13px;font-weight:650;color:#6f7b68">Interview questions</div>
         <span id="iq-chip"></span>
       </div>
-      <div id="iq-body"></div>
+      <div id="iq-body" class="jm-card" style="padding:18px 22px"></div>
     </div>
 
     <div id="jt-cv-tpl" style="display:none">
@@ -4330,7 +4376,7 @@ async function viewJobDetails(jobId){
 }
 
 function jobTab(t){
-  document.querySelectorAll('#job-detail-modal .jtab').forEach(b=>b.classList.toggle('act', b.dataset.jt===t));
+  document.querySelectorAll('#job-detail-modal .jm-tab').forEach(b=>b.classList.toggle('act', b.dataset.jt===t));
   ['link','mcq','cv','viva'].forEach(k=>{
     const p=document.getElementById('jt-'+k); if(p) p.classList.toggle('act', k===t);
   });
@@ -4354,55 +4400,39 @@ function renderPublicLink(job, spend){
     if(!s) return '';
     const pct  = s.cap ? Math.min(100, Math.round(s.used / s.cap * 100)) : 0;
     const full = s.used >= s.cap;
-    const col  = full ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)';
-    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#2E401B;margin-top:6px">
-      <span style="min-width:72px;font-weight:600">${label}</span>
-      <span style="flex:1;height:4px;background:var(--s3);border-radius:9999px;overflow:hidden">
-        <span style="display:block;height:100%;width:${pct}%;background:${col}"></span>
-      </span>
-      <span style="font-variant-numeric:tabular-nums;color:${full?'var(--red)':'var(--t2)'};font-weight:${full?'700':'600'}">
-        ${s.used}/${s.cap}${full?' — reached':''}
-      </span>
+    const col  = full ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green,#639922)';
+    return `<div class="jm-cap">
+      <span class="cl">${label}</span>
+      <div class="track"><span style="width:${pct}%;background:${col}"></span></div>
+      <span class="cv" style="${full?'color:var(--red);font-weight:700':''}">${s.used} / ${s.cap}${full?' — reached':''}</span>
     </div>`;
   };
 
   box.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px;flex-wrap:wrap">
-      <div class="jt-sec" style="margin-bottom:0">Public application link</div>
-      <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;color:${on?'var(--green)':'var(--t3)'}">
-        <input type="checkbox" id="pub-toggle" ${on?'checked':''}
-               onchange="togglePublic('${job._id}', this.checked)" style="cursor:pointer">
-        ${on ? 'On — accepting applications' : 'Off — turn on to accept applications'}
-      </label>
-    </div>
-
-    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px">
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;${on?'':'opacity:.55'}">
-        <input readonly value="${url}" id="pub-url" onclick="this.select()" ${on?'':'disabled'}
-               style="flex:1;min-width:200px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;background:#fff;border:1px solid var(--border);border-radius:var(--rs);color:var(--text)">
-        <button class="btn btn-xs btn-primary" onclick="copyPublicLink()">Copy link</button>
-        <button class="btn btn-xs btn-ghost" onclick="rotateToken('${job._id}')" title="Issues a new URL and kills this one permanently">Rotate</button>
+    <div class="jm-card">
+      <div class="jm-sec">
+        <div class="jm-trow">
+          <div class="tl"><b>Accepting applications</b><span>${on?'The public link is live — turn off to pause it without losing the URL':'Off — the link is paused; the URL is kept'}</span></div>
+          <input type="checkbox" class="jm-swc" id="pub-toggle" ${on?'checked':''}
+                 onchange="togglePublic('${job._id}', this.checked)">
+        </div>
       </div>
-
-      ${on
-        ? `<div class="jt-help">
-             Paste into your job post. Off pauses the link and keeps the URL; <strong>Rotate</strong> kills it for good.
-           </div>`
-        : `<div class="jt-help" style="color:var(--amber);font-weight:600">
-             Not accepting applications yet — turn the switch on to activate this link.
-           </div>`}
-
+      <div class="jm-sec" style="${on?'':'opacity:.55'}">
+        <div class="jm-st">Public application link</div>
+        <div class="jm-linkrow">
+          <input readonly value="${url}" id="pub-url" onclick="this.select()" ${on?'':'disabled'}>
+          <button class="jm-btn-s primary" onclick="copyPublicLink()">Copy</button>
+          <button class="jm-btn-s" onclick="rotateToken('${job._id}')" title="Issues a new URL and kills this one permanently">Rotate</button>
+        </div>
+        <div class="jm-hint" style="margin-top:9px">${on?'Rotate issues a new URL and kills this one for good.':'Turn on accepting applications to activate this link.'}</div>
+      </div>
       ${spend ? `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <div class="jt-sec">Spend caps</div>
-          ${capRow('This job', spend.job)}
-          ${capRow('Today',    spend.day)}
-          ${capRow('This month', spend.month)}
-          <div class="jt-help">
-            Past a cap, applications are still received and stored — they wait for you to score them.
-          </div>
-        </div>` : ''}
-
+      <div class="jm-sec">
+        <div class="jm-st">Spend caps <span class="soft">· past a cap, applications are stored and wait for you to score them</span></div>
+        ${capRow('This job', spend.job)}
+        ${capRow('Today',    spend.day)}
+        ${capRow('This month', spend.month)}
+      </div>` : ''}
     </div>`;
   // The viva / CV-threshold / MCQ / interview-question cards now live in
   // their tabs — same controls, same ids, same save paths. Rendering them
@@ -4416,25 +4446,38 @@ function renderJobConfigTabs(job){
   const von = !!(v && v.enabled);
   const cfg = (v && v.config) || null;
 
-  // CV tab: the CV score threshold (saved by the SAME saveJobViva action;
-  // the Save here is just a second trigger for it, per the approved mapping).
+  // CV tab: read-only scoring-weight bars (display of the job's existing
+  // weights — no editor, no new wiring) + the CV score threshold (saved by
+  // the SAME saveJobViva action, per the approved mapping).
+  const wBox = document.getElementById('cv-weights-box');
+  if(wBox){
+    const DEFW = {"Skills Match":.25,"Experience Relevance":.20,"Education & Certifications":.10,
+                  "Achievement & Impact":.20,"Role Alignment":.15,"Stability & Tenure":.10};
+    const W = (job.weights && typeof job.weights==='object' && Object.keys(job.weights).length) ? job.weights : DEFW;
+    const NAMES = {"Skills Match":"Skills match","Experience Relevance":"Experience relevance",
+                   "Education & Certifications":"Education & certs","Achievement & Impact":"Achievement & impact",
+                   "Role Alignment":"Role alignment","Stability & Tenure":"Stability & tenure"};
+    const mx = Math.max(...Object.keys(NAMES).map(k=>+W[k]||DEFW[k]||0), .01);
+    wBox.innerHTML = `
+      <div class="jm-card"><div class="jm-sec">
+        <div class="jm-st">Scoring weights <span class="soft">· how the CV score is weighed for this job</span></div>
+        ${Object.entries(NAMES).map(([k,label])=>{const val=+W[k]||DEFW[k]||0;
+          return `<div class="jm-dim"><span class="dn">${label}</span><div class="dt"><span style="width:${Math.round(val/mx*100)}%"></span></div><span class="dv">${Math.round(val*100)}%</span></div>`;}).join('')}
+      </div></div>`;
+  }
   const thBox = document.getElementById('cv-threshold-box');
   if(thBox){
     thBox.innerHTML = `
-      <div class="jt-sec">CV screening — interview threshold</div>
-      <div class="jt-card" style="margin-bottom:0">
-        <div class="jt-row">
-          <label class="jt-label">CV score threshold
-            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'} style="width:64px"></label>
-          ${von
-            ? `<button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>`
-            : `<span class="jt-note">Turn on the live interview (Viva tab) to use the threshold.</span>`}
+      <div class="jm-card"><div class="jm-sec">
+        <div class="jm-st">CV score threshold</div>
+        <div class="jm-grid">
+          <div class="jm-f"><label>Minimum score to qualify <span class="jm-hint">· at or above goes straight to the interview</span></label>
+            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'}></div>
+          <div class="jm-f" style="justify-content:flex-end">${von
+            ? `<button class="jm-btn-save" style="width:100%" onclick="saveJobViva('${job._id}', true)">Save</button>`
+            : `<span class="jm-hint">Turn on the live interview (Viva tab) to use the threshold.</span>`}</div>
         </div>
-        <div class="jt-help">
-          Applicants scoring at or above the threshold go straight into the interview.
-          Everyone else sees the normal received page — no hint a gate exists.
-        </div>
-      </div>`;
+      </div></div>`;
   }
 
   // Viva tab: the live-interview gate (threshold input lives on the CV tab).
@@ -4447,35 +4490,32 @@ function renderJobConfigTabs(job){
         ? `${(cfg.questions||[]).length} question(s) · ${cfg.max_turns||4} turns · ${cfg.vad||'patient'} pace · proctoring ${cfg.proctoring||'off'} · ${escapeHtml(cfg.interviewer_name||'AI Interviewer')}`
         : `Default setup — one general question, 4 turns, patient pace, proctoring off.`);
     vBox.innerHTML = `
-      <div class="jt-card" style="margin-bottom:0">
-      <div class="jt-row" style="justify-content:space-between">
-        <div class="jt-sec" style="margin-bottom:0">Live interview after CV</div>
-        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;color:${von?'var(--green)':'#4A5443'}">
-          <input type="checkbox" id="viva-toggle" ${von?'checked':''}
-                 onchange="toggleJobViva('${job._id}', this.checked)" style="cursor:pointer">
-          ${von ? 'On — qualifying applicants flow into a live interview' : 'Off — applications are CV-only'}
-        </label>
-      </div>
-      <div id="viva-fields" style="display:${von?'block':'none'};margin-top:12px">
-        <div class="jt-row">
-          <label class="jt-label">Daily interview cap
-            <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}" style="width:64px"></label>
-          <label class="jt-label" title="How long a funnel invite link stays valid">Invite window (days)
-            <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}" style="width:58px"></label>
-          <label class="jt-label">Proctoring
-            <select id="viva-proc">
-              <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
-              <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
-              <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
-            </select></label>
-          <button class="btn btn-xs btn-primary" onclick="saveJobViva('${job._id}', true)">Save</button>
+      <div class="jm-card">
+        <div class="jm-sec">
+          <div class="jm-trow">
+            <div class="tl"><b>Live interview after CV</b><span>${von?'Qualifying applicants flow straight into the interview':'Off — applications are CV-only'}</span></div>
+            <input type="checkbox" class="jm-swc" id="viva-toggle" ${von?'checked':''}
+                   onchange="toggleJobViva('${job._id}', this.checked)">
+          </div>
         </div>
-        <div class="jt-help">
-          The CV score threshold that gates the interview lives on the <strong>CV tab</strong>.
-          Setup: <strong>${cfgLine}</strong> · edit on
-          <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a> → &ldquo;attach to a job&rdquo;.
+        <div class="jm-sec" id="viva-fields" style="display:${von?'block':'none'}">
+          <div class="jm-st">Interview settings</div>
+          <div class="jm-grid">
+            <div class="jm-f"><label>Daily interview cap</label>
+              <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"></div>
+            <div class="jm-f"><label>Invite window <span class="jm-hint">· days</span></label>
+              <input id="viva-window" type="number" min="1" max="30" value="${(v&&v.invite_window_days!=null)?v.invite_window_days:5}"></div>
+            <div class="jm-f full"><label>Proctoring</label>
+              <select id="viva-proc">
+                <option value="off" ${(!cfg||cfg.proctoring==='off'||!cfg.proctoring)?'selected':''}>Off</option>
+                <option value="M" ${(cfg&&cfg.proctoring==='M')?'selected':''}>Snapshot — periodic captures</option>
+                <option value="S" ${(cfg&&cfg.proctoring==='S')?'selected':''}>Continuous — camera + screen</option>
+              </select></div>
+          </div>
+          <div class="jm-save"><button class="jm-btn-save" onclick="saveJobViva('${job._id}', true)">Save settings</button></div>
+          <div class="jm-hint" style="margin-top:10px">CV score threshold lives on the <b>CV tab</b> · setup: ${cfgLine} · edit on
+            <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a></div>
         </div>
-      </div>
       </div>`;
   }
 
@@ -4673,11 +4713,11 @@ function iqRender(){
           : iqCounts(list)}</span>
       </div>
       ${iqScenEditor()}
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px">
-        <button class="btn btn-xs btn-primary" id="iq-approve" onclick="iqApprove()">Approve — use for this job</button>
-        ${st.editing ? '' : '<button class="btn btn-xs" onclick="iqSaveDraft()">Save draft</button>'}
-        <button class="btn btn-xs" onclick="iqRegenerate()">Regenerate</button>
-        <button class="btn btn-xs" onclick="iqDiscard()" style="color:var(--t3)">Discard</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+        <button class="jm-btn-save" id="iq-approve" onclick="iqApprove()">Approve — use for this job</button>
+        ${st.editing ? '' : '<button class="jm-btn-s" onclick="iqSaveDraft()">Save draft</button>'}
+        <button class="jm-btn-s" onclick="iqRegenerate()">Regenerate</button>
+        <button class="jm-btn-s" onclick="iqDiscard()" style="color:#9aa590">Discard</button>
       </div>`;
   }else if(st.approved){
     iqChip(`<span class="badge b-green">APPROVED · used for all candidates</span>`);
@@ -4702,11 +4742,11 @@ function iqRender(){
         ${st.approved.scenario.questions.map((q,i)=>`<div style="font-size:11.5px;color:var(--t2);margin-top:3px">⌨ Q${i+1}. ${escapeHtml(q)}</div>`).join('')}
       </div>` : `
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px">No written scenario — this interview has no written exercise.</div>`}
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
-        <span style="font-size:11.5px;font-weight:700;color:var(--t2)">${st.approved.topics
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+        <span class="jm-approved"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>${st.approved.topics
           ? `${st.approved.count} spoken across ${st.approved.topics.length} topic(s)`
           : iqCounts(st.approved.questions)}</span>
-        <button class="btn btn-xs" onclick="iqEditApproved()">Edit questions</button>
+        <button class="jm-big jm-big-edit" style="padding:9px 15px;font-size:13px" onclick="iqEditApproved()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Edit</button>
       </div>
       <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
         ${st.approved.topics
@@ -4715,24 +4755,20 @@ function iqRender(){
       </div>`;
   }else{
     iqChip(`<span class="badge" style="background:var(--s2);color:var(--t3)">NO QUESTIONS</span>`);
+    const numIn = 'width:56px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:700;margin-left:5px';
     body.innerHTML = `
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <label style="font-size:11px;font-weight:600;color:var(--t2)">Topics
-          <input id="iq-topics" type="number" min="1" max="4" value="2"
-                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-        <label style="font-size:11px;font-weight:600;color:var(--t2)">Follow-ups each
-          <input id="iq-followups" type="number" min="1" max="5" value="2"
-                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-        <label style="font-size:11px;font-weight:600;color:var(--t2)">Scenario questions
-          <input id="iq-scenq" type="number" min="2" max="8" value="6"
-                 style="width:46px;margin-left:5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px;font-weight:700"></label>
-        <button class="btn btn-xs btn-primary" id="iq-gen" onclick="iqGenerate()">Generate from job description</button>
-      </div>
-      <div style="font-size:10.5px;color:var(--t3);margin-top:6px;line-height:1.5">
-        AI drafts a structured interview from this job's description: spoken topic clusters
-        (each 1 main + follow-ups on the same topic) and one written scenario with its questions.
-        Default 2×(1+2) + 6 = 12 questions — half spoken, half written — asked EXACTLY;
-        you review and edit everything before approval.
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:170px">
+          <b style="font-size:14.5px;font-weight:650;display:block">No questions yet</b>
+          <span style="font-size:12.5px;color:#6f7b68">Draft with AI from the job description, then review before it goes live</span>
+        </div>
+        <label class="jm-hint" style="display:inline-flex;align-items:center">Topics
+          <input id="iq-topics" type="number" min="1" max="4" value="2" style="${numIn}"></label>
+        <label class="jm-hint" style="display:inline-flex;align-items:center">Follow-ups
+          <input id="iq-followups" type="number" min="1" max="5" value="2" style="${numIn}"></label>
+        <label class="jm-hint" style="display:inline-flex;align-items:center">Written
+          <input id="iq-scenq" type="number" min="2" max="8" value="6" style="${numIn}"></label>
+        <button class="jm-big jm-big-gen" id="iq-gen" onclick="iqGenerate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l1.6 5L19 8l-5 1.6L12 15l-1.6-5.4L5 8l5.4-1z"/></svg>Generate</button>
       </div>`;
   }
 }
@@ -4860,26 +4896,27 @@ function mcqfRender(){
     ? '<span style="font-size:11px;font-weight:700;color:var(--green)">ON — '+((appr&&appr.count)||0)+' approved questions</span>'
     : (appr ? '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — '+appr.count+' questions approved</span>'
             : '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — no approved set</span>');
-  let html=`<div class="jt-card" style="margin-bottom:12px">
-  <div class="jt-row">
-    <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;color:${on?'var(--green)':'#4A5443'}">
-      <input type="checkbox" ${on?'checked':''} onchange="mcqfToggle(this.checked)"> ${on?'Filter ON — applicants take the test; CVs held until you advance':'Filter off — normal apply flow'}
-    </label>
+  let html=`<div class="jm-card">
+  <div class="jm-actbar">
+    <div class="lead"><b>Screening test${appr?` · ${appr.count} questions`:(draft?` · draft`:'')}</b><span>Draft with AI, then review the answer keys before it goes live</span></div>
+    <label class="jm-hint" style="display:inline-flex;align-items:center;gap:6px">Questions
+      <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:58px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:700"></label>
+    <button class="jm-big jm-big-gen" onclick="mcqfGenerate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l1.6 5L19 8l-5 1.6L12 15l-1.6-5.4L5 8l5.4-1z"/></svg>Generate</button>
+    ${(draft||appr)?`<button class="jm-big jm-big-edit" onclick="mcqfEdit()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Edit</button>`:''}
   </div>
-  <div class="jt-row">
-    <label class="jt-label">Target
-      <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:52px"></label>
-    <button class="btn btn-xs" onclick="mcqfGenerate()">✨ Generate draft (AI)</button>
-    ${(draft||appr)?`<button class="btn btn-xs" onclick="mcqfEdit()">✎ Review / edit</button>`:''}
-    ${st.editing?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve set</button>
-    <button class="btn btn-xs" onclick="mcqfSaveDraft()">Save draft</button>`:
-      (draft?`<button class="btn btn-xs btn-primary" onclick="mcqfApprove()">✓ Approve draft</button>`:'')}
-  </div>
-  <div class="jt-help">
-    Applicants take the test; you advance the top N — <b>screening spend lands only on the advanced set</b>.
-    Drafts go live only after you review the answer keys and approve.
+  <div class="jm-sec">
+    <div class="jm-trow">
+      <div class="tl"><b>Screening test on</b><span>${on?'Applicants take the test; CVs held (never rejected) until you advance':'Off — normal apply flow, no test'}</span></div>
+      <input type="checkbox" class="jm-swc" ${on?'checked':''} onchange="mcqfToggle(this.checked)">
+    </div>
   </div>`;
   if(st.editing){
+    html += `<div class="jm-sec">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <button class="jm-btn-save" onclick="mcqfApprove()">Approve set</button>
+      <button class="jm-btn-s" onclick="mcqfSaveDraft()">Save draft</button>
+      <span class="jm-hint">Review the marked answers — candidates never see a set until you approve.</span>
+    </div>`;
     html += st.work.map((m,i)=>`
       ${m.scenario && (i===0||st.work[i-1].scenario!==m.scenario) ? `
       <div style="background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.25);border-radius:var(--rs);padding:.55rem .7rem;margin:8px 0 4px">
@@ -4899,52 +4936,52 @@ function mcqfRender(){
           </div>`).join('')}
         <button class="btn btn-xs" onclick="window._mcqfState.work.splice(${i},1);mcqfRender()" style="color:var(--red)">Remove</button>
       </div>`).join('')
-      + `<button class="btn btn-xs" onclick="window._mcqfState.work.push({q:'',options:['','','',''],correct:0});mcqfRender()">+ Add question</button>`;
+      + `<button class="jm-btn-s" onclick="window._mcqfState.work.push({q:'',options:['','','',''],correct:0});mcqfRender()">+ Add question</button></div>`;
   }else if(appr||draft){
     const qs=(appr&&appr.questions)||(draft&&draft.questions)||[];
     const nScen=new Set(qs.filter(m=>m.scenario).map(m=>m.scenario)).size;
     const nGrouped=qs.filter(m=>m.scenario).length;
-    html += `<div class="jt-note" style="margin-top:10px">${appr?'<b style="color:var(--green)">Approved</b>':'<b style="color:var(--orange)">Draft — review the answers, then approve</b>'} · ${qs.length} questions${nScen?` (${nScen} scenario group${nScen>1?'s':''} · ${nGrouped} grouped + ${qs.length-nGrouped} standalone)`:''}
-      ${qs.slice(0,3).map((m,i)=>`<div style="margin-top:4px;color:#4A5443">${i+1}. ${escapeHtml(m.q)} <b style="color:var(--green)">(✓ ${String.fromCharCode(65+m.correct)})</b></div>`).join('')}
-      ${qs.length>3?`<div style="color:#5B6650;margin-top:3px">…and ${qs.length-3} more — Review / edit to see all.</div>`:''}</div>`;
+    html += `<div class="jm-sec">
+      <span class="jm-approved${appr?'':' draft'}">${appr
+        ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Approved'
+        : 'Draft — review the answers, then approve'}</span>
+      ${(!appr && draft)?`<button class="jm-btn-save" style="margin-left:10px;padding:7px 14px;font-size:12.5px" onclick="mcqfApprove()">Approve draft</button>`:''}
+      <div class="jm-qmeta">${qs.length} questions${nScen?` · ${nScen} scenario group${nScen>1?'s':''} · ${nGrouped} grouped + ${qs.length-nGrouped} standalone`:''}</div>
+      ${qs.slice(0,3).map((m,i)=>`<div class="jm-qrow"><span class="jm-qn">${i+1}</span><span class="jm-qt">${escapeHtml(m.q)}</span><span class="jm-qa">${String.fromCharCode(65+m.correct)}</span></div>`).join('')}
+      ${qs.length>3?`<div class="jm-qmeta" style="margin:10px 0 0">…and ${qs.length-3} more — Edit to see all.</div>`:''}
+    </div>`;
   }
-  html += `</div>`;   // close the setup card
   if(appr){
     const pm=(mf.paste_mode==='monitor')?'monitor':'restrict';
-    html += `<div class="jt-card" style="margin-bottom:12px">
-      <div class="jt-sec">Test settings</div>
-      <div class="jt-row" style="align-items:flex-end">
-        <div class="jt-field">
-          <span>Copy/paste</span>
+    html += `<div class="jm-sec">
+      <div class="jm-st">Test settings${(mf.paste_mode==null && mf.seconds_per_question==null)?' <span style="color:var(--amber,#B45309);font-weight:700">· never saved — running on defaults</span>':''}</div>
+      <div class="jm-grid">
+        <div class="jm-f"><label>Copy &amp; paste</label>
           <select id="mcqf-pm">
-            <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked (attempts recorded)</option>
-            <option value="monitor" ${pm==='monitor'?'selected':''}>Monitor — allowed, every use recorded</option>
+            <option value="restrict" ${pm==='restrict'?'selected':''}>Restricted — blocked, attempts recorded</option>
+            <option value="monitor" ${pm==='monitor'?'selected':''}>Monitored — allowed, every use recorded</option>
           </select></div>
-        <div class="jt-field" title="The test's total time = question count × this">
-          <span>Sec / question</span>
-          <input id="mcqf-spq" type="number" min="15" max="120" value="${mf.seconds_per_question||45}" style="width:70px"></div>
-        <div class="jt-field">
-          <span>Proctoring</span>
+        <div class="jm-f" title="The test's total time = question count × this"><label>Seconds per question <span class="jm-hint">· total = questions × this</span></label>
+          <input id="mcqf-spq" type="number" min="15" max="120" value="${mf.seconds_per_question||45}"></div>
+        <div class="jm-f full"><label>Proctoring</label>
           <select id="mcqf-pl">
-            <option value="light" ${mf.proctor_level!=='full'?'selected':''}>Light — tab/paste/timing only, no camera</option>
-            <option value="full" ${mf.proctor_level==='full'?'selected':''}>Full — camera + screen snapshots (disclosed)</option>
+            <option value="light" ${mf.proctor_level!=='full'?'selected':''}>Light — tab &amp; paste signals only, no camera</option>
+            <option value="full" ${mf.proctor_level==='full'?'selected':''}>Full — camera + screen snapshots (disclosed to the candidate)</option>
           </select></div>
-        <button class="btn btn-xs btn-primary" onclick="mcqfSettings()" style="margin-left:auto">Save settings</button>
       </div>
-      ${(mf.paste_mode==null && mf.seconds_per_question==null)
-        ? `<div class="jt-help" style="font-weight:700;color:var(--amber,#B45309)">⚠ Settings never saved on this job — running on defaults (Restricted · 45s/question · Light). Click Save settings to persist.</div>`
-        : `<div class="jt-help">Total time = questions × sec/question (e.g. 15 × 45s ≈ 11 min), spent freely. The instruction screen shows candidates these exact rules${mf.proctor_level==='full'?' — including the camera + screen request; denial flags, never blocks':''}.</div>`}
+      <div class="jm-save"><button class="jm-btn-save" onclick="mcqfSettings()">Save settings</button></div>
     </div>`;
   }
   if(on){
-    html += `<div class="jt-card" style="margin-bottom:0">
-      <div class="jt-row" style="justify-content:space-between;margin-bottom:10px">
-        <div class="jt-sec" style="margin-bottom:0">Funnel — advance to CV screening</div>
-        <button class="btn btn-xs" onclick="mcqFunnelLoad()">↻ Refresh</button>
+    html += `<div class="jm-sec">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px">
+        <div class="jm-st" style="margin-bottom:0">Advance to CV screening</div>
+        <button class="jm-btn-s" onclick="mcqFunnelLoad()">↻ Refresh</button>
       </div>
-      <div id="mcqf-funnel" style="font-size:12px;color:#2E401B">Loading funnel…</div>
+      <div id="mcqf-funnel" style="font-size:12px;color:#3c4a38;margin-top:12px">Loading…</div>
     </div>`;
   }
+  html += `</div>`;   // close the unified card
   body.innerHTML=html;
   if(st.funnel) mcqFunnelRender();
 }
@@ -5006,7 +5043,7 @@ function mcqFunnelRender(){
   const dist=f.distribution||[];
   if(dist.length){
     const mx=Math.max(...dist.map(d=>d.n));
-    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:5px">Score distribution — everyone who took the test</div>
+    html+=`<div style="font-size:12.5px;font-weight:650;color:#6f7b68;margin-bottom:6px">Score distribution <span style="font-weight:400;color:#9aa590">· everyone who took the test</span></div>
       <div style="display:flex;align-items:flex-end;gap:5px;height:56px;border-bottom:1.5px solid var(--border);padding:0 2px">`
       +dist.map(d=>`<div title="${d.n} candidate(s) scored ${d.score}/${f.total_questions}" style="flex:1;max-width:32px;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="background:var(--green,#639922);border-radius:3px 3px 0 0;height:${Math.max(6,Math.round(d.n/mx*92))}%;opacity:.9"></div></div>`).join('')
       +`</div><div style="display:flex;gap:5px;margin:4px 0 12px;padding:0 2px">`
@@ -5016,7 +5053,7 @@ function mcqFunnelRender(){
   // ── cumulative mark chips (held only — click sets the cutoff) ──
   if(st.heldScores.length){
     const uniq=[...new Set(st.heldScores)].sort((a,b)=>b-a);
-    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Held candidates at or above each mark — click to set a manual override</div>
+    html+=`<div style="font-size:12.5px;font-weight:650;color:#6f7b68;margin-bottom:6px">Held at or above each mark <span style="font-weight:400;color:#9aa590">· click to set a manual override</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">`
       +uniq.map(s=>{const n=st.heldScores.filter(x=>x>=s).length;
         return `<button type="button" class="btn btn-xs" onclick="mcqfSetMark(${s})" style="font-weight:700;color:#173404">${s}+ · ${n}</button>`;}).join('')
@@ -5031,22 +5068,26 @@ function mcqFunnelRender(){
   const mfSaved=st.mf||{};
   if(st.target===undefined) st.target = mfSaved.target_count || mfSaved.quota_cap || 200;
   if(st.ovr===undefined){ st.ovr = mfSaved.cutoff_mark!=null; st.mark = mfSaved.cutoff_mark!=null?mfSaved.cutoff_mark:null; }
-  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:12px 14px;margin-bottom:6px">
-    <div class="jt-field">
-      <span>Target to advance</span>
-      <input id="mcqf-target" type="number" min="1" max="5000" value="${st.target}" style="width:88px" oninput="mcqfAdvPreview()">
+  html+=`<div style="background:#f6f8f3;border:1px solid #e6ebe0;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+    <div class="jm-grid">
+      <div class="jm-f">
+        <label>Advance target <span class="jm-hint">· system picks the cutoff</span></label>
+        <input id="mcqf-target" type="number" min="1" max="5000" value="${st.target}" oninput="mcqfAdvPreview()">
+      </div>
+      <div class="jm-f" id="mcqf-ovr-wrap" style="${st.ovr?'':'display:none'}">
+        <label>Manual mark <span class="jm-hint">· override</span></label>
+        <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${st.ovr&&st.mark!=null?st.mark:''}" placeholder="auto" oninput="mcqfAdvPreview()">
+      </div>
+      <div class="jm-f full" style="flex-direction:row;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="jm-btn-s" onclick="mcqfSaveAdvance()" title="Save the target (and any manual override) without advancing anyone">Save</button>
+        <span id="mcqf-adv-saved" style="display:none;font-size:12px;font-weight:700;color:var(--green,#639922)">✓ Saved</span>
+        <button class="jm-btn-save" onclick="mcqfAdvance()">Advance → screen</button>
+        <a href="javascript:void(0)" id="mcqf-ovr-link" onclick="mcqfOvrToggle()" style="color:#476B15;font-weight:600;text-decoration:none;font-size:12.5px;margin-left:auto">${st.ovr?'✕ Back to auto cutoff':'Override the mark manually'}</a>
+      </div>
     </div>
-    <div class="jt-field" id="mcqf-ovr-wrap" style="${st.ovr?'':'display:none'}">
-      <span>Manual mark (override)</span>
-      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${st.ovr&&st.mark!=null?st.mark:''}" placeholder="auto" style="width:78px" oninput="mcqfAdvPreview()">
-    </div>
-    <button class="btn btn-xs" onclick="mcqfSaveAdvance()" title="Save the target (and any manual override) on this job without advancing anyone">Save</button>
-    <span id="mcqf-adv-saved" style="display:none;font-size:11px;font-weight:800;color:var(--green,#639922);align-self:center">✓ Saved</span>
-    <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button>
-    <div id="mcqf-adv-preview" style="flex:1;min-width:220px;font-size:11.5px;color:#2E401B;line-height:1.55"></div>
+    <div id="mcqf-adv-preview" style="font-size:12.5px;color:#3c4a38;line-height:1.6;margin-top:12px"></div>
   </div>
-  <div style="font-size:11px;margin-bottom:8px"><a href="javascript:void(0)" id="mcqf-ovr-link" onclick="mcqfOvrToggle()" style="color:#476B15;font-weight:700;text-decoration:none">${st.ovr?'✕ Remove manual override (back to auto cutoff)':'Override the cutoff mark manually'}</a></div>
-  <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:12px">Advancing starts AI CV screening on exactly the advanced candidates — spend applies to them only. Everyone else stays <b>held</b> (held is never rejected). Raise the target any time to advance more; already-screened candidates are never re-screened.</div>`;
+  <div class="jm-hint" style="margin-bottom:12px">Spend lands only on the advanced set · held is never rejected · already-screened are never re-screened.</div>`;
   const rows=(f.rows||[]).slice(0,30);
   if(rows.length){
     html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th>Interview</th><th></th></tr></thead><tbody>`
