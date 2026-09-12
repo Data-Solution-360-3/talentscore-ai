@@ -4500,6 +4500,16 @@ async def mcq_filter_save(request: Request, job_id: str):
                 mf["quota_cap"] = max(1, min(500, int(body.get("quota_cap"))))
             except Exception:
                 pass
+        # Target-count model: the recruiter saves "how many I want advanced
+        # to CV screening" (cumulative); the UI auto-picks the cutoff mark
+        # from the held distribution at advance time. Stored value only —
+        # nothing advances automatically, and the advance endpoint's own
+        # quota cap remains the authoritative never-exceed bound.
+        if "target_count" in body:
+            try:
+                mf["target_count"] = max(1, min(5000, int(body.get("target_count"))))
+            except Exception:
+                pass
         await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
                                  {"$set": {"mcq_filter": mf}})
         return {"success": True, "mcq_filter": serialize_mongo(mf)}

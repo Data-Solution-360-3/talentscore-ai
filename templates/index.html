@@ -5016,34 +5016,37 @@ function mcqFunnelRender(){
   // ── cumulative mark chips (held only — click sets the cutoff) ──
   if(st.heldScores.length){
     const uniq=[...new Set(st.heldScores)].sort((a,b)=>b-a);
-    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Held candidates at or above each mark — click to set the cutoff</div>
+    html+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#4A5443;margin-bottom:4px">Held candidates at or above each mark — click to set a manual override</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">`
       +uniq.map(s=>{const n=st.heldScores.filter(x=>x>=s).length;
         return `<button type="button" class="btn btn-xs" onclick="mcqfSetMark(${s})" style="font-weight:700;color:#173404">${s}+ · ${n}</button>`;}).join('')
       +`</div>`;
   }
-  // ── advance controls: cutoff mark (primary) + quota cap + live preview.
-  //    Inputs initialize from the job's SAVED cutoff/quota (Save persists
-  //    them without advancing anyone); typed-but-unsaved values win within
-  //    this open session, and Advance always uses what's in the inputs. ──
+  // ── advance controls: TARGET-first. The recruiter sets how many they want
+  //    advanced (cumulative); the UI auto-picks the cutoff mark from the
+  //    HELD distribution — the lowest mark whose qualifying count fits the
+  //    remaining target (closest-without-going-over). A manual mark override
+  //    stays available. The pick here is display + intent; the advance
+  //    endpoint's own quota cap (n) is the authoritative never-exceed bound.
   const mfSaved=st.mf||{};
-  const initMark = st.mark!==undefined ? st.mark : (mfSaved.cutoff_mark!=null?mfSaved.cutoff_mark:null);
-  const initQuota = st.quota || mfSaved.quota_cap || 200;
-  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+  if(st.target===undefined) st.target = mfSaved.target_count || mfSaved.quota_cap || 200;
+  if(st.ovr===undefined){ st.ovr = mfSaved.cutoff_mark!=null; st.mark = mfSaved.cutoff_mark!=null?mfSaved.cutoff_mark:null; }
+  html+=`<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:#F7FAF3;border:1px solid #E4E8E0;border-radius:10px;padding:12px 14px;margin-bottom:6px">
     <div class="jt-field">
-      <span>Cutoff mark (≥ of ${f.total_questions||'—'})</span>
-      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${initMark!=null?initMark:''}" placeholder="none" style="width:78px" oninput="mcqfAdvPreview()">
+      <span>Target to advance</span>
+      <input id="mcqf-target" type="number" min="1" max="5000" value="${st.target}" style="width:88px" oninput="mcqfAdvPreview()">
     </div>
-    <div class="jt-field">
-      <span>Quota cap</span>
-      <input id="mcqf-n" type="number" min="1" max="500" value="${initQuota}" style="width:78px" oninput="mcqfAdvPreview()">
+    <div class="jt-field" id="mcqf-ovr-wrap" style="${st.ovr?'':'display:none'}">
+      <span>Manual mark (override)</span>
+      <input id="mcqf-mark" type="number" min="0" max="${f.total_questions||100}" value="${st.ovr&&st.mark!=null?st.mark:''}" placeholder="auto" style="width:78px" oninput="mcqfAdvPreview()">
     </div>
-    <button class="btn btn-xs" onclick="mcqfSaveAdvance()" title="Save the cutoff + quota on this job without advancing anyone">Save</button>
+    <button class="btn btn-xs" onclick="mcqfSaveAdvance()" title="Save the target (and any manual override) on this job without advancing anyone">Save</button>
     <span id="mcqf-adv-saved" style="display:none;font-size:11px;font-weight:800;color:var(--green,#639922);align-self:center">✓ Saved</span>
     <button class="btn btn-xs btn-primary" onclick="mcqfAdvance()">Advance → screen</button>
-    <div id="mcqf-adv-preview" style="flex:1;min-width:200px;font-size:11.5px;color:#2E401B;line-height:1.55"></div>
+    <div id="mcqf-adv-preview" style="flex:1;min-width:220px;font-size:11.5px;color:#2E401B;line-height:1.55"></div>
   </div>
-  <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:12px">Advancing starts AI CV screening on exactly the advanced candidates — spend applies to them only. Everyone else stays <b>held</b> (held is never rejected). Lower the mark any time to advance more; already-screened candidates are never re-screened.</div>`;
+  <div style="font-size:11px;margin-bottom:8px"><a href="javascript:void(0)" id="mcqf-ovr-link" onclick="mcqfOvrToggle()" style="color:#476B15;font-weight:700;text-decoration:none">${st.ovr?'✕ Remove manual override (back to auto cutoff)':'Override the cutoff mark manually'}</a></div>
+  <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:12px">Advancing starts AI CV screening on exactly the advanced candidates — spend applies to them only. Everyone else stays <b>held</b> (held is never rejected). Raise the target any time to advance more; already-screened candidates are never re-screened.</div>`;
   const rows=(f.rows||[]).slice(0,30);
   if(rows.length){
     html+=`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Candidate</th><th>MCQ</th><th>Status</th><th>Interview</th><th></th></tr></thead><tbody>`
@@ -5065,57 +5068,117 @@ function mcqFunnelRender(){
   el.innerHTML=html;
   mcqfAdvPreview();
 }
-// The live "who would advance" line — recomputed on every mark/quota keystroke
-// from the HELD scores (the only rows advancing can touch). Honest counts:
-// never includes already-advanced people.
+// ── Target-first cutoff resolution. All math runs on the HELD scores (the
+// only rows advancing can touch); the target is CUMULATIVE, so already-
+// advanced candidates count toward it. Auto-pick = the lowest mark whose
+// qualifying count fits the remaining target (closest-without-going-over);
+// if even the top mark exceeds it, honest top-N by score. The server's
+// quota cap on the advance call is the authoritative never-exceed bound. ──
+function mcqfResolve(){
+  const st=window._mcqfState, f=st.funnel||{}, c=f.counts||{};
+  const scores=st.heldScores||[];
+  const tEl=document.getElementById('mcqf-target');
+  const target=Math.max(1,Math.min(5000,parseInt(tEl&&tEl.value)||st.target||200));
+  st.target=target;
+  const advanced=+c.advanced||0;
+  const remaining=Math.max(0,target-advanced);
+  const uniq=[...new Set(scores)].sort((a,b)=>b-a);
+  const cum=m=>scores.filter(x=>x>=m).length;
+  let autoMark=null, autoCount=0;
+  for(const m of uniq){ const q=cum(m); if(q<=remaining){ autoMark=m; autoCount=q; } else break; }
+  let nextMark=null, nextCount=0;
+  if(autoMark!=null){
+    const i=uniq.indexOf(autoMark);
+    if(i+1<uniq.length){ nextMark=uniq[i+1]; nextCount=cum(nextMark); }
+  }
+  let mode='auto', mark=autoMark, adv=Math.min(autoCount,500);
+  if(st.ovr){
+    const mEl=document.getElementById('mcqf-mark');
+    const raw=(mEl&&mEl.value.trim())||'';
+    if(raw!==''){ mode='manual'; mark=Math.max(0,parseInt(raw)||0); st.mark=mark; adv=Math.min(cum(mark),500); }
+    else st.mark=null;
+  }
+  if(mode==='auto' && autoMark==null && uniq.length && remaining>0){
+    mode='topn'; mark=null; adv=Math.min(remaining,500);
+  }
+  return {scores,target,advanced,remaining,uniq,cum,autoMark,autoCount,nextMark,nextCount,mode,mark,adv};
+}
 function mcqfAdvPreview(){
   const st=window._mcqfState, el=document.getElementById('mcqf-adv-preview');
   if(!st||!el) return;
-  const markEl=document.getElementById('mcqf-mark'), nEl=document.getElementById('mcqf-n');
-  const raw=(markEl&&markEl.value.trim())||'';
-  const mark=raw===''?null:Math.max(0,parseInt(raw)||0);
-  const quota=Math.max(1,Math.min(500,parseInt(nEl&&nEl.value)||200));
-  st.mark=mark; st.quota=quota;
-  const scores=st.heldScores||[];
-  if(!scores.length){ el.innerHTML='<span style="color:#6B7280">No held candidates with a score yet.</span>'; return; }
-  const qual=(mark==null?scores:scores.filter(s=>s>=mark)).length;
-  const adv=Math.min(quota,qual);
-  el.innerHTML = mark==null
-    ? `No cutoff set — advancing the <b>top ${adv}</b> of ${scores.length} held, by score.`
-    : `At mark <b>${mark}+</b>: <b>${qual}</b> held qualify — advancing <b>${adv}</b>${adv<qual?' of them (quota cap)':''}${qual===0?' — lower the mark to include more':''}.`;
+  const r=mcqfResolve();
+  if(!r.scores.length){ el.innerHTML='<span style="color:#6B7280">No held candidates with a score yet.</span>'; return; }
+  const batch=n=>n>500?' <span style="color:#6B7280">(500 per click — click Advance again for the rest)</span>':'';
+  let t;
+  if(r.mode==='manual'){
+    const q=r.cum(r.mark);
+    t=`Manual override: mark <b>${r.mark}+</b> → advancing <b>${Math.min(q,500)}</b> of ${q} qualifying`
+      +(q>r.remaining?` — <b>over your target of ${r.target}</b>`:'')+`.`+batch(q);
+  } else if(r.remaining===0){
+    t=`Target <b>${r.target}</b> already reached — ${r.advanced} advanced. Raise the target to advance more.`;
+  } else if(r.mode==='topn'){
+    t=`Even the top mark (<b>${r.uniq[0]}</b>) advances ${r.cum(r.uniq[0])} — over your target of ${r.target}. `
+      +`Advancing <b>top ${r.adv}</b> by score (ties: earliest submission first).`+batch(r.remaining);
+  } else if(r.autoCount>=r.scores.length){
+    t=`Target <b>${r.target}</b>${r.advanced?` · already advanced ${r.advanced}`:''} → only <b>${r.scores.length}</b> candidate(s) are held with a score — advancing all of them.`+batch(r.scores.length);
+  } else {
+    t=`Target <b>${r.target}</b>${r.advanced?` · already advanced ${r.advanced}`:''} → auto cutoff: mark <b>${r.autoMark}+</b> → advancing <b>${r.adv}</b>.`
+      +(r.nextMark!=null?` <span style="color:#6B7280">Mark ${r.nextMark} would advance ${r.nextCount} — over your target.</span>`:'')
+      +batch(r.autoCount);
+  }
+  el.innerHTML=t;
 }
 function mcqfSetMark(s){
-  const el=document.getElementById('mcqf-mark');
-  if(el){ el.value=s; mcqfAdvPreview(); }
+  const st=window._mcqfState; st.ovr=true;
+  const w=document.getElementById('mcqf-ovr-wrap'); if(w) w.style.display='';
+  const el=document.getElementById('mcqf-mark'); if(el) el.value=s;
+  const l=document.getElementById('mcqf-ovr-link'); if(l) l.textContent='✕ Remove manual override (back to auto cutoff)';
+  mcqfAdvPreview();
 }
-// Persist the cutoff + quota on the job WITHOUT advancing anyone — Advance
-// stays its own button. Rides the existing only-set-provided settings action.
+function mcqfOvrToggle(){
+  const st=window._mcqfState; st.ovr=!st.ovr;
+  const w=document.getElementById('mcqf-ovr-wrap'); if(w) w.style.display=st.ovr?'':'none';
+  if(!st.ovr){ const el=document.getElementById('mcqf-mark'); if(el) el.value=''; st.mark=null; }
+  const l=document.getElementById('mcqf-ovr-link');
+  if(l) l.textContent=st.ovr?'✕ Remove manual override (back to auto cutoff)':'Override the cutoff mark manually';
+  mcqfAdvPreview();
+}
+// Persist the target (and any manual override mark) WITHOUT advancing anyone.
+// Rides the existing only-set-provided settings action; Advance stays separate.
 async function mcqfSaveAdvance(){
-  const raw=(document.getElementById('mcqf-mark')||{value:''}).value.trim();
-  const n=Math.max(1,Math.min(500,parseInt((document.getElementById('mcqf-n')||{}).value)||200));
-  const d=await mcqfApi({action:'settings',
-    cutoff_mark: raw===''?'':Math.max(0,parseInt(raw)||0), quota_cap:n});
+  const st=window._mcqfState;
+  const r=mcqfResolve();
+  const d=await mcqfApi({action:'settings', target_count:r.target,
+    cutoff_mark:(st.ovr&&st.mark!=null)?st.mark:''});
   if(!d) return;
   const el=document.getElementById('mcqf-adv-saved');
   if(el){ el.style.display='inline'; setTimeout(()=>{ el.style.display='none'; },2500); }
 }
 async function mcqfAdvance(){
   const st=window._mcqfState;
-  const n=Math.max(1,Math.min(500,parseInt(document.getElementById('mcqf-n').value)||0));
-  const raw=(document.getElementById('mcqf-mark')||{value:''}).value.trim();
-  const mark=raw===''?null:Math.max(0,parseInt(raw)||0);
-  const scores=st.heldScores||[];
-  const qual=(mark==null?scores:scores.filter(s=>s>=mark)).length;
-  const adv=Math.min(n,qual);
-  const msg = mark==null
-    ? 'Advance the top '+adv+' held candidates by MCQ score?'
-    : 'Advance everyone scoring '+mark+'+ ('+qual+' held qualify'+(adv<qual?', quota-capped to '+adv:'')+')?';
-  if(!confirm(msg+'\n\nAI CV screening starts on exactly the advanced candidates (spend applies to them only). The rest stay HELD — held is never rejected, and you can lower the mark later; already-screened candidates are never re-screened.')) return;
+  const r=mcqfResolve();
+  if(!r.scores.length){ toast('No held candidates with a score yet.',{type:'error'}); return; }
+  if(r.mode!=='manual' && r.remaining===0){ toast('Target already reached — raise the target to advance more.',{type:'warning'}); return; }
+  let n, mark=null, msg;
+  if(r.mode==='manual'){
+    const q=r.cum(r.mark);
+    if(!q){ toast('Nobody is at or above that mark.',{type:'warning'}); return; }
+    n=Math.min(q,500); mark=r.mark;
+    msg='MANUAL OVERRIDE — advance everyone scoring '+r.mark+'+? ('+q+' held qualify'
+      +(q>r.remaining?' — over your target of '+r.target:'')+(q>500?'; '+n+' this click, click again for the rest':'')+')';
+  } else if(r.mode==='topn'){
+    n=r.adv;
+    msg='Even the top mark advances more than your target of '+r.target+' — advance the top '+n+' held by score (ties: earliest submission first)?';
+  } else {
+    n=Math.min(r.remaining,500); mark=r.autoMark;
+    msg='Advance at the auto cutoff — mark '+r.autoMark+'+, '+r.adv+' candidate(s) toward your target of '+r.target+'?';
+  }
+  if(!confirm(msg+'\n\nAI CV screening starts on exactly the advanced candidates (spend applies to them only). The rest stay HELD — held is never rejected; already-screened candidates are never re-screened.')) return;
   const fd=new FormData(); fd.append('n',n);
   if(mark!=null) fd.append('mark',mark);
-  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-advance',{method:'POST',body:fd,credentials:'include'});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
+  const rr=await fetch('/api/jobs/'+st.jobId+'/mcq-advance',{method:'POST',body:fd,credentials:'include'});
+  const d=await rr.json().catch(()=>({}));
+  if(!rr.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
   toast('Advanced '+d.advanced+' candidate(s)'+(d.mark!=null?' at mark '+d.mark+'+ ('+d.qualified+' qualified)':'')+' — screening started.'+(d.capped_by?' Stopped early: '+d.capped_by+' cap reached.':''),{type:d.capped_by?'warning':'success',duration:8000});
   mcqFunnelLoad();
 }
