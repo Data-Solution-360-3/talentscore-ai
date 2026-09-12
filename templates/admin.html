@@ -325,7 +325,7 @@ img,video{max-width:100%}
         <div class="card-hd"><div class="card-title">Usage by client</div><span class="card-sub" id="bl-grand"></span></div>
         <div class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>Client / Job</th><th>MCQ taken</th><th>CVs scored</th><th>Interviews</th><th>৳ MCQ</th><th>৳ CV</th><th>৳ Interview</th><th>৳ Total</th></tr></thead>
+            <thead><tr><th>Client / Job</th><th>Plan</th><th>MCQ taken</th><th>CVs scored</th><th>Interviews</th><th>৳ MCQ</th><th>৳ CV</th><th>৳ Interview</th><th>৳ Total</th></tr></thead>
             <tbody id="bl-tbl"><tr><td colspan="8" class="tbl-empty">Loading…</td></tr></tbody>
           </table>
         </div>
@@ -642,17 +642,20 @@ async function loadBilling(){
   blScopeChange();
   // usage table
   const rows=[];
+  const TIERS=[['','— no plan (legacy, uncapped) —'],['screening_starter','Screening Starter'],['screening_growth','Screening Growth'],['screening_scale','Screening Scale'],['full_starter','Full · Starter'],['full_growth','Full · Growth'],['full_scale','Full · Scale'],['enterprise','Enterprise']];
   (_blUsage.orgs||[]).forEach(o=>{
+    const planSel = o.org_id ? `<select onchange="blSetPlan('${o.org_id}',this.value)" style="font-family:inherit;font-size:11px;padding:4px 6px;border-radius:6px;max-width:150px">${TIERS.map(([v,l])=>`<option value="${v}" ${v===(o.plan_tier||'')?'selected':''}>${l}</option>`).join('')}</select>` : '—';
     rows.push(`<tr style="background:rgba(99,153,34,.06);font-weight:700"><td>${escBl(o.name)}${o.rates_source==='override'?' <span class="badge b-amber" title="Uses its own override rates">custom rates</span>':''}</td>
+      <td style="font-weight:400">${planSel}</td>
       <td>${o.counts.mcq}</td><td>${o.counts.cv}</td><td>${o.counts.interview}</td>
       <td>৳${o.cost_tk.mcq}</td><td>৳${o.cost_tk.cv}</td><td>৳${o.cost_tk.interview}</td><td>৳${o.total_tk}</td></tr>`);
     (o.jobs||[]).forEach(j=>{
-      rows.push(`<tr><td style="padding-left:26px;color:#4A5443">${escBl(j.title)}</td>
+      rows.push(`<tr><td style="padding-left:26px;color:#4A5443">${escBl(j.title)}</td><td></td>
         <td>${j.counts.mcq}</td><td>${j.counts.cv}</td><td>${j.counts.interview}</td>
         <td>৳${j.cost_tk.mcq}</td><td>৳${j.cost_tk.cv}</td><td>৳${j.cost_tk.interview}</td><td>৳${j.total_tk}</td></tr>`);
     });
   });
-  document.getElementById('bl-tbl').innerHTML=rows.join('')||'<tr><td colspan="8" class="tbl-empty">No billable usage yet.</td></tr>';
+  document.getElementById('bl-tbl').innerHTML=rows.join('')||'<tr><td colspan="9" class="tbl-empty">No billable usage yet.</td></tr>';
   document.getElementById('bl-grand').textContent='Grand total: ৳'+(_blUsage.grand_total_tk||'0')+' · estimate at current rates';
 }
 function escBl(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
@@ -683,6 +686,14 @@ async function blSaveRates(){
   const d=await r.json().catch(()=>({}));
   if(!r.ok){ document.getElementById('bl-rates-msg').innerHTML='<span style="color:#f43f5e">'+escBl(d.detail||'Save failed')+'</span>'; return; }
   document.getElementById('bl-rates-msg').textContent='Saved — MCQ ৳'+d.mcq_tk+' · CV ৳'+d.cv_tk+' · Interview ৳'+d.interview_tk+'. Totals recomputed.';
+  loadBilling();
+}
+async function blSetPlan(orgId, tier){
+  const r=await fetch('/api/admin/billing/plan',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({org_id:orgId,tier:tier})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ document.getElementById('bl-rates-msg').innerHTML='<span style="color:#f43f5e">'+escBl(d.detail||'Plan change failed')+'</span>'; loadBilling(); return; }
+  document.getElementById('bl-rates-msg').textContent='Plan set: '+(d.label||'no plan')+' — limits apply from the next action; screening-only plans block interviews immediately.';
   loadBilling();
 }
 async function blClearOverride(){

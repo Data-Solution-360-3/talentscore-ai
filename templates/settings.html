@@ -516,6 +516,12 @@ img,video{max-width:100%}
       <div class="card" id="bill-denied" style="display:none">
         <div style="font-size:13px;color:var(--t2);line-height:1.7">Usage &amp; billing details are visible to the workspace owner.</div>
       </div>
+      <!-- ── YOUR PLAN (subscription tier + this month's usage vs limits) ── -->
+      <div class="card" id="plan-card" style="display:none">
+        <div class="card-hd"><div class="card-title">Your plan</div>
+          <span class="card-sub" id="plan-name"></span></div>
+        <div id="plan-body"></div>
+      </div>
       <div class="card" id="bill-card" style="display:none">
         <div class="card-hd"><div class="card-title">Usage &amp; Cost Summary</div>
           <span class="card-sub">your usage × current rates — an estimate, not an invoice</span></div>
@@ -1017,6 +1023,31 @@ async function loadBillingSummary(){
   }catch(_){card.style.display='none';return;}
   card.style.display='';
   if(denied)denied.style.display='none';
+  // ── Plan card: tier + this month's usage vs limits ──
+  const pc=document.getElementById('plan-card'), p=d.plan;
+  if(pc && p){
+    pc.style.display='';
+    document.getElementById('plan-name').textContent = p.assigned
+      ? (p.family==='screening'?'Screening only · ':'Full funnel · ')+p.label
+      : p.label;
+    const bar=(label,used,cap)=>{
+      if(cap==null) return `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--t2)">${label}</span><b>${used} <span style="font-weight:400;color:var(--t3)">/ unlimited</span></b></div>`;
+      const pct=Math.min(100,Math.round(used/cap*100));
+      const col=pct>=100?'var(--red)':pct>=80?'var(--amber,#B45309)':'var(--green,#639922)';
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:var(--t2)">${label}</span><b style="color:${col}">${used} / ${cap}</b></div>
+        <div style="height:6px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col}"></div></div></div>`;
+    };
+    let ph = bar('Applicants this month', (p.usage||{}).applicants||0, p.applicants_mo);
+    ph += p.interviews_allowed
+      ? bar('Interviews this month', (p.usage||{}).interviews||0, p.interviews_mo)
+      : `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--t2)">Live interviews</span><b style="color:var(--t3)">Not included in this plan</b></div>`;
+    if(p.jobs!=null) ph += `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0"><span style="color:var(--t2)">Active jobs limit</span><b>${p.jobs}</b></div>`;
+    ph += `<div style="font-size:11.5px;color:var(--t3);margin-top:10px;line-height:1.6">${p.assigned
+      ? 'Limits reset each calendar month. At a limit, candidates are held safely — never lost. To upgrade, contact TopCandidate.'
+      : 'No plan assigned yet — no plan limits apply. TopCandidate will assign your plan.'}</div>`;
+    document.getElementById('plan-body').innerHTML=ph;
+  }
   const rows=[['mcq','MCQ tests taken'],['cv','CVs screened (AI-scored)'],['interview','Interviews completed']]
     .map(([k,lbl])=>`<tr><td>${lbl}</td>
       <td style="text-align:right;font-weight:700">${(d.counts||{})[k]||0}</td>

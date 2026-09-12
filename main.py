@@ -824,6 +824,9 @@ async def me(request: Request):
             "org_role": db_user.get("org_role", "owner"),
             # White-label: the caller's org branding (null = default look).
             "branding": await _org_branding(str(db_user.get("org_id") or "")),
+            # Subscription plan flags (display + UI gating; the backend
+            # enforces independently at every launch point).
+            "org_plan": await _org_plan(str(db_user.get("org_id") or "")),
             "is_super_admin": bool(db_user.get("is_super_admin")),
             "plan": db_user.get("plan", "trial"),
             "screening_count": db_user.get("screening_count", 0),
@@ -985,6 +988,22 @@ async def batch_screen_endpoint(
 
     if not files:
         raise HTTPException(status_code=400, detail="All uploaded files were empty.")
+
+    # ── ORG PLAN cap (applicants/month) — batch uploads count too, or they
+    # would be a loophole around the public-apply cap. All-or-nothing: the
+    # batch either fits under the remaining allowance or is refused whole
+    # with the exact numbers (nothing partially screened, nothing lost). ──
+    _org_id = str(user.get("org_id") or "")
+    _plan = await _org_plan(_org_id)
+    if _org_id:
+        from database import reserve_org_monthly_bulk, get_org_monthly_usage
+        if not await reserve_org_monthly_bulk(_org_id, "scr", len(files),
+                                              _plan["applicants_mo"]):
+            _u = await get_org_monthly_usage(_org_id)
+            raise HTTPException(status_code=429, detail=(
+                f"Monthly applicant limit on your plan ({_plan['label']}): "
+                f"{_u['applicants']}/{_plan['applicants_mo']} used — this batch of "
+                f"{len(files)} doesn't fit. It runs again after an upgrade or next month."))
 
     jd_text  = job_description.strip()
     user_id  = user["user_id"]
@@ -3680,6 +3699,11 @@ async def viva_live_create(request: Request):
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid request body.")
+    # Plan gate: screening-only orgs cannot mint interviews (hard, backend);
+    # full-funnel orgs consume one monthly interview slot per link created.
+    _allowed, _reason, _q = await _plan_interview_gate(str(user.get("org_id") or ""))
+    if not _allowed:
+        raise HTTPException(status_code=403, detail=_reason)
     config = _validated_viva_config(body)
     doc = await create_live_interview(user["user_id"], config)
     # Echo what was STORED (not what was sent) so a stale page or dropped
@@ -4121,7 +4145,7 @@ async def score_application(application_id: str):
                 {"_id": _OID(application_id)},
                 {"$set": {"status": "stored_unscored", "error": "CV file missing"}},
             )
-            await release_screening_slot(app_doc["job_id"])
+            await release_screening_slot(app_doc["job_id"], str(app_doc.get("org_id") or ""))
             return
 
         await db.applications.update_one({"_id": _OID(application_id)}, {"$set": {"status": "scoring"}})
@@ -4135,7 +4159,7 @@ async def score_application(application_id: str):
                 {"$set": {"status": "stored_unscored", "error": err or "No text could be extracted"}},
             )
             # No API call happened, so the reservation is genuinely unused.
-            await release_screening_slot(app_doc["job_id"])
+            await release_screening_slot(app_doc["job_id"], str(app_doc.get("org_id") or ""))
             return
 
         weights = job.get("weights") if isinstance(job.get("weights"), dict) else None
@@ -4338,7 +4362,9 @@ async def public_apply_submit(
 
     # The reservation happens here, before anything is queued. If it fails the
     # application is kept and simply isn't scored — the candidate is never told.
-    ok, blocked_by = await reserve_screening_slot(job_id)
+    _plan = await _org_plan(str(job.get("org_id") or ""))
+    ok, blocked_by = await reserve_screening_slot(job_id, str(job.get("org_id") or ""),
+                                                  _plan["applicants_mo"])
     if ok:
         background.add_task(score_application, application_id)
     else:
@@ -4790,7 +4816,10 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
         if not a:
             raise HTTPException(status_code=409,
                                 detail="Candidate is not held (or has no MCQ score).")
-        ok, blocked_by = await reserve_screening_slot(str(job["_id"]))
+        _plan = await _org_plan(str(job.get("org_id") or ""))
+        ok, blocked_by = await reserve_screening_slot(str(job["_id"]),
+                                                      str(job.get("org_id") or ""),
+                                                      _plan["applicants_mo"])
         if not ok:
             return {"success": True, "advanced": 0, "requested": 1, "qualified": 1,
                     "mark": None, "held_remaining": 1, "capped_by": blocked_by}
@@ -4816,8 +4845,11 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
     qualified = len(held)
     advanced, capped_by = 0, None
     from bson import ObjectId as _OID
+    _plan = await _org_plan(str(job.get("org_id") or ""))
     for a in held[:n]:
-        ok, blocked_by = await reserve_screening_slot(str(job["_id"]))
+        ok, blocked_by = await reserve_screening_slot(str(job["_id"]),
+                                                      str(job.get("org_id") or ""),
+                                                      _plan["applicants_mo"])
         if not ok:
             capped_by = blocked_by
             break
@@ -5318,6 +5350,29 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
     if claimed is None:
         return {"busy": True}
 
+    # ── PLAN GATE (before any budget is spent). Screening-family orgs are
+    # HARD-blocked (backend, not just UI). A monthly-cap block queues the
+    # candidate exactly like the daily cap (viva_capped) — the existing daily
+    # retry sweep then auto-launches after an upgrade or the next month. ──
+    _org = str(job.get("org_id") or app_doc.get("org_id") or "")
+    _allowed, _reason, _queue = await _plan_interview_gate(_org)
+    if not _allowed:
+        if _queue:
+            await db.applications.update_one(
+                {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
+            try:
+                if app_doc.get("screening_id"):
+                    await db.screenings.update_one(
+                        {"_id": _OID(str(app_doc["screening_id"]))},
+                        {"$set": {"viva_capped": True}})
+            except Exception:
+                pass
+            print(f"[VIVA] plan monthly cap — application {application_id} queued: {_reason}")
+            return {"capped": True, "plan": True}
+        await db.applications.update_one({"_id": aid}, {"$unset": {"viva_minting": ""}})
+        print(f"[VIVA] plan-blocked (screening-only) — application {application_id}: {_reason}")
+        return {"plan_blocked": True, "reason": _reason}
+
     try:
         cap = max(1, min(200, int(viva.get("daily_cap", VIVA_DAILY_LAUNCH_CAP_DEFAULT))))
     except Exception:
@@ -5327,6 +5382,8 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
         # candidate; flagged for the recruiter so nobody qualified is lost.
         # Stamped on the screening too — that's the doc the Candidates page
         # renders, so the badge needs no join.
+        from database import release_org_monthly
+        await release_org_monthly(_org, "iv")   # no launch happened — give the plan slot back
         await db.applications.update_one(
             {"_id": aid}, {"$set": {"viva_capped": True}, "$unset": {"viva_minting": ""}})
         try:
@@ -5388,6 +5445,8 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
         # Release the claim so a later attempt can retry; fail closed meanwhile.
         print(f"[VIVA] launch failed for {application_id}: {e}")
         try:
+            from database import release_org_monthly
+            await release_org_monthly(_org, "iv")   # mint failed — plan slot unused
             await db.applications.update_one({"_id": aid}, {"$unset": {"viva_minting": ""}})
         except Exception:
             pass
@@ -5565,6 +5624,14 @@ async def set_job_viva_config(request: Request, job_id: str):
     if not body.get("enabled"):
         await set_job_viva(job["_id"], None)
         return {"success": True, "viva": None}
+
+    # Plan gate: a screening-only org cannot even ENABLE the interview stage
+    # on a job — backend-refused, so hidden UI is not the only protection.
+    _plan = await _org_plan(str(job.get("org_id") or ""))
+    if not _plan["interviews_allowed"]:
+        raise HTTPException(status_code=403, detail=(
+            f"Your plan ({_plan['label']}) doesn't include live interviews — "
+            "upgrade to a Full funnel plan to enable them."))
 
     try:
         threshold = max(0, min(100, int(body.get("threshold", VIVA_THRESHOLD_DEFAULT))))
@@ -6541,6 +6608,21 @@ async def create_job_endpoint(
     from scorer import ROLE_CATEGORIES
     if role_category in ROLE_CATEGORIES:
         job["role_category"] = role_category
+    # Plan gate: active-jobs cap (Full-funnel Starter/Growth). None = unlimited.
+    _plan = await _org_plan(str(user.get("org_id") or ""))
+    if _plan["jobs"] is not None and user.get("org_id"):
+        from bson import ObjectId as _POID
+        _okeys = [str(user["org_id"])]
+        try:
+            _okeys.append(_POID(str(user["org_id"])))
+        except Exception:
+            pass
+        _n_jobs = await db.jobs.count_documents(
+            {"org_id": {"$in": _okeys}, "active": True})
+        if _n_jobs >= int(_plan["jobs"]):
+            raise HTTPException(status_code=403, detail=(
+                f"Your plan ({_plan['label']}) allows {_plan['jobs']} active jobs — "
+                f"you have {_n_jobs}. Close a job or upgrade to create more."))
     try:
         job_id = await save_job(job)
     except DuplicateJobError as e:
@@ -6697,6 +6779,97 @@ def _paisa_to_tk_str(p: int) -> str:
     return f"{sign}{p // 100}" + (f".{p % 100:02d}" if p % 100 else "")
 
 
+# ─────────────────────────────────────────────────────────────
+# SUBSCRIPTION PLANS (org-level; assigned by super-admin, no payment yet).
+# Two families: "screening" (CV + MCQ, interview stage HARD-DISABLED) and
+# "full" (CV + MCQ + interview). Numbers live in code as defaults and are
+# OVERRIDABLE via the plan_catalog DB doc, so prices/limits/labels can be
+# adjusted without a deploy. None = unlimited. Enforcement rides the same
+# atomic spend counters as everything else (reserve_org_monthly).
+# ─────────────────────────────────────────────────────────────
+
+PLAN_TIERS = {
+    "screening_starter": {"family": "screening", "label": "Screening Starter",
+        "price_bdt": 1500,  "applicants_mo": 500,  "interviews_mo": 0, "jobs": None},
+    "screening_growth":  {"family": "screening", "label": "Screening Growth",
+        "price_bdt": 6000,  "applicants_mo": 2000, "interviews_mo": 0, "jobs": None},
+    "screening_scale":   {"family": "screening", "label": "Screening Scale",
+        "price_bdt": 18000, "applicants_mo": 6000, "interviews_mo": 0, "jobs": None},
+    "full_starter": {"family": "full", "label": "Starter",
+        "price_bdt": 2000,  "applicants_mo": 500,  "interviews_mo": 25,  "jobs": 3},
+    "full_growth":  {"family": "full", "label": "Growth",
+        "price_bdt": 5500,  "applicants_mo": 2000, "interviews_mo": 100, "jobs": 15},
+    "full_scale":   {"family": "full", "label": "Scale",
+        "price_bdt": 15000, "applicants_mo": 6000, "interviews_mo": 300, "jobs": None},
+    "enterprise":   {"family": "any", "label": "Enterprise",
+        "price_bdt": None, "applicants_mo": None, "interviews_mo": None, "jobs": None},
+}
+
+_UNASSIGNED_PLAN = {"assigned": False, "tier_key": None,
+                    "label": "Legacy — no plan limits", "family": "any",
+                    "applicants_mo": None, "interviews_mo": None, "jobs": None,
+                    "interviews_allowed": True}
+
+
+async def _plan_catalog() -> dict:
+    """Code defaults merged under the editable plan_catalog DB doc."""
+    merged = {k: {**v} for k, v in PLAN_TIERS.items()}
+    try:
+        doc = await db.plan_catalog.find_one({"_id": "catalog"})
+        if doc and isinstance(doc.get("tiers"), dict):
+            for k, o in doc["tiers"].items():
+                if k in merged and isinstance(o, dict):
+                    merged[k].update({kk: o[kk] for kk in
+                                      ("label", "price_bdt", "applicants_mo",
+                                       "interviews_mo", "jobs") if kk in o})
+    except Exception:
+        pass
+    return merged
+
+
+async def _org_plan(org_id: str) -> dict:
+    """Resolved plan for an org. Unassigned (the default for every existing
+    org, approved 2026-09-14) = 'Legacy' — uncapped, interviews allowed —
+    so NOTHING changes for anyone until the super-admin assigns a tier."""
+    if not org_id:
+        return dict(_UNASSIGNED_PLAN)
+    from bson import ObjectId as _OID
+    try:
+        org = await db.orgs.find_one({"_id": _OID(str(org_id))}, {"plan": 1})
+    except Exception:
+        org = None
+    tier_key = ((org or {}).get("plan") or {}).get("tier")
+    if not tier_key:
+        return dict(_UNASSIGNED_PLAN)
+    cat = await _plan_catalog()
+    t = cat.get(tier_key)
+    if not t:
+        return dict(_UNASSIGNED_PLAN)
+    return {"assigned": True, "tier_key": tier_key, "label": t["label"],
+            "family": t["family"], "applicants_mo": t.get("applicants_mo"),
+            "interviews_mo": t.get("interviews_mo"), "jobs": t.get("jobs"),
+            "interviews_allowed": t["family"] != "screening"}
+
+
+async def _plan_interview_gate(org_id: str) -> tuple[bool, str, bool]:
+    """One gate for every interview LAUNCH. Returns (allowed, reason,
+    queue_retry). Screening-family: hard no (never queued — it can never
+    succeed on this plan). Monthly cap reached: not now, but queue-able —
+    the existing daily cap-retry sweep then auto-recovers after an upgrade
+    or the next calendar month. On allowed=True one interview slot has been
+    atomically reserved (count at launch = the economic protection)."""
+    plan = await _org_plan(org_id)
+    if not plan["interviews_allowed"]:
+        return False, (f"Your plan ({plan['label']}) doesn't include live interviews — "
+                       "upgrade to a Full funnel plan to run them."), False
+    from database import reserve_org_monthly
+    if not await reserve_org_monthly(org_id, "iv", plan["interviews_mo"]):
+        return False, (f"Monthly interview limit reached ({plan['interviews_mo']} on "
+                       f"{plan['label']}) — qualified candidates stay queued and launch "
+                       "after an upgrade or next month."), True
+    return True, "", False
+
+
 async def _billing_rates(org_id: str | None = None) -> dict:
     """Merged per-unit rates in paisa: the org's override if one exists,
     else the platform default. Zero when nothing is configured yet."""
@@ -6787,8 +6960,11 @@ async def admin_billing_usage(request: Request):
     # Names for orgs and jobs (one query each; buckets keep working when a
     # name is missing).
     from bson import ObjectId as _OID
-    org_names = {str(o["_id"]): str(o.get("name") or "") async for o in
-                 db.orgs.find({}, {"name": 1})}
+    org_names, org_tiers = {}, {}
+    async for o in db.orgs.find({}, {"name": 1, "plan": 1}):
+        org_names[str(o["_id"])] = str(o.get("name") or "")
+        org_tiers[str(o["_id"])] = ((o.get("plan") or {}).get("tier")) or ""
+    _cat = await _plan_catalog()
     job_ids = [j for jobs in per.values() for j in jobs if j]
     oids = []
     for j in set(job_ids):
@@ -6824,6 +7000,8 @@ async def admin_billing_usage(request: Request):
         grand_paisa += org_total
         orgs_out.append({"org_id": org_id,
                          "name": (org_names.get(org_id) or (org_id[:8] + "…" if org_id else "(no org — legacy)")),
+                         "plan_tier": org_tiers.get(org_id, ""),
+                         "plan_label": (_cat.get(org_tiers.get(org_id, ""), {}) or {}).get("label", ""),
                          "rates_source": rr["source"],
                          "rates_tk": {k: _paisa_to_tk_str(rates[k]) for k in _BILL_STAGES},
                          "counts": org_counts,
@@ -6835,6 +7013,48 @@ async def admin_billing_usage(request: Request):
     return {"orgs": orgs_out,
             "grand_total_tk": _paisa_to_tk_str(grand_paisa),
             "note": "Usage & cost summary — an estimate of usage × current rates. Not an invoice."}
+
+
+@app.get("/api/plans")
+async def public_plan_catalog():
+    """PUBLIC pricing catalog (display only — prices, limits, labels). The
+    landing page renders its pricing section from this, so catalog edits
+    show everywhere without a deploy. No org data, nothing sensitive."""
+    cat = await _plan_catalog()
+    return {"tiers": {k: {kk: v.get(kk) for kk in
+                          ("family", "label", "price_bdt", "applicants_mo",
+                           "interviews_mo", "jobs")}
+                      for k, v in cat.items()},
+            "annual_months_free": 2}
+
+
+@app.post("/api/admin/billing/plan")
+async def admin_set_org_plan(request: Request):
+    """Super-admin assigns (or clears) an org's subscription tier."""
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    org_id = str(body.get("org_id") or "").strip()
+    tier = str(body.get("tier") or "").strip()
+    from bson import ObjectId as _OID
+    try:
+        oid = _OID(org_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    if not await db.orgs.find_one({"_id": oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    if not tier:
+        await db.orgs.update_one({"_id": oid}, {"$unset": {"plan": ""}})
+        return {"success": True, "tier": None, "label": _UNASSIGNED_PLAN["label"]}
+    cat = await _plan_catalog()
+    if tier not in cat:
+        raise HTTPException(status_code=400, detail="Unknown plan tier.")
+    await db.orgs.update_one({"_id": oid}, {"$set": {"plan": {
+        "tier": tier, "family": cat[tier]["family"],
+        "assigned_at": _dt.utcnow(), "assigned_by": str(user.get("email") or "")}}})
+    return {"success": True, "tier": tier, "label": cat[tier]["label"]}
 
 
 @app.get("/api/org/billing-usage")
@@ -6866,7 +7086,13 @@ async def org_billing_usage(request: Request):
     rates = (await _billing_rates(org_id))["rates_paisa"]
     cost = {k: counts[k] * rates[k] for k in _BILL_STAGES}
     total = sum(cost.values())
-    return {"counts": counts,
+    # Subscription plan + this month's usage vs limits (display for the
+    # client's Plan card; enforcement lives at the launch points).
+    from database import get_org_monthly_usage
+    _plan = await _org_plan(org_id)
+    _usage = await get_org_monthly_usage(org_id)
+    return {"plan": {**_plan, "usage": _usage},
+            "counts": counts,
             "rates_tk": {k: _paisa_to_tk_str(rates[k]) for k in _BILL_STAGES},
             "cost_tk": {k: _paisa_to_tk_str(cost[k]) for k in _BILL_STAGES},
             "total_tk": _paisa_to_tk_str(total),

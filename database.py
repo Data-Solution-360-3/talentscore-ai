@@ -1036,13 +1036,72 @@ async def release_spend(key: str) -> None:
     await db.spend_counters.update_one({"_id": key, "count": {"$gt": 0}}, {"$inc": {"count": -1}})
 
 
-async def reserve_screening_slot(job_id: str) -> tuple[bool, str]:
-    """Reserve against all three caps. Returns (ok, which_cap_blocked).
+async def reserve_org_monthly(org_id: str, kind: str, cap: int | None) -> bool:
+    """PLAN-limit reservation on the SAME atomic counter primitive as the
+    spend caps — no parallel counter that can drift. Counts even when
+    uncapped (cap None = legacy/enterprise) so usage displays stay truthful;
+    enforces only when a cap is set. The calendar-month key IS the monthly
+    reset. kind: 'scr' (applicants scored) | 'iv' (interviews launched)."""
+    if not org_id:
+        return True
+    key = f"org:{org_id}:{kind}:{datetime.utcnow():%Y-%m}"
+    if cap is None:
+        await db.spend_counters.update_one({"_id": key}, {"$inc": {"count": 1}}, upsert=True)
+        return True
+    return await reserve_spend(key, int(cap))
 
-    Reserved in order job → day → month, releasing the earlier ones if a later
-    cap refuses, so a blocked application never leaves a phantom reservation
-    holding budget it didn't use.
-    """
+
+async def reserve_org_monthly_bulk(org_id: str, kind: str, n: int, cap: int | None) -> bool:
+    """Batch variant: claim n units at once, atomically (all-or-nothing) —
+    a batch either fits under the plan cap or is refused whole."""
+    if not org_id or n <= 0:
+        return True
+    key = f"org:{org_id}:{kind}:{datetime.utcnow():%Y-%m}"
+    if cap is None:
+        await db.spend_counters.update_one({"_id": key}, {"$inc": {"count": n}}, upsert=True)
+        return True
+    r = await db.spend_counters.update_one(
+        {"_id": key, "count": {"$lte": int(cap) - n}}, {"$inc": {"count": n}})
+    if r.modified_count:
+        return True
+    # first-ever claim for this key (doc absent): create it if n fits the cap
+    if n <= int(cap):
+        try:
+            await db.spend_counters.insert_one({"_id": key, "count": n})
+            return True
+        except Exception:
+            r = await db.spend_counters.update_one(
+                {"_id": key, "count": {"$lte": int(cap) - n}}, {"$inc": {"count": n}})
+            return bool(r.modified_count)
+    return False
+
+
+async def release_org_monthly(org_id: str, kind: str) -> None:
+    if not org_id:
+        return
+    await release_spend(f"org:{org_id}:{kind}:{datetime.utcnow():%Y-%m}")
+
+
+async def get_org_monthly_usage(org_id: str) -> dict:
+    """This month's plan-relevant usage for one org (display)."""
+    now = datetime.utcnow()
+
+    async def n(kind):
+        d = await db.spend_counters.find_one(
+            {"_id": f"org:{org_id}:{kind}:{now:%Y-%m}"}, {"count": 1})
+        return int((d or {}).get("count", 0))
+
+    return {"applicants": await n("scr"), "interviews": await n("iv"),
+            "month": f"{now:%Y-%m}"}
+
+
+async def reserve_screening_slot(job_id: str, org_id: str = "",
+                                 org_applicants_cap: int | None = None) -> tuple[bool, str]:
+    """Reserve against the three platform caps PLUS the org's plan cap.
+    Returns (ok, which_cap_blocked) — 'plan' means the org's monthly
+    applicant limit. Reserved in order job → day → month → plan, releasing
+    the earlier ones if a later cap refuses, so a blocked application never
+    leaves a phantom reservation holding budget it didn't use."""
     now = datetime.utcnow()
     k_job = f"job:{job_id}"
     k_day = f"day:{now:%Y-%m-%d}"
@@ -1057,14 +1116,21 @@ async def reserve_screening_slot(job_id: str) -> tuple[bool, str]:
         await release_spend(k_day)
         await release_spend(k_job)
         return False, "month"
+    if org_id and not await reserve_org_monthly(org_id, "scr", org_applicants_cap):
+        await release_spend(k_month)
+        await release_spend(k_day)
+        await release_spend(k_job)
+        return False, "plan"
     return True, ""
 
 
-async def release_screening_slot(job_id: str) -> None:
+async def release_screening_slot(job_id: str, org_id: str = "") -> None:
     now = datetime.utcnow()
     await release_spend(f"job:{job_id}")
     await release_spend(f"day:{now:%Y-%m-%d}")
     await release_spend(f"month:{now:%Y-%m}")
+    if org_id:
+        await release_org_monthly(org_id, "scr")
 
 
 async def get_spend_state(job_id: str) -> dict:
