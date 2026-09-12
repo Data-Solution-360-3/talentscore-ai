@@ -4693,19 +4693,48 @@ async def mcq_funnel_view(request: Request, job_id: str):
 @app.post("/api/jobs/{job_id}/mcq-advance")
 async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
                              job_id: str, n: int = Form(...),
-                             mark: int = Form(None)):
+                             mark: int = Form(None),
+                             application_id: str = Form(None)):
     """Advance HELD candidates into CV screening — exactly the apply flow's
     own reserve + score_application per candidate; screening spend happens
     here and ONLY here for funnel jobs.
 
     Primary control: a CUTOFF MARK — everyone scoring AT OR ABOVE `mark`
     qualifies, highest scores first, up to the quota cap `n`. No mark =
-    plain top-N (kept). Re-running with a lower mark is safe by construction:
-    only status "held" ever matches, and advancing flips a row to "pending",
-    so already-advanced candidates can never be re-screened. Held stays held
-    — a triage state, never a rejection."""
+    plain top-N (kept). `application_id` advances exactly ONE held candidate
+    on this job (the per-row button) through the identical reserve + score
+    path. Re-running is safe by construction in every mode: only status
+    "held" ever matches, and advancing flips a row to "pending", so already-
+    advanced candidates can never be re-screened. Held stays held — a triage
+    state, never a rejection."""
     user = await get_current_user(request)
     job = await owned_job(job_id, user)
+    if application_id:
+        # Single-candidate advance: must be THIS job's held, scored candidate
+        # (owned_job already org-gates the job; the job_id match ties the app
+        # to it, so nothing cross-org or cross-job is reachable).
+        from bson import ObjectId as _OID
+        try:
+            aid = _OID(application_id)
+        except Exception:
+            raise HTTPException(status_code=404, detail="Not found.")
+        a = await db.applications.find_one(
+            {"_id": aid, "job_id": str(job["_id"]), "funnel": "mcq",
+             "status": "held", "mcq_score": {"$ne": None}}, {"_id": 1})
+        if not a:
+            raise HTTPException(status_code=409,
+                                detail="Candidate is not held (or has no MCQ score).")
+        ok, blocked_by = await reserve_screening_slot(str(job["_id"]))
+        if not ok:
+            return {"success": True, "advanced": 0, "requested": 1, "qualified": 1,
+                    "mark": None, "held_remaining": 1, "capped_by": blocked_by}
+        await db.applications.update_one(
+            {"_id": aid}, {"$set": {"status": "pending", "advanced_at": _dt.utcnow(),
+                                    "advanced_by": user["user_id"]}})
+        background.add_task(score_application, str(aid))
+        print(f"[MCQ-FUNNEL] job={job_id} advanced SINGLE app={application_id} by={user.get('email')}")
+        return {"success": True, "advanced": 1, "requested": 1, "qualified": 1,
+                "mark": None, "held_remaining": 0, "capped_by": None}
     n = max(1, min(500, int(n)))
     score_q: dict = {"$ne": None}
     if mark is not None:

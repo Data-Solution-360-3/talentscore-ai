@@ -5001,7 +5001,7 @@ function mcqFunnelRender(){
   // ── stat chips ──
   const chip=(n,label,color)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:3px 11px;font-size:11px;color:#3A4433"><b style="color:${color};font-size:12.5px">${n||0}</b>${label}</span>`;
   html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-    ${chip(c.held,'held','var(--amber,#B45309)')}${chip(c.advanced,'advanced','var(--green,#639922)')}${chip(c.released,'released','#6B7280')}${chip(c.awaiting_test,'awaiting test','#6B7280')}</div>`;
+    ${chip(c.held,'held','var(--amber,#B45309)')}${chip(c.advanced,'advanced','var(--green,#639922)')}${chip(c.released,'set aside','#6B7280')}${chip(c.awaiting_test,'awaiting test','#6B7280')}</div>`;
   // ── score distribution: green bars, labels UNDER the bars ──
   const dist=f.distribution||[];
   if(dist.length){
@@ -5053,15 +5053,15 @@ function mcqFunnelRender(){
       +rows.map((r,i)=>`<tr><td style="color:var(--t3)">${i+1}</td><td>${escapeHtml(r.name||r.email||'—')}</td>
         <td><b>${r.mcq_score==null?'—':r.mcq_score+'/'+r.mcq_total}</b>${r.assessment_seconds!=null?`<div style="font-size:10px;color:var(--t3);white-space:nowrap">⏱ ${Math.floor(r.assessment_seconds/60)}:${String(r.assessment_seconds%60).padStart(2,'0')}${r.timed_out?' (timeout)':''} · ${r.activity_flags?`<span style="color:var(--orange2)">🚩${r.activity_flags}</span>`:'🚩0'}</div>`:''}</td>
         <td>${r.status==='held'?'<span style="color:var(--amber,#B45309)">held — not advanced</span>'
-            :r.status==='released'?'<span style="color:var(--t3)">released</span>'
+            :r.status==='released'?'<span style="color:var(--t3)" title="Marked as not advancing — no screening was run; reversible">set aside — no screening run</span>'
             :'<span style="color:var(--green)">'+escapeHtml(r.status)+(r.screened?' ✓ screened':'')+'</span>'}</td>
         <td>${r.interview==='done'?'<span style="color:var(--green)">✓ done</span>'
             :r.interview==='invited'?'<span style="color:#476B15">invited '+escapeHtml(r.invited_at||'')+' · by '+escapeHtml(r.invite_deadline||'')+'</span>'
             :r.interview==='expired'?'<span style="color:var(--red,#DC2626)">expired</span>'
             :r.interview==='capped'?'<span style="color:var(--amber,#B45309)" title="Qualified; daily interview cap was full — retried automatically next day">capped — retrying</span>'
             :'<span style="color:var(--t3)">—</span>'}</td>
-        <td>${r.mcq_score!=null?`<button class="btn btn-xs" onclick="mcqfReport('${r.application_id}')">Report</button> `:''}${r.status==='held'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')">Release</button>`
-            :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Re-hold</button>`
+        <td>${r.mcq_score!=null?`<button class="btn btn-xs" onclick="mcqfReport('${r.application_id}')">Report</button> `:''}${r.status==='held'?`<button class="btn btn-xs btn-primary" onclick="mcqfAdvanceOne('${r.application_id}')" title="Advance THIS candidate to CV screening now — one screening runs and spends">Advance</button> <button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','release')" title="Mark as not advancing — runs NO screening; reversible">Set aside</button>`
+            :r.status==='released'?`<button class="btn btn-xs" onclick="mcqfRelease('${r.application_id}','hold')">Move back to held</button>`
             :r.interview==='expired'?`<button class="btn btn-xs btn-primary" onclick="mcqfReinvite('${r.application_id}')">Re-invite</button>`:''}</td></tr>`).join('')
       +`</tbody></table>${(f.rows||[]).length>30?`<div style="color:var(--t3);font-size:10.5px;margin-top:3px">Showing top 30 of ${f.rows.length}.</div>`:''}</div>`;
   }else html+=`<div style="color:var(--t3)">No funnel applicants yet.</div>`;
@@ -5294,6 +5294,22 @@ async function mcqfRelease(appId, action){
   const fd=new FormData(); fd.append('application_id',appId); fd.append('action',action);
   const r=await fetch('/api/jobs/'+st.jobId+'/mcq-release',{method:'POST',body:fd,credentials:'include'});
   if(!r.ok){ const d=await r.json().catch(()=>({})); toast(d.detail||'Failed',{type:'error'}); return; }
+  toast(action==='release'
+    ? 'Set aside — NO screening was run for this candidate (reversible: Move back to held).'
+    : 'Moved back to held — they can be advanced to screening now.',{type:'success',duration:6000});
+  mcqFunnelLoad();
+}
+// Per-candidate advance: THIS candidate goes to CV screening now, through
+// the exact same reserve + score path as the bulk advance.
+async function mcqfAdvanceOne(appId){
+  const st=window._mcqfState;
+  if(!confirm('Advance THIS candidate to CV screening now?\n\nOne screening runs (spend applies to them only). Everyone else stays exactly as they are.')) return;
+  const fd=new FormData(); fd.append('n',1); fd.append('application_id',appId);
+  const r=await fetch('/api/jobs/'+st.jobId+'/mcq-advance',{method:'POST',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.detail||'Advance failed',{type:'error'}); return; }
+  if(d.capped_by){ toast('Not advanced — the '+d.capped_by+' screening cap is full.',{type:'warning'}); }
+  else toast('Advanced — CV screening started for this candidate.',{type:'success'});
   mcqFunnelLoad();
 }
 
