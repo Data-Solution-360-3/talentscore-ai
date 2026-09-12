@@ -6597,7 +6597,8 @@ async def admin_billing_usage(request: Request):
         j[stage] += int(n)
 
     for stage, (coll, match) in _BILL_MATCH.items():
-        async for r in db[coll].aggregate([
+        # db is the _LiveDB proxy — attribute access only, never subscripting
+        async for r in getattr(db, coll).aggregate([
                 {"$match": match},
                 {"$group": {"_id": {"o": "$org_id", "j": "$job_id"}, "n": {"$sum": 1}}}]):
             bump(str(r["_id"].get("o") or ""), str(r["_id"].get("j") or ""), stage, r["n"])
@@ -6679,7 +6680,7 @@ async def org_billing_usage(request: Request):
         org_keys = [org_id]
     counts = {}
     for stage, (coll, match) in _BILL_MATCH.items():
-        counts[stage] = await db[coll].count_documents(
+        counts[stage] = await getattr(db, coll).count_documents(
             {**match, "org_id": {"$in": org_keys}})
     rates = (await _billing_rates(org_id))["rates_paisa"]
     cost = {k: counts[k] * rates[k] for k in _BILL_STAGES}
