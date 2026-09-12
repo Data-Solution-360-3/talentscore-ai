@@ -207,7 +207,10 @@ img,video{max-width:100%}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
       Email Templates
     </button>
-    <button class="sb-item" onclick="nav('api',this)">
+    <!-- API Keys — HIDDEN for now (2026-09-13), not deleted: the page,
+         routes, and key management all stay intact. To re-enable, remove
+         the display:none below. -->
+    <button class="sb-item" onclick="nav('api',this)" style="display:none">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       API Keys
     </button>
