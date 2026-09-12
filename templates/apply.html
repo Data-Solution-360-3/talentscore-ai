@@ -31,7 +31,7 @@
 .mcq-scen{background:linear-gradient(180deg,#F6FAF0,#EFF6E6);border:1.5px solid #CFE3B4;border-left:4px solid var(--brand-primary,#639922);border-radius:14px;padding:.9rem 1rem;margin-bottom:.75rem}
 .mcq-scen .t{font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--brand-primary,#639922);margin-bottom:.35rem}
 .mcq-scen .b{font-size:.87rem;line-height:1.65;color:#25350F;white-space:pre-wrap}
-.mcq-card{background:#fff;border:1.5px solid #E4E8E0;border-radius:16px;padding:1.1rem 1.15rem;box-shadow:0 3px 14px rgba(23,52,4,.06)}
+.mcq-card{background:#fff;border:1.5px solid #E4E8E0;border-radius:16px;padding:1.2rem 1.25rem;box-shadow:0 3px 14px rgba(23,52,4,.06)}
 .mcq-q{font-size:1rem;font-weight:800;color:var(--brand-deep,#173404);line-height:1.5;margin-bottom:.8rem}
 .mcq-opt{display:flex;gap:.65rem;align-items:flex-start;width:100%;text-align:left;padding:.7rem .8rem;margin-bottom:.5rem;border:1.5px solid #E4E8E0;border-radius:12px;background:#FAFBF8;cursor:pointer;font-family:inherit;font-size:.92rem;color:#33401F;line-height:1.5;transition:.12s;min-width:0}
 .mcq-opt:hover{border-color:#BFE3CE}
@@ -43,7 +43,7 @@
 .btn-mcqsubmit{background:linear-gradient(135deg,var(--brand-accent,#EF9F27),#F57C2E) !important}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --ink:var(--brand-primary,#128A40);--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
+  --ink:var(--brand-primary,#173404);--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
   --og:rgba(245,124,46,.10);--ob:rgba(245,124,46,.30);--ig:rgba(245,124,46,.08);
   --bg:#FAFBFC;--surface:#FFFFFF;--s2:#F4F6FA;--s3:#EDF0F5;
   --border:#E4E8F0;--border2:#D5DCE8;
@@ -57,12 +57,12 @@ html{overflow-x:hidden;max-width:100vw}
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden;max-width:100vw}
 input,select,textarea{max-width:100%}
 
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.85rem 1.15rem;display:flex;align-items:center;gap:9px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:1rem 1.25rem;display:flex;align-items:center;gap:9px;box-shadow:var(--shadow-sm)}
 .tb-icon{width:28px;height:28px;border-radius:var(--r-md);background:var(--orange);display:grid;place-items:center;flex-shrink:0}
 .tb-name{font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
 .tb-tag{margin-left:auto;font-size:11.5px;color:var(--t3);font-weight:500}
 
-.wrap{max-width:720px;margin:0 auto;padding:1.5rem 1.15rem 4rem}
+.wrap{max-width:780px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
 
 .jobcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:1.25rem}
 .jc-head{padding:1.5rem 1.35rem 1.25rem;border-bottom:1px solid var(--border)}
@@ -77,7 +77,7 @@ input,select,textarea{max-width:100%}
 .jd-more{margin-top:.85rem;background:none;border:none;font-family:inherit;font-size:13px;font-weight:700;color:var(--orange2);cursor:pointer;padding:0}
 
 .formcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:1.5rem 1.35rem}
-.fc-title{font-size:1.15rem;font-weight:800;color:var(--ink);letter-spacing:-.4px;margin-bottom:.35rem}
+.fc-title{font-size:1.25rem;font-weight:800;color:var(--ink);letter-spacing:-.4px;margin-bottom:.4rem}
 .fc-sub{font-size:.88rem;color:var(--t2);margin-bottom:1.5rem}
 .fw{display:flex;flex-direction:column;gap:6px;margin-bottom:1.05rem}
 .fl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
@@ -107,9 +107,14 @@ input,select,textarea{max-width:100%}
 /* Success. Deliberately says nothing: no score, no stage, no timeline, no
    internal identifier. The candidate learns that we received the file. */
 .done{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.75rem 1.5rem;text-align:center}
+/* Instruction/notice sub-card — one neutral family (the flow's own greys,
+   never slate/navy), so it reads premium under any client's brand colors. */
+.mi-box{background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:1.15rem 1.25rem;margin:1.1rem 0;font-size:.9rem;color:var(--t2);line-height:1.85}
+.mcq-nav{display:flex;gap:.75rem;margin-top:1.15rem}
+.mcq-nav .btn{margin-top:0}
 .done-ico{width:60px;height:60px;border-radius:50%;background:rgba(22,163,74,.10);display:grid;place-items:center;margin:0 auto 1.25rem}
 .done-t{font-size:1.4rem;font-weight:900;color:var(--ink);letter-spacing:-.6px;margin-bottom:.65rem}
-.done-b{font-size:.95rem;color:var(--t2);line-height:1.7;max-width:400px;margin:0 auto}
+.done-b{font-size:.95rem;color:var(--t2);line-height:1.7;max-width:440px;margin:0 auto}
 .done-f{margin-top:1.75rem;padding-top:1.35rem;border-top:1px solid var(--border);font-size:12px;color:var(--t3);line-height:1.6}
 #done-view{display:none}
 
@@ -130,9 +135,11 @@ input,select,textarea{max-width:100%}
 .dup-card button:hover{background:var(--orange2)}
 
 @media(min-width:768px){
-  .wrap{padding:2.25rem 1.5rem 5rem}
-  .jc-head{padding:1.85rem 1.75rem 1.5rem}
-  .jc-body,.formcard{padding:1.75rem}
+  .wrap{padding:2.5rem 1.5rem 5rem}
+  .jc-head{padding:2rem 2rem 1.6rem}
+  .jc-body,.formcard{padding:2rem}
+  .done{padding:3.25rem 2rem}
+  .mcq-card{padding:1.35rem 1.4rem}
 }
 </style>
 {{BRAND_CSS}}
@@ -201,8 +208,8 @@ input,select,textarea{max-width:100%}
           <input type="file" id="cv" accept="application/pdf,.pdf" style="display:none" onchange="pickFile(this)">
         </div>
 
-        <div class="fw" style="background:#F1F4F9;border:1px solid #E4E8F0;border-radius:10px;padding:.8rem .9rem">
-          <label style="display:flex;gap:.6rem;align-items:flex-start;cursor:pointer;font-size:.8rem;color:#33415c;line-height:1.55">
+        <div class="fw" style="background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:.95rem 1.05rem">
+          <label style="display:flex;gap:.65rem;align-items:flex-start;cursor:pointer;font-size:.82rem;color:var(--t2);line-height:1.6">
             <input type="checkbox" id="consent" style="margin-top:3px;flex:none;width:15px;height:15px">
             <span>I agree that my CV and application details will be analysed to assess my fit for this role,
             and — if I'm invited to an AI interview — that a text transcript is kept for 12 months and
@@ -221,7 +228,9 @@ input,select,textarea{max-width:100%}
   </div>
 
   <div id="mcq-view" style="display:none">
-    <div class="fc" style="text-align:left">
+    <!-- formcard (was a nonexistent "fc" class — the instruction page and
+         quiz rendered card-less; same chrome as every other screen now) -->
+    <div class="formcard" style="text-align:left">
       <!-- INSTRUCTION + DISCLOSURE page (Pathao #1): shown BEFORE question 1,
            always. TWO hand-written templates — pure English, and natural
            Banglish (Bangla sentence language, technical terms in English) —
@@ -231,7 +240,7 @@ input,select,textarea{max-width:100%}
         <div id="mi-en" style="display:none">
           <div class="fc-title">One more step — a short assessment</div>
           <div class="fc-sub">Your application is saved. Completing this test finishes it.</div>
-          <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.88rem;color:#33415c;line-height:1.8">
+          <div class="mi-box">
             <b>How it works</b><br>
             • You'll see <b>one question at a time</b> — read it and pick one of the four options.<br>
             • <b><span class="mi-count">—</span> multiple-choice questions</b> in total.<br>
@@ -242,7 +251,7 @@ input,select,textarea{max-width:100%}
             • Switching browser tabs or windows will <b>not end your test</b> — but when you leave and how long you're away is recorded.<br>
             • <b>To submit:</b> on the last question press <b>Submit answers</b> — you'll see a confirmation screen, and you're done.<br>
             • <b>After you submit:</b> a person on the {{COMPANY}} hiring team reviews your test together with your CV. Strong results may be invited to an interview.
-            <span style="display:block;margin-top:.6rem;color:#4A5970;font-size:.82rem">
+            <span style="display:block;margin-top:.7rem;color:var(--t2);font-size:.83rem">
             <b>Monitoring notice:</b> while the test is open we record tab/window switches, copy-paste
             attempts, long inactivity, page reloads, and the time you spend on each question. These are
             <b>review signals read by a human</b> — nothing automatically disqualifies you, and speed alone
@@ -254,7 +263,7 @@ input,select,textarea{max-width:100%}
         <div id="mi-bn" style="display:none">
           <div class="fc-title">আর একটা step — ছোট একটা assessment</div>
           <div class="fc-sub">আপনার application save হয়ে গেছে। এই test টা complete করলেই application সম্পূর্ণ।</div>
-          <div style="background:#F8FAFC;border:1px solid #E4E8F0;border-radius:12px;padding:1rem 1.1rem;margin:1rem 0;font-size:.9rem;color:#33415c;line-height:1.9">
+          <div class="mi-box" style="line-height:1.95">
             <b>যেভাবে কাজ করে</b><br>
             • একবারে <b>একটা করে question</b> দেখবেন — পড়ে চারটা option থেকে একটা বেছে নিন।<br>
             • মোট <b><span class="mi-count">—</span> টা multiple-choice question</b>।<br>
@@ -265,7 +274,7 @@ input,select,textarea{max-width:100%}
             • অন্য tab বা window তে গেলে test <b>বন্ধ হয়ে যাবে না</b> — তবে কখন গেলেন আর কতক্ষণ বাইরে ছিলেন, সেটা record হয়।<br>
             • <b>Submit করবেন যেভাবে:</b> শেষ question এ গিয়ে <b>Submit answers</b> button চাপুন — confirmation screen দেখলেই আপনার কাজ শেষ।<br>
             • <b>Submit এর পরে:</b> {{COMPANY}} এর hiring team এর একজন মানুষ আপনার test আর CV একসাথে review করবেন। ভালো করলে interview এর invitation পেতে পারেন।
-            <span style="display:block;margin-top:.6rem;color:#4A5970;font-size:.84rem">
+            <span style="display:block;margin-top:.7rem;color:var(--t2);font-size:.85rem">
             <b>Monitoring notice:</b> test চলার সময় tab/window switch, copy-paste attempt, লম্বা inactivity,
             page reload আর প্রতিটা question এ আপনি কত সময় নিলেন — এগুলো record হয়। এগুলো শুধুই
             <b>review signal, যেটা একজন মানুষ দেখে বিবেচনা করবেন</b> — কোনো কিছুই আপনাকে automatically
@@ -287,7 +296,7 @@ input,select,textarea{max-width:100%}
         <div class="mcq-progbar"><i id="mcq-bar" style="width:0%"></i></div>
         <div class="err" id="mcq-err"></div>
         <div id="mcq-qbox"></div>
-        <div style="display:flex;gap:.6rem;margin-top:1rem">
+        <div class="mcq-nav">
           <button class="btn btn-mcqprev" id="mcq-prev" onclick="mcqNav(-1)">← Previous</button>
           <button class="btn" id="mcq-next" onclick="mcqNav(1)">Next →</button>
           <button class="btn btn-mcqsubmit" id="mcq-btn" style="display:none" onclick="submitMcqTest(false)">Submit answers</button>
