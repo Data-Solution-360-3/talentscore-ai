@@ -28,6 +28,45 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from interview_scorer import score_written_answers, DIMENSIONS  # noqa: E402
 
+# ── Gate cost metering (measurement ONLY — never affects any assertion or
+#    the exit code). Every scorer result already carries the usage summary
+#    its own _usages produced; the gate just collects and totals them, and
+#    best-effort writes ONE ledger row (purpose "fairness_gate") so QA spend
+#    stops being invisible to the 24h cost reports. ──
+_GATE_USAGE: dict = {}
+
+
+def _meter(name: str, result) -> None:
+    try:
+        if not isinstance(result, dict):
+            return
+        u = result.get("usage") or ((result.get("api_usage") or {}).get("cv_scoring"))
+        if isinstance(u, dict) and u.get("est_usd") is not None:
+            _GATE_USAGE[name] = u
+    except Exception:
+        pass
+
+
+async def _report_gate_cost() -> None:
+    try:
+        from usage_meter import merge_usage_summaries
+        total = merge_usage_summaries(_GATE_USAGE)
+        usd = float(total.get("est_usd") or 0)
+        print(f"\n  GATE COST this run: ${usd:.4f} (Tk {usd*122.85:.2f}) · "
+              f"{total.get('calls')} calls · "
+              f"{total.get('input_tokens'):,}/{total.get('output_tokens'):,} tokens in/out "
+              f"(written+spoken+scenario+bangla on gpt-4o, cv on the pipeline default)")
+        try:
+            import database
+            await database.connect()
+            from database import log_api_usage
+            await log_api_usage({"purpose": "fairness_gate", "model": "mixed", **total})
+            print("  (logged to api_usage_log as purpose=fairness_gate)")
+        except Exception as e:
+            print(f"  (ledger write skipped: {e})")
+    except Exception as e:
+        print(f"  (gate cost metering failed harmlessly: {e})")
+
 QUESTION = ("Describe a difficult bug or problem you solved at work. "
             "How did you find the cause, and what did you do?")
 
@@ -89,6 +128,7 @@ async def main() -> int:
     if err or not result:
         print(f"\nScoring failed: {err}")
         return 1
+    _meter("written", result)
 
     a, b, c = result["answers"][0], result["answers"][1], result["answers"][2]
     show("A · rough English, real substance ", a)
@@ -116,6 +156,7 @@ async def main() -> int:
     scenario_ok = await scenario_gate(key)
     cv_ok = await cv_gate(key)
     bangla_ok = await bangla_written_gate(key)
+    await _report_gate_cost()   # measurement only — spend happened either way
     if written_ok and spoken_ok and scenario_ok and cv_ok and bangla_ok:
         print("\n\033[32mFAIRNESS GATE PASSED (written + spoken + scenario + cv + bangla)\033[0m\n")
         return 0
@@ -161,6 +202,8 @@ async def scenario_gate(key) -> bool:
     if err_a or err_c or not res_a or not res_c:
         print(f"Scoring failed: {err_a or err_c}")
         return False
+    _meter("scenario_a", res_a)
+    _meter("scenario_c", res_c)
     oa, oc = res_a.get("overall", 0), res_c.get("overall", 0)
     print(f"  A · rough English, real diagnostic thinking  overall {oa:>3}/100  {bar(oa)}")
     for d in res_a.get("dimensions", []):
@@ -221,6 +264,7 @@ async def bangla_written_gate(key: str) -> bool:
     if err or not result:
         print(f"\nBangla scoring failed: {err}")
         return False
+    _meter("bangla", result)
     a, b, c = result["answers"][0], result["answers"][1], result["answers"][2]
     show("A · rough Bangla, real substance ", a)
     show("B · fluent Bangla, says nothing  ", b)
@@ -296,6 +340,7 @@ async def cv_gate(key) -> bool:
         if err or not res:
             print(f"\n  {label}: pipeline failed — {err}")
             return False
+        _meter(f"cv_{label}", res)
         results[label] = res
         rep = res.get("report") or {}
         print(f"\n  {label}: overall {res.get('overall_score')}/100 · engine rec {res.get('recommendation')}"
@@ -381,6 +426,7 @@ async def spoken_gate(key) -> bool:
         if err or not res:
             print(f"\n  {label}: scoring failed — {err}")
             return False
+        _meter(f"spoken_{label}", res)
         results[label] = res
 
     show_spoken("A · rough/garbled English, real substance", results["A"])
