@@ -5159,6 +5159,9 @@ async function mcqfReport(appId, jobId){
   html+=`</tbody></table></div>
   <div style="font-size:10.5px;color:var(--t3);margin:.4rem 0 .8rem">Per-question time is neutral behavioral data for your review — fast or slow means nothing on its own, and none of it affects the score.</div>`;
   const act=d.activity||{};
+  // Display-only integrity summary (shared renderer) — computed here in the
+  // modal render and nowhere else; never stored, never in a decision path.
+  html+=SessionRender.integrityHTML(act,{monitor:a.paste_mode==='monitor'});
   html+=`<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:.4rem 0">Activity log <span style="text-transform:none;letter-spacing:0;font-weight:500">— monitored + flagged, never blocked or auto-disqualified; expect false positives</span></div>`;
   if(act.enabled){
     const c=act.counts||{}, du=act.durations||{};
@@ -6898,6 +6901,6 @@ window.addEventListener('resize',()=>{ clearTimeout(_kpiRz); _kpiRz=setTimeout((
 },250); });
 </script>
 <script src="/static/score_core.js"></script>
-<script src="/static/session_render.js?v=4"></script>
+<script src="/static/session_render.js?v=5"></script>
 </body>
 </html>

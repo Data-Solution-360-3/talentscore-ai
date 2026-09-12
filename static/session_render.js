@@ -153,10 +153,81 @@ window.SessionRender = (function(){
 
   // ── Proctoring: coverage timeline + frames strip, honest in every state.
   //    snapsId must be unique per surface (page vs modal). ──
+  // ── SESSION INTEGRITY SIGNALS — a DISPLAY-ONLY summary of the proctoring
+  //    facts rendered beneath it. NEVER stored, never posted anywhere, never
+  //    read by scoring, advancement, or sorting — it exists only inside this
+  //    render call, so no decision path can reach it by construction.
+  //    Weighting (approved 2026-09-12): reliable signals carry the weight
+  //    (tab −6/ev cap −30 · paste family −8/ev cap −30, half in Monitor
+  //    mode · camera-off −1/min cap −20 · refresh/reopen −5/ev cap −10 ·
+  //    share-stop −5/ev cap −10); face-derived signals are HARD-CAPPED at
+  //    −5 total and always labeled soft; inactivity is never deducted
+  //    (thinking is not a violation). No traffic-light colors — the number
+  //    is a summary of the facts, never a verdict on the person. ──
+  function integrityHTML(p, opts){
+    if(!p || !p.enabled) return '';
+    // pre-schema sessions: no flags were stored — never fake a clean score
+    if(p.flags_schema == null && p.flags == null) return '';
+    const monitor = !!(opts && opts.monitor);
+    const c = p.counts||{}, du = p.durations||{};
+    const n = k => +c[k]||0;
+    const dur = t => (t>=60 ? Math.floor(t/60)+'m '+String(Math.round(t%60)).padStart(2,'0')+'s' : Math.round(t)+'s');
+    const rows = [];
+    let total = 0;
+    const ded = (label, facts, pts, cap, soft) => {
+      if(pts <= 0) return;
+      const v = Math.min(cap, Math.round(pts));
+      total += v;
+      rows.push({label, facts, v, soft});
+    };
+    const tabs = n('tab_switch');
+    ded('Tab switches / focus lost',
+        tabs+' event(s)'+(du.tab_away?' · tab hidden '+dur(du.tab_away)+' total':''), tabs*6, 30);
+    const pastes = n('paste')+n('copy')+n('cut');
+    ded('Copy / cut / paste',
+        pastes+' event(s)'+(monitor?' — allowed in Monitor mode (recorded, half weight)':''),
+        pastes*(monitor?4:8), 30);
+    const camSec = +du.camera_off||0;
+    ded('Camera off', camSec?dur(camSec)+' total':n('camera_off')+' event(s)',
+        camSec?Math.floor(camSec/60):n('camera_off')*2, 20);
+    const rr = n('refresh')+n('reopen');
+    ded('Page refresh / reopen', rr+' event(s)', rr*5, 10);
+    const sh = n('share_stopped')+n('partial_share');
+    ded('Screen share stopped / partial', sh+' event(s)', sh*5, 10);
+    const softN = n('no_face')+n('look_away')+n('multi_face');
+    const softDur = +du.look_away||0;
+    const SOFT_LABEL = 'soft signal — high false-positive rate (thinking, reading, lighting, a small room can all cause this); capped at −5 on the number; not evidence, and cannot detect a second device.';
+    ded('Face / look-away / no-face',
+        softN+' event(s)'+(softDur?' · '+dur(softDur)+' total':''), softN*1, 5, true);
+    const score = Math.max(0, 100 - total);
+    // Prominent off-screen flag: HIGH visibility to the human, LOW weight on
+    // the number (the soft cap above still holds). Honest label sits with it.
+    const prominent = (softN >= 3 || softDur >= 60)
+      ? `<div style="background:var(--og,#FDF3E7);border:1.5px solid var(--ob,#F2CFA4);border-radius:10px;padding:.6rem .8rem;margin:.55rem 0;font-size:.85rem;color:var(--t2);line-height:1.6">
+           <b style="font-size:.92rem">⚑ Off-screen / no face detected: ${softN} time(s)${softDur?' · '+dur(softDur)+' total':''}</b> — worth your own look at the frames/timeline below.<br>
+           <span style="font-size:11px;color:var(--t3)">${SOFT_LABEL}</span></div>`
+      : '';
+    const breakdown = rows.length
+      ? rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px">
+          <span>${esc(r.label)} — ${esc(r.facts)}${r.soft?` <i style="color:var(--t3)">· ${SOFT_LABEL}</i>`:''}</span>
+          <b style="white-space:nowrap;font-variant-numeric:tabular-nums">−${r.v}</b></div>`).join('')
+      : `<div style="color:var(--t3)">No flags seen in this session — not proof of honesty (see note below).</div>`;
+    return `<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);margin:.9rem 0 .3rem">Session integrity signals</div>
+      <div style="background:var(--s2,#F7F8F6);border:1px solid var(--border,#E7EAEE);border-radius:var(--r-lg,12px);padding:.75rem .95rem;font-size:.83rem;color:var(--t2);line-height:1.75">
+        <div style="font-size:.95rem;margin-bottom:.35rem">Signal summary: <b style="font-size:1.25rem">${score}</b>/100 <span style="color:var(--t3)">· fewer flags = higher. A summary of the events below — not a judgment of the candidate.</span></div>
+        ${prominent}
+        ${breakdown}
+        <div style="font-size:11px;color:var(--t3);margin-top:.55rem;line-height:1.55">For human review — not a hiring decision, and never part of the candidate&rsquo;s assessment or interview score. Expect false positives: a busy room, a nervous or fidgety candidate, poor lighting, or a shaky camera can raise flags. This cannot detect a second device or phone — a high number is not proof of honesty, and a low number is not proof of cheating. A low number means one thing only: worth a closer human look.</div>
+      </div>`;
+  }
+
   function proctoringHTML(s, snapsId){
     const pr = s.proctoring;
     let html = '';
     if(pr && pr.enabled){
+      // Display-only signal summary sits ABOVE the raw facts it summarizes —
+      // the number never renders without its breakdown.
+      html += integrityHTML(pr, {monitor:false});
       const mmss = t => Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
       // ── Anti-cheat review flags: counts + coverage numbers, honest labels. ──
       const c = pr.counts||{}, du = pr.durations||{};
@@ -227,5 +298,5 @@ window.SessionRender = (function(){
     }catch(_){ wrap.textContent = 'Could not load stored frames.'; }
   }
 
-  return {scoresHTML, statsHTML, costHTML, timingsHTML, transcriptHTML, proctoringHTML, loadSnapshots, esc};
+  return {scoresHTML, statsHTML, costHTML, timingsHTML, transcriptHTML, proctoringHTML, integrityHTML, loadSnapshots, esc};
 })();
