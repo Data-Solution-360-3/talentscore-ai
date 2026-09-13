@@ -376,6 +376,25 @@ def main():
                   st.get("state") == "active" and st.get("assigned") is False,
                   f"got {st.get('state')}/{st.get('assigned')}")
 
+            print("\nKPI insights — own-org only, test rows excluded")
+            r = c.get("/api/kpi-insights", headers=hdr(t_owner_a))
+            body_txt = r.text if r.status_code == 200 else ""
+            check("owner A reads own-org KPI insights", r.status_code == 200
+                  and (r.json().get("n_real") or 0) >= 1, f"got {r.status_code}")
+            check("org B's job never appears in org A's insights",
+                  f"Fixture Job {org_b[-5:]}" not in body_txt)
+            # a test-marked row must vanish from n_real but stay in the DB
+            n_before = r.json().get("n_real")
+            scr_t = mk_screening(org_a, owner_a.inserted_id, is_test=True)
+            r = c.get("/api/kpi-insights", headers=hdr(t_owner_a))
+            check("is_test row excluded from KPI counts",
+                  r.status_code == 200 and r.json().get("n_real") == n_before
+                  and (r.json().get("n_excluded") or 0) >= 1,
+                  f"n_real {r.json().get('n_real')} vs {n_before}")
+            check("is_test row still exists (never deleted)",
+                  dbx.screenings.count_documents(
+                      {"_id": __import__("bson").ObjectId(scr_t)}) == 1)
+
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
                 r = c.get("/api/employees", headers=hdr(tok))

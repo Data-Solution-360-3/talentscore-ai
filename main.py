@@ -6498,6 +6498,170 @@ async def dimension_averages(request: Request):
     return {"dimensions": dims}
 
 
+@app.get("/api/kpi-insights")
+async def kpi_insights(request: Request):
+    """Deeper-analysis KPIs for the caller's OWN org (org from the session —
+    no parameter exists, nothing to point cross-org). REAL candidates only:
+    is_test rows (M1 self-CV rule + M3 admin marking) are excluded from every
+    number here, and each block carries its n so small samples read honestly.
+    Point-in-time analysis — trends stay deferred until enough real history
+    exists (months_of_history says how much there is)."""
+    user = await get_current_user(request)
+    from database import org_match, org_match_field, REAL_ROWS
+    scope = org_match(user["user_id"])
+    real = {**scope, **REAL_ROWS}
+
+    # ── screenings (one projected pass drives funnel/dist/per-job/interview) ──
+    rows = []
+    async for s in db.screenings.find(real, {
+            "overall_score": 1, "overall_combined": 1, "interview_score": 1,
+            "recommendation": 1, "stage": 1, "job_id": 1, "created_at": 1}):
+        rows.append(s)
+    n_real = len(rows)
+    n_excluded = await db.screenings.count_documents({**scope, "is_test": True})
+
+    def ov(s):
+        v = s.get("overall_combined")
+        if v is None:
+            v = s.get("overall_score") or 0
+        return float(v)
+
+    # Score distribution — the same brackets the candidates filter uses.
+    dist = {"80+": 0, "65-80": 0, "48-65": 0, "<48": 0}
+    for s in rows:
+        v = ov(s)
+        dist["80+" if v >= 80 else "65-80" if v >= 65 else "48-65" if v >= 48 else "<48"] += 1
+
+    bands = {"STRONG HIRE": 0, "HIRE": 0, "MAYBE": 0, "REJECT": 0}
+    for s in rows:
+        r = (s.get("recommendation") or "").upper()
+        if r in bands:
+            bands[r] += 1
+
+    shortlisted = sum(1 for s in rows if s.get("stage") in ("shortlisted", "hire"))
+    hired_stage = sum(1 for s in rows if s.get("stage") == "hire")
+    interviewed = sum(1 for s in rows if s.get("interview_score") is not None)
+
+    # ── applications (MCQ funnel head) — real filter can't apply (no CV yet),
+    #    but these are volume counts of the org's own funnel. ──
+    app_scope = org_match_field("user_id", user["user_id"])
+    apps_total = await db.applications.count_documents(app_scope)
+    mcq_rows = [a async for a in db.applications.find(
+        {**app_scope, "mcq_score": {"$ne": None}}, {"mcq_score": 1, "advanced_at": 1})]
+    mcq_taken = len(mcq_rows)
+    mcq_avg = round(sum(a["mcq_score"] for a in mcq_rows) / mcq_taken, 1) if mcq_taken else None
+    mcq_advanced = sum(1 for a in mcq_rows if a.get("advanced_at"))
+
+    # ── interview sessions (completion) + CV↔interview delta from screenings ──
+    iv_scope = org_match_field("user_id", user["user_id"])
+    iv_sessions = await db.interview_sessions.count_documents(iv_scope)
+    iv_completed = await db.interview_sessions.count_documents(
+        {**iv_scope, "status": "completed"})
+    iv_scored = [s for s in rows if s.get("interview_score") is not None
+                 and s.get("overall_score") is not None]
+    iv_avg = (round(sum(float(s["interview_score"]) for s in iv_scored) / len(iv_scored), 1)
+              if iv_scored else None)
+    iv_delta = (round(sum(float(s["interview_score"]) - float(s["overall_score"])
+                          for s in iv_scored) / len(iv_scored), 1)
+                if iv_scored else None)
+
+    # ── per-job depth ──
+    jobs_by_id = {}
+    async for j in db.jobs.find(scope, {"title": 1}):
+        jobs_by_id[str(j["_id"])] = j.get("title") or "Untitled job"
+    per_job = {}
+    for s in rows:
+        jid = str(s.get("job_id") or "")
+        d = per_job.setdefault(jid, {"n": 0, "scores": [], "shortlisted": 0, "interviewed": 0})
+        d["n"] += 1
+        d["scores"].append(ov(s))
+        if s.get("stage") in ("shortlisted", "hire"):
+            d["shortlisted"] += 1
+        if s.get("interview_score") is not None:
+            d["interviewed"] += 1
+    job_rows = []
+    for jid, d in per_job.items():
+        sc = sorted(d["scores"])
+        job_rows.append({
+            "title": jobs_by_id.get(jid, "(no job linked)"),
+            "n": d["n"],
+            "avg": round(sum(sc) / len(sc), 1),
+            "median": round(sc[len(sc) // 2] if len(sc) % 2 else (sc[len(sc)//2 - 1] + sc[len(sc)//2]) / 2, 1),
+            "shortlisted": d["shortlisted"],
+            "interviewed": d["interviewed"],
+        })
+    job_rows.sort(key=lambda r: -r["n"])
+
+    # ── skills gaps (already real-filtered in the helper) ──
+    gaps = await get_skills_gaps_for_user(user["user_id"])
+
+    # ── history: distinct months with real rows + latest consecutive streak ──
+    months = sorted({s["created_at"].strftime("%Y-%m") for s in rows if s.get("created_at")})
+    streak = 0
+    if months:
+        streak = 1
+        for i in range(len(months) - 1, 0, -1):
+            y1, m1 = map(int, months[i].split("-"))
+            y0, m0 = map(int, months[i - 1].split("-"))
+            if (y1 * 12 + m1) - (y0 * 12 + m0) == 1:
+                streak += 1
+            else:
+                break
+
+    return {
+        "n_real": n_real, "n_excluded": n_excluded,
+        "score_dist": dist, "bands": bands,
+        "funnel": {"applications": apps_total, "mcq_taken": mcq_taken,
+                   "mcq_advanced": mcq_advanced, "cv_scored": n_real,
+                   "shortlisted": shortlisted, "interviewed": interviewed,
+                   "hired_stage": hired_stage},
+        "per_job": job_rows[:12],
+        "interviews": {"sessions": iv_sessions, "completed": iv_completed,
+                       "avg_score": iv_avg, "cv_iv_delta": iv_delta,
+                       "scored_pairs": len(iv_scored)},
+        "mcq": {"takers": mcq_taken, "avg_mark": mcq_avg, "advanced": mcq_advanced},
+        "skills_gaps": gaps[:10],
+        "months_of_history": len(months), "consecutive_months": streak,
+        "trends_unlock_at": 3,
+    }
+
+
+@app.post("/api/admin/screenings/{screening_id}/test-flag")
+async def admin_toggle_test_flag(request: Request, screening_id: str):
+    """Super-admin M3 fine-tuning: flip one screening's is_test marker.
+    Display/analytics metadata only — the row itself is untouched."""
+    await require_admin(request)
+    from bson import ObjectId as _OID
+    try:
+        oid = _OID(screening_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Screening not found.")
+    doc = await db.screenings.find_one({"_id": oid}, {"is_test": 1})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Screening not found.")
+    new_val = not bool(doc.get("is_test"))
+    await db.screenings.update_one({"_id": oid}, {"$set": {"is_test": new_val}})
+    return {"success": True, "is_test": new_val}
+
+
+@app.post("/api/admin/orgs/{org_id}/internal")
+async def admin_toggle_org_internal(request: Request, org_id: str):
+    """Super-admin M2: flip an org's internal flag (internal orgs drop out of
+    cross-org platform stats; the org's own dashboards are unaffected)."""
+    await require_admin(request)
+    from bson import ObjectId as _OID
+    try:
+        oid = _OID(org_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    org = await db.orgs.find_one({"_id": oid}, {"internal": 1})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    new_val = not bool(org.get("internal"))
+    await db.orgs.update_one({"_id": oid}, {"$set": {"internal": new_val}})
+    return {"success": True, "internal": new_val}
+
+
 # ─────────────────────────────────────────────────────────────
 # JOBS (tenant-scoped)
 # ─────────────────────────────────────────────────────────────

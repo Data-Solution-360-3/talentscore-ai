@@ -274,7 +274,7 @@ img,video{max-width:100%}
         <div class="stat"><div style="height:2px;background:var(--indigo);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total users</div><div class="stat-val" id="ov-users">—</div><div class="stat-sub">registered companies</div></div>
         <div class="stat"><div style="height:2px;background:var(--orange);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Total screenings</div><div class="stat-val" id="ov-screens">—</div><div class="stat-sub">all time</div></div>
         <div class="stat"><div style="height:2px;background:var(--green);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Active accounts</div><div class="stat-val" id="ov-active">—</div><div class="stat-sub">not suspended</div></div>
-        <div class="stat"><div style="height:2px;background:var(--amber);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Avg overall</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">combined where an interview exists, else CV</div></div>
+        <div class="stat"><div style="height:2px;background:var(--amber);position:absolute;top:0;left:0;right:0;border-radius:2px 2px 0 0"></div><div class="stat-lbl">Avg overall</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">real candidates only — test rows &amp; internal orgs excluded</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="card">
@@ -926,9 +926,9 @@ function renderDashboard(stats){
   document.getElementById('ov-avg').textContent=stats.avg_score||'—';
   document.getElementById('recent-count').textContent=allUsers.length+' total users';
 
-  // Top companies
+  // Top companies — REAL rows only (test rows excluded, same rule as avg/breakdown)
   const compMap={};
-  allScreenings.forEach(s=>{if(s.company)compMap[s.company]=(compMap[s.company]||0)+1;});
+  allScreenings.forEach(s=>{if(s.company&&!s.is_test)compMap[s.company]=(compMap[s.company]||0)+1;});
   const sorted=Object.entries(compMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const max=sorted[0]?.[1]||1;
   document.getElementById('top-companies').innerHTML=sorted.length
@@ -1026,6 +1026,15 @@ async function addUser(){
 }
 
 // ── SCREENINGS ──
+// M3 fine-tuning: flip one row's test marker (analytics metadata only).
+async function toggleTestFlag(id){
+  const r=await fetch('/api/admin/screenings/'+id+'/test-flag',{method:'POST',credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ alert('Failed: '+(d.detail||r.status)); return; }
+  const s=allScreenings.find(x=>x._id===id); if(s) s.is_test=d.is_test;
+  renderScreenings();
+}
+
 function renderScreenings(){
   const q=(document.getElementById('screen-search')?.value||'').toLowerCase();
   const recF=(document.getElementById('screen-filter-rec')?.value||'').toUpperCase();
@@ -1045,8 +1054,9 @@ function renderScreenings(){
     const _ov=ovOf(s);
     const cv=_ov.cv, hasIv=!_ov.pending, iv=_ov.iv, overall=_ov.s;
     const rec=(s.recommendation||'MAYBE').toUpperCase();
-    return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer">
-      <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}</td>
+    return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer${s.is_test?';opacity:.6':''}">
+      <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}
+        <span class="badge ${s.is_test?'b-amber':'b-green'}" style="font-size:8.5px;margin-left:5px;cursor:pointer" title="${s.is_test?'Marked TEST — excluded from all analytics. Click to count as real.':'Counted as REAL in analytics. Click to mark as test data.'}" onclick="event.stopPropagation();toggleTestFlag('${s._id}')">${s.is_test?'TEST':'real'}</span></td>
       <td>${s.company||'—'}</td>
       <td style="font-weight:700;color:${gc(cv)}">${cv}</td>
       <td>${hasIv?`<span style="font-weight:700;color:${gc(iv)}">${iv}</span>`:'<span style="color:var(--t3);font-size:11px">pending</span>'}</td>

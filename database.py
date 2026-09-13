@@ -178,10 +178,30 @@ async def stamp_org(doc: dict) -> dict:
     return doc
 
 
+# ── Test-data exclusion for ANALYTICS (approved 2026-09-15) ──
+# Aggregates count only real candidates: rows stamped is_test (M1 self-CV
+# auto-rule at save time, M3 admin bulk/row marking) are excluded from every
+# metric while staying fully visible in candidate lists. Nothing is deleted.
+REAL_ROWS = {"is_test": {"$ne": True}}
+
+
 async def save_screening(result: dict) -> str:
     doc = {**result, "created_at": datetime.utcnow()}
     doc.pop("_id", None)
     doc = await stamp_org(doc)
+    # M1 auto-rule: a CV whose candidate email belongs to a platform account
+    # in the SAME org is someone testing with their own CV — stamped is_test
+    # so analytics never count it. Metadata only; scoring/storage untouched.
+    try:
+        cand = (((doc.get("parsed_cv") or {}).get("personal") or {}).get("email")
+                or "").strip().lower()
+        if cand and doc.get("org_id") and not doc.get("is_test"):
+            hit = await db.users.find_one(
+                {"email": cand, "org_id": str(doc["org_id"])}, {"_id": 1})
+            if hit:
+                doc["is_test"] = True
+    except Exception:
+        pass
     inserted = await db.screenings.insert_one(doc)
     return str(inserted.inserted_id)
 
@@ -202,7 +222,17 @@ async def get_screening_by_id(screening_id: str) -> dict | None:
 
 
 async def get_screening_stats() -> dict:
+    # REAL candidates only: is_test rows excluded (M1/M3), and every org the
+    # super-admin marked internal (M2) drops out of cross-org platform stats.
+    match = dict(REAL_ROWS)
+    internal_ids = []
+    async for o in db.orgs.find({"internal": True}, {"_id": 1}):
+        internal_ids.append(str(o["_id"]))
+        internal_ids.append(o["_id"])   # both storage forms of the org stamp
+    if internal_ids:
+        match["org_id"] = {"$nin": internal_ids}
     pipeline = [
+        {"$match": match},
         {
             "$group": {
                 "_id": None,
@@ -531,7 +561,7 @@ async def get_screenings_for_user(user_id: str, limit: int = 200) -> list:
 
 async def get_stats_for_user(user_id: str) -> dict:
     pipeline = [
-        {"$match": org_match(user_id)},
+        {"$match": {**org_match(user_id), **REAL_ROWS}},
         {
             "$group": {
                 "_id": None,
@@ -569,7 +599,7 @@ async def get_jobs_for_user(user_id: str) -> list:
 
 async def get_skills_gaps_for_user(user_id: str) -> list:
     pipeline = [
-        {"$match": org_match(user_id)},
+        {"$match": {**org_match(user_id), **REAL_ROWS}},
         {"$unwind": "$critical_gaps"},
         {"$group": {"_id": "$critical_gaps", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
@@ -581,7 +611,7 @@ async def get_skills_gaps_for_user(user_id: str) -> list:
 
 async def get_dimension_averages_for_user(user_id: str) -> list:
     pipeline = [
-        {"$match": org_match(user_id)},
+        {"$match": {**org_match(user_id), **REAL_ROWS}},
         {"$unwind": "$dimensions"},
         {"$group": {
             "_id": "$dimensions.name",
@@ -1786,7 +1816,8 @@ async def get_admin_screenings(limit: int = 100, skip: int = 0) -> tuple[list, i
     true platform total regardless of the page size."""
     proj = {"candidate_name": 1, "company": 1, "overall_score": 1,
             "recommendation": 1, "skills_coverage_pct": 1,
-            "years_experience": 1, "created_at": 1, "user_id": 1}
+            "years_experience": 1, "created_at": 1, "user_id": 1,
+            "is_test": 1}   # so the admin table can label + exclude test rows
     cursor = (db.screenings.find({}, proj)
               .sort("created_at", -1).skip(skip).limit(limit))
     out = []

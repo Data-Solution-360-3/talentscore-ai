@@ -1229,161 +1229,68 @@ img,svg,video{max-width:100%}
   <div class="rd">
   <div id="kpi-body">
     <div class="kpi-head">
-      <div><h2>KPI dashboard</h2><div class="sub">Computed live from your data — hiring and HR together. Small samples are labelled, and a metric with no data says so instead of showing a number.</div></div>
-      <div class="kpi-range">
-        <select id="kpi-preset" onchange="kpiPresetChanged()">
-          <option value="month" selected>This month</option>
-          <option value="quarter">This quarter</option>
-          <option value="year">This year</option>
-          <option value="30">Last 30 days</option>
-          <option value="all">All time</option>
-          <option value="custom">Custom…</option>
-        </select>
-        <span id="kpi-custom" class="hidden">
-          <input type="date" id="kpi-from"> <input type="date" id="kpi-to">
-          <button class="rd-mini" onclick="kpiApplyCustom()">Apply</button>
-        </span>
-        <span id="kpi-rangelbl" style="font-size:11.5px;color:var(--rg-mut);font-weight:600"></span>
+      <div><h2>Hiring insights</h2><div class="sub">Deeper analysis of your REAL pipeline — test rows and self-uploaded CVs are excluded from every number here. Small samples are labelled, an empty metric says so, and trends stay locked until enough real history exists — nothing is ever fabricated.</div></div>
+      <div class="kpi-range"><span id="kpi-real-note" style="font-size:11.5px;color:var(--rg-mut);font-weight:600"></span></div>
+    </div>
+
+    <div class="kpi-sec">Pipeline funnel — where candidates drop off</div>
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Screening funnel</div>
+        <div class="kpi-cs">CV-scored → shortlisted → interviewed → hired. Each step shows conversion from the step before — the stages are your recruiters' decisions, never the AI's.</div>
+        <div id="kpi-funnel2"></div>
+        <div class="kpi-note" id="kpi-funnel2-note"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Apply-link funnel (MCQ head)</div>
+        <div class="kpi-cs">Applications via the public link → MCQ taken → advanced to CV screening. Direct CV uploads skip this head and enter at "CV-scored".</div>
+        <div id="kpi-funnel-mcq"></div>
+        <div class="kpi-note" id="kpi-funnel-mcq-note"></div>
       </div>
     </div>
 
-    <div class="kpi-sec">Hiring &amp; recruitment</div>
+    <div class="kpi-grid2">
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">Score distribution</div>
+        <div class="kpi-cs">Quality of the real pipeline — the same brackets as the candidates filter</div>
+        <div id="kpi-dist"></div>
+      </div>
+      <div class="kpi-chart-card">
+        <div class="kpi-ct">AI recommendation mix</div>
+        <div class="kpi-cs">How the scorer called your real candidates (a human makes every decision)</div>
+        <div id="kpi-bands"></div>
+      </div>
+    </div>
+
+    <div class="kpi-sec">Per-job performance</div>
+    <div class="kpi-chart-card">
+      <div class="kpi-ct">How each role is performing</div>
+      <div class="kpi-cs">Real candidates per job — volume, score quality, and how far they progress</div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Job</th><th>Candidates</th><th>Avg score</th><th>Median</th><th>Shortlisted</th><th>Interviewed</th></tr></thead>
+        <tbody id="kpi-jobs2"><tr><td colspan="6" class="kpi-empty">Loading…</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="kpi-sec">Interviews &amp; MCQ</div>
     <div class="kpi-cards">
-      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open all candidates"><div class="kl">Total applicants</div><div class="kv" id="kpi-applicants">—</div><div class="ks" id="kpi-applicants-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open candidates"><div class="kl">Active candidates</div><div class="kv" id="kpi-activec">—</div><div class="ks" id="kpi-activec-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('jobs')" title="Open jobs"><div class="kl">Open vacancies</div><div class="kv" id="kpi-vac">—</div><div class="ks" id="kpi-vac-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('stage','shortlisted')" title="Show shortlisted candidates"><div class="kl">Shortlisting rate</div><div class="kv" id="kpi-short">—</div><div class="ks" id="kpi-short-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('stage','interview')" title="Show candidates at interview stage"><div class="kl">Interview → hire<span id="kpi-ivh-b"></span></div><div class="kv" id="kpi-ivh">—</div><div class="ks" id="kpi-ivh-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('candidates')" title="Open all candidates"><div class="kl">Hiring conversion<span id="kpi-conv-b"></span></div><div class="kv" id="kpi-conv">—</div><div class="ks" id="kpi-conv-s"></div></div>
-      <div class="kpi-card kpi-click" onclick="kpiDrill('jobs')" title="Open jobs"><div class="kl">Jobs posted<span id="kpi-jobs-b"></span></div><div class="kv" id="kpi-jobs">—</div><div class="ks" id="kpi-jobs-s"></div></div>
-      <div class="kpi-card"><div class="kl">Cost per hire<span id="kpi-cph-b"></span></div><div class="kv" id="kpi-cph">—</div><div class="ks" id="kpi-cph-s"></div></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Offer acceptance rate</div><div class="kv-soon">Coming soon</div><div class="ks">No offer stage exists in the pipeline, so this can’t be measured honestly yet.</div><span class="kpi-soon-pill">needs an Offer stage</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Quality of hire</div><div class="kv-soon">Coming soon</div><div class="ks">Needs post-hire performance data to exist first.</div><span class="kpi-soon-pill">needs Performance module</span></div>
+      <div class="kpi-card"><div class="kl">Interview completion</div><div class="kv" id="kpi-ivc">—</div><div class="ks" id="kpi-ivc-s"></div></div>
+      <div class="kpi-card"><div class="kl">Avg interview score<span id="kpi-iva-b"></span></div><div class="kv" id="kpi-iva">—</div><div class="ks" id="kpi-iva-s"></div></div>
+      <div class="kpi-card"><div class="kl">CV ↔ interview delta<span id="kpi-ivd-b"></span></div><div class="kv" id="kpi-ivd">—</div><div class="ks" id="kpi-ivd-s"></div></div>
+      <div class="kpi-card"><div class="kl">MCQ takers<span id="kpi-mcq-b"></span></div><div class="kv" id="kpi-mcq">—</div><div class="ks" id="kpi-mcq-s"></div></div>
     </div>
 
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Hiring funnel</div>
-        <div class="kpi-cs">Candidates screened in the range, by how far they got. Same definitions as the Pipeline — nothing recomputed.</div>
-        <div id="kpi-funnel"></div>
-        <div class="kpi-note" id="kpi-funnel-note"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Screening volume</div>
-        <div class="kpi-cs" id="kpi-vol-s">CVs screened per period</div>
-        <div id="kpi-vol"></div>
-      </div>
+    <div class="kpi-sec">Skills-gap patterns</div>
+    <div class="kpi-chart-card">
+      <div class="kpi-ct">Most-missed requirements across real candidates</div>
+      <div class="kpi-cs">What your applicant market lacks most, from the scorer's gap analysis — useful for deciding what to train for vs. require</div>
+      <div id="kpi-gaps2"></div>
     </div>
 
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Average score by job</div>
-        <div class="kpi-cs">Which roles attract stronger candidates (0–100, candidates screened in the range)</div>
-        <div id="kpi-scorejob"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Source of hire &amp; live interviews</div>
-        <div class="kpi-cs">Hires in the range by application channel — the channels the system actually tracks — plus AI interview sessions</div>
-        <div id="kpi-source"></div>
-        <div id="kpi-iv" style="margin-top:12px"></div>
-      </div>
-    </div>
-
-    <div class="kpi-sec">Hiring time intelligence</div>
-    <div class="kpi-cards">
-      <div class="kpi-card"><div class="kl">Avg time to hire<span id="kpi-tth-b"></span></div><div class="kv" id="kpi-tth">—</div><div class="ks" id="kpi-tth-s"></div></div>
-      <div class="kpi-card"><div class="kl">Avg time to fill<span id="kpi-ttf-b"></span></div><div class="kv" id="kpi-ttf">—</div><div class="ks" id="kpi-ttf-s"></div></div>
-      <div class="kpi-card"><div class="kl">Hires MTD · QTD · YTD</div><div class="kv" id="kpi-mtd">—</div><div class="ks" id="kpi-mtd-s">Calendar to-date counts, independent of the range filter</div></div>
-      <div class="kpi-card"><div class="kl">Hiring growth<span id="kpi-grow-b"></span></div><div class="kv" id="kpi-grow">—</div><div class="ks" id="kpi-grow-s"></div></div>
-      <div class="kpi-card"><div class="kl">Stuck candidates</div><div class="kv" id="kpi-stuckn">—</div><div class="ks" id="kpi-stuckn-s"></div></div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Hires over time</div>
-        <div class="kpi-cs" id="kpi-hires-cs">Funnel hires per period</div>
-        <div id="kpi-hireschart"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Vacancy aging</div>
-        <div class="kpi-cs">Days each open job has been open — a live snapshot</div>
-        <div id="kpi-vacage"></div>
-      </div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Days to reach current stage</div>
-        <div class="kpi-cs">Avg days from screening until candidates arrived at the stage they hold now. Stages keep no full history — this is the per-stage timing the data honestly supports</div>
-        <div id="kpi-stagedays"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Longest-waiting candidates</div>
-        <div class="kpi-cs">In screening or interview with no stage change for 14+ days</div>
-        <div id="kpi-stuck"></div>
-      </div>
-    </div>
-
-    <div class="kpi-sec">Workforce</div>
-    <div class="kpi-cards">
-      <div class="kpi-card kpi-click" onclick="kpiDrill('employees')" title="Open employees"><div class="kl">Total headcount</div><div class="kv" id="kpi-head">—</div><div class="ks" id="kpi-head-s"></div></div>
-      <div class="kpi-card"><div class="kl">New joiners</div><div class="kv" id="kpi-join">—</div><div class="ks" id="kpi-join-s"></div></div>
-      <div class="kpi-card"><div class="kl">Turnover rate<span id="kpi-turn-b"></span></div><div class="kv" id="kpi-turn">—</div><div class="ks" id="kpi-turn-s"></div></div>
-      <div class="kpi-card"><div class="kl">Retention rate<span id="kpi-ret-b"></span></div><div class="kv" id="kpi-ret">—</div><div class="ks" id="kpi-ret-s"></div></div>
-      <div class="kpi-card"><div class="kl">Headcount growth<span id="kpi-hgrow-b"></span></div><div class="kv" id="kpi-hgrow">—</div><div class="ks" id="kpi-hgrow-s"></div></div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Headcount over time</div>
-        <div class="kpi-cs">Employees on the books at each period end, rebuilt from start/end dates</div>
-        <div id="kpi-headchart"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Headcount by department</div>
-        <div class="kpi-cs">Current active employees — a snapshot, not a range metric</div>
-        <div id="kpi-dept"></div>
-      </div>
-    </div>
-
-    <div class="kpi-sec">Attendance &amp; performance</div>
-    <div class="kpi-cards">
-      <div class="kpi-card"><div class="kl">Attendance rate<span id="kpi-att-b"></span></div><div class="kv" id="kpi-att">—</div><div class="ks" id="kpi-att-s"></div></div>
-      <div class="kpi-card"><div class="kl">Absenteeism rate</div><div class="kv" id="kpi-abs">—</div><div class="ks" id="kpi-abs-s"></div></div>
-      <div class="kpi-card"><div class="kl">Leave days approved</div><div class="kv" id="kpi-leave">—</div><div class="ks" id="kpi-leave-s"></div></div>
-      <div class="kpi-card" id="kpi-perf-card"><div class="kl">Avg performance rating</div><div class="kv">—</div></div>
-      <div class="kpi-card" id="kpi-perfhigh-card"><div class="kl">High performer %</div><div class="kv">—</div></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Training completion</div><div class="kv-soon">Coming soon</div><div class="ks">No training records exist in the system yet.</div><span class="kpi-soon-pill">needs Training module</span></div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Attendance over time</div>
-        <div class="kpi-cs">Marked attendance per day in the range</div>
-        <div id="kpi-attchart"></div>
-        <div class="kpi-legend" id="kpi-attlegend"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Leave utilization</div>
-        <div class="kpi-cs">Approved leave starting in the range, against <b>annual</b> allowances — reads honestly on a year range</div>
-        <div id="kpi-leavechart"></div>
-      </div>
-    </div>
-
-    <div class="kpi-sec">Business HR</div>
-    <div class="kpi-cards">
-      <div class="kpi-card kpi-soon"><div class="kl">Payroll cost</div><div class="kv-soon">Coming soon</div><div class="ks">No salary data is stored yet — deliberately.</div><span class="kpi-soon-pill">needs Payroll module</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Average salary</div><div class="kv-soon">Coming soon</div><div class="ks">Follows payroll data.</div><span class="kpi-soon-pill">needs Payroll module</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Revenue per employee</div><div class="kv-soon">Coming soon</div><div class="ks">Needs revenue input alongside payroll.</div><span class="kpi-soon-pill">needs Payroll module</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">HR cost per employee</div><div class="kv-soon">Coming soon</div><div class="ks">Follows payroll data.</div><span class="kpi-soon-pill">needs Payroll module</span></div>
-      <div class="kpi-card kpi-soon"><div class="kl">Human capital ROI</div><div class="kv-soon">Coming soon</div><div class="ks">Needs payroll and revenue together.</div><span class="kpi-soon-pill">needs Payroll module</span></div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card" style="grid-column:1/-1">
-        <div class="kpi-ct">Definitions &amp; assumptions</div>
-        <div class="kpi-note" id="kpi-defs" style="margin-top:4px"></div>
-      </div>
+    <div class="kpi-sec">Trends</div>
+    <div class="kpi-chart-card kpi-soon" id="kpi-trends-card" style="border-style:dashed">
+      <div class="kpi-ct">Month-over-month trends</div>
+      <div class="kpi-cs" id="kpi-trends-s">Checking your real history…</div>
     </div>
   </div>
   </div>
@@ -6701,108 +6608,102 @@ function payPrintSlip(id){
 // Honesty rules: small samples get a "limited data" pill, empty metrics say
 // "no data yet", estimates are labelled as estimates, and a failed fetch says
 // "couldn't load" — never a silent zero.
-const KPI_COST_CV = 0.054;   // actual, matches the Jobs page cost line
-const KPI_COST_IV = 0.35;    // ESTIMATE per live interview session
-let KPI_RANGE = null;
-
-function kpiPresetRange(p){
-  const now = new Date(); const end = now.toISOString().slice(0,10);
-  const iso = d => d.toISOString().slice(0,10);
-  const pad = n => String(n).padStart(2,'0');
-  if(p==='30'){ return {start: iso(new Date(Date.now()-29*86400000)), end, label:'Last 30 days'}; }
-  if(p==='quarter'){ const q=Math.floor(now.getUTCMonth()/3)*3+1; return {start:`${now.getUTCFullYear()}-${pad(q)}-01`, end, label:'This quarter'}; }
-  if(p==='year'){ return {start:`${now.getUTCFullYear()}-01-01`, end, label:'This year'}; }
-  if(p==='all'){ return {start:'2000-01-01', end, label:'All time'}; }
-  return {start:`${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-01`, end, label:'This month'};
-}
-function kpiPresetChanged(){
-  const p=document.getElementById('kpi-preset').value;
-  const custom=document.getElementById('kpi-custom');
-  if(p==='custom'){ custom.classList.remove('hidden'); return; }
-  custom.classList.add('hidden');
-  KPI_RANGE = kpiPresetRange(p); renderKpi();
-}
-function kpiApplyCustom(){
-  const f=document.getElementById('kpi-from').value, t=document.getElementById('kpi-to').value;
-  if(!f||!t||f>t){ toast('Pick a valid from/to range.'); return; }
-  KPI_RANGE={start:f,end:t,label:'Custom'}; renderKpi();
-}
-
+// ── HIRING INSIGHTS (rebuilt 2026-09-15): point-in-time deeper analysis over
+//    REAL candidates only (/api/kpi-insights excludes is_test rows server-
+//    side, per-org). No trends until enough real history — never fabricated.
 async function renderKpi(){
-  if(!KPI_RANGE) KPI_RANGE = kpiPresetRange('month');
-  const body=document.getElementById('kpi-body');
-  document.getElementById('kpi-rangelbl').textContent = KPI_RANGE.start+' → '+KPI_RANGE.end;
-  body.style.opacity=.55;                      // keep the frame while refetching
-  let api=null;
+  const K=id=>document.getElementById(id);
+  const body=K('kpi-body');
+  body.style.opacity=.55;
+  let d=null;
   try{
-    const r=await fetch(`/api/kpi?start=${KPI_RANGE.start}&end=${KPI_RANGE.end}`);
-    if(r.ok) api=await r.json();
+    const r=await fetch('/api/kpi-insights',{credentials:'include'});
+    if(r.ok) d=await r.json();
   }catch(_){}
   body.style.opacity=1;
-  kpiRenderAll(api);
-}
+  if(!d){ K('kpi-real-note').textContent='Couldn’t load — refresh to retry.'; return; }
 
-// ── shared tooltip (textContent only — labels are data, not markup) ──
-function kpiTipShow(lines,x,y){
-  const t=document.getElementById('kpi-tip'); t.textContent='';
-  lines.forEach((s2,i)=>{ const n=document.createElement(i===0?'b':'div'); n.textContent=s2; t.appendChild(n); });
-  t.style.display='block';
-  const w=t.offsetWidth; let lx=x+14; if(lx+w>window.innerWidth-8) lx=x-w-14;
-  t.style.left=lx+'px'; t.style.top=Math.max(8,y-12)+'px';
-}
-function kpiTipHide(){ const t=document.getElementById('kpi-tip'); if(t) t.style.display='none'; }
+  K('kpi-real-note').textContent=`${d.n_real.toLocaleString()} real candidate(s) · ${d.n_excluded.toLocaleString()} test row(s) excluded from all numbers`;
+  const smallN=(n,thresh)=> n>0&&n<thresh? ` <span class="kpi-lim">n=${n} — more needed for reliable rates</span>`:'';
 
-// ── column chart: single or 2-series stacked, green + neutral, hover per bucket ──
-function kpiColumns(elId, buckets, colors, names){
-  const el=document.getElementById(elId); if(!el) return;
-  if(!buckets.length || !buckets.some(b=>b.vals.some(v=>v>0))){
-    el.innerHTML='<div class="kpi-empty">No data in this range.</div>'; return;
+  // ── Screening funnel with step-to-step conversion ──
+  const f=d.funnel;
+  const steps=[['CV-scored',f.cv_scored],['Shortlisted',f.shortlisted],
+               ['Interviewed',f.interviewed],['Hired (stage)',f.hired_stage]];
+  if(!f.cv_scored){
+    K('kpi-funnel2').innerHTML='<div class="kpi-empty">No real candidates yet — numbers appear as genuine applications come in.</div>';
+    K('kpi-funnel2-note').textContent='';
+  }else{
+    kpiHBars('kpi-funnel2',steps.map(([l,v],i)=>{
+      const prev=i? steps[i-1][1] : null;
+      const conv= prev? (prev>0? Math.round(v/prev*100)+'% of previous' : '') : 'entry point';
+      return {label:l,value:v,display:v,badge:` <span style="color:var(--rg-mut2);font-weight:600">· ${conv}</span>`};
+    }),{max:Math.max(f.cv_scored,1)});
+    K('kpi-funnel2-note').innerHTML=(f.cv_scored<20?`<span class="kpi-lim">n=${f.cv_scored} real candidates — conversion rates firm up with volume</span> `:'')
+      +'“Hired (stage)” is the pipeline column your team sets — the system never hires anyone.';
   }
-  const W=Math.max(280, el.clientWidth||480), H=180, padL=36, padB=20, padT=10;
-  const plotW=W-padL-8, plotH=H-padT-padB;
-  const totals=buckets.map(b=>b.vals.reduce((a,c)=>a+c,0));
-  const rawMax=Math.max(...totals,1);
-  const mag=Math.pow(10,Math.floor(Math.log10(rawMax)));
-  const yMax=[1,2,5,10].map(m=>m*mag).find(m=>m>=rawMax)||rawMax;
-  const step=plotW/buckets.length;
-  const bw=Math.min(24, Math.max(3, step*0.62));
-  let s='<svg width="'+W+'" height="'+H+'" style="display:block;max-width:100%">';
-  [0,.5,1].forEach(f=>{
-    const y=padT+plotH-plotH*f;
-    s+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-4}" y2="${y.toFixed(1)}" stroke="#E6EFE9" stroke-width="1"/>`;
-    s+=`<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" font-size="10" fill="#93A29A" text-anchor="end" font-family="Inter,sans-serif">${Math.round(yMax*f).toLocaleString()}</text>`;
-  });
-  buckets.forEach((b,i)=>{
-    const cx=padL+step*i+step/2;
-    let y=padT+plotH;
-    b.vals.forEach((v,si)=>{
-      const h=(v/yMax)*plotH;
-      if(h>0.5){
-        const top=y-h, r=Math.min(4,h/2);
-        s+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${r.toFixed(1)}" fill="${colors[si]}"/>`;
-        s+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${(y-Math.min(r,h)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.min(r,h).toFixed(1)}" fill="${colors[si]}"/>`;
-        y=top-2;                              // 2px surface gap between stacked segments
-      }
-    });
-  });
-  const lblIdx=new Set([0,buckets.length-1,Math.floor((buckets.length-1)/2)]);
-  buckets.forEach((b,i)=>{ if(lblIdx.has(i)){
-    const cx=padL+step*i+step/2;
-    s+=`<text x="${cx.toFixed(1)}" y="${H-5}" font-size="10" fill="#6B7B72" text-anchor="middle" font-family="Inter,sans-serif">${b.label}</text>`;
-  }});
-  buckets.forEach((b,i)=>{ s+=`<rect x="${(padL+step*i).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${H}" fill="transparent" data-i="${i}"/>`; });
-  s+='</svg>';
-  el.innerHTML=s;
-  const svg=el.querySelector('svg');
-  svg.addEventListener('pointermove',e=>{
-    const t=e.target.closest('rect[data-i]'); if(!t){ kpiTipHide(); return; }
-    const b=buckets[+t.dataset.i];
-    kpiTipShow([b.tip||b.label, ...b.vals.map((v,si)=>(names&&names[si]?names[si]+': ':'')+v.toLocaleString())], e.clientX, e.clientY);
-  });
-  svg.addEventListener('pointerleave',kpiTipHide);
+
+  // ── Apply-link / MCQ head ──
+  const msteps=[['Applications',f.applications],['MCQ taken',f.mcq_taken],['Advanced to CV',f.mcq_advanced]];
+  if(!f.applications){
+    K('kpi-funnel-mcq').innerHTML='<div class="kpi-empty">No public-link applications yet.</div>';
+    K('kpi-funnel-mcq-note').textContent='';
+  }else{
+    kpiHBars('kpi-funnel-mcq',msteps.map(([l,v],i)=>{
+      const prev=i? msteps[i-1][1] : null;
+      const conv= prev&&prev>0? Math.round(v/prev*100)+'% of previous' : (i?'':'entry point');
+      return {label:l,value:v,display:v,badge:` <span style="color:var(--rg-mut2);font-weight:600">· ${conv}</span>`};
+    }),{max:Math.max(f.applications,1)});
+    K('kpi-funnel-mcq-note').innerHTML= f.applications<20? `<span class="kpi-lim">n=${f.applications} applications — early days for this funnel</span>`:'';
+  }
+
+  // ── Score distribution + recommendation mix ──
+  const distOrder=[['80+','#16A34A'],['65-80','#65A30D'],['48-65','#D97706'],['<48','#93A29A']];
+  kpiHBars('kpi-dist',distOrder.map(([k,c])=>({label:k+' score',value:d.score_dist[k]||0,display:d.score_dist[k]||0,color:c})),
+    {empty:'No real candidates scored yet.'});
+  const bandC={'STRONG HIRE':'#16A34A','HIRE':'#22d3ee','MAYBE':'#D97706','REJECT':'#93A29A'};
+  kpiHBars('kpi-bands',Object.entries(d.bands).map(([k,v])=>({label:k,value:v,display:v,color:bandC[k]})),
+    {empty:'No real candidates scored yet.'});
+
+  // ── Per-job table ──
+  K('kpi-jobs2').innerHTML=(d.per_job||[]).length
+    ? d.per_job.map(j=>`<tr>
+        <td style="font-weight:600">${escapeHtml(j.title)}</td>
+        <td>${j.n}${j.n<5?' <span class="kpi-lim">small</span>':''}</td>
+        <td style="font-weight:800;color:${gc(j.avg)}">${j.avg}</td>
+        <td>${j.median}</td>
+        <td>${j.shortlisted}${j.n?` <span style="color:var(--rg-mut2);font-size:10.5px">(${Math.round(j.shortlisted/j.n*100)}%)</span>`:''}</td>
+        <td>${j.interviewed}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="kpi-empty">No real candidates linked to jobs yet.</td></tr>';
+
+  // ── Interview & MCQ cards ──
+  const iv=d.interviews;
+  K('kpi-ivc').textContent= iv.sessions? Math.round(iv.completed/iv.sessions*100)+'%' : '—';
+  K('kpi-ivc-s').textContent= iv.sessions? `${iv.completed} completed of ${iv.sessions} session(s)` : 'No live interview sessions yet';
+  K('kpi-iva').textContent= iv.avg_score!=null? iv.avg_score : '—';
+  K('kpi-iva-s').textContent= iv.avg_score!=null? `Across ${iv.scored_pairs} scored interview(s), 0–100` : 'No scored interviews yet';
+  K('kpi-iva-b').innerHTML=smallN(iv.scored_pairs,10);
+  K('kpi-ivd').textContent= iv.cv_iv_delta!=null? (iv.cv_iv_delta>0?'+':'')+iv.cv_iv_delta : '—';
+  K('kpi-ivd-s').textContent= iv.cv_iv_delta!=null
+    ? (iv.cv_iv_delta>=0?'Candidates interview better than their CV suggests':'Interviews score below the CV — CVs may oversell')
+    : 'Needs candidates with both a CV score and an interview score';
+  K('kpi-ivd-b').innerHTML=smallN(iv.scored_pairs,10);
+  K('kpi-mcq').textContent= d.mcq.takers||'—';
+  K('kpi-mcq-s').textContent= d.mcq.takers? `Avg mark ${d.mcq.avg_mark} · ${d.mcq.advanced} advanced to CV screening` : 'No MCQ tests completed yet';
+  K('kpi-mcq-b').innerHTML=smallN(d.mcq.takers,10);
+
+  // ── Skills gaps ──
+  kpiHBars('kpi-gaps2',(d.skills_gaps||[]).map(g=>({label:g.skill,value:g.count,display:g.count})),
+    {empty:'No gap data from real candidates yet.'});
+
+  // ── Trends: locked until the data honestly supports them ──
+  const need=d.trends_unlock_at, have=d.consecutive_months;
+  K('kpi-trends-s').innerHTML= have>=need
+    ? `You now have ${have} consecutive month(s) of real data — trend charts are ready to be built. Ask TopCandidate to enable them.`
+    : `Locked — month-over-month needs <b>${need} consecutive months</b> of real data to mean anything. You have <b>${d.months_of_history} month(s)</b> of real history (${have} consecutive). No chart is shown until then; we never fabricate a trend.`;
 }
 
-// ── horizontal bars, single hue; opts.max fixes the scale (e.g. scores vs 100) ──
 function kpiHBars(elId, rows, opts){
   const el=document.getElementById(elId); if(!el) return;
   if(!rows.length){ el.innerHTML='<div class="kpi-empty">'+((opts&&opts.empty)||'No data in this range.')+'</div>'; return; }
@@ -6810,385 +6711,11 @@ function kpiHBars(elId, rows, opts){
   el.innerHTML=rows.map(r=>`
     <div class="kpi-hrow">
       <div class="kpi-hlbl" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</div>
-      <div class="kpi-htrack"><div class="kpi-hfill" style="width:${Math.min(100,Math.max(r.value>0?2:0,r.value/max*100)).toFixed(1)}%"></div></div>
+      <div class="kpi-htrack"><div class="kpi-hfill" style="width:${Math.min(100,Math.max(r.value>0?2:0,r.value/max*100)).toFixed(1)}%${r.color?';background:'+r.color:''}"></div></div>
       <div class="kpi-hval">${escapeHtml(String(r.display!=null?r.display:r.value))}${r.badge||''}</div>
     </div>`).join('');
 }
 
-// ── date bucketing: day ≤35d, week ≤170d, month beyond; all-time clamps to first datum ──
-function kBucketKey(d,mode){
-  if(mode==='day') return d;
-  if(mode==='month') return d.slice(0,7);
-  const dt=new Date(d+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()-((dt.getUTCDay()+6)%7));
-  return dt.toISOString().slice(0,10);
-}
-function kpiMakeBuckets(dates){
-  let s2=KPI_RANGE.start; const e=KPI_RANGE.end;
-  if(s2==='2000-01-01'){ const ds=dates.filter(Boolean).sort(); s2=ds.length?ds[0]:e; }
-  const spanDays=Math.max(1,Math.round((new Date(e+'T00:00:00Z')-new Date(s2+'T00:00:00Z'))/86400000)+1);
-  const mode= spanDays<=35?'day': spanDays<=170?'week':'month';
-  const counts={};
-  dates.forEach(d=>{ if(d&&d>=s2&&d<=e){ const k=kBucketKey(d,mode); counts[k]=(counts[k]||0)+1; } });
-  const keys=[];
-  if(mode==='month'){
-    let [y,m]=s2.split('-').map(Number); const pe=e.split('-').map(Number);
-    while((y<pe[0]||(y===pe[0]&&m<=pe[1])) && keys.length<240){ keys.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
-  }else{
-    const d=new Date(s2+'T00:00:00Z'); const end=new Date(e+'T00:00:00Z'); const seen=new Set();
-    while(d<=end && keys.length<400){ const k=kBucketKey(d.toISOString().slice(0,10),mode); if(!seen.has(k)){seen.add(k);keys.push(k);} d.setUTCDate(d.getUTCDate()+1); }
-  }
-  return {mode, buckets: keys.map(k=>({k, label: mode==='month'?k:k.slice(5), tip:(mode==='week'?'Week of ':'')+k, vals:[counts[k]||0]}))};
-}
-
-function kpiBadge(elId,n,thresh){
-  const b=document.getElementById(elId); if(!b) return;
-  if(n===0) b.innerHTML=' <span class="kpi-zero">no data yet</span>';
-  else if(n<thresh) b.innerHTML=` <span class="kpi-lim">limited data · n=${n}</span>`;
-  else b.innerHTML='';
-}
-function kpiFmtMoney(v){ return '$'+(v>=100?Math.round(v).toLocaleString():v.toFixed(2)); }
-
-// End date of a bucket key, for level-series (headcount at period end).
-function kpiBucketEnd(k,mode){
-  if(mode==='day') return k;
-  if(mode==='week'){ const d=new Date(k+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+6); return d.toISOString().slice(0,10); }
-  const p=k.split('-').map(Number); return new Date(Date.UTC(p[0],p[1],0)).toISOString().slice(0,10);
-}
-
-function kpiRenderAll(api){
-  const K=id=>document.getElementById(id);
-  const today=new Date().toISOString().slice(0,10);
-  const rows=allResults.filter(r=>{ const d=(r.created_at||'').slice(0,10); return d && d>=KPI_RANGE.start && d<=KPI_RANGE.end; });
-  const s=CandidateStats.compute(rows);
-  const apiOk=!!api;
-  const iv=(api&&api.interviews)||{sessions:0,completed:0};
-  const hiresAll=(api&&api.hires)||[];
-  const hiresR=hiresAll.filter(h=>h.hired_at&&h.hired_at>=KPI_RANGE.start&&h.hired_at<=KPI_RANGE.end);
-  const hiredN=hiresR.length;
-  const noload=(v,sub,badge)=>{K(v).textContent='—';K(sub).textContent='Couldn’t load from the server — refresh to retry';if(badge)K(badge).innerHTML='';};
-
-  // ═══ A. Hiring & recruitment ═══
-  K('kpi-applicants').textContent=s.total.toLocaleString();
-  K('kpi-applicants-s').textContent= s.hidden? `${s.hidden} duplicate(s) merged — dedupe follows the Dashboard toggle` : 'Candidates screened in this range';
-
-  const activeC=s.byStage.screening+s.byStage.interview+s.byStage.shortlisted+s.byStage.hire;   // active = in the pipeline, not rejected (Hire included — owner's call)
-  K('kpi-activec').textContent=activeC.toLocaleString();
-  K('kpi-activec-s').textContent= s.total? `In the pipeline (not rejected) · ${s.reviewNeeded} awaiting first review` : 'No candidates in this range';
-
-  const openJobs=(allJobs||[]).filter(j=>(j.status||'active')==='active');
-  K('kpi-vac').textContent=openJobs.length;
-  K('kpi-vac-s').textContent= openJobs.length? 'Jobs with status Active — live snapshot, not range-scoped' : 'No active jobs right now';
-
-  // Jobs posted (all-time, tenant-scoped) from the server; active from live jobs.
-  const jobsInfo=(api&&api.jobs)||null;
-  if(jobsInfo){
-    K('kpi-jobs').textContent=jobsInfo.total;
-    K('kpi-jobs-s').textContent=`${jobsInfo.active} active · ${jobsInfo.total-jobsInfo.active} closed/paused — all roles you’ve posted`;
-  }else{
-    K('kpi-jobs').textContent=(allJobs||[]).length||'—';
-    K('kpi-jobs-s').textContent='Active jobs (couldn’t load the all-time total)';
-  }
-
-  K('kpi-short').textContent= s.total? Math.round(s.byStage.shortlisted/s.total*100)+'%' : '—';
-  K('kpi-short-s').textContent= s.total? `${s.byStage.shortlisted} shortlisted of ${s.total} screened — your decision, not the AI’s` : 'No candidates screened in this range';
-
-  const ivPlus=s.byStage.interview+s.byStage.shortlisted+s.byStage.hire;   // at interview or beyond
-  if(!apiOk){ noload('kpi-ivh','kpi-ivh-s','kpi-ivh-b'); }
-  else if(ivPlus>0&&hiredN<=ivPlus){
-    K('kpi-ivh').textContent=Math.round(hiredN/ivPlus*100)+'%';
-    K('kpi-ivh-s').textContent=`${hiredN} hired of ${ivPlus} at interview stage or beyond — a proxy; stages don’t keep history`;
-    kpiBadge('kpi-ivh-b',ivPlus,5);
-  }else{
-    K('kpi-ivh').textContent='—';
-    K('kpi-ivh-s').textContent= ivPlus===0? 'No candidates at interview stage in this range' : 'More hires than staged candidates — stage data too sparse to rate';
-    K('kpi-ivh-b').innerHTML='';
-  }
-
-  if(!apiOk){ noload('kpi-conv','kpi-conv-s','kpi-conv-b'); }
-  else if(s.total>0){
-    K('kpi-conv').textContent=Math.round(hiredN/s.total*100)+'%';
-    K('kpi-conv-s').textContent=`${hiredN} hire(s) from ${s.total} applicant(s) in the range`;
-    kpiBadge('kpi-conv-b',hiredN,3);
-  }else{ K('kpi-conv').textContent='—'; K('kpi-conv-s').textContent='No applicants in this range'; K('kpi-conv-b').innerHTML=''; }
-
-  if(!apiOk){ noload('kpi-cph','kpi-cph-s','kpi-cph-b'); }
-  else{
-    const cost=s.total*KPI_COST_CV + iv.sessions*KPI_COST_IV;
-    if(hiredN>0){
-      K('kpi-cph').textContent=kpiFmtMoney(cost/hiredN);
-      K('kpi-cph-s').textContent=`${s.total} CV × $${KPI_COST_CV} + ${iv.sessions} interview × $${KPI_COST_IV} (est.) ÷ ${hiredN} hire(s)`;
-    }else{
-      K('kpi-cph').textContent='—';
-      K('kpi-cph-s').textContent=`Screening + interview spend in range ≈ ${kpiFmtMoney(cost)} · no hires to divide by`;
-    }
-    kpiBadge('kpi-cph-b',hiredN,3);
-  }
-
-  // Funnel — CandidateStats verbatim; Hired from the same hires list as every other card.
-  const fEl=K('kpi-funnel');
-  if(!s.total){
-    fEl.innerHTML='<div class="kpi-empty">No candidates screened in this range.</div>';
-    K('kpi-funnel-note').textContent='';
-  }else{
-    fEl.innerHTML='<div id="kpi-funbars"></div><div class="kpi-funrow" id="kpi-funcells"></div>';
-    const st=s.byStage;
-    kpiHBars('kpi-funbars',[
-      {label:'Screening',value:st.screening,display:st.screening},
-      {label:'Interview',value:st.interview,display:st.interview},
-      {label:'Shortlisted',value:st.shortlisted,display:st.shortlisted},
-      {label:'Hire (stage)',value:st.hire,display:st.hire},
-      {label:'Rejected',value:st.rejected,display:st.rejected},
-    ]);
-    const pct=(a,b)=> b>0? Math.round(a/b*100)+'% of applied' : '';
-    K('kpi-funcells').innerHTML=[
-      ['Applied / screened',s.total,'',"kpiDrill('candidates')"],
-      ['Interview +',ivPlus,pct(ivPlus,s.total),"kpiDrill('stage','interview')"],
-      ['Shortlisted',st.shortlisted,pct(st.shortlisted,s.total),"kpiDrill('stage','shortlisted')"],
-      ['Hired',apiOk?hiredN:'—',apiOk?pct(hiredN,s.total):'',"kpiDrill('employees')"],
-    ].map(c=>`<div class="kpi-funcell kpi-click" onclick="${c[3]}" title="Open these records"><div class="kpi-funn">${c[1]}</div><div class="kpi-funl">${c[0]}</div><div class="kpi-funp">${c[2]}</div></div>`).join('');
-    K('kpi-funnel-note').textContent='“Interview +” counts candidates currently at interview stage or beyond (shortlisted or Hire). Stages are current positions, not a history. “Hire (stage)” is the manual pipeline column; “Hired” counts employee records created from the funnel in the range — they may have been screened earlier.';
-  }
-
-  const bk=kpiMakeBuckets(s.rows.map(r=>(r.created_at||'').slice(0,10)));
-  K('kpi-vol-s').textContent='CVs screened per '+bk.mode+(s.hidden?' (deduped)':'');
-  kpiColumns('kpi-vol',bk.buckets,['#16A34A']);
-
-  const byJob={};
-  s.rows.forEach(r=>{ const j=r.job_id||''; (byJob[j]=byJob[j]||{n:0,sum:0}); byJob[j].n++; byJob[j].sum+=ovOf(r).s; });
-  const jrows=Object.entries(byJob).map(([jid,v])=>{
-    const j=(allJobs||[]).find(x=>x._id===jid);
-    const avg=Math.round(v.sum/v.n);
-    return {label:(j&&j.title)||'(no job)',value:avg,display:avg,
-            badge: v.n<5? ` <span class="kpi-lim">n=${v.n}</span>` : ` <span style="color:var(--rg-mut2);font-weight:600">· ${v.n} CVs</span>`};
-  }).sort((a,b)=>b.value-a.value).slice(0,8);
-  kpiHBars('kpi-scorejob',jrows,{max:100,empty:'No screened candidates in this range.'});
-
-  // Source of hire (the channels the system tracks) + live interview trio.
-  if(!apiOk){ K('kpi-source').innerHTML='<div class="kpi-empty">Couldn’t load.</div>'; K('kpi-iv').innerHTML=''; }
-  else{
-    const bySrc={};
-    hiresR.forEach(h=>{ const c=h.channel||'Unlinked'; bySrc[c]=(bySrc[c]||0)+1; });
-    kpiHBars('kpi-source',Object.entries(bySrc).map(p=>({label:p[0],value:p[1],display:p[1]})).sort((a,b)=>b.value-a.value),
-      {empty:'No hires in this range yet — nothing to attribute.'});
-    K('kpi-iv').innerHTML= iv.sessions? `<div class="kpi-funrow" style="grid-template-columns:repeat(3,1fr)">
-      <div class="kpi-funcell"><div class="kpi-funn">${iv.sessions}</div><div class="kpi-funl">Sessions</div></div>
-      <div class="kpi-funcell"><div class="kpi-funn">${iv.completed}</div><div class="kpi-funl">Completed</div></div>
-      <div class="kpi-funcell"><div class="kpi-funn">${Math.round(iv.completed/iv.sessions*100)}%</div><div class="kpi-funl">Completion</div></div></div>`
-      : '<div class="kpi-empty">No live interview sessions in this range.</div>';
-  }
-
-  // ═══ B. Hiring time intelligence ═══
-  if(!apiOk){
-    noload('kpi-tth','kpi-tth-s','kpi-tth-b'); noload('kpi-ttf','kpi-ttf-s','kpi-ttf-b');
-    noload('kpi-mtd','kpi-mtd-s'); noload('kpi-grow','kpi-grow-s','kpi-grow-b');
-    K('kpi-hireschart').innerHTML='<div class="kpi-empty">Couldn’t load.</div>';
-  }else{
-    const tthDays=hiresR.filter(h=>h.screened_at).map(h=>Math.max(0,(new Date(h.hired_at)-new Date(h.screened_at))/86400000));
-    if(tthDays.length){
-      K('kpi-tth').textContent=(tthDays.reduce((a,c)=>a+c,0)/tthDays.length).toFixed(1)+'d';
-      K('kpi-tth-s').textContent=`CV screened → hired · measured on ${tthDays.length} of ${hiredN} hire(s) in range`;
-    }else{ K('kpi-tth').textContent='—'; K('kpi-tth-s').textContent= hiredN? 'Hire(s) exist but none link back to a screening' : 'No hires in this range yet'; }
-    kpiBadge('kpi-tth-b',tthDays.length,5);
-
-    const firstHire={};
-    hiresAll.forEach(h=>{ if(h.job_id&&h.hired_at&&(!firstHire[h.job_id]||h.hired_at<firstHire[h.job_id])) firstHire[h.job_id]=h.hired_at; });
-    const fills=[];
-    Object.entries(firstHire).forEach(([jid,d])=>{
-      if(d<KPI_RANGE.start||d>KPI_RANGE.end) return;
-      const j=(allJobs||[]).find(x=>x._id===jid);
-      const posted=j&&(j.created_at||'').slice(0,10);
-      if(posted&&posted<=d) fills.push((new Date(d)-new Date(posted))/86400000);
-    });
-    if(fills.length){
-      K('kpi-ttf').textContent=(fills.reduce((a,c)=>a+c,0)/fills.length).toFixed(1)+'d';
-      K('kpi-ttf-s').textContent=`Job posted → its first hire · ${fills.length} job(s) filled in range`;
-    }else{ K('kpi-ttf').textContent='—'; K('kpi-ttf-s').textContent='No job reached its first hire in this range'; }
-    kpiBadge('kpi-ttf-b',fills.length,3);
-
-    const y=today.slice(0,4), mo=today.slice(0,7);
-    const qm=Math.floor((+today.slice(5,7)-1)/3)*3+1;
-    const cnt=from=>hiresAll.filter(h=>h.hired_at&&h.hired_at>=from&&h.hired_at<=today).length;
-    K('kpi-mtd').textContent=`${cnt(mo+'-01')} · ${cnt(`${y}-${String(qm).padStart(2,'0')}-01`)} · ${cnt(y+'-01-01')}`;
-
-    const prevM=(()=>{const d=new Date(mo+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);})();
-    const inM=k=>hiresAll.filter(h=>h.hired_at&&h.hired_at.slice(0,7)===k).length;
-    const inY=k=>hiresAll.filter(h=>h.hired_at&&h.hired_at.slice(0,4)===k).length;
-    const cm=inM(mo), pm=inM(prevM), cy=inY(y), py=inY(String(+y-1));
-    const delta=(a,b)=> b>0? (a>=b?'+':'')+Math.round((a-b)/b*100)+'%' : (a>0?'new':'—');
-    K('kpi-grow').textContent=`${delta(cm,pm)} MoM`;
-    K('kpi-grow-s').textContent=`${cm} this month vs ${pm} last · YoY ${delta(cy,py)} (${cy} vs ${py})`;
-    K('kpi-grow-b').innerHTML=(hiresAll.length<5||pm===0)? ' <span class="kpi-lim">limited history</span>':'';
-
-    const hb=kpiMakeBuckets(hiresAll.map(h=>h.hired_at).filter(d=>d&&d>=KPI_RANGE.start&&d<=KPI_RANGE.end));
-    K('kpi-hires-cs').textContent='Funnel hires per '+hb.mode;
-    kpiColumns('kpi-hireschart',hb.buckets,['#16A34A']);
-  }
-
-  // Vacancy aging — client-side live snapshot of open jobs.
-  kpiHBars('kpi-vacage',openJobs.map(j=>{
-    const posted=(j.created_at||'').slice(0,10);
-    const days=posted? Math.max(0,Math.round((new Date(today)-new Date(posted))/86400000)) : 0;
-    return {label:j.title||'Untitled job',value:days,display:days+'d'};
-  }).sort((a,b)=>b.value-a.value).slice(0,8),{empty:'No open jobs right now.'});
-
-  // Days to reach current stage — only what stage_updated_at honestly supports.
-  const stAgg={screening:[],interview:[],shortlisted:[],hire:[],rejected:[]};
-  s.rows.forEach(r=>{
-    if(!r.stage_updated_at||!r.created_at) return;
-    const d=(new Date(r.stage_updated_at)-new Date(r.created_at))/86400000;
-    if(d>=0) stAgg[CandidateStats.stageOf(r)].push(d);
-  });
-  kpiHBars('kpi-stagedays',Object.entries(stAgg).filter(p=>p[1].length).map(p=>{
-    const avg=p[1].reduce((a,c)=>a+c,0)/p[1].length;
-    return {label:p[0][0].toUpperCase()+p[0].slice(1),value:+avg.toFixed(1),display:avg.toFixed(1)+'d',
-            badge: p[1].length<5? ` <span class="kpi-lim">n=${p[1].length}</span>` : ` <span style="color:var(--rg-mut2);font-weight:600">· ${p[1].length}</span>`};
-  }),{empty:'No candidate has been moved between stages in this range yet.'});
-
-  // Stuck candidates — whole-pipeline snapshot, deliberately range-independent.
-  const stuck=CandidateStats.compute(allResults).rows
-    .filter(r=>['screening','interview'].includes(CandidateStats.stageOf(r)))
-    .map(r=>{ const ref=r.stage_updated_at||r.created_at;
-      return {r,days: ref? Math.round((new Date(today)-new Date(ref))/86400000) : null}; })
-    .filter(x=>x.days!=null&&x.days>=14).sort((a,b)=>b.days-a.days);
-  K('kpi-stuckn').textContent=stuck.length;
-  K('kpi-stuckn-s').textContent='14+ days without a stage change — live snapshot of the whole pipeline';
-  K('kpi-stuck').innerHTML= stuck.length?
-    stuck.slice(0,7).map(x=>`<div class="kpi-stuckrow"><b>${escapeHtml(x.r.candidate_name||'Unknown')}</b><span class="st">${escapeHtml(CandidateStats.stageOf(x.r))}</span><span class="dd">${x.days}d</span></div>`).join('')
-    : '<div class="kpi-empty">Nobody is stuck — every pipeline candidate was touched in the last 14 days.</div>';
-
-  // ═══ C. Workforce ═══
-  if(!apiOk){
-    noload('kpi-head','kpi-head-s'); noload('kpi-join','kpi-join-s');
-    noload('kpi-turn','kpi-turn-s','kpi-turn-b'); noload('kpi-ret','kpi-ret-s','kpi-ret-b');
-    noload('kpi-hgrow','kpi-hgrow-s','kpi-hgrow-b');
-    noload('kpi-att','kpi-att-s','kpi-att-b'); noload('kpi-abs','kpi-abs-s'); noload('kpi-leave','kpi-leave-s');
-    ['kpi-dept','kpi-headchart','kpi-attchart','kpi-leavechart','kpi-perf-card','kpi-perfhigh-card'].forEach(id=>K(id).innerHTML='<div class="kpi-empty">Couldn’t load.</div>');
-    K('kpi-attlegend').innerHTML=''; K('kpi-defs').innerHTML=''; return;
-  }
-  const hr=api.hr, tl=hr.timeline||[];
-  const countAt=d=>tl.filter(t=>t.start<=d&&(!t.end||t.end>d)).length;
-  const hc=hr.headcount;
-  K('kpi-head').textContent=hc.total;
-  K('kpi-head-s').textContent= hc.total? `${hc.on_leave} on leave now · current snapshot` : 'No employees yet — add them on the Employees page';
-
-  const joiners=tl.filter(t=>t.start>=KPI_RANGE.start&&t.start<=KPI_RANGE.end).length;
-  K('kpi-join').textContent=joiners;
-  K('kpi-join-s').textContent= joiners? 'Employee start dates falling in the range' : 'No start dates in this range';
-
-  const terms=tl.filter(t=>t.end&&t.end>=KPI_RANGE.start&&t.end<=KPI_RANGE.end).length;
-  const headStart=countAt(KPI_RANGE.start), headEnd=countAt(KPI_RANGE.end);
-  const avgHead=(headStart+headEnd)/2;
-  if(avgHead>0){
-    K('kpi-turn').textContent=Math.round(terms/avgHead*100)+'%';
-    K('kpi-turn-s').textContent=`${terms} termination(s) ÷ average headcount ${avgHead.toFixed(1)} over the range`;
-  }else{ K('kpi-turn').textContent='—'; K('kpi-turn-s').textContent='No employees on the books in this range'; }
-  K('kpi-turn-b').innerHTML= avgHead>0&&avgHead<5? ' <span class="kpi-lim">limited data · few employees</span>'
-    : (avgHead>0&&terms===0? ' <span class="kpi-zero">no terminations yet</span>':'');
-
-  if(headStart>0){
-    const kept=tl.filter(t=>t.start<=KPI_RANGE.start&&(!t.end||t.end>KPI_RANGE.end)).length;
-    K('kpi-ret').textContent=Math.round(kept/headStart*100)+'%';
-    K('kpi-ret-s').textContent=`${kept} of ${headStart} employed at range start still on the books at range end`;
-    K('kpi-ret-b').innerHTML= headStart<5? ' <span class="kpi-lim">limited data · few employees</span>':'';
-  }else{ K('kpi-ret').textContent='—'; K('kpi-ret-s').textContent='Nobody was on the books at the start of this range'; K('kpi-ret-b').innerHTML=''; }
-
-  if(headStart>0){
-    const g=Math.round((headEnd-headStart)/headStart*100);
-    K('kpi-hgrow').textContent=(g>=0?'+':'')+g+'%';
-    K('kpi-hgrow-s').textContent=`${headStart} at range start → ${headEnd} at range end`;
-    K('kpi-hgrow-b').innerHTML= headStart<5? ' <span class="kpi-lim">limited data</span>':'';
-  }else if(headEnd>0){
-    K('kpi-hgrow').textContent='new';
-    K('kpi-hgrow-s').textContent=`0 at range start → ${headEnd} at range end`;
-    K('kpi-hgrow-b').innerHTML=' <span class="kpi-lim">limited data</span>';
-  }else{ K('kpi-hgrow').textContent='—'; K('kpi-hgrow-s').textContent='No employees in this range'; K('kpi-hgrow-b').innerHTML=''; }
-
-  const hbk=kpiMakeBuckets(tl.map(t=>t.start));
-  kpiColumns('kpi-headchart',
-    hbk.buckets.map(b=>({label:b.label,tip:'Headcount at end of '+(b.tip||b.label),vals:[countAt(kpiBucketEnd(b.k,hbk.mode))]})),
-    ['#16A34A']);
-  kpiHBars('kpi-dept',hc.by_department.slice(0,8).map(d=>({label:d.department,value:d.n,display:d.n})),{empty:'No active employees yet.'});
-
-  // ═══ D. Attendance ═══
-  const at=hr.attendance, A=at.totals, denom=A.present+A.absent;
-  if(denom>0){
-    K('kpi-att').textContent=Math.round(A.present/denom*100)+'%';
-    K('kpi-att-s').textContent=`${A.present} present / ${A.absent} absent over ${at.marked_days} marked day(s) — leave & holiday excluded`;
-    K('kpi-abs').textContent=Math.round(A.absent/denom*100)+'%';
-    K('kpi-abs-s').textContent='Absent ÷ (present + absent) — the complement of attendance';
-  }else{
-    K('kpi-att').textContent='—'; K('kpi-att-s').textContent='No attendance marked in this range';
-    K('kpi-abs').textContent='—'; K('kpi-abs-s').textContent='No attendance marked in this range';
-  }
-  kpiBadge('kpi-att-b',at.marked_days,5);
-  let attDays=at.days;
-  if(attDays.length>35){
-    const wk={};
-    attDays.forEach(d=>{ const k=kBucketKey(d.date,'week'); (wk[k]=wk[k]||{present:0,absent:0}); wk[k].present+=d.present; wk[k].absent+=d.absent; });
-    attDays=Object.keys(wk).sort().map(k=>({date:'Week of '+k,label:k.slice(5),present:wk[k].present,absent:wk[k].absent}));
-  }
-  kpiColumns('kpi-attchart',
-    attDays.map(d=>({label:(d.label||d.date.slice(5)),tip:d.date,vals:[d.present,d.absent]})),
-    ['#16A34A','#93A29A'],['Present','Absent']);
-  K('kpi-attlegend').innerHTML= attDays.length?
-    '<span><i style="background:#16A34A"></i>Present</span><span><i style="background:#93A29A"></i>Absent</span>':'';
-
-  const lv=hr.leave, totLeave=lv.by_type.reduce((a,c)=>a+c.days,0);
-  K('kpi-leave').textContent=totLeave;
-  K('kpi-leave-s').textContent= totLeave?
-    lv.by_type.map(t=>`${t.days} ${t.type}`).join(' · ')+` · ${lv.pending_now} pending now`:
-    (lv.pending_now? `${lv.pending_now} request(s) pending approval` : 'No approved leave starting in this range');
-  const alw=lv.allowance_totals, byT={};
-  lv.by_type.forEach(t=>byT[t.type]=t.days);
-  if(alw.annual+alw.sick>0 || totLeave>0){
-    K('kpi-leavechart').innerHTML=['annual','sick','unpaid'].map(tp=>{
-      const taken=byT[tp]||0;
-      const allow= tp==='annual'?alw.annual : tp==='sick'?alw.sick : null;
-      const over= allow!=null && taken>allow;
-      const pctW= allow? Math.min(100,taken/allow*100) : 0;
-      return `<div style="margin:11px 0">
-        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text)">
-          <span style="text-transform:capitalize">${tp}</span>
-          <span>${taken}${allow!=null?' / '+allow+' days':' days — no allowance applies'}${over?' <span class="kpi-lim">over allowance</span>':''}</span></div>
-        ${allow!=null?`<div class="kpi-meter" style="margin-top:5px"><i style="width:${pctW.toFixed(1)}%${over?';background:#D97706':''}"></i></div>`:''}
-      </div>`;
-    }).join('');
-  }else K('kpi-leavechart').innerHTML='<div class="kpi-empty">No employees with allowances yet.</div>';
-
-  // Performance KPIs — live once a 360° cycle has CLOSED; honest until then.
-  const perf=hr.performance;
-  if(perf){
-    K('kpi-perf-card').innerHTML=`<div class="kl">Avg performance rating${perf.n<3?' <span class="kpi-lim">limited data · n='+perf.n+'</span>':''}</div>
-      <div class="kv">${perf.avg_headline}</div>
-      <div class="ks">${escapeHtml(perf.cycle_name||'')} · ${perf.n} employee(s) reviewed · weighted 360° headline</div>`;
-    K('kpi-perfhigh-card').innerHTML=`<div class="kl">High performer %</div>
-      <div class="kv">${perf.high_pct}%</div>
-      <div class="ks">Headline ≥ ${perf.high_threshold} in ${escapeHtml(perf.cycle_name||'')}</div>`;
-  }else{
-    K('kpi-perf-card').innerHTML=`<div class="kl" style="color:var(--rg-mut2)">Avg performance rating</div>
-      <div class="kv-soon">Not yet</div>
-      <div class="ks">No closed 360° cycle — run one in HRM → Performance, close it, and this goes live.</div>`;
-    K('kpi-perfhigh-card').innerHTML=`<div class="kl" style="color:var(--rg-mut2)">High performer %</div>
-      <div class="kv-soon">Not yet</div>
-      <div class="ks">Follows the first closed 360° cycle.</div>`;
-  }
-
-  // ═══ Definitions ═══
-  K('kpi-defs').innerHTML=
-    `<b>Applicants / funnel</b> — CandidateStats over the same screening rows as every other page${DEDUPE_ON?', duplicates merged (Dashboard toggle)':''}. Stages are current positions, not a history.<br>`+
-    `<b>Hired</b> — employee records with source “hired”, identical to the Dashboard’s Hired card. One all-time hires list drives conversion, cost, time-to-hire, MTD/QTD/YTD and growth, so they always agree.<br>`+
-    `<b>Time to hire</b> — CV screened → employee record created. <b>Time to fill</b> — job posted → its first hire (open jobs only; closed jobs aren’t listed).<br>`+
-    `<b>Cost per hire</b> — $${KPI_COST_CV}/CV (actual) + $${KPI_COST_IV}/live interview (<b>estimate</b>) ÷ hires in range.<br>`+
-    `<b>Source of hire</b> — the application channel the system records (apply link vs direct upload) — never a guessed marketing source.<br>`+
-    `<b>Turnover</b> — terminations ÷ average headcount over the range. <b>Retention</b> — of those employed at range start, the share still on the books at range end. <b>Headcount over time</b> — rebuilt from start/end dates.<br>`+
-    `<b>Attendance / absenteeism</b> — present and absent only; leave and holiday excluded from both sides.<br>`+
-    `<b>Coming soon cards</b> — the metric’s data source doesn’t exist yet (offer stage, performance, training, payroll). They’re roadmap, not measurements — no number is invented.<br>`+
-    `Records without a timestamp are excluded from ranged views. Every number is tenant-scoped and queried fresh on each load.`;
-}
-let _kpiRz=null;
-window.addEventListener('resize',()=>{ clearTimeout(_kpiRz); _kpiRz=setTimeout(()=>{
-  if(document.getElementById('page-kpi')?.classList.contains('act')) renderKpi();
-},250); });
 </script>
 <script src="/static/score_core.js"></script>
 <script src="/static/session_render.js?v=5"></script>
