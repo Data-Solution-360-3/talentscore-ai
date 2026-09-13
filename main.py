@@ -6795,14 +6795,20 @@ PLAN_TIERS = {
         "price_bdt": 6000,  "applicants_mo": 2000, "interviews_mo": 0, "jobs": None},
     "screening_scale":   {"family": "screening", "label": "Screening Scale",
         "price_bdt": 18000, "applicants_mo": 6000, "interviews_mo": 0, "jobs": None},
+    # Interview caps FINAL 2026-09-14: interviews cost ~Tk38 each, so the
+    # monthly cap is the margin protection — a FIRM block at launch time
+    # (reserve fails -> no interview starts; qualified candidates queue and
+    # auto-recover after upgrade/reset, never lost).
     "full_starter": {"family": "full", "label": "Starter",
-        "price_bdt": 2000,  "applicants_mo": 500,  "interviews_mo": 25,  "jobs": 3},
+        "price_bdt": 2000,  "applicants_mo": 500,  "interviews_mo": 20,  "jobs": 3},
     "full_growth":  {"family": "full", "label": "Growth",
-        "price_bdt": 5500,  "applicants_mo": 2000, "interviews_mo": 100, "jobs": 15},
+        "price_bdt": 5500,  "applicants_mo": 2000, "interviews_mo": 60,  "jobs": 15},
     "full_scale":   {"family": "full", "label": "Scale",
-        "price_bdt": 15000, "applicants_mo": 6000, "interviews_mo": 300, "jobs": None},
+        "price_bdt": 15000, "applicants_mo": 6000, "interviews_mo": 180, "jobs": None},
+    # Enterprise: 150/mo DEFAULT cap (firm, like every tier) — a bigger deal
+    # gets a higher number via the plan_catalog override doc, deliberately.
     "enterprise":   {"family": "any", "label": "Enterprise",
-        "price_bdt": None, "applicants_mo": None, "interviews_mo": None, "jobs": None},
+        "price_bdt": None, "applicants_mo": None, "interviews_mo": 150, "jobs": None},
 }
 
 _UNASSIGNED_PLAN = {"assigned": False, "tier_key": None,
