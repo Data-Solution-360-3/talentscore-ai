@@ -526,6 +526,22 @@ def _strip_cost_fields(doc, is_admin: bool):
     return doc
 
 
+def _org_fence(user_org_id) -> dict:
+    """M2 defense-in-depth (2026-09-14): an org filter for the WRITE itself,
+    matching both storage forms of the org stamp (str and ObjectId) so a
+    correctly-scoped update behaves identically while a cross-org one
+    matches nothing."""
+    s = str(user_org_id or "")
+    forms: list = [s]
+    try:
+        from bson import ObjectId as _O
+        if _O.is_valid(s):
+            forms.append(_O(s))
+    except Exception:
+        pass
+    return {"org_id": {"$in": forms}}
+
+
 async def _is_admin_fresh(user: dict) -> bool:
     """Cross-org admin bypasses read the role FRESH from the DB — never the
     (up to 30-day-old) JWT claim — so a demoted admin loses cross-tenant
@@ -1613,9 +1629,14 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if not await _is_admin_fresh(user) and _org_denied(doc, user):
+    _admin = await _is_admin_fresh(user)
+    if not _admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
-    await delete_screening(screening_id)
+    # M2: for non-admins the DELETE itself is org-fenced (second layer);
+    # org-less legacy rows keep the bare path.
+    await delete_screening(screening_id,
+                           org_id=(None if _admin or not doc.get("org_id")
+                                   else str(user.get("org_id") or "")))
     return {"deleted": True}
 
 
@@ -2104,8 +2125,14 @@ async def update_screening_stage(
     is_admin = bool(db_user and db_user.get("role") == "admin")
     if not is_admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
+    # M2 (2026-09-14): the update itself is org-fenced for non-admins — even
+    # a future forgotten route check cannot cross-org write. Org-less legacy
+    # rows keep the bare-_id path (behavior unchanged).
+    _flt = {"_id": oid}
+    if not is_admin and doc.get("org_id"):
+        _flt.update(_org_fence(user.get("org_id")))
     await mongodb.screenings.update_one(
-        {"_id": oid},
+        _flt,
         {"$set": {
             "stage": stage,
             "stage_updated_at": _dt.utcnow(),
@@ -3401,7 +3428,8 @@ async def score_live_session(session_id: str):
                 sid = app_doc and app_doc.get("screening_id")
                 if sid:
                     scr = await db.screenings.find_one(
-                        {"_id": _OID(str(sid))}, {"overall_score": 1, "interview_status": 1})
+                        {"_id": _OID(str(sid))},
+                        {"overall_score": 1, "interview_status": 1, "org_id": 1})
                     if scr is not None:
                         incoming = sess.get("status") or "abandoned"
                         existing = scr.get("interview_status")
@@ -3415,7 +3443,12 @@ async def score_live_session(session_id: str):
                             if len(spoken_only) < 6:
                                 iv_flag = (f"Spoken transcript has only {len(spoken_only)} turns — "
                                            "the interview score rests on very little conversation")
-                            await db.screenings.update_one({"_id": scr["_id"]}, {"$set": {
+                            # M2 tripwire: fence on the doc's OWN org stamp —
+                            # exact form, so the write-back can never miss.
+                            await db.screenings.update_one(
+                                {"_id": scr["_id"],
+                                 **({"org_id": scr["org_id"]} if scr.get("org_id") else {})},
+                                {"$set": {
                                 "interview_score": interview_score,
                                 "interview_parts": interview_parts,
                                 "interview_session_id": session_id,
@@ -6965,8 +6998,11 @@ async def delete_job_endpoint(request: Request, job_id: str):
     user = await get_current_user(request)
     # Ownership BEFORE deletion — without this, any authenticated account
     # could delete any tenant's job by guessing its id.
-    await owned_job(job_id, user)
-    deleted = await delete_job(job_id)
+    _job = await owned_job(job_id, user)
+    # M2: the delete itself is org-fenced with the job's own stamp (second
+    # layer; org-less legacy rows keep the bare path).
+    deleted = await delete_job(job_id, org_id=(str(_job.get("org_id"))
+                                               if isinstance(_job, dict) and _job.get("org_id") else None))
     if not deleted:
         raise HTTPException(status_code=404, detail="Job not found.")
     return {"deleted": True}

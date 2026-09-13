@@ -171,11 +171,52 @@ async def org_of_user(user_id) -> str | None:
     return None
 
 
+_QUARANTINE_CACHE: dict = {}
+
+
+async def _quarantine_org_id() -> str | None:
+    """The __quarantine__ org's id (cached; created if it ever goes missing).
+    Where tenant rows land when their owner has no org — scoped and safe,
+    never floating unowned."""
+    if _QUARANTINE_CACHE.get("id"):
+        return _QUARANTINE_CACHE["id"]
+    try:
+        o = await db.orgs.find_one({"name": "__quarantine__"}, {"_id": 1})
+        if not o:
+            r = await db.orgs.insert_one({
+                "name": "__quarantine__", "owner_user_id": "",
+                "created_at": datetime.utcnow(), "legacy_uncapped": True,
+                "note": "auto-recreated by stamp_org fail-closed (M3)"})
+            o = {"_id": r.inserted_id}
+        _QUARANTINE_CACHE["id"] = str(o["_id"])
+        return _QUARANTINE_CACHE["id"]
+    except Exception as e:
+        print(f"[TENANCY] CRITICAL: quarantine org unresolvable: {e}")
+        return None
+
+
 async def stamp_org(doc: dict) -> dict:
-    """Add org_id to a tenant doc from its own user_id (no-op if present)."""
+    """Add org_id to a tenant doc from its own user_id (no-op if present).
+
+    FAIL-CLOSED (M3, 2026-09-14): a doc whose user_id resolves to NO org is
+    a tenant row about to be written unscoped — it is stamped into the
+    __quarantine__ org and logged CRITICAL instead. Docs with no user_id at
+    all (platform rows, e.g. demo-request leads) are untouched, as before."""
     if "org_id" not in doc:
-        oid = await org_of_user(doc.get("user_id"))
-        if oid:
+        uid = doc.get("user_id")
+        if uid:
+            oid = await org_of_user(uid)
+            if not oid:
+                qid = await _quarantine_org_id()
+                if qid:
+                    doc["org_id"] = qid
+                    print(f"[TENANCY] CRITICAL: user {uid} resolves to no org — "
+                          f"row QUARANTINED (keys={sorted(doc.keys())[:8]})")
+                else:
+                    print(f"[TENANCY] CRITICAL: user {uid} resolves to no org and "
+                          f"quarantine unavailable — row written UNSCOPED "
+                          f"(keys={sorted(doc.keys())[:8]})")
+                return doc
             doc["org_id"] = oid
     return doc
 
@@ -287,8 +328,15 @@ async def get_dimension_averages() -> list:
              "count": r["count"]} for r in results]
 
 
-async def delete_screening(screening_id: str) -> bool:
-    result = await db.screenings.delete_one({"_id": ObjectId(screening_id)})
+async def delete_screening(screening_id: str, org_id: str | None = None) -> bool:
+    flt: dict = {"_id": ObjectId(screening_id)}
+    if org_id:
+        # M2 (2026-09-14): org-fenced delete — both storage forms of the stamp.
+        forms: list = [str(org_id)]
+        if ObjectId.is_valid(str(org_id)):
+            forms.append(ObjectId(str(org_id)))
+        flt["org_id"] = {"$in": forms}
+    result = await db.screenings.delete_one(flt)
     return result.deleted_count > 0
 
 
@@ -346,11 +394,15 @@ async def get_all_jobs() -> list:
     return jobs
 
 
-async def delete_job(job_id: str) -> bool:
-    result = await db.jobs.update_one(
-        {"_id": ObjectId(job_id)},
-        {"$set": {"active": False}}
-    )
+async def delete_job(job_id: str, org_id: str | None = None) -> bool:
+    flt: dict = {"_id": ObjectId(job_id)}
+    if org_id:
+        # M2 (2026-09-14): org-fenced — both storage forms of the stamp.
+        forms: list = [str(org_id)]
+        if ObjectId.is_valid(str(org_id)):
+            forms.append(ObjectId(str(org_id)))
+        flt["org_id"] = {"$in": forms}
+    result = await db.jobs.update_one(flt, {"$set": {"active": False}})
     return result.modified_count > 0
 
 
