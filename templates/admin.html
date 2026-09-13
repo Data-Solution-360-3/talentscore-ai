@@ -304,6 +304,23 @@ img,video{max-width:100%}
         <div class="page-hd"><h1>Usage &amp; Billing</h1><p>Usage &amp; cost summary — an estimate of usage × current rates. <b>Not an invoice.</b></p></div>
         <button class="btn btn-ghost btn-sm" onclick="loadBilling()">↻ Refresh</button>
       </div>
+      <!-- ── PENDING PAYMENT VERIFICATIONS — the manual-payment queue.
+           A plan activates ONLY from Approve here (or manual assignment). -->
+      <div class="card" style="margin-bottom:12px;border-color:#F3C77F">
+        <div class="card-hd"><div class="card-title">🧾 Pending payment verifications</div>
+          <span class="card-sub" id="mpq-count"></span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Submitted</th><th>Company</th><th>Plan requested</th><th>Period</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Note</th><th>Actions</th></tr></thead>
+            <tbody id="mpq-tbl"><tr><td colspan="9" class="tbl-empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:11px;color:var(--t3,#6B7280);margin-top:8px;line-height:1.5">
+          Verify the transaction ID against the bank/wallet statement, then <b>Approve</b> — the org's plan
+          activates/extends for the paid period (stacks on remaining days). <b>Reject</b> asks for a reason the client sees.
+        </div>
+        <div id="mpq-decided" style="margin-top:10px"></div>
+      </div>
       <div class="card" style="margin-bottom:12px">
         <div class="card-hd"><div class="card-title">Per-unit rates (Taka)</div>
           <span class="card-sub">MCQ test taken · CV scored · interview completed — stored exactly (integer paisa)</span></div>
@@ -634,7 +651,63 @@ function nav(id){
 //    come preformatted from the server's integer-paisa math; this JS never
 //    does arithmetic on Taka amounts. ──
 let _blRates=null, _blUsage=null;
+// ── Manual-payment verification queue ──
+async function loadPayQueue(){
+  const tb=document.getElementById('mpq-tbl'); if(!tb) return;
+  let d;
+  try{
+    const r=await tFetch('/api/admin/manual-payments');
+    if(!r.ok) throw new Error('load failed');
+    d=await r.json();
+  }catch(e){ tb.innerHTML='<tr><td colspan="9" class="tbl-empty" style="color:#f43f5e">Failed to load <button class="btn btn-xs" onclick="loadPayQueue()">Retry</button></td></tr>'; return; }
+  const fmt=s=>{ try{ return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(_){ return s||''; } };
+  const cnt=document.getElementById('mpq-count');
+  if(cnt) cnt.textContent=(d.pending||[]).length ? (d.pending.length+' awaiting your verification') : 'Queue clear';
+  tb.innerHTML=(d.pending||[]).length ? d.pending.map(p=>`<tr>
+    <td style="font-size:11px;color:var(--t3,#6B7280)">${fmt(p.created_at)}</td>
+    <td style="font-weight:700">${escBl(p.company||p.org&&p.org.name||p.email)}</td>
+    <td>${escBl(p.plan_label||p.plan_id)}</td>
+    <td>${p.period==='annual'?'Annual':'Monthly'}</td>
+    <td style="font-weight:700">৳${escBl(p.amount)}</td>
+    <td>${escBl(p.payment_method)}</td>
+    <td style="font-family:monospace;font-size:11.5px">${escBl(p.transaction_id)}</td>
+    <td style="font-size:11px;color:var(--t3,#6B7280);max-width:160px">${escBl(p.note||'—')}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-xs" style="background:rgba(99,153,34,.12);color:#476B15;border:1px solid rgba(99,153,34,.3)" onclick="mpqApprove('${p._id}','${escBl(p.plan_label||p.plan_id)}','${escBl(p.company||'')}')">✓ Approve</button>
+      <button class="btn btn-xs" style="background:rgba(220,38,38,.08);color:#B4232C;border:1px solid rgba(220,38,38,.25)" onclick="mpqReject('${p._id}')">✕ Reject</button>
+    </td></tr>`).join('')
+    : '<tr><td colspan="9" class="tbl-empty">No payments awaiting verification 🎉</td></tr>';
+  const dec=document.getElementById('mpq-decided');
+  if(dec) dec.innerHTML=(d.decided||[]).length
+    ? '<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3,#6B7280);margin-bottom:5px">Recent decisions (audit)</div>'
+      +d.decided.map(p=>`<div style="font-size:11.5px;padding:4px 0;border-bottom:1px solid var(--border,#E5E7EB);color:var(--t2,#4B5563)">
+        ${p.status==='approved'?'<b style="color:#476B15">✓ approved</b>':'<b style="color:#B4232C">✕ rejected</b>'}
+        · ${fmt(p.approved_at||p.rejected_at||p.created_at)} · <b>${escBl(p.company||p.email)}</b> · ${escBl(p.plan_label||p.plan_id)} · ৳${escBl(p.amount)} · txn ${escBl(p.transaction_id)}
+        ${p.status==='approved'&&p.paid_until_after?' · paid until '+fmt(p.paid_until_after):''}
+        ${p.status==='rejected'&&p.reject_reason?' · reason: '+escBl(p.reject_reason):''}
+      </div>`).join('')
+    : '';
+}
+async function mpqApprove(id,label,company){
+  if(!confirm('Approve this payment?\n\n'+company+' → '+label+'\n\nOnly approve after matching the transaction ID against the bank/wallet statement. This activates/extends the plan immediately.')) return;
+  const r=await fetch('/api/admin/manual-payments/'+id+'/approve',{method:'POST',credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  alert(r.ok ? (d.message||'Approved — plan active.') : ('Failed: '+(d.detail||r.status)));
+  loadPayQueue();
+}
+async function mpqReject(id){
+  const reason=prompt('Reason for rejection (the client sees this and can resubmit):');
+  if(reason===null) return;
+  if(!reason.trim()){ alert('A reason is required.'); return; }
+  const fd=new FormData(); fd.append('reason',reason.trim());
+  const r=await fetch('/api/admin/manual-payments/'+id+'/reject',{method:'POST',body:fd,credentials:'include'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) alert('Failed: '+(d.detail||r.status));
+  loadPayQueue();
+}
+
 async function loadBilling(){
+  loadPayQueue();
   try{
     const [r1,r2]=await Promise.all([tFetch('/api/admin/billing/rates'),tFetch('/api/admin/billing/usage')]);
     if(!r1.ok||!r2.ok) throw new Error('load failed');

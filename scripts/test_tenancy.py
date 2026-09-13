@@ -306,6 +306,76 @@ def main():
             check("owner A cannot set payment details (super-admin only)",
                   r.status_code == 403, f"got {r.status_code}")
 
+            print("\nManual payments — owner-only submit, own-org visibility, admin-only queue")
+            pay_data = {"plan_id": "screening_starter", "payment_method": "bkash",
+                        "transaction_id": "TNCGATE-TXN-1", "amount": "1000",
+                        "period": "monthly"}
+            r = c.post("/api/payments/manual", headers=hdr(t_view_a), data=pay_data)
+            check("viewer A cannot submit a payment", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.post("/api/payments/manual", headers=hdr(t_rec_a), data=pay_data)
+            check("recruiter A cannot submit a payment (owner-only)",
+                  r.status_code == 403, f"got {r.status_code}")
+            r = c.post("/api/payments/manual", headers=hdr(t_owner_a),
+                       data={**pay_data, "plan_id": "not_a_real_tier"})
+            check("unknown tier refused (400)", r.status_code == 400,
+                  f"got {r.status_code}")
+            r = c.post("/api/payments/manual", headers=hdr(t_owner_a), data=pay_data)
+            check("owner A submits a payment", r.status_code == 200,
+                  f"got {r.status_code}")
+            r = c.get("/api/payments/mine", headers=hdr(t_owner_a))
+            check("owner A sees own submission", r.status_code == 200
+                  and "TNCGATE-TXN-1" in r.text, f"got {r.status_code}")
+            r = c.get("/api/payments/mine", headers=hdr(t_owner_b))
+            check("owner B does NOT see org A's submission", r.status_code == 200
+                  and "TNCGATE-TXN-1" not in r.text, f"got {r.status_code}")
+            r = c.get("/api/payments/mine", headers=hdr(t_view_a))
+            check("viewer A cannot read payment submissions", r.status_code == 403,
+                  f"got {r.status_code}")
+            for name, tok in (("owner A", t_owner_a), ("recruiter A", t_rec_a),
+                              ("viewer A", t_view_a)):
+                r = c.get("/api/admin/manual-payments", headers=hdr(tok))
+                check(f"{name} cannot read the verification queue",
+                      r.status_code == 403, f"got {r.status_code}")
+            r = c.post("/api/admin/manual-payments/000000000000000000000000/approve",
+                       headers=hdr(t_owner_a))
+            check("owner A cannot approve a payment", r.status_code == 403,
+                  f"got {r.status_code}")
+            r = c.post("/api/admin/manual-payments/000000000000000000000000/reject",
+                       headers=hdr(t_owner_a), data={"reason": "x"})
+            check("owner A cannot reject a payment", r.status_code == 403,
+                  f"got {r.status_code}")
+
+            print("\nPlan payment states — active/grace/paused computed from paid_until")
+            from datetime import timedelta as _tdx
+            from bson import ObjectId as _OIDX
+            def set_paid_until(dtv):
+                dbx.orgs.update_one({"_id": _OIDX(org_a)}, {"$set": {"plan": {
+                    "tier": "screening_starter", "family": "screening",
+                    "status": "active", "paid_until": dtv}}})
+            set_paid_until(datetime.utcnow() + _tdx(days=10))
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
+            st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
+            check("future paid_until -> state active", st.get("state") == "active",
+                  f"got {st.get('state')}")
+            set_paid_until(datetime.utcnow() - _tdx(days=1))
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
+            st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
+            check("1 day past -> state grace with days left",
+                  st.get("state") == "grace" and 1 <= int(st.get("grace_days_left") or 0) <= 4,
+                  f"got {st.get('state')}/{st.get('grace_days_left')}")
+            set_paid_until(datetime.utcnow() - _tdx(days=10))
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
+            st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
+            check("10 days past -> state paused", st.get("state") == "paused",
+                  f"got {st.get('state')}")
+            dbx.orgs.update_one({"_id": _OIDX(org_a)}, {"$unset": {"plan": ""}})
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
+            st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
+            check("no tier -> Legacy stays active (never gated)",
+                  st.get("state") == "active" and st.get("assigned") is False,
+                  f"got {st.get('state')}/{st.get('assigned')}")
+
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):
                 r = c.get("/api/employees", headers=hdr(tok))
@@ -385,6 +455,7 @@ def main():
         dbx.jobs.delete_many({"fixture": MARK})
         dbx.applications.delete_many({"email": {"$regex": MARK}})
         dbx.team_invites.delete_many({"email": {"$regex": MARK}})
+        dbx.manual_payments.delete_many({"email": {"$regex": MARK}})
         dbx.email_history.delete_many({"screening_id": {"$in": [scr_a, scr_b]}})
         for coll in ("applications", "application_files", "interview_sessions",
                      "live_interviews", "proctor_snapshots",

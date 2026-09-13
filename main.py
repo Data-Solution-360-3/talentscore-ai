@@ -995,6 +995,10 @@ async def batch_screen_endpoint(
     # with the exact numbers (nothing partially screened, nothing lost). ──
     _org_id = str(user.get("org_id") or "")
     _plan = await _org_plan(_org_id)
+    # Payment-due gate: past the grace window, NEW usage pauses (batch refused
+    # whole, nothing partially screened); grace itself never blocks.
+    if _plan.get("state") == "paused":
+        raise HTTPException(status_code=402, detail=_PLAN_PAUSED_MSG)
     if _org_id:
         from database import reserve_org_monthly_bulk, get_org_monthly_usage
         if not await reserve_org_monthly_bulk(_org_id, "scr", len(files),
@@ -4359,8 +4363,15 @@ async def public_apply_submit(
     # the approved MCQ test; screening happens only when the recruiter
     # advances the top N. Jobs with the filter OFF never enter this branch —
     # their flow below is byte-identical to before.
+    # Payment-due gate (paused only — grace never blocks): the application is
+    # STORED and safe, but starts no new billable work (no MCQ, no scoring).
+    # Response shape is identical to the capped path — the candidate is never
+    # told; everything runs when the org's payment is approved.
+    _plan = await _org_plan(str(job.get("org_id") or ""))
+    _paused = _plan.get("state") == "paused"
+
     _mf = job.get("mcq_filter") or {}
-    if _mf.get("enabled") and ((_mf.get("approved") or {}).get("questions")):
+    if not _paused and _mf.get("enabled") and ((_mf.get("approved") or {}).get("questions")):
         await db.applications.update_one(
             {"_id": __import__("bson").ObjectId(application_id)},
             {"$set": {"status": "held", "funnel": "mcq"}},
@@ -4370,9 +4381,11 @@ async def public_apply_submit(
 
     # The reservation happens here, before anything is queued. If it fails the
     # application is kept and simply isn't scored — the candidate is never told.
-    _plan = await _org_plan(str(job.get("org_id") or ""))
-    ok, blocked_by = await reserve_screening_slot(job_id, str(job.get("org_id") or ""),
-                                                  _plan["applicants_mo"])
+    if _paused:
+        ok, blocked_by = False, "payment_due"
+    else:
+        ok, blocked_by = await reserve_screening_slot(job_id, str(job.get("org_id") or ""),
+                                                      _plan["applicants_mo"])
     if ok:
         background.add_task(score_application, application_id)
     else:
@@ -4825,6 +4838,8 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
             raise HTTPException(status_code=409,
                                 detail="Candidate is not held (or has no MCQ score).")
         _plan = await _org_plan(str(job.get("org_id") or ""))
+        if _plan.get("state") == "paused":
+            raise HTTPException(status_code=402, detail=_PLAN_PAUSED_MSG)
         ok, blocked_by = await reserve_screening_slot(str(job["_id"]),
                                                       str(job.get("org_id") or ""),
                                                       _plan["applicants_mo"])
@@ -4854,6 +4869,8 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
     advanced, capped_by = 0, None
     from bson import ObjectId as _OID
     _plan = await _org_plan(str(job.get("org_id") or ""))
+    if _plan.get("state") == "paused":
+        raise HTTPException(status_code=402, detail=_PLAN_PAUSED_MSG)
     for a in held[:n]:
         ok, blocked_by = await reserve_screening_slot(str(job["_id"]),
                                                       str(job.get("org_id") or ""),
@@ -6827,7 +6844,31 @@ PLAN_TIERS = {
 _UNASSIGNED_PLAN = {"assigned": False, "tier_key": None,
                     "label": "Legacy — no plan limits", "family": "any",
                     "applicants_mo": None, "interviews_mo": None, "jobs": None,
-                    "interviews_allowed": True}
+                    "interviews_allowed": True,
+                    "state": "active", "paid_until": None, "grace_days_left": None}
+
+# Manual-payment billing (approved 2026-09-14): a plan is paid up to
+# plan.paid_until. Past that date it gets a GRACE window (usage still works,
+# client sees "payment due — X days left"), then it is PAUSED: new usage is
+# gated, data untouched, everything restored the moment a payment is approved.
+# Orgs with no assigned tier (Legacy) and tiers assigned before this build
+# (no paid_until) are never gated.
+_PLAN_GRACE_DAYS = 4
+
+_PLAN_PAUSED_MSG = ("Payment due — your plan is paused. Pay manually and submit "
+                    "the transaction ID on Plan & Billing to continue; your data "
+                    "and candidates are safe and nothing is lost.")
+
+
+def _add_months(d: "_dt", n: int) -> "_dt":
+    """Calendar-month addition (Jan 31 + 1mo = Feb 28/29) — billing periods
+    follow the calendar, not a lossy 30-day approximation."""
+    y, m = d.year, d.month - 1 + n
+    y += m // 12
+    m = m % 12 + 1
+    leap = y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)
+    dim = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+    return d.replace(year=y, month=m, day=min(d.day, dim))
 
 
 async def _plan_catalog() -> dict:
@@ -6857,17 +6898,33 @@ async def _org_plan(org_id: str) -> dict:
         org = await db.orgs.find_one({"_id": _OID(str(org_id))}, {"plan": 1})
     except Exception:
         org = None
-    tier_key = ((org or {}).get("plan") or {}).get("tier")
+    p = (org or {}).get("plan") or {}
+    tier_key = p.get("tier")
     if not tier_key:
         return dict(_UNASSIGNED_PLAN)
     cat = await _plan_catalog()
     t = cat.get(tier_key)
     if not t:
         return dict(_UNASSIGNED_PLAN)
+    # Billing state, computed at read time from paid_until — no cron, no
+    # stored state that can go stale. No paid_until (tier assigned before the
+    # payment loop existed) = active with no period, never gated.
+    paid_until = p.get("paid_until")
+    state, grace_left = "active", None
+    if isinstance(paid_until, _dt):
+        now = _dt.utcnow()
+        if now > paid_until:
+            grace_end = paid_until + _td(days=_PLAN_GRACE_DAYS)
+            if now <= grace_end:
+                state = "grace"
+                grace_left = max(1, (grace_end - now).days + (1 if (grace_end - now).seconds else 0))
+            else:
+                state = "paused"
     return {"assigned": True, "tier_key": tier_key, "label": t["label"],
             "family": t["family"], "applicants_mo": t.get("applicants_mo"),
             "interviews_mo": t.get("interviews_mo"), "jobs": t.get("jobs"),
-            "interviews_allowed": t["family"] != "screening"}
+            "interviews_allowed": t["family"] != "screening",
+            "state": state, "paid_until": paid_until, "grace_days_left": grace_left}
 
 
 async def _plan_interview_gate(org_id: str) -> tuple[bool, str, bool]:
@@ -6881,6 +6938,11 @@ async def _plan_interview_gate(org_id: str) -> tuple[bool, str, bool]:
     if not plan["interviews_allowed"]:
         return False, (f"Your plan ({plan['label']}) doesn't include live interviews — "
                        "upgrade to a Full funnel plan to run them."), False
+    # Payment-due gate: paused = not now, but QUEUE-able — the existing daily
+    # cap-retry sweep relaunches automatically once a payment is approved, so
+    # qualified candidates are held, never lost.
+    if plan.get("state") == "paused":
+        return False, _PLAN_PAUSED_MSG, True
     from database import reserve_org_monthly
     if not await reserve_org_monthly(org_id, "iv", plan["interviews_mo"]):
         return False, (f"Monthly interview limit reached ({plan['interviews_mo']} on "
@@ -7123,10 +7185,16 @@ async def admin_set_org_plan(request: Request):
     cat = await _plan_catalog()
     if tier not in cat:
         raise HTTPException(status_code=400, detail="Unknown plan tier.")
+    # Manual assignment grants ONE paid month (approved 2026-09-14) — without
+    # a paid_until, an assigned plan would run free forever. Renewals after
+    # that go through the manual-payment verification loop.
+    now = _dt.utcnow()
     await db.orgs.update_one({"_id": oid}, {"$set": {"plan": {
         "tier": tier, "family": cat[tier]["family"],
-        "assigned_at": _dt.utcnow(), "assigned_by": str(user.get("email") or "")}}})
-    return {"success": True, "tier": tier, "label": cat[tier]["label"]}
+        "status": "active", "paid_until": _add_months(now, 1),
+        "assigned_at": now, "assigned_by": str(user.get("email") or "")}}})
+    return {"success": True, "tier": tier, "label": cat[tier]["label"],
+            "paid_until": _add_months(now, 1)}
 
 
 @app.get("/api/org/billing-usage")
@@ -7277,12 +7345,13 @@ async def settings_page(request: Request):
 
 @app.get("/payment/success", response_class=HTMLResponse)
 async def payment_success(request: Request, plan: str = "", session_id: str = ""):
+    """REDIRECT ONLY. This route used to $set the user's plan from the query
+    string with NO payment verification — any logged-in user could self-upgrade
+    for free by typing the URL (leak killed 2026-09-14). Plans now change only
+    via super-admin assignment or an approved manual payment."""
     token = get_token_from_request(request)
     if not token or not decode_token(token):
         return RedirectResponse("/login")
-    user = decode_token(token)
-    if plan and plan in PLANS:
-        await update_user_subscription(user["user_id"], plan, {"session_id": session_id})
     return RedirectResponse("/settings?tab=billing&payment=success")
 
 
@@ -8190,108 +8259,233 @@ async def api_docs(request: Request):
     return read_template("docs.html")
 
 
+# ─────────────────────────────────────────────────────────────
+# MANUAL-PAYMENT VERIFICATION LOOP (approved 2026-09-14).
+# Client (org owner) submits proof → pending_review → super-admin approves
+# (org plan activates/extends) or rejects (reason shown, resubmit). A plan
+# NEVER activates or renews any other way.
+# ─────────────────────────────────────────────────────────────
+
+def _mp_email(to_email: str, subject: str, body: str):
+    """Notify the submitter — best-effort: a mail failure must never fail or
+    roll back a money operation."""
+    try:
+        send_candidate_email(to_email=to_email, subject=subject, body_text=body)
+    except Exception as e:
+        print(f"[PAYMENTS] notify email failed for {to_email}: {e}")
+
+
 @app.post("/api/payments/manual")
 async def manual_payment_request(
     request: Request,
     plan_id: str = Form(...),
-    payment_method: str = Form(...),  # "bank" or "bkash" or "nagad"
+    payment_method: str = Form(...),  # bank / bkash / nagad / rocket
     transaction_id: str = Form(...),
     amount: str = Form(...),
+    period: str = Form("monthly"),    # monthly | annual (pay 10, get 12)
     screenshot_note: str = Form(""),
 ):
-    """Client submits manual payment proof. Admin reviews and upgrades plan."""
-    user = await get_current_user(request)
-    from database import db as mongodb
-    doc = {
+    """Org owner submits manual payment proof for admin verification.
+    Validated against the live plan catalog — an unknown tier can't be bought."""
+    user = await _require_branding_editor(request)   # owner-or-admin + org (billing discipline)
+    cat = await _plan_catalog()
+    t = cat.get(plan_id)
+    if not t or t.get("price_bdt") is None:
+        raise HTTPException(status_code=400, detail=(
+            "Unknown plan — pick a tier from the list. (Enterprise is arranged "
+            "directly with TopCandidate.)"))
+    period = period if period in ("monthly", "annual") else "monthly"
+    txn = (transaction_id or "").strip()[:80]
+    if not txn:
+        raise HTTPException(status_code=400, detail="Transaction ID is required.")
+    amt_raw = (amount or "").replace("৳", "").replace(",", "").strip()
+    try:
+        amt = float(amt_raw)
+        assert amt > 0
+    except Exception:
+        raise HTTPException(status_code=400, detail="Enter the amount paid as a number (BDT).")
+    from database import db as mongodb, stamp_org as _stamp_org
+    doc = await _stamp_org({
         "user_id": user["user_id"],
         "email": user["email"],
         "company": user["company"],
         "plan_id": plan_id,
-        "payment_method": payment_method,
-        "transaction_id": transaction_id,
-        "amount": amount,
-        "note": screenshot_note,
+        "plan_label": t["label"],
+        "payment_method": (payment_method or "").strip()[:20],
+        "transaction_id": txn,
+        "amount": f"{amt:g}",
+        "period": period,
+        "note": (screenshot_note or "").strip()[:500],
         "status": "pending_review",
-        "created_at": __import__("datetime").datetime.utcnow(),
-    }
-    from database import stamp_org as _stamp_org
-    doc = await _stamp_org(doc)
+        "created_at": _dt.utcnow(),
+    })
+    if not doc.get("org_id"):
+        raise HTTPException(status_code=409, detail="No organization on this account.")
     inserted = await mongodb.manual_payments.insert_one(doc)
     return {
         "success": True,
         "request_id": str(inserted.inserted_id),
-        "message": "Payment submitted for review. Your plan will be upgraded within 24 hours after verification."
+        "message": "Payment submitted for verification. Your plan activates as soon as we confirm it — usually within 24 hours."
     }
+
+
+@app.get("/api/payments/mine")
+async def my_manual_payments(request: Request):
+    """Org owner: the caller's OWN org's submissions (org_id from the session;
+    no parameter exists, so nothing can point cross-org). Drives the Pending /
+    Rejected states on Plan & Billing."""
+    user = await _require_branding_editor(request)
+    from database import db as mongodb
+    rows = []
+    async for d in mongodb.manual_payments.find(
+            {"org_id": user["org_id"]},
+            {"plan_id": 1, "plan_label": 1, "payment_method": 1, "transaction_id": 1,
+             "amount": 1, "period": 1, "status": 1, "created_at": 1,
+             "reject_reason": 1, "approved_at": 1, "rejected_at": 1,
+             "paid_until_after": 1}).sort("created_at", -1).limit(20):
+        d["_id"] = str(d["_id"])
+        rows.append(d)
+    return {"payments": rows}
 
 
 @app.get("/api/admin/manual-payments")
 async def list_manual_payments(request: Request):
-    """Admin: list all pending manual payments."""
-    user = await get_current_user(request)
-    db_user = await get_user_by_id(user["user_id"])
-    if not db_user or db_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+    """Super-admin: the verification queue (pending first) + recent decisions
+    (audit). Org names resolved so the queue reads at a glance."""
+    await require_admin(request)
     from database import db as mongodb
-    cursor = mongodb.manual_payments.find({}).sort("created_at", -1).limit(100)
+    from bson import ObjectId as _OID
     payments = []
-    async for doc in cursor:
+    async for doc in mongodb.manual_payments.find({}).sort("created_at", -1).limit(200):
         doc["_id"] = str(doc["_id"])
         payments.append(doc)
-    return {"payments": payments}
+    # Resolve org names + current tier in one pass
+    org_ids = {p.get("org_id") for p in payments if p.get("org_id")}
+    orgs = {}
+    for oid in org_ids:
+        try:
+            o = await db.orgs.find_one({"_id": _OID(str(oid))}, {"name": 1, "plan": 1})
+        except Exception:
+            o = None
+        if o:
+            orgs[oid] = {"name": o.get("name") or "", "tier": (o.get("plan") or {}).get("tier"),
+                         "paid_until": (o.get("plan") or {}).get("paid_until")}
+    for p in payments:
+        p["org"] = orgs.get(p.get("org_id")) or {}
+    pending = [p for p in payments if p.get("status") == "pending_review"]
+    decided = [p for p in payments if p.get("status") != "pending_review"][:25]
+    return {"pending": pending, "decided": decided}
 
 
 @app.post("/api/admin/manual-payments/{payment_id}/approve")
-async def approve_manual_payment(request: Request, payment_id: str, plan: str = Form(...)):
-    """Admin: approve a manual payment and upgrade user plan."""
-    user = await get_current_user(request)
-    db_user = await get_user_by_id(user["user_id"])
-    if not db_user or db_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+async def approve_manual_payment(request: Request, payment_id: str):
+    """Super-admin verifies the transaction against the bank/wallet and
+    approves: the ORG plan (the enforced one) activates/extends for the paid
+    period, stacking on any remaining time — paying early never loses days.
+    Only a pending submission can be approved (each payment counts once)."""
+    user = await require_admin(request)
     from database import db as mongodb
     from bson import ObjectId
-    payment = await mongodb.manual_payments.find_one({"_id": ObjectId(payment_id)})
+    try:
+        pid = ObjectId(payment_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+    payment = await mongodb.manual_payments.find_one({"_id": pid})
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found.")
-    # Upgrade the user's plan
-    await mongodb.users.update_one(
-        {"_id": ObjectId(payment["user_id"])},
-        {"$set": {"plan": plan, "screening_count": 0}}
-    )
+    if payment.get("status") != "pending_review":
+        raise HTTPException(status_code=409, detail=(
+            f"Already {payment.get('status')} — a payment is decided once."))
+    org_id = str(payment.get("org_id") or "")
+    if not org_id:
+        raise HTTPException(status_code=409, detail=(
+            "This submission has no organization stamp (pre-tenancy record) — "
+            "assign the plan manually in Usage & Billing instead."))
+    tier = str(payment.get("plan_id") or "")
+    cat = await _plan_catalog()
+    t = cat.get(tier)
+    if not t or t.get("price_bdt") is None:
+        raise HTTPException(status_code=400, detail=f"Unknown tier '{tier}' on this submission.")
+    from bson import ObjectId as _OID
+    try:
+        ooid = _OID(org_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    org = await db.orgs.find_one({"_id": ooid}, {"plan": 1, "name": 1})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    months = 12 if payment.get("period") == "annual" else 1
+    now = _dt.utcnow()
+    cur_until = ((org.get("plan") or {}).get("paid_until"))
+    base = cur_until if isinstance(cur_until, _dt) and cur_until > now else now
+    paid_until = _add_months(base, months)
+    prev = org.get("plan") or {}
+    await db.orgs.update_one({"_id": ooid}, {"$set": {"plan": {
+        "tier": tier, "family": t["family"],
+        "status": "active", "paid_until": paid_until,
+        "assigned_at": prev.get("assigned_at") or now,
+        "assigned_by": prev.get("assigned_by") or f"payment approval by {user.get('email')}",
+        "activated_at": now, "activated_by": str(user.get("email") or ""),
+        "last_payment_id": str(pid),
+    }}})
     await mongodb.manual_payments.update_one(
-        {"_id": ObjectId(payment_id)},
-        {"$set": {"status": "approved", "approved_by": user["email"], "approved_at": __import__("datetime").datetime.utcnow()}}
-    )
-    # Also create a payments history row so the user sees it on their settings page
+        {"_id": pid, "status": "pending_review"},
+        {"$set": {"status": "approved", "approved_by": user.get("email"),
+                  "approved_at": now, "months_granted": months,
+                  "paid_until_after": paid_until}})
+    # Client-visible history row (their Payment history table reads db.payments)
     await save_payment({
         "user_id": payment["user_id"],
-        "plan": plan,
+        "plan": t["label"],
         "amount": payment.get("amount", ""),
         "method": payment.get("payment_method", "manual"),
         "status": "paid",
         "tran_id": payment.get("transaction_id", ""),
     })
-    return {"success": True, "message": f"Plan upgraded to {plan} for {payment['email']}"}
+    _mp_email(payment.get("email", ""),
+              f"Payment confirmed — {t['label']} active until {paid_until:%d %b %Y}",
+              (f"Good news! Your payment (transaction {payment.get('transaction_id')}) is "
+               f"verified.\n\nPlan: {t['label']}\nPaid until: {paid_until:%d %b %Y}\n\n"
+               "All limits for the paid period are active now. Thank you!\n\n— TopCandidate.pro"))
+    print(f"[PAYMENTS] APPROVED {pid} org={org_id} tier={tier} months={months} "
+          f"paid_until={paid_until:%Y-%m-%d} by={user.get('email')}")
+    return {"success": True, "tier": tier, "label": t["label"],
+            "months": months, "paid_until": paid_until,
+            "message": f"{t['label']} active until {paid_until:%d %b %Y} for {payment.get('company') or payment.get('email')}"}
 
 
 @app.post("/api/admin/manual-payments/{payment_id}/reject")
-async def reject_manual_payment(request: Request, payment_id: str, status: str = Form("rejected")):
-    """Admin: reject a manual payment submission (does NOT upgrade the user)."""
-    user = await get_current_user(request)
-    db_user = await get_user_by_id(user["user_id"])
-    if not db_user or db_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only.")
+async def reject_manual_payment(request: Request, payment_id: str, reason: str = Form(...)):
+    """Super-admin rejects a submission WITH a reason (shown to the client,
+    who can fix and resubmit). Never touches any plan. Pending only —
+    an approved payment can't be silently un-approved from here."""
+    user = await require_admin(request)
+    reason = (reason or "").strip()[:300]
+    if not reason:
+        raise HTTPException(status_code=400, detail="A reason is required — the client sees it.")
     from database import db as mongodb
     from bson import ObjectId
-    result = await mongodb.manual_payments.update_one(
-        {"_id": ObjectId(payment_id)},
-        {"$set": {
-            "status": "rejected",
-            "rejected_by": user["email"],
-            "rejected_at": __import__("datetime").datetime.utcnow(),
-        }}
-    )
-    if result.matched_count == 0:
+    try:
+        pid = ObjectId(payment_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="Payment not found.")
+    payment = await mongodb.manual_payments.find_one({"_id": pid})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+    if payment.get("status") != "pending_review":
+        raise HTTPException(status_code=409, detail=(
+            f"Already {payment.get('status')} — a payment is decided once."))
+    await mongodb.manual_payments.update_one(
+        {"_id": pid, "status": "pending_review"},
+        {"$set": {"status": "rejected", "reject_reason": reason,
+                  "rejected_by": user.get("email"), "rejected_at": _dt.utcnow()}})
+    _mp_email(payment.get("email", ""),
+              "Payment submission needs another look",
+              (f"We couldn't verify your payment submission (transaction "
+               f"{payment.get('transaction_id')}).\n\nReason: {reason}\n\n"
+               "Please check the details and resubmit on Plan & Billing — or reply "
+               "if you believe this is a mistake.\n\n— TopCandidate.pro"))
+    print(f"[PAYMENTS] REJECTED {pid} by={user.get('email')} reason={reason[:60]}")
     return {"success": True}
 
 

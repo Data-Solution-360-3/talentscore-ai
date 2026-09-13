@@ -379,10 +379,17 @@ img,video{max-width:100%}
         <!-- Submission form -->
         <div class="alert alert-ok" id="manual-pay-ok" style="display:none">✓ Payment submitted! We will verify and upgrade your plan within 24 hours.</div>
         <div class="alert alert-err" id="manual-pay-err" style="display:none"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;margin-bottom:10px">
           <div class="form-group" style="margin:0">
             <label class="form-label">Plan you are paying for</label>
             <select class="form-select" id="mp-plan"></select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Billing period</label>
+            <select class="form-select" id="mp-period">
+              <option value="monthly">Monthly</option>
+              <option value="annual">Annual (pay 10 months, get 12)</option>
+            </select>
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Payment method used</label>
@@ -929,24 +936,57 @@ brandLoad();
 //    payment details. Pure display — no payment logic here. ──
 const _tk=n=>n==null?'':('৳'+Number(n).toLocaleString('en-IN'));
 async function loadPlanBilling(){
-  let cat=null,pd=null,plan=null;
+  let cat=null,pd=null,plan=null,mine=null;
   try{ const r=await fetch('/api/plans',{credentials:'include'}); if(r.ok) cat=await r.json(); }catch(_){}
   try{ const r=await fetch('/api/payment-details',{credentials:'include'}); if(r.ok) pd=await r.json(); }catch(_){}
   try{ const r=await fetch('/api/org/billing-usage',{credentials:'include'}); if(r.ok) plan=(await r.json()).plan; }catch(_){}
+  try{ const r=await fetch('/api/payments/mine',{credentials:'include'}); if(r.ok) mine=(await r.json()).payments; }catch(_){}
   const esc=s=>{const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;};
+  const dfmt=s=>{ try{ return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(_){ return ''; } };
   const cur=document.getElementById('pb-current');
   if(cur){
     if(plan){
       const lbl=document.getElementById('pb-current-label');
       if(lbl) lbl.textContent = plan.assigned?((plan.family==='screening'?'Screening only · ':'Full funnel · ')+plan.label):plan.label;
-      cur.innerHTML = plan.assigned
+      // ── Honest billing state (server-computed): active / grace / paused ──
+      let stateHtml='';
+      if(plan.assigned){
+        if(plan.state==='paused'){
+          stateHtml=`<div style="background:#FDF2F2;border:1.5px solid #F3C1C1;color:#B4232C;border-radius:10px;padding:.7rem .9rem;font-size:12.5px;font-weight:700;margin:8px 0">
+            ⛔ Payment due — plan paused. New screenings, tests and interviews are on hold until payment;
+            <b>all your data, candidates and jobs are safe</b> and everything resumes the moment your payment is verified.
+            Pay below and submit the transaction ID.</div>`;
+        } else if(plan.state==='grace'){
+          stateHtml=`<div style="background:#FFF7E8;border:1.5px solid #F3D77F;color:#8A5A00;border-radius:10px;padding:.7rem .9rem;font-size:12.5px;font-weight:700;margin:8px 0">
+            ⚠ Payment due — please pay to continue (${plan.grace_days_left} day${plan.grace_days_left===1?'':'s'} left).
+            Your plan keeps working during this grace window; pay below and submit the transaction ID.</div>`;
+        } else if(plan.paid_until){
+          stateHtml=`<div style="font-size:12px;color:var(--green,#639922);font-weight:700;margin:6px 0">✓ Paid until ${dfmt(plan.paid_until)} — renew any time; extra time stacks on.</div>`;
+        }
+      }
+      // ── Latest submission status: pending shows always; a rejection shows
+      //    until a newer submission or approval supersedes it ──
+      let subHtml='';
+      if(mine&&mine.length){
+        const latest=mine[0];
+        if(latest.status==='pending_review'){
+          subHtml=`<div style="background:rgba(79,70,229,.06);border:1.5px solid rgba(79,70,229,.25);color:#3730A3;border-radius:10px;padding:.6rem .9rem;font-size:12px;font-weight:600;margin:6px 0">
+            ⏳ Payment submitted (${esc(latest.plan_label||latest.plan_id)} · ৳${esc(latest.amount)} · txn ${esc(latest.transaction_id)}) — pending verification, usually within 24 hours.</div>`;
+        } else if(latest.status==='rejected'){
+          subHtml=`<div style="background:#FDF2F2;border:1.5px solid #F3C1C1;color:#B4232C;border-radius:10px;padding:.6rem .9rem;font-size:12px;font-weight:600;margin:6px 0">
+            ✕ Your last payment submission was rejected${latest.reject_reason?': <b>'+esc(latest.reject_reason)+'</b>':''}.
+            Please check the details and resubmit below — or contact us if this looks wrong.</div>`;
+        }
+      }
+      cur.innerHTML = (plan.assigned
         ? `<b style="font-size:18px;color:var(--text)">${esc(plan.label)}</b>
            <div style="margin-top:4px">${plan.applicants_mo!=null?Number(plan.applicants_mo).toLocaleString('en-IN')+' applicants / month':'Unlimited applicants'} ·
            ${plan.interviews_allowed?((plan.interviews_mo!=null?plan.interviews_mo:'Unlimited')+' live interviews / month'):'no live interviews on this plan'} ·
-           ${plan.jobs!=null?plan.jobs+' active jobs':'unlimited jobs'}</div>
-           <div style="font-size:11.5px;color:var(--t3);margin-top:6px">Limits reset each calendar month. Your usage bars are on the Usage &amp; Billing page.</div>`
+           ${plan.jobs!=null?plan.jobs+' active jobs':'unlimited jobs'}</div>`
         : `<b style="font-size:16px;color:var(--text)">${esc(plan.label)}</b>
-           <div style="font-size:12px;color:var(--t3);margin-top:4px">No plan limits apply yet — pick a tier below and pay manually, or contact TopCandidate.</div>`;
+           <div style="font-size:12px;color:var(--t3);margin-top:4px">No plan limits apply yet — pick a tier below and pay manually, or contact TopCandidate.</div>`)
+        + stateHtml + subHtml
+        + (plan.assigned?`<div style="font-size:11.5px;color:var(--t3);margin-top:6px">Limits reset each calendar month. Your usage bars are on the Usage &amp; Billing page.</div>`:'');
     } else cur.innerHTML='<span style="color:var(--t3)">Plan details are visible to the workspace owner.</span>';
   }
   if(cat&&cat.tiers){
@@ -1251,6 +1291,7 @@ async function submitManualPayment(){
     const fd=new FormData();
     fd.append('plan_id',plan);fd.append('payment_method',method);
     fd.append('transaction_id',txn);fd.append('amount',amount);
+    fd.append('period',(document.getElementById('mp-period')||{}).value||'monthly');
     fd.append('screenshot_note',note);
     const res=await fetch('/api/payments/manual',{method:'POST',body:fd,credentials:'include'});
     const data=await res.json();
@@ -1259,6 +1300,7 @@ async function submitManualPayment(){
     document.getElementById('mp-txn').value='';
     document.getElementById('mp-amount').value='';
     document.getElementById('mp-note').value='';
+    loadPlanBilling();   // show the new "Pending verification" state right away
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
 
