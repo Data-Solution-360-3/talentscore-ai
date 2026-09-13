@@ -7034,46 +7034,55 @@ async def public_plan_catalog():
             "annual_months_free": 2}
 
 
-# Manual-payment account details — CONFIGURABLE, one place. Values below are
-# PLACEHOLDERS shipped only so the layout renders; until the super-admin
-# saves real details, configured=False and the client UI shows a loud
-# do-not-pay warning. Real numbers are entered in /admin → Usage & Billing.
-_PAYMENT_FIELDS = ("bank_name", "account_name", "account_number", "branch",
-                   "routing", "bkash", "nagad", "rocket", "note")
-_PAYMENT_PLACEHOLDER = {
-    "bank_name": "Dutch-Bangla Bank Ltd", "account_name": "LinkX360 Limited",
-    "account_number": "2581234567890", "branch": "Dhaka Main Branch",
-    "routing": "090262503", "bkash": "01712-345678", "nagad": "01712-345678",
-    "rocket": "01712-3456780", "note": "",
-}
+# Manual-payment account details — CONFIGURABLE, one place (platform_settings
+# doc). Structured: multiple bank accounts + mobile wallets, each with an
+# account-type badge. Unconfigured = EMPTY lists + a do-not-pay warning; no
+# placeholder account numbers exist anywhere (2026-09-14 — a fake digit on a
+# payment page is worse than no digits). Edited in /admin → Usage & Billing.
+_PD_BANK_FIELDS = ("bank", "account", "name", "routing", "swift",
+                   "branch", "address", "type")
+_PD_WALLET_FIELDS = ("provider", "number", "type")
+
+
+def _pd_clean(doc: dict) -> dict:
+    banks = []
+    for b in (doc.get("banks") or [])[:6]:
+        if isinstance(b, dict) and str(b.get("account") or "").strip():
+            banks.append({k: str(b.get(k) or "").strip()[:160] for k in _PD_BANK_FIELDS})
+    wallets = []
+    for w in (doc.get("wallets") or [])[:6]:
+        if isinstance(w, dict) and str(w.get("number") or "").strip():
+            wallets.append({k: str(w.get(k) or "").strip()[:60] for k in _PD_WALLET_FIELDS})
+    return {"banks": banks, "wallets": wallets,
+            "note": str(doc.get("note") or "").strip()[:300]}
 
 
 @app.get("/api/payment-details")
 async def payment_details_get(request: Request):
     """Where clients send manual payments — authenticated (org members are
-    the ones paying). configured=False until real details are saved."""
+    the ones paying). configured=False (and NO numbers) until real details
+    are saved by the super-admin."""
     await get_current_user(request)
     doc = await db.platform_settings.find_one({"_id": "payment_details"})
-    if doc:
-        return {"configured": True,
-                **{k: str(doc.get(k) or "") for k in _PAYMENT_FIELDS}}
-    return {"configured": False, **_PAYMENT_PLACEHOLDER}
+    if doc and (doc.get("banks") or doc.get("wallets")):
+        return {"configured": True, **_pd_clean(doc)}
+    return {"configured": False, "banks": [], "wallets": [], "note": ""}
 
 
 @app.post("/api/admin/payment-details")
 async def payment_details_set(request: Request):
-    """Super-admin saves the REAL bank / mobile-banking details (one place)."""
+    """Super-admin saves the REAL bank / mobile-wallet details (one place)."""
     user = await require_admin(request)
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid request body.")
-    doc = {k: str(body.get(k) or "").strip()[:120] for k in _PAYMENT_FIELDS}
-    if not any(v for k, v in doc.items() if k != "note"):
-        raise HTTPException(status_code=400, detail="Enter at least one real payment detail.")
+    clean = _pd_clean(body)
+    if not clean["banks"] and not clean["wallets"]:
+        raise HTTPException(status_code=400, detail="Enter at least one account or wallet.")
     await db.platform_settings.update_one(
         {"_id": "payment_details"},
-        {"$set": {**doc, "updated_at": _dt.utcnow(),
+        {"$set": {**clean, "updated_at": _dt.utcnow(),
                   "updated_by": str(user.get("email") or "")}}, upsert=True)
     return {"success": True, "configured": True}
 

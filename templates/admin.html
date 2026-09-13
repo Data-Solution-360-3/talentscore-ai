@@ -324,17 +324,7 @@ img,video{max-width:100%}
       <div class="card" style="margin-bottom:12px">
         <div class="card-hd"><div class="card-title">Manual payment details</div>
           <span class="card-sub" id="pdset-status"></span></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Bank name</label><input id="pdset-bank_name" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Account name</label><input id="pdset-account_name" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Account number</label><input id="pdset-account_number" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Branch</label><input id="pdset-branch" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Routing</label><input id="pdset-routing" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">bKash</label><input id="pdset-bkash" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Nagad</label><input id="pdset-nagad" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Rocket</label><input id="pdset-rocket" style="width:100%"></div>
-          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Note (optional)</label><input id="pdset-note" style="width:100%"></div>
-        </div>
+        <div id="pdset-body">Loading…</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap">
           <span style="font-size:11px;color:var(--t3,#6B7280)">These render on every client's Plan &amp; Billing page. Until saved, clients see a "placeholder — do not pay" warning.</span>
           <button class="btn btn-sm" onclick="pdSave()">Save payment details</button>
@@ -678,26 +668,56 @@ async function loadBilling(){
   document.getElementById('bl-grand').textContent='Grand total: ৳'+(_blUsage.grand_total_tk||'0')+' · estimate at current rates';
 }
 function escBl(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
-const _PD_FIELDS=['bank_name','account_name','account_number','branch','routing','bkash','nagad','rocket','note'];
+const _PD_BANKF=['bank','account','name','routing','swift','branch','address','type'];
+function _pdInput(id,val,ph){return `<input id="${id}" value="${escBl(val||'')}" placeholder="${ph||''}" style="width:100%">`;}
 async function pdLoad(){
+  let d={banks:[],wallets:[],note:'',configured:false};
   try{
     const r=await tFetch('/api/payment-details');
-    if(!r.ok) return;
-    const d=await r.json();
-    _PD_FIELDS.forEach(k=>{const el=document.getElementById('pdset-'+k); if(el) el.value=d[k]||'';});
-    const st=document.getElementById('pdset-status');
-    if(st) st.textContent=d.configured?'✓ configured — shown to clients':'⚠ NOT configured — clients see a placeholder warning';
+    if(r.ok) d=await r.json();
   }catch(_){}
+  const st=document.getElementById('pdset-status');
+  if(st) st.textContent=d.configured?'✓ configured — shown to clients':'⚠ NOT configured — clients see a do-not-pay warning';
+  const wallets=['bKash','Nagad','Rocket'].map(p=>(d.wallets||[]).find(w=>w.provider===p)||{provider:p,number:'',type:p==='Rocket'?'Personal':'Merchant'});
+  const banks=[0,1,2].map(i=>(d.banks||[])[i]||{});
+  const body=document.getElementById('pdset-body');
+  if(!body) return;
+  body.innerHTML=
+    `<div style="font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3,#6B7280);margin-bottom:6px">Mobile wallets</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">`+
+    wallets.map((w,i)=>`<div style="border:1px solid var(--border,#2a2f3a);border-radius:8px;padding:8px">
+      <b style="font-size:12px">${w.provider}</b>
+      <div style="margin:6px 0">${_pdInput('pdw-'+i+'-number',w.number,'01XXXXXXXXX')}</div>
+      <select id="pdw-${i}-type" style="width:100%"><option ${w.type==='Merchant'?'selected':''}>Merchant</option><option ${w.type==='Personal'?'selected':''}>Personal</option></select>
+    </div>`).join('')+
+    `</div><div style="font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--t3,#6B7280);margin-bottom:6px">Bank accounts (leave account number empty to omit)</div>`+
+    banks.map((b,i)=>`<div style="border:1px solid var(--border,#2a2f3a);border-radius:8px;padding:10px;margin-bottom:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Bank</label>${_pdInput('pdb-'+i+'-bank',b.bank)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Account number</label>${_pdInput('pdb-'+i+'-account',b.account)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Account name</label>${_pdInput('pdb-'+i+'-name',b.name)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Type</label><select id="pdb-${i}-type" style="width:100%"><option ${b.type!=='Personal'?'selected':''}>Company</option><option ${b.type==='Personal'?'selected':''}>Personal</option></select></div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Routing</label>${_pdInput('pdb-'+i+'-routing',b.routing)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">SWIFT</label>${_pdInput('pdb-'+i+'-swift',b.swift)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Branch</label>${_pdInput('pdb-'+i+'-branch',b.branch)}</div>
+      <div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Address</label>${_pdInput('pdb-'+i+'-address',b.address)}</div>
+    </div>`).join('')+
+    `<div><label style="font-size:10px;font-weight:700;display:block;margin-bottom:3px">Note (optional, shown to clients)</label>${_pdInput('pdset-note',d.note)}</div>`;
 }
 async function pdSave(){
-  const body={};
-  _PD_FIELDS.forEach(k=>{const el=document.getElementById('pdset-'+k); body[k]=el?el.value.trim():'';});
+  const gv=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  const body={
+    wallets:['bKash','Nagad','Rocket'].map((p,i)=>({provider:p,number:gv('pdw-'+i+'-number'),type:gv('pdw-'+i+'-type')})).filter(w=>w.number),
+    banks:[0,1,2].map(i=>({bank:gv('pdb-'+i+'-bank'),account:gv('pdb-'+i+'-account'),name:gv('pdb-'+i+'-name'),
+      type:gv('pdb-'+i+'-type'),routing:gv('pdb-'+i+'-routing'),swift:gv('pdb-'+i+'-swift'),
+      branch:gv('pdb-'+i+'-branch'),address:gv('pdb-'+i+'-address')})).filter(b=>b.account),
+    note:gv('pdset-note')};
   const r=await fetch('/api/admin/payment-details',{method:'POST',credentials:'include',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
   const st=document.getElementById('pdset-status');
   if(!r.ok){ if(st) st.textContent='Save failed: '+(d.detail||r.status); return; }
-  if(st) st.textContent='✓ Saved — clients now see these details (warning removed)';
+  if(st) st.textContent='✓ Saved — clients now see these details';
+  pdLoad();
 }
 function blScopeChange(){
   const sc=document.getElementById('bl-scope').value;

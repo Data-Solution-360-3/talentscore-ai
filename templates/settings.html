@@ -373,17 +373,8 @@ img,video{max-width:100%}
         <!-- ⚠ shown until the super-admin saves REAL account details -->
         <div id="pd-warn" style="display:none;background:#FDF2F2;border:1.5px solid #F3C1C1;color:#B4232C;border-radius:10px;padding:.75rem .9rem;font-size:12.5px;font-weight:700;margin-bottom:1rem">⚠ These account details are placeholders — do NOT send money yet. Payment details are being updated; contact TopCandidate to pay.</div>
 
-        <!-- Bank & mobile banking details — rendered from /api/payment-details -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem">
-          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">🏦 Bank transfer</div>
-            <div style="font-size:12px;color:var(--t2);line-height:2" id="pd-bank">Loading…</div>
-          </div>
-          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">📱 Mobile banking</div>
-            <div style="font-size:12px;color:var(--t2);line-height:2" id="pd-mobile">Loading…</div>
-          </div>
-        </div>
+        <!-- Wallet + bank cards — rendered from /api/payment-details -->
+        <div id="pd-wrap" style="margin-bottom:1.25rem;font-size:12.5px;color:var(--t2)">Loading…</div>
 
         <!-- Submission form -->
         <div class="alert alert-ok" id="manual-pay-ok" style="display:none">✓ Payment submitted! We will verify and upgrade your plan within 24 hours.</div>
@@ -988,18 +979,50 @@ async function loadPlanBilling(){
       `<option value="${k}">${(x.family==='screening'?'Screening · ':'Full funnel · ')+esc(x.label)} — ${x.price_bdt!=null?_tk(x.price_bdt)+'/mo':'Contact us'}</option>`).join('');
   }
   if(pd){
+    window._pdData = pd;
     const warn=document.getElementById('pd-warn'); if(warn) warn.style.display=pd.configured?'none':'block';
-    const b=document.getElementById('pd-bank');
-    if(b) b.innerHTML=`<strong style="color:var(--text)">Bank:</strong> ${esc(pd.bank_name)||'—'}<br>
-      <strong style="color:var(--text)">Account:</strong> ${esc(pd.account_number)||'—'}<br>
-      <strong style="color:var(--text)">Name:</strong> ${esc(pd.account_name)||'—'}<br>
-      <strong style="color:var(--text)">Branch:</strong> ${esc(pd.branch)||'—'}<br>
-      <strong style="color:var(--text)">Routing:</strong> ${esc(pd.routing)||'—'}`;
-    const m=document.getElementById('pd-mobile');
-    if(m) m.innerHTML=[['💚','bKash',pd.bkash],['🟠','Nagad',pd.nagad],['🔴','Rocket',pd.rocket]]
-      .map(([i,l,v])=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0"><span style="font-size:14px">${i}</span><div><strong style="color:var(--text)">${l}:</strong> ${esc(v)||'—'}</div></div>`).join('')
-      +(pd.note?`<div style="font-size:11px;color:var(--t3);margin-top:4px">${esc(pd.note)}</div>`:'');
+    const wrap=document.getElementById('pd-wrap');
+    if(wrap){
+      const badge=t=>t?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:${t==='Personal'?'rgba(245,124,46,.12)':'rgba(99,153,34,.12)'};color:${t==='Personal'?'#B4571E':'#476B15'}">${esc(t)}</span>`:'';
+      const cbtn=(v)=>`<button class="btn btn-ghost btn-sm" style="padding:2px 9px;font-size:10.5px" onclick="pdCopy(this,'${String(v||'').replace(/[^\w .,-]/g,'')}')">Copy</button>`;
+      const row=(l,v,copy)=>v?`<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="min-width:64px;color:var(--t3)">${l}</span><b style="color:var(--text);word-break:break-all">${esc(v)}</b>${copy?cbtn(v):''}</div>`:'';
+      let h='';
+      if((pd.wallets||[]).length){
+        const icon={bKash:'💚',Nagad:'🟠',Rocket:'🔴'};
+        h+=`<div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.9rem;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:6px">📱 Mobile wallet</div>`
+          +pd.wallets.map(w=>`<div style="display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:14px">${icon[w.provider]||'📱'}</span>
+            <b style="min-width:52px;color:var(--text)">${esc(w.provider)}</b>
+            <b style="font-size:14px;letter-spacing:.4px;color:var(--text)">${esc(w.number)}</b>
+            ${badge(w.type)}<span style="margin-left:auto">${cbtn(w.number)}</span></div>`).join('')
+          +`<div style="font-size:11px;color:var(--t3);margin-top:7px;line-height:1.6">Merchant numbers (bKash/Nagad): open the app → tap <b>Payment</b> → pay to the merchant number. Rocket (Personal): use <b>Send Money</b>.</div>
+        </div>`;
+      }
+      h+=(pd.banks||[]).map((b,bi)=>`<div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.9rem;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:800;color:var(--text)">🏦 ${esc(b.bank)}</span>${badge(b.type)}
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto;padding:2px 10px;font-size:10.5px" onclick="pdCopyAll(this,${bi})">Copy all details</button>
+          </div>
+          ${row('Account',b.account,true)}${row('Name',b.name,false)}${row('Routing',b.routing,true)}${row('SWIFT',b.swift,true)}${row('Branch',b.branch,false)}${row('Address',b.address,false)}
+          <div style="font-size:11px;color:var(--t3);margin-top:6px">Bank transfer, cheque or cash deposit at any ${esc(b.bank)} branch.</div>
+        </div>`).join('');
+      if(pd.note) h+=`<div style="font-size:11.5px;color:var(--t3)">${esc(pd.note)}</div>`;
+      wrap.innerHTML=h||'<div style="color:var(--t3)">Payment details will appear here once TopCandidate configures them.</div>';
+    }
   }
+}
+function pdCopy(btn,v){
+  try{ navigator.clipboard.writeText(v).then(()=>{ const t=btn.textContent; btn.textContent='✓ Copied';
+    setTimeout(()=>btn.textContent=t==='✓ Copied'?'Copy':t,1200); }); }catch(_){}
+}
+function pdCopyAll(btn,i){
+  const b=((window._pdData||{}).banks||[])[i]; if(!b) return;
+  const t=[['Bank',b.bank],['Account',b.account],['Name',b.name],['Routing',b.routing],
+           ['SWIFT',b.swift],['Branch',b.branch],['Address',b.address]]
+    .filter(x=>x[1]).map(x=>x[0]+': '+x[1]).join('\n');
+  try{ navigator.clipboard.writeText(t).then(()=>{ btn.textContent='✓ Copied';
+    setTimeout(()=>btn.textContent='Copy all details',1200); }); }catch(_){}
 }
 function pbPick(k){
   const sel=document.getElementById('mp-plan');
