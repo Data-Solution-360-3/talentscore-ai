@@ -6145,26 +6145,11 @@ async function loadFromDB(){
     console.log('[DEBUG] screenings:',screenData.screenings?.length,'role:',me.role,'email:',me.email);
 
     document.getElementById('t-avatar').textContent=(me.company||'TC').slice(0,2).toUpperCase();
-    const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
-    document.getElementById('t-plan').textContent=planName;
     { const sc=document.getElementById('sb-company'); if(sc) sc.textContent=me.company||''; }
-    // Update usage bar
-    const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
-    const limit=planLimits[me.plan||'trial']||10;
-    const used=me.screening_count||0;
-    const pct=Math.min(100,Math.round(used/limit*100));
-    const remaining=Math.max(0,limit-used);
-    const bar=document.getElementById('t-usage-bar');
-    const txt=document.getElementById('t-usage-text');
-    if(bar)bar.style.width=pct+'%';
-    if(bar)bar.style.background=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--indigo)';
-    if(txt)txt.textContent=used+'/'+limit;
-    if(txt)txt.style.color=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--t2)';
-    // Show upgrade prompt if near limit
-    if(remaining<=2&&remaining>0){
-      const wrap=document.getElementById('t-usage-wrap');
-      if(wrap)wrap.title='Only '+remaining+' screenings left! Click to upgrade.';
-    }
+    // Usage pill: render IMMEDIATELY from the real org plan (the legacy
+    // users.plan block that lived here left the pill wrong/empty for the
+    // interval's first 60s — deleted 2026-09-14).
+    refreshPlan();
 
     // Process data
     allJobs=(jobsData.jobs||[]).map(j=>({...j,dept:j.department,loc:j.location,type:j.employment_type,status:j.status||'active'}));

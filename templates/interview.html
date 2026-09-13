@@ -81,6 +81,12 @@ input,select,textarea{max-width:100%}
 .rail .rstep.cur{color:var(--ink,#173404)}
 .rail .rbar{flex:1;height:2px;background:#e6ebe0;margin:0 12px;max-width:120px}
 .rail .rbar.done{background:var(--green,#639922)}
+/* Phones: tighter connectors so the last step label never clips (375px) */
+@media(max-width:480px){
+  .rail .rbar{margin:0 6px;max-width:36px}
+  .rail .rstep{font-size:11.5px;gap:5px}
+  .rail .rstep .n{width:20px;height:20px}
+}
 body.has-rail .stage{padding-top:132px}
 /* written/scenario mode: the top slot HIDES — the typed panel right above the
    textarea is the question's single display (plus the pinned case-study card),

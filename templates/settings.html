@@ -627,13 +627,13 @@ img,video{max-width:100%}
         <table class="tbl">
           <thead><tr><th>Plan</th><th>Screens/month</th><th>Batch size</th><th>Rate limit</th></tr></thead>
           <tbody>
-            <tr><td>Trial (free)</td><td>10</td><td>10</td><td>2/min</td></tr>
-            <tr><td>Starter ($29)</td><td>100</td><td>20</td><td>10/min</td></tr>
-            <tr><td>Pro ($79)</td><td>500</td><td>100</td><td>30/min</td></tr>
+            <tr><td>Trial</td><td>10</td><td>10</td><td>2/min</td></tr>
+            <tr><td>Starter</td><td>100</td><td>20</td><td>10/min</td></tr>
+            <tr><td>Pro</td><td>500</td><td>100</td><td>30/min</td></tr>
             <tr><td>Enterprise</td><td>Unlimited</td><td>100</td><td>60/min</td></tr>
           </tbody>
         </table>
-        <div style="margin-top:.75rem"><a href="/settings?tab=billing" class="btn btn-primary btn-sm">Upgrade plan →</a></div>
+        <div style="margin-top:.75rem;font-size:12px;color:var(--t3)">API access is arranged with your plan — contact TopCandidate to enable or raise limits.</div>
       </div>
     </div>
 
@@ -1133,7 +1133,10 @@ async function loadUser(){
     document.getElementById('profile-avatar').textContent=initials;
     document.getElementById('profile-name-display').textContent=userData.company||'Your company';
     document.getElementById('profile-email-display').textContent=userData.email||'—';
-    document.getElementById('profile-plan-badge').textContent=(userData.plan||'trial').charAt(0).toUpperCase()+(userData.plan||'trial').slice(1);
+    // Real org plan label (the dead users.plan showed "Trial"/"Pro" here,
+    // contradicting Plan & Billing — fixed 2026-09-14).
+    document.getElementById('profile-plan-badge').textContent=
+      (userData.org_plan&&userData.org_plan.assigned)?userData.org_plan.label:'Legacy';
     document.getElementById('p-company').value=userData.company||'';
     document.getElementById('p-fullname').value=userData.full_name||'';
     document.getElementById('p-phone').value=userData.phone||'';
