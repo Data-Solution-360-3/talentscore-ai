@@ -337,68 +337,29 @@ img,video{max-width:100%}
 
     <!-- ── BILLING ── -->
     <div class="page" id="page-billing">
-      <div class="page-hd"><h1>Plan & Billing</h1><p>Manage your subscription and payment method</p></div>
+      <div class="page-hd"><h1>Plan & Billing</h1><p>Your plan, the pricing tiers, and how to pay</p></div>
 
-      <!-- Current plan -->
+      <!-- Current plan (real assigned plan from the shared catalog) -->
       <div class="card">
         <div class="card-hd">
           <div class="card-title">Current plan</div>
-          <span class="badge b-indigo" id="current-plan-badge">Trial</span>
+          <span class="card-sub" id="pb-current-label"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
-          <div>
-            <div style="font-size:22px;font-weight:800" id="current-plan-name">Trial Plan</div>
-            <div style="font-size:13px;color:var(--t2)" id="current-plan-desc">Free forever · 10 screenings/month</div>
-          </div>
-        </div>
-        <div id="current-sub-info" style="font-size:13px;color:var(--t3);margin-bottom:1rem"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="showUpgrade()">Upgrade plan</button>
-          <button class="btn btn-ghost btn-sm" id="cancel-sub-btn" style="display:none" onclick="cancelSubscription()">Cancel subscription</button>
-          <button class="btn btn-ghost btn-sm" id="manage-billing-btn" style="display:none" onclick="manageBilling()">Manage billing →</button>
-        </div>
+        <div id="pb-current" style="font-size:13px;color:var(--t2);line-height:1.7">Loading…</div>
       </div>
 
-      <!-- Upgrade section (hidden by default) -->
-      <div id="upgrade-section" style="display:none">
-        <div class="card">
-          <div class="card-hd"><div class="card-title">Choose your plan</div><button class="btn btn-ghost btn-sm" onclick="hideUpgrade()">Cancel</button></div>
-
-          <!-- Currency toggle -->
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
-            <span style="font-size:13px;font-weight:500;color:var(--t2)">USD</span>
-            <label class="toggle"><input type="checkbox" id="currency-tog" onchange="toggleCurrency()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
-            <span style="font-size:13px;font-weight:500;color:var(--t2)">BDT</span>
-            <span class="badge b-green" style="font-size:10px">Bangladesh local payment</span>
-          </div>
-
-          <div class="plan-cards" id="plan-cards">
-            <!-- Populated by JS -->
-          </div>
-
-          <!-- Payment method selection -->
-          <div id="payment-method-section" style="display:none">
-            <div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Choose payment method</div>
-            <div class="payment-method">
-              <div class="pm-card selected" id="pm-stripe" onclick="selectPayment('stripe')">
-                <div class="pm-icon">💳</div>
-                <div class="pm-name">Card Payment</div>
-                <div class="pm-desc">Visa, Mastercard, Amex<br>Powered by Stripe</div>
-              </div>
-              <div class="pm-card" id="pm-ssl" onclick="selectPayment('ssl')">
-                <div class="pm-icon">🏦</div>
-                <div class="pm-name">Bangladesh Payment</div>
-                <div class="pm-desc">bKash, Nagad, Rocket<br>Card, Net Banking<br>Powered by SSLCommerz</div>
-              </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
-              <button class="btn btn-primary" onclick="proceedPayment()" id="pay-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                Proceed to payment
-              </button>
-            </div>
-          </div>
-        </div>
+      <!-- Both plan families — rendered from /api/plans (the SAME catalog the
+           landing page and the limit enforcement use; they cannot disagree) -->
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Full funnel</div>
+          <span class="card-sub">CV screening + MCQ test + live AI interview</span></div>
+        <div class="plan-cards" id="pb-full" style="grid-template-columns:repeat(2,1fr)">Loading…</div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Screening only</div>
+          <span class="card-sub">CV screening + MCQ test — no live interviews</span></div>
+        <div class="plan-cards" id="pb-screening" style="grid-template-columns:repeat(3,1fr)">Loading…</div>
+        <div style="font-size:11.5px;color:var(--t3);margin-top:6px">All plans: limits reset monthly · annual billing ≈ 2 months free · at a limit, candidates are held safely — never lost.</div>
       </div>
 
       <!-- Manual payment -->
@@ -407,52 +368,20 @@ img,video{max-width:100%}
           <div class="card-title">🏦 Pay manually (Bangladesh)</div>
           <span class="badge b-orange">BDT payment</span>
         </div>
-        <p style="font-size:12px;color:var(--t2);margin-bottom:1rem;line-height:1.7">Pay via bank transfer or mobile banking and enter your transaction ID. Your plan will be upgraded within 24 hours after verification.</p>
+        <p style="font-size:12px;color:var(--t2);margin-bottom:1rem;line-height:1.7">Pay via bank transfer or mobile banking and enter your transaction ID. Your plan is upgraded within 24 hours after verification.</p>
 
-        <!-- Bank & mobile banking details -->
+        <!-- ⚠ shown until the super-admin saves REAL account details -->
+        <div id="pd-warn" style="display:none;background:#FDF2F2;border:1.5px solid #F3C1C1;color:#B4232C;border-radius:10px;padding:.75rem .9rem;font-size:12.5px;font-weight:700;margin-bottom:1rem">⚠ These account details are placeholders — do NOT send money yet. Payment details are being updated; contact TopCandidate to pay.</div>
+
+        <!-- Bank & mobile banking details — rendered from /api/payment-details -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem">
           <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">🏦 Bank Transfer</div>
-            <div style="font-size:12px;color:var(--t2);line-height:2">
-              <strong style="color:var(--text)">Bank:</strong> Dutch-Bangla Bank Ltd<br>
-              <strong style="color:var(--text)">Account:</strong> 2581234567890<br>
-              <strong style="color:var(--text)">Name:</strong> LinkX360 Limited<br>
-              <strong style="color:var(--text)">Branch:</strong> Dhaka Main Branch<br>
-              <strong style="color:var(--text)">Routing:</strong> 090262503
-            </div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">🏦 Bank transfer</div>
+            <div style="font-size:12px;color:var(--t2);line-height:2" id="pd-bank">Loading…</div>
           </div>
           <div style="background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);padding:.85rem">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">📱 Mobile Banking</div>
-            <div style="font-size:12px;color:var(--t2);line-height:2">
-              <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-                <span style="font-size:14px">💚</span>
-                <div><strong style="color:var(--text)">bKash:</strong> 01712-345678 (Personal)</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-                <span style="font-size:14px">🟠</span>
-                <div><strong style="color:var(--text)">Nagad:</strong> 01712-345678</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;padding:4px 0">
-                <span style="font-size:14px">🔴</span>
-                <div><strong style="color:var(--text)">Rocket:</strong> 01712-3456780</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Prices reminder -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:1.25rem">
-          <div style="background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:.6rem;text-align:center">
-            <div style="font-size:14px;font-weight:700;color:var(--text)">৳3,200</div>
-            <div style="font-size:10px;color:var(--t3)">Starter · 100 screens</div>
-          </div>
-          <div style="background:var(--ig);border:1px solid var(--ib);border-radius:var(--rs);padding:.6rem;text-align:center">
-            <div style="font-size:14px;font-weight:700;color:var(--indigo)">৳8,500</div>
-            <div style="font-size:10px;color:var(--t3)">Pro · 500 screens</div>
-          </div>
-          <div style="background:var(--bg);border:1px solid var(--border2);border-radius:var(--rs);padding:.6rem;text-align:center">
-            <div style="font-size:14px;font-weight:700;color:var(--orange)">Custom</div>
-            <div style="font-size:10px;color:var(--t3)">Enterprise · Unlimited</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">📱 Mobile banking</div>
+            <div style="font-size:12px;color:var(--t2);line-height:2" id="pd-mobile">Loading…</div>
           </div>
         </div>
 
@@ -462,16 +391,12 @@ img,video{max-width:100%}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div class="form-group" style="margin:0">
             <label class="form-label">Plan you are paying for</label>
-            <select class="form-select" id="mp-plan">
-              <option value="starter">Starter — ৳3,200/month</option>
-              <option value="pro">Pro — ৳8,500/month</option>
-              <option value="enterprise">Enterprise — Contact us</option>
-            </select>
+            <select class="form-select" id="mp-plan"></select>
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Payment method used</label>
             <select class="form-select" id="mp-method">
-              <option value="bank">Bank Transfer (DBBL)</option>
+              <option value="bank">Bank transfer</option>
               <option value="bkash">bKash</option>
               <option value="nagad">Nagad</option>
               <option value="rocket">Rocket</option>
@@ -1007,6 +932,83 @@ async function refreshUsage(){
 }
 brandLoad();
 
+// ── Plan & Billing page: rendered from the SHARED catalog (/api/plans — the
+//    same source the landing pricing and the limit enforcement read, so they
+//    can never disagree), the org's real assigned plan, and the configurable
+//    payment details. Pure display — no payment logic here. ──
+const _tk=n=>n==null?'':('৳'+Number(n).toLocaleString('en-IN'));
+async function loadPlanBilling(){
+  let cat=null,pd=null,plan=null;
+  try{ const r=await fetch('/api/plans',{credentials:'include'}); if(r.ok) cat=await r.json(); }catch(_){}
+  try{ const r=await fetch('/api/payment-details',{credentials:'include'}); if(r.ok) pd=await r.json(); }catch(_){}
+  try{ const r=await fetch('/api/org/billing-usage',{credentials:'include'}); if(r.ok) plan=(await r.json()).plan; }catch(_){}
+  const esc=s=>{const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;};
+  const cur=document.getElementById('pb-current');
+  if(cur){
+    if(plan){
+      const lbl=document.getElementById('pb-current-label');
+      if(lbl) lbl.textContent = plan.assigned?((plan.family==='screening'?'Screening only · ':'Full funnel · ')+plan.label):plan.label;
+      cur.innerHTML = plan.assigned
+        ? `<b style="font-size:18px;color:var(--text)">${esc(plan.label)}</b>
+           <div style="margin-top:4px">${plan.applicants_mo!=null?Number(plan.applicants_mo).toLocaleString('en-IN')+' applicants / month':'Unlimited applicants'} ·
+           ${plan.interviews_allowed?((plan.interviews_mo!=null?plan.interviews_mo:'Unlimited')+' live interviews / month'):'no live interviews on this plan'} ·
+           ${plan.jobs!=null?plan.jobs+' active jobs':'unlimited jobs'}</div>
+           <div style="font-size:11.5px;color:var(--t3);margin-top:6px">Limits reset each calendar month. Your usage bars are on the Usage &amp; Billing page.</div>`
+        : `<b style="font-size:16px;color:var(--text)">${esc(plan.label)}</b>
+           <div style="font-size:12px;color:var(--t3);margin-top:4px">No plan limits apply yet — pick a tier below and pay manually, or contact TopCandidate.</div>`;
+    } else cur.innerHTML='<span style="color:var(--t3)">Plan details are visible to the workspace owner.</span>';
+  }
+  if(cat&&cat.tiers){
+    const t=cat.tiers;
+    const card=(k,x,feats,action)=>`<div class="plan-card" style="cursor:default">
+      <div class="plan-name">${esc(x.label)}</div>
+      <div class="plan-price">${x.price_bdt!=null?_tk(x.price_bdt):'Contact us'}<span>${x.price_bdt!=null?'/month':''}</span></div>
+      <div class="plan-features">${feats.map(f=>'✓ '+f).join('<br>')}</div>
+      <div style="margin-top:10px">${action}</div></div>`;
+    const pay=k=>`<button class="btn btn-primary btn-sm" onclick="pbPick('${k}')">Pay manually</button>`;
+    const fullEl=document.getElementById('pb-full');
+    if(fullEl) fullEl.innerHTML=['full_starter','full_growth','full_scale','enterprise'].map(k=>{
+      const x=t[k]; if(!x) return '';
+      const feats=[
+        x.applicants_mo!=null?Number(x.applicants_mo).toLocaleString('en-IN')+' applicants / month':'Custom applicant volume',
+        (x.interviews_mo!=null?x.interviews_mo:'Custom')+' live interviews / month'+(k==='enterprise'&&x.interviews_mo!=null?' (default cap)':''),
+        x.jobs!=null?x.jobs+' active jobs':'Unlimited jobs'];
+      if(k==='enterprise') feats.push('White-label · API as available');
+      return card(k,x,feats,k==='enterprise'
+        ?'<span style="font-size:12px;color:var(--t2);font-weight:600">Contact TopCandidate to arrange</span>':pay(k));
+    }).join('');
+    const scrEl=document.getElementById('pb-screening');
+    if(scrEl) scrEl.innerHTML=['screening_starter','screening_growth','screening_scale'].map(k=>{
+      const x=t[k]; if(!x) return '';
+      return card(k,x,[Number(x.applicants_mo).toLocaleString('en-IN')+' applicants / month',
+                       'CV screening + MCQ test','No live interviews'],pay(k));
+    }).join('');
+    const sel=document.getElementById('mp-plan');
+    if(sel) sel.innerHTML=Object.entries(t).map(([k,x])=>
+      `<option value="${k}">${(x.family==='screening'?'Screening · ':'Full funnel · ')+esc(x.label)} — ${x.price_bdt!=null?_tk(x.price_bdt)+'/mo':'Contact us'}</option>`).join('');
+  }
+  if(pd){
+    const warn=document.getElementById('pd-warn'); if(warn) warn.style.display=pd.configured?'none':'block';
+    const b=document.getElementById('pd-bank');
+    if(b) b.innerHTML=`<strong style="color:var(--text)">Bank:</strong> ${esc(pd.bank_name)||'—'}<br>
+      <strong style="color:var(--text)">Account:</strong> ${esc(pd.account_number)||'—'}<br>
+      <strong style="color:var(--text)">Name:</strong> ${esc(pd.account_name)||'—'}<br>
+      <strong style="color:var(--text)">Branch:</strong> ${esc(pd.branch)||'—'}<br>
+      <strong style="color:var(--text)">Routing:</strong> ${esc(pd.routing)||'—'}`;
+    const m=document.getElementById('pd-mobile');
+    if(m) m.innerHTML=[['💚','bKash',pd.bkash],['🟠','Nagad',pd.nagad],['🔴','Rocket',pd.rocket]]
+      .map(([i,l,v])=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0"><span style="font-size:14px">${i}</span><div><strong style="color:var(--text)">${l}:</strong> ${esc(v)||'—'}</div></div>`).join('')
+      +(pd.note?`<div style="font-size:11px;color:var(--t3);margin-top:4px">${esc(pd.note)}</div>`:'');
+  }
+}
+function pbPick(k){
+  const sel=document.getElementById('mp-plan');
+  if(sel) sel.value=k;
+  const txn=document.getElementById('mp-txn');
+  if(txn && txn.closest('.card')) txn.closest('.card').scrollIntoView({behavior:'smooth'});
+}
+loadPlanBilling();
+
 // ── USAGE & COST SUMMARY (client price at platform-set rates) — READ-ONLY.
 //    Owner/admin only (server 403s others; card stays hidden). Every money
 //    string arrives preformatted from the server's integer-paisa math —
@@ -1081,21 +1083,8 @@ async function loadUser(){
     document.getElementById('p-website').value=userData.website||'';
     document.getElementById('p-address').value=userData.address||'';
 
-    // Billing tab
-    const plan=userData.plan||'trial';
-    const planNames={trial:'Trial Plan',starter:'Starter Plan',pro:'Pro Plan',enterprise:'Enterprise Plan'};
-    const planDescs={trial:'Free forever · 10 screenings/month',starter:'$29/month · 100 screenings/month',pro:'$79/month · 500 screenings/month',enterprise:'Custom pricing · Unlimited screenings'};
-    document.getElementById('current-plan-badge').textContent=plan.charAt(0).toUpperCase()+plan.slice(1);
-    document.getElementById('current-plan-name').textContent=planNames[plan]||plan;
-    document.getElementById('current-plan-desc').textContent=planDescs[plan]||'';
-    if(plan!=='trial'){
-      document.getElementById('cancel-sub-btn').style.display='inline-flex';
-      document.getElementById('manage-billing-btn').style.display='inline-flex';
-    }
-    if(userData.subscription?.current_period_end){
-      const d=new Date(userData.subscription.current_period_end*1000);
-      document.getElementById('current-sub-info').textContent='Next billing: '+d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-    }
+    // Billing tab: the old user-level $-plan display was replaced by the
+    // org-plan view (loadPlanBilling — shared catalog, real assigned tier).
 
     // Payment history
     const payments=payData.payments||[];

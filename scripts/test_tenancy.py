@@ -301,6 +301,10 @@ def main():
                              "interview_tk": "1"})
             check("owner A cannot set billing rates", r.status_code == 403,
                   f"got {r.status_code}")
+            r = c.post("/api/admin/payment-details", headers=hdr(t_owner_a),
+                       json={"bank_name": "x"})
+            check("owner A cannot set payment details (super-admin only)",
+                  r.status_code == 403, f"got {r.status_code}")
 
             print("\nHRM — hidden from every non-super-admin org member (Q2)")
             for name, tok in (("recruiter A", t_rec_a), ("owner A", t_owner_a)):

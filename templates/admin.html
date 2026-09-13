@@ -321,6 +321,25 @@ img,video{max-width:100%}
         </div>
         <div id="bl-rates-msg" style="font-size:11.5px;margin-top:8px;color:var(--t3,#6B7280)"></div>
       </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd"><div class="card-title">Manual payment details</div>
+          <span class="card-sub" id="pdset-status"></span></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Bank name</label><input id="pdset-bank_name" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Account name</label><input id="pdset-account_name" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Account number</label><input id="pdset-account_number" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Branch</label><input id="pdset-branch" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Routing</label><input id="pdset-routing" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">bKash</label><input id="pdset-bkash" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Nagad</label><input id="pdset-nagad" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Rocket</label><input id="pdset-rocket" style="width:100%"></div>
+          <div><label style="font-size:10.5px;font-weight:700;display:block;margin-bottom:4px">Note (optional)</label><input id="pdset-note" style="width:100%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--t3,#6B7280)">These render on every client's Plan &amp; Billing page. Until saved, clients see a "placeholder — do not pay" warning.</span>
+          <button class="btn btn-sm" onclick="pdSave()">Save payment details</button>
+        </div>
+      </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Usage by client</div><span class="card-sub" id="bl-grand"></span></div>
         <div class="tbl-wrap">
@@ -618,7 +637,7 @@ function nav(id){
   if(id==='edit-landing')loadLandingContent();
   if(id==='settings')loadSettings();
   if(id==='demos')loadDemos();
-  if(id==='billing')loadBilling();
+  if(id==='billing'){loadBilling();pdLoad();}
 }
 
 // ── USAGE & BILLING (super-admin) — client-price view. All money strings
@@ -659,6 +678,27 @@ async function loadBilling(){
   document.getElementById('bl-grand').textContent='Grand total: ৳'+(_blUsage.grand_total_tk||'0')+' · estimate at current rates';
 }
 function escBl(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+const _PD_FIELDS=['bank_name','account_name','account_number','branch','routing','bkash','nagad','rocket','note'];
+async function pdLoad(){
+  try{
+    const r=await tFetch('/api/payment-details');
+    if(!r.ok) return;
+    const d=await r.json();
+    _PD_FIELDS.forEach(k=>{const el=document.getElementById('pdset-'+k); if(el) el.value=d[k]||'';});
+    const st=document.getElementById('pdset-status');
+    if(st) st.textContent=d.configured?'✓ configured — shown to clients':'⚠ NOT configured — clients see a placeholder warning';
+  }catch(_){}
+}
+async function pdSave(){
+  const body={};
+  _PD_FIELDS.forEach(k=>{const el=document.getElementById('pdset-'+k); body[k]=el?el.value.trim():'';});
+  const r=await fetch('/api/admin/payment-details',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  const st=document.getElementById('pdset-status');
+  if(!r.ok){ if(st) st.textContent='Save failed: '+(d.detail||r.status); return; }
+  if(st) st.textContent='✓ Saved — clients now see these details (warning removed)';
+}
 function blScopeChange(){
   const sc=document.getElementById('bl-scope').value;
   const msg=document.getElementById('bl-rates-msg');

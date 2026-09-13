@@ -7034,6 +7034,50 @@ async def public_plan_catalog():
             "annual_months_free": 2}
 
 
+# Manual-payment account details — CONFIGURABLE, one place. Values below are
+# PLACEHOLDERS shipped only so the layout renders; until the super-admin
+# saves real details, configured=False and the client UI shows a loud
+# do-not-pay warning. Real numbers are entered in /admin → Usage & Billing.
+_PAYMENT_FIELDS = ("bank_name", "account_name", "account_number", "branch",
+                   "routing", "bkash", "nagad", "rocket", "note")
+_PAYMENT_PLACEHOLDER = {
+    "bank_name": "Dutch-Bangla Bank Ltd", "account_name": "LinkX360 Limited",
+    "account_number": "2581234567890", "branch": "Dhaka Main Branch",
+    "routing": "090262503", "bkash": "01712-345678", "nagad": "01712-345678",
+    "rocket": "01712-3456780", "note": "",
+}
+
+
+@app.get("/api/payment-details")
+async def payment_details_get(request: Request):
+    """Where clients send manual payments — authenticated (org members are
+    the ones paying). configured=False until real details are saved."""
+    await get_current_user(request)
+    doc = await db.platform_settings.find_one({"_id": "payment_details"})
+    if doc:
+        return {"configured": True,
+                **{k: str(doc.get(k) or "") for k in _PAYMENT_FIELDS}}
+    return {"configured": False, **_PAYMENT_PLACEHOLDER}
+
+
+@app.post("/api/admin/payment-details")
+async def payment_details_set(request: Request):
+    """Super-admin saves the REAL bank / mobile-banking details (one place)."""
+    user = await require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body.")
+    doc = {k: str(body.get(k) or "").strip()[:120] for k in _PAYMENT_FIELDS}
+    if not any(v for k, v in doc.items() if k != "note"):
+        raise HTTPException(status_code=400, detail="Enter at least one real payment detail.")
+    await db.platform_settings.update_one(
+        {"_id": "payment_details"},
+        {"$set": {**doc, "updated_at": _dt.utcnow(),
+                  "updated_by": str(user.get("email") or "")}}, upsert=True)
+    return {"success": True, "configured": True}
+
+
 @app.post("/api/admin/billing/plan")
 async def admin_set_org_plan(request: Request):
     """Super-admin assigns (or clears) an org's subscription tier."""
