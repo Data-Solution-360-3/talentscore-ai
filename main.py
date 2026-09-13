@@ -755,7 +755,8 @@ async def register(
         password_hash=hash_password(password)
     )
     # Send verification email
-    sent = send_verification_email(to_email=email, company_name=company_name, otp=otp)
+    sent = await asyncio.to_thread(send_verification_email, to_email=email,
+                                   company_name=company_name, otp=otp)
     if not sent:
         raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
     return JSONResponse({"success": True, "message": "Verification code sent to your email."})
@@ -788,7 +789,8 @@ async def verify_email(
         raise HTTPException(status_code=400, detail=str(e))
 
     # Send welcome email
-    send_welcome_email(to_email=email, company_name=pending["company_name"])
+    await asyncio.to_thread(send_welcome_email, to_email=email,
+                            company_name=pending["company_name"])
 
     # Fetch user to get correct role from DB
     new_user = await get_user_by_email(email)
@@ -822,7 +824,8 @@ async def resend_otp(request: Request, email: str = Form(...)):
         company_name=pending["company_name"],
         password_hash=pending["password_hash"]
     )
-    send_verification_email(to_email=email, company_name=pending["company_name"], otp=otp)
+    await asyncio.to_thread(send_verification_email, to_email=email,
+                            company_name=pending["company_name"], otp=otp)
     return JSONResponse({"success": True})
 
 
@@ -2195,7 +2198,8 @@ async def send_email_to_candidate(
     sender_name = ((_sb or {}).get("company_name")
                    or (db_user or {}).get("company_name") or "")
 
-    ok, err = send_candidate_email(
+    ok, err = await asyncio.to_thread(
+        send_candidate_email,
         to_email=target,
         subject=subject,
         body_text=body,
@@ -4250,13 +4254,48 @@ async def public_apply_page(token: str):
     return HTMLResponse(page)
 
 
+# ── SCORING CONCURRENCY CONTROL (scale fix, 2026-09-14) ──
+# All funnel fan-out paths launch through queue_scoring(): a detached task
+# bounded by ONE semaphore, so "advance 500" runs ~SCORING_MAX_CONCURRENT
+# pipelines at a time instead of 500 at once (429 storm + event-loop
+# starvation) — and instead of Starlette BackgroundTasks' one-at-a-time
+# serialization, which made a big advance take hours. Limit is per worker
+# process (2 gunicorn workers => at most 2x platform-wide). The batch-upload
+# page keeps its own CONCURRENCY_LIMIT throttle, unchanged.
+SCORING_MAX_CONCURRENT = 5
+_SCORING_SEM: "asyncio.Semaphore | None" = None
+_SCORING_TASKS: set = set()
+
+
+def _scoring_sem() -> "asyncio.Semaphore":
+    global _SCORING_SEM
+    if _SCORING_SEM is None:
+        _SCORING_SEM = asyncio.Semaphore(SCORING_MAX_CONCURRENT)
+    return _SCORING_SEM
+
+
+def queue_scoring(application_id: str):
+    """Bounded, detached scoring launch. Never drops a candidate: the task
+    set holds a strong reference until completion, score_application itself
+    lands every failure in stored_unscored, and the retry sweep re-drives
+    transient failures."""
+    async def _run():
+        try:
+            async with _scoring_sem():
+                await score_application(application_id)
+        except Exception as e:
+            print(f"[SCORING] queued task crashed for {application_id}: {e}")
+    t = asyncio.get_running_loop().create_task(_run())
+    _SCORING_TASKS.add(t)
+    t.add_done_callback(_SCORING_TASKS.discard)
+
+
 async def score_application(application_id: str):
-    """Score one public application. Runs AFTER the response is sent.
+    """Score one public application. Runs detached from the response.
 
     Nothing here talks to the candidate. If it fails, the application drops back
-    to stored_unscored and shows up in the recruiter's pending queue, which is
-    the same path a capped application takes — so the manual "Score all pending"
-    button doubles as the retry mechanism. No queue infrastructure needed.
+    to stored_unscored and shows up in the recruiter's pending queue — and the
+    tc-screening-retry sweep re-drives transient failures automatically.
     """
     from bson import ObjectId as _OID
     try:
@@ -4506,7 +4545,7 @@ async def public_apply_submit(
         ok, blocked_by = await reserve_screening_slot(job_id, str(job.get("org_id") or ""),
                                                       _plan["applicants_mo"])
     if ok:
-        background.add_task(score_application, application_id)
+        queue_scoring(application_id)
     else:
         await db.applications.update_one(
             {"_id": __import__("bson").ObjectId(application_id)},
@@ -4969,7 +5008,7 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
         await db.applications.update_one(
             {"_id": aid}, {"$set": {"status": "pending", "advanced_at": _dt.utcnow(),
                                     "advanced_by": user["user_id"]}})
-        background.add_task(score_application, str(aid))
+        queue_scoring(str(aid))
         print(f"[MCQ-FUNNEL] job={job_id} advanced SINGLE app={application_id} by={user.get('email')}")
         return {"success": True, "advanced": 1, "requested": 1, "qualified": 1,
                 "mark": None, "held_remaining": 0, "capped_by": None}
@@ -5002,7 +5041,7 @@ async def mcq_funnel_advance(request: Request, background: BackgroundTasks,
                                          {"$set": {"status": "pending",
                                                    "advanced_at": _dt.utcnow(),
                                                    "advanced_by": user["user_id"]}})
-        background.add_task(score_application, str(a["_id"]))
+        queue_scoring(str(a["_id"]))
         advanced += 1
     print(f"[MCQ-FUNNEL] job={job_id} advanced={advanced} of n={n}"
           + (f" mark>={mark} (qualified={qualified})" if mark is not None else "")
@@ -5657,7 +5696,9 @@ async def invite_funnel_candidate(job: dict, application_id: str) -> dict:
         if brand.get("logo_url"):
             brand = {**brand, "logo_url": f"{APP_URL}{brand['logo_url']}"}
     from email_service import send_interview_invite_email
-    sent, info = send_interview_invite_email(
+    # Threaded (2026-09-14): the send is a sync HTTP call — inline it blocked
+    # the event loop ~0.5-2s per invite during scoring bursts.
+    sent, info = await asyncio.to_thread(send_interview_invite_email,
         to_email=str(app_doc.get("email") or ""),
         candidate_name=str(app_doc.get("name") or ""),
         company=company,
@@ -7856,7 +7897,7 @@ async def team_invite(request: Request, email: str = Form(...), role: str = Form
         # Send invitation email (best-effort; the link in the response is the
         # reliable path — the owner can always copy it to the invitee).
         from email_service import send_team_invite_email
-        email_sent, email_info = send_team_invite_email(
+        email_sent, email_info = await asyncio.to_thread(send_team_invite_email,
             to_email=email,
             invited_by=user["email"],
             company_name=company,
@@ -8584,11 +8625,13 @@ async def api_docs(request: Request):
 # NEVER activates or renews any other way.
 # ─────────────────────────────────────────────────────────────
 
-def _mp_email(to_email: str, subject: str, body: str):
-    """Notify the submitter — best-effort: a mail failure must never fail or
-    roll back a money operation."""
+async def _mp_email(to_email: str, subject: str, body: str):
+    """Notify the submitter — best-effort AND threaded: a mail failure must
+    never fail or roll back a money operation, and the sync HTTP send must
+    never block the event loop."""
     try:
-        send_candidate_email(to_email=to_email, subject=subject, body_text=body)
+        await asyncio.to_thread(send_candidate_email, to_email=to_email,
+                                subject=subject, body_text=body)
     except Exception as e:
         print(f"[PAYMENTS] notify email failed for {to_email}: {e}")
 
@@ -8825,7 +8868,7 @@ async def approve_manual_payment(request: Request, payment_id: str,
         "status": "paid",
         "tran_id": payment.get("transaction_id", ""),
     })
-    _mp_email(payment.get("email", ""),
+    await _mp_email(payment.get("email", ""),
               f"Payment confirmed — {t['label']} active until {paid_until:%d %b %Y}",
               (f"Good news! Your payment (transaction {payment.get('transaction_id')}) is "
                f"verified.\n\nPlan: {t['label']}\nPaid until: {paid_until:%d %b %Y}\n\n"
@@ -8862,7 +8905,7 @@ async def reject_manual_payment(request: Request, payment_id: str, reason: str =
         {"_id": pid, "status": "pending_review"},
         {"$set": {"status": "rejected", "reject_reason": reason,
                   "rejected_by": user.get("email"), "rejected_at": _dt.utcnow()}})
-    _mp_email(payment.get("email", ""),
+    await _mp_email(payment.get("email", ""),
               "Payment submission needs another look",
               (f"We couldn't verify your payment submission (transaction "
                f"{payment.get('transaction_id')}).\n\nReason: {reason}\n\n"
