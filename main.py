@@ -6801,12 +6801,13 @@ def _paisa_to_tk_str(p: int) -> str:
 # ─────────────────────────────────────────────────────────────
 
 PLAN_TIERS = {
+    # Screening prices FINAL 2026-09-14 (was 1500/6000/18000).
     "screening_starter": {"family": "screening", "label": "Screening Starter",
-        "price_bdt": 1500,  "applicants_mo": 500,  "interviews_mo": 0, "jobs": None},
+        "price_bdt": 1000,  "applicants_mo": 500,  "interviews_mo": 0, "jobs": None},
     "screening_growth":  {"family": "screening", "label": "Screening Growth",
-        "price_bdt": 6000,  "applicants_mo": 2000, "interviews_mo": 0, "jobs": None},
+        "price_bdt": 3800,  "applicants_mo": 2000, "interviews_mo": 0, "jobs": None},
     "screening_scale":   {"family": "screening", "label": "Screening Scale",
-        "price_bdt": 18000, "applicants_mo": 6000, "interviews_mo": 0, "jobs": None},
+        "price_bdt": 11000, "applicants_mo": 6000, "interviews_mo": 0, "jobs": None},
     # Interview caps FINAL 2026-09-14: interviews cost ~Tk38 each, so the
     # monthly cap is the margin protection — a FIRM block at launch time
     # (reserve fails -> no interview starts; qualified candidates queue and
