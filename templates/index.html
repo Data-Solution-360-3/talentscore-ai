@@ -826,19 +826,17 @@ img,svg,video{max-width:100%}
     <button class="mt-btn" id="mt-hrm" onclick="setMode('hrm')">HRM</button>
   </div>
   <div class="t-right">
-    <!-- Usage indicator — single primary location for "how many screenings used" -->
-    <div id="t-usage-wrap" style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:6px 12px;cursor:pointer;transition:border-color .15s" onclick="showPage('dashboard');showUsageModal()" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="Click to see usage details">
-      <div style="display:flex;flex-direction:column;gap:3px;min-width:90px">
+    <!-- Usage pill — ALL stages vs the org plan's real caps (2026-09-15).
+         Reads me.org_plan (+usage) from /api/auth/me: the same _org_plan +
+         atomic monthly counters the backend enforces with — never the old
+         legacy users.plan / hardcoded-limits table. -->
+    <div id="t-usage-wrap" style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);padding:6px 12px;cursor:pointer;transition:border-color .15s" onclick="location.href='/settings'" onmouseover="this.style.borderColor='var(--border3)'" onmouseout="this.style.borderColor='var(--border2)'" title="This month's usage vs your plan — click for Plan &amp; Billing">
+      <div style="display:flex;flex-direction:column;gap:3px;min-width:150px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)">Screenings</span>
-          <span class="t-plan" id="t-plan" style="font-size:9px;padding:1px 7px;line-height:1.4">Trial</span>
+          <span class="t-plan" id="t-plan" style="font-size:9px;padding:1px 7px;line-height:1.4">—</span>
+          <span id="t-plan-state" style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden;min-width:60px">
-            <div id="t-usage-bar" style="height:100%;background:linear-gradient(90deg,var(--orange),#E16A1F);border-radius:3px;width:0%;transition:width .5s"></div>
-          </div>
-          <span id="t-usage-text" style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums">0/10</span>
-        </div>
+        <div id="t-usage-rows" style="display:flex;flex-direction:column;gap:2px"></div>
       </div>
     </div>
     <a href="/batch" class="t-btn accent" style="padding:7px 14px;font-weight:600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Screen CVs</a>
@@ -2686,22 +2684,30 @@ function openCandModal(id){
 // ── Per-candidate cost line (owner/admin only; the server also strips these
 //    fields from non-owner responses, so this render gate is belt-and-braces).
 //    ESTIMATES from the server's dated rate constants — rates change.
+// Per-candidate cost, SEPARATED BY STAGE and only for stages this candidate
+// actually went through: MCQ (deterministic = Tk0, shown only when they took
+// one), CV scoring, interview (audio + scoring). Taka-primary at the real
+// all-in rate (142 BDT/USD incl. VAT, set 2026-09-13 — was a stale 122.85).
 function candCostHTML(r){
   const me = window._meCache || {};
   if(!(me.org_role === 'owner' || me.role === 'admin')) return '';
-  const BDT = 122.85;
+  const BDT = 142;
   const cv = (r.api_usage && r.api_usage.cv_scoring) || null;
   const sc = r.interview_scoring_usage || null;
   const rt = r.interview_realtime_usage || null;
-  if(!cv && !sc && !rt) return '';
+  if(!cv && !sc && !rt && !r.mcq_taken) return '';
   const usd = x => (x && typeof x.est_usd === 'number') ? x.est_usd : 0;
-  const total = usd(cv) + usd(sc) + usd(rt);
-  const part = (label, x) => x ? `${label} $${usd(x).toFixed(3)}` : `${label} —`;
+  const ivUsd = usd(sc) + usd(rt);
+  const total = usd(cv) + ivUsd;
+  const tk = v => '৳' + (v*BDT).toFixed(2);
+  const parts = [];
+  if(r.mcq_taken) parts.push('MCQ <b>৳0</b> <span style="opacity:.6">(deterministic — question-set generation is a per-job cost)</span>');
+  if(cv) parts.push(`CV <b>${tk(usd(cv))}</b>`);
+  if(sc || rt) parts.push(`Interview <b>${tk(ivUsd)}</b> <span style="opacity:.6">(audio ${tk(usd(rt))} + scoring ${tk(usd(sc))})</span>`);
   return `<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:6px">
-    <strong style="color:var(--t2)">💵 OpenAI spend (est.):</strong>
-    <b>$${total.toFixed(3)}</b> (৳${(total*BDT).toFixed(1)}) —
-    ${part('CV scoring', cv)} · ${part('interview audio', rt)} · ${part('interview scoring', sc)}
-    <span style="opacity:.65">· estimated from stored rates · owner only</span>
+    <strong style="color:var(--t2)">💵 OpenAI cost, this candidate (est.):</strong>
+    ${parts.join(' · ')} · Total <b style="color:var(--t2)">${tk(total)}</b>
+    <span style="opacity:.65">($${total.toFixed(3)} @ ৳${BDT}/USD incl. VAT · latest scoring run · owner only)</span>
   </div>`;
 }
 
@@ -6203,21 +6209,43 @@ async function refreshPlan(){
     window._meCache = me;   // keep the cache fresh for email composer
     // Re-apply HRM access if the super-admin flag changed since load.
     if((me.is_super_admin === true) !== window._isSuper) applyModeAccess(me.is_super_admin === true);
-    const planName=(me.plan||'trial').charAt(0).toUpperCase()+(me.plan||'trial').slice(1);
+    // ── Usage pill: the REAL org plan + this month's per-stage usage from
+    //    the enforcing counters — the legacy users.plan/hardcoded limits are
+    //    gone (they were why an approved payment never showed here).
+    const op = me.org_plan || {};
+    const u  = op.usage || {};
+    const planName = op.assigned ? op.label : 'Legacy';
     const tp = document.getElementById('t-plan');
     const prev = tp ? tp.textContent : '';
     if(tp) tp.textContent = planName;
-    // Update usage bar with fresh values
-    const planLimits={trial:10,starter:100,pro:500,enterprise:9999};
-    const limit=planLimits[me.plan||'trial']||10;
-    const used=me.screening_count||0;
-    const pct=Math.min(100,Math.round(used/limit*100));
-    const bar=document.getElementById('t-usage-bar');
-    const txt=document.getElementById('t-usage-text');
-    if(bar){bar.style.width=pct+'%';bar.style.background=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--indigo)';}
-    if(txt){txt.textContent=used+'/'+limit;txt.style.color=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--t2)';}
+    const stEl=document.getElementById('t-plan-state');
+    if(stEl){
+      stEl.textContent = op.state==='paused'?'paused':op.state==='grace'?'payment due':'';
+      stEl.style.color = op.state==='paused'?'var(--red)':'var(--amber)';
+    }
+    const rowsEl=document.getElementById('t-usage-rows');
+    if(rowsEl){
+      const row=(lbl,used2,cap)=>{
+        const capped=cap!=null;
+        const pct=capped?Math.min(100,Math.round(used2/cap*100)):0;
+        const col=!capped?'var(--indigo)':pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--indigo)';
+        return `<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);width:30px;flex:none">${lbl}</span>
+          <div style="flex:1;height:4px;background:var(--s3);border-radius:3px;overflow:hidden;min-width:44px">
+            <div style="height:100%;width:${capped?pct:(used2>0?100:0)}%;background:${col};border-radius:3px;transition:width .5s;${!capped?'opacity:.35':''}"></div>
+          </div>
+          <span style="font-size:10px;font-weight:700;color:${capped&&pct>=90?'var(--red)':'var(--t2)'};white-space:nowrap;font-variant-numeric:tabular-nums">${used2}${capped?'/'+cap:''}</span>
+        </div>`;
+      };
+      rowsEl.innerHTML =
+        row('MCQ', u.mcq||0, null) +
+        row('CV',  u.applicants||0, op.applicants_mo!=null?op.applicants_mo:null) +
+        (op.interviews_allowed
+          ? row('IV', u.interviews||0, op.interviews_mo!=null?op.interviews_mo:null)
+          : `<div style="font-size:8.5px;color:var(--t3);padding-left:36px">no live interviews on this plan</div>`);
+    }
     // Notify the user if their plan just changed
-    if(prev && prev !== planName){
+    if(prev && prev !== '—' && prev !== planName){
       const toast=document.createElement('div');
       toast.style.cssText='position:fixed;top:70px;right:20px;background:#10b981;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(16,185,129,.3)';
       toast.textContent='✓ Your plan was updated to '+planName;

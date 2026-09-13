@@ -816,6 +816,20 @@ async def me(request: Request):
     # Always fetch fresh data from DB to get latest role/plan
     db_user = await get_user_by_id(user["user_id"])
     if db_user:
+        _org_id = str(db_user.get("org_id") or "")
+        _op = await _org_plan(_org_id)
+        if _org_id:
+            # Per-org monthly usage for the top-bar pill — the SAME atomic
+            # counters that enforce the caps, so display and enforcement can
+            # never disagree. MCQ has no plan cap; its count is display-only.
+            from database import get_org_monthly_usage
+            _ou = await get_org_monthly_usage(_org_id)
+            _ms = _dt.utcnow().replace(day=1, hour=0, minute=0,
+                                       second=0, microsecond=0)
+            _ou["mcq"] = await db.applications.count_documents(
+                {"org_id": _org_id, "mcq_score": {"$ne": None},
+                 "submitted_at": {"$gte": _ms}})
+            _op = {**_op, "usage": _ou}
         return {
             "user_id": user["user_id"],
             "email": db_user.get("email", user["email"]),
@@ -824,9 +838,9 @@ async def me(request: Request):
             "org_role": db_user.get("org_role", "owner"),
             # White-label: the caller's org branding (null = default look).
             "branding": await _org_branding(str(db_user.get("org_id") or "")),
-            # Subscription plan flags (display + UI gating; the backend
-            # enforces independently at every launch point).
-            "org_plan": await _org_plan(str(db_user.get("org_id") or "")),
+            # Subscription plan + this month's usage (display + UI gating;
+            # the backend enforces independently at every launch point).
+            "org_plan": _op,
             "is_super_admin": bool(db_user.get("is_super_admin")),
             "plan": db_user.get("plan", "trial"),
             "screening_count": db_user.get("screening_count", 0),
@@ -4209,6 +4223,9 @@ async def score_application(application_id: str):
             "job_title": job.get("title"),
             "user_id": app_doc.get("user_id"),
             "source": "public_apply",
+            # Display metadata: lets the per-candidate cost line show an
+            # explicit "MCQ Tk0" only for candidates who actually took one.
+            "mcq_taken": app_doc.get("mcq_score") is not None,
             "application_id": application_id,
             "applicant_name": app_doc.get("name"),
             "applicant_email": app_doc.get("email"),
