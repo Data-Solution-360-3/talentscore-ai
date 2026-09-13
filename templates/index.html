@@ -493,10 +493,20 @@ img,svg,video{max-width:100%}
 #page-candidates .tbl tbody tr:last-child td{border-bottom:none}
 /* softer skill chips + compact gaps chip */
 #page-candidates .tag.matched{background:var(--gg);color:var(--green);border:none;font-weight:600;padding:3px 9px;border-radius:999px}
-#page-candidates .gaps-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--rg);color:#B4433A;white-space:nowrap;cursor:default}
-#page-candidates .gaps-chip.none{background:var(--gg);color:var(--green)}
-#page-candidates .gaps-chip .gaps-more{opacity:.7;font-weight:800}
+#page-candidates .gaps-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--rg);color:#B4433A;white-space:nowrap;cursor:pointer;max-width:280px;transition:box-shadow .12s}
+#page-candidates .gaps-chip:not(.none):hover{box-shadow:0 0 0 2px rgba(180,67,58,.18)}
+#page-candidates .gaps-chip.none{background:var(--gg);color:var(--green);cursor:default}
+#page-candidates .gaps-chip .gaps-more{opacity:.7;font-weight:800;flex:none}
+#page-candidates .gaps-chip .gc-short{display:inline-flex;align-items:center;gap:5px;min-width:0}
+#page-candidates .gaps-chip .gc-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+#page-candidates .gaps-chip .gc-full{display:none}
+#page-candidates .gaps-chip.open{white-space:normal;max-width:360px;border-radius:12px;padding:8px 12px;align-items:flex-start}
+#page-candidates .gaps-chip.open .gc-short{display:none}
+#page-candidates .gaps-chip.open .gc-full{display:flex;flex-direction:column;gap:5px;text-align:left}
+#page-candidates .gap-line{font-weight:600;line-height:1.4;display:block}
+#page-candidates .gap-tag{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:1px 6px;border-radius:6px;background:rgba(180,67,58,.14);margin-right:5px;vertical-align:1px;flex:none}
 #page-candidates .tbl.dense .gaps-chip{font-size:9px;padding:1px 6px}
+#page-candidates .tbl.dense .gaps-chip.open{padding:6px 9px}
 .filter-select{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--t2);outline:none;transition:border-color .12s;cursor:pointer}
 .filter-select:focus{border-color:var(--indigo)}
 .filter-input{padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rs);font-size:11px;font-family:inherit;color:var(--text);outline:none;transition:border-color .12s}
@@ -1053,10 +1063,11 @@ img,svg,video{max-width:100%}
     </div>
   </div>
 
-  <!-- Filters — four clean controls in one soft row. The Stage/Score/
-       Experience/Date controls are kept in a hidden block (below) so their
-       ids still resolve: applyFilters/clearFilters read them unchanged, and
-       the dashboard's filterByStage() still drives f-stage. -->
+  <!-- Filters — two rows of soft controls. Row 1: search/job/result/sort.
+       Row 2: score bracket, live-interview status, date preset + custom range.
+       Stage + Experience stay in the hidden block so their ids still resolve:
+       applyFilters/clearFilters read them unchanged, and the dashboard's
+       filterByStage() still drives f-stage. -->
   <div class="card cand-filters" style="margin-bottom:12px;padding:.95rem 1rem">
     <div class="filters-row cand-primary">
       <input class="filter-input cand-fi" id="f-search" placeholder="🔍 Search by name or skill…" oninput="applyFilters()" style="flex:1;min-width:220px">
@@ -1074,13 +1085,35 @@ img,svg,video{max-width:100%}
         <option value="job">Job name (A–Z)</option>
       </select>
     </div>
+    <div class="filters-row cand-primary" style="margin-top:8px">
+      <select class="filter-select cand-fi" id="f-score" onchange="applyFilters()" title="Filter by the overall score shown in the table">
+        <option value="">Any score</option>
+        <option value="80">Score 80+</option>
+        <option value="65">Score 65–80</option>
+        <option value="48">Score 48–65</option>
+        <option value="0">Score 0–48</option>
+      </select>
+      <select class="filter-select cand-fi" id="f-interview" onchange="applyFilters()" title="Filter by live-interview status">
+        <option value="">Interview — any</option>
+        <option value="not_taken">Not taken</option>
+        <option value="pending">Pending / incomplete</option>
+        <option value="completed">Completed</option>
+      </select>
+      <select class="filter-select cand-fi" id="f-date-pre" onchange="datePreset(this.value)" title="Filter by screening date">
+        <option value="">Any time</option>
+        <option value="7d">Last 7 days</option>
+        <option value="month">This month</option>
+        <option value="custom">Custom range</option>
+      </select>
+      <input type="date" class="filter-input cand-fi" id="f-date-from" onchange="document.getElementById('f-date-pre').value='custom';applyFilters()" title="Screened on or after this date">
+      <input type="date" class="filter-input cand-fi" id="f-date-to" onchange="document.getElementById('f-date-pre').value='custom';applyFilters()" title="Screened on or before this date">
+      <button class="filter-clear" onclick="clearFilters()" title="Reset every filter" style="margin-left:auto">✕ Clear filters</button>
+    </div>
     <!-- Kept for logic (hidden): dashboard funnel/stat clicks set f-stage;
-         applyFilters/clearFilters reference all of these. Not shown in the bar. -->
+         applyFilters/clearFilters reference both. Not shown in the bar. -->
     <div id="cand-hidden-filters" style="display:none">
       <select id="f-stage"><option value="">All stages</option><option value="screening">Screening</option><option value="review">— needs review</option><option value="interview">Interview</option><option value="shortlisted">Shortlisted</option><option value="hire">Hire</option><option value="rejected">Rejected</option></select>
-      <select id="f-score"><option value="">Any score</option><option value="80">80+</option><option value="60">60+</option><option value="40">40+</option><option value="0">Below 40</option></select>
       <select id="f-exp"><option value="">Any experience</option><option value="0">0–2</option><option value="3">3–5</option><option value="6">6+</option></select>
-      <input type="date" id="f-date-from"><input type="date" id="f-date-to">
     </div>
     <div style="font-size:11.5px;color:var(--t3);margin-top:.7rem" id="filter-count">Showing all candidates</div>
   </div>
@@ -2357,12 +2390,41 @@ function ivCell(r){
   return `<a class="tbl-link" href="/viva-live/sessions#${iv.id}" onclick="event.stopPropagation()" title="Open the full interview report" style="font-weight:800;color:${gc(iv.overall)}">${iv.overall}</a>`;
 }
 
+// Interview state for the filter — the SAME sources ivCell renders from, folded
+// to three buckets: completed (a score exists), pending (a session exists but no
+// score yet — includes ended-early/scoring/failed states), not_taken (no session).
+function ivStateOf(r){
+  if(r.interview_score!=null && r.interview_session_id) return 'completed';
+  const iv=(r.application_id&&_ivMap)?_ivMap[r.application_id]:null;
+  if(!iv) return 'not_taken';
+  return iv.overall!=null ? 'completed' : 'pending';
+}
+
+// ── Gaps chip: display only — critical_gaps data untouched. Collapsed = one
+//    clamped line ("⚠ TAG first-gap +N"); click toggles the full list in place.
+//    A leading "[SKILLS]"-style prefix becomes a small tag instead of raw text.
+function gapSplit(g){
+  const m=/^\[([A-Za-z _-]+)\]\s*(.*)$/.exec(g||'');
+  return (m&&m[2]) ? {tag:m[1].toUpperCase(),text:m[2]} : {tag:null,text:g||''};
+}
+function gapsChipHTML(allGaps){
+  if(!allGaps.length) return '<span class="gaps-chip none">✓ None</span>';
+  const first=gapSplit(allGaps[0]);
+  const full=allGaps.map(g=>{const p=gapSplit(g);
+    return `<span class="gap-line">${p.tag?`<span class="gap-tag">${escapeHtml(p.tag)}</span>`:''}${escapeHtml(p.text)}</span>`;}).join('');
+  return `<span class="gaps-chip" onclick="event.stopPropagation();this.classList.toggle('open')" title="Click to expand or collapse the full gap list">`
+    +`<span class="gc-short">⚠${first.tag?` <span class="gap-tag">${escapeHtml(first.tag)}</span>`:''}<span class="gc-txt">${escapeHtml(first.text)}</span>${allGaps.length>1?` <span class="gaps-more">+${allGaps.length-1}</span>`:''}</span>`
+    +`<span class="gc-full">${full}</span></span>`;
+}
+
 function renderCandidates(results){
   const tbody=document.getElementById('cands-tbl');
   // Interview scores load once in the background; the first arrival re-renders.
   if(_ivMap===null){
     _ivMap={};   // guard against a re-entrant loop while the fetch is in flight
-    loadIvMap().then(()=>{ if(document.getElementById('page-candidates')?.classList.contains('act')) renderCandidates(results); });
+    // Re-run the FILTERS (not just the render) once scores arrive so the
+    // interview-status filter evaluates against the loaded map.
+    loadIvMap().then(()=>{ if(document.getElementById('page-candidates')?.classList.contains('act')) applyFilters(); });
   }
   // Render the sortable thead each time so the sort indicator stays in sync.
   // (cheap — only 10 columns and only when this page is visible)
@@ -2415,11 +2477,7 @@ function renderCandidates(results){
     const score=r.score||Math.round(r.overall_score||0);const col=gc(score);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();
     const matched=(r.dimensions||[]).flatMap(d=>d.matched_skills||[]).slice(0,3);
     const allGaps=(r.critical_gaps||[]);
-    // Compact gaps chip: first gap + "+N", full list on hover, all in the modal.
-    // Same data as before — just no longer two stacked red boxes per row.
-    const gapsCell = allGaps.length
-      ? `<span class="gaps-chip" title="Missing: ${escapeHtml(allGaps.join(', '))}">⚠ ${escapeHtml(allGaps[0])}${allGaps.length>1?` <span class="gaps-more">+${allGaps.length-1}</span>`:''}</span>`
-      : `<span class="gaps-chip none">✓ None</span>`;
+    const gapsCell = gapsChipHTML(allGaps);
     const edu=r.parsed_cv?.education?.[0];
     const stage=r.stage||'pending';
     const sl_active = stage==='shortlisted' ? 'box-shadow:0 0 0 2px var(--green);font-weight:700' : '';
@@ -2466,10 +2524,13 @@ function applyFilters(){
   const dateTo=document.getElementById('f-date-to')?.value||'';
   const result=document.getElementById('f-result')?.value||'';
   const stageF=document.getElementById('f-stage')?.value||'';
-  const scoreMin=parseInt(document.getElementById('f-score')?.value||'0')||0;
+  const ivF=document.getElementById('f-interview')?.value||'';
   const expMin=parseInt(document.getElementById('f-exp')?.value||'-1');
   const sort=document.getElementById('f-sort')?.value||'score';
-  const scoreMax=document.getElementById('f-score')?.value===''?999:(scoreMin===0?39:scoreMin===80?100:scoreMin===60?79:59);
+  // Score brackets (both bounds checked): 80→80–100, 65→65–79, 48→48–64, 0→0–47
+  const scoreSel=document.getElementById('f-score')?.value??'';
+  const scoreMin=scoreSel===''?0:(parseInt(scoreSel)||0);
+  const scoreMax=scoreSel===''?999:(scoreMin===80?100:scoreMin===65?79:scoreMin===48?64:47);
 
   // Dedup is all-or-nothing across pages — same rule the Dashboard funnel uses.
   const base=CandidateStats.compute(allResults).rows;
@@ -2485,9 +2546,10 @@ function applyFilters(){
     const matchR=!result||rec===result;
     const st=CandidateStats.stageOf(r);
     const matchStage=!stageF||(stageF==='review'?CandidateStats.needsReview(r):st===stageF);
-    const matchS=document.getElementById('f-score')?.value===''||score<=scoreMax;
+    const matchS=scoreSel===''||(score>=scoreMin&&score<=scoreMax);
     const matchE=expMin<0||(expMin===0?exp<=2:expMin===3?exp>=3&&exp<=5:exp>=6);
-    return matchQ&&matchJ&&matchR&&matchStage&&matchS&&matchE&&matchDF&&matchDT;
+    const matchIv=!ivF||ivStateOf(r)===ivF;
+    return matchQ&&matchJ&&matchR&&matchStage&&matchS&&matchE&&matchDF&&matchDT&&matchIv;
   });
 
   if(sort==='score')filtered.sort((a,b)=>ovOf(b).s-ovOf(a).s);   // (T2) order matches the visible column
@@ -2505,8 +2567,21 @@ function applyFilters(){
 }
 
 function clearFilters(){
-  ['f-search','f-job','f-stage','f-result','f-score','f-exp','f-date-from','f-date-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-search','f-job','f-stage','f-result','f-score','f-exp','f-interview','f-date-pre','f-date-from','f-date-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('f-sort').value='score';
+  applyFilters();
+}
+
+// Date preset → fills the from/to inputs (local dates, not UTC — Dhaka is +6
+// and toISOString would shift the day). Editing an input flips it to 'custom'.
+function datePreset(v){
+  const from=document.getElementById('f-date-from'), to=document.getElementById('f-date-to');
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const now=new Date();
+  if(v==='7d'){ const d=new Date(now); d.setDate(d.getDate()-7); from.value=iso(d); to.value=''; }
+  else if(v==='month'){ from.value=iso(new Date(now.getFullYear(),now.getMonth(),1)); to.value=''; }
+  else if(v===''){ from.value=''; to.value=''; }
+  // 'custom' leaves the inputs alone for the user to set
   applyFilters();
 }
 
