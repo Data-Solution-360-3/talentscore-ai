@@ -8716,10 +8716,14 @@ async def approve_manual_payment(request: Request, payment_id: str,
         raise HTTPException(status_code=409, detail=(
             "Already decided — a payment is credited once."))
     try:
-        cur_until = ((org.get("plan") or {}).get("paid_until"))
-        base = cur_until if isinstance(cur_until, _dt) and cur_until > now else now
-        paid_until = _add_months(base, months)
         prev = org.get("plan") or {}
+        cur_until = prev.get("paid_until")
+        # Stacking preserves REMAINING PAID time only: upgrading from the
+        # free trial starts the paid period at approval — trial days were
+        # never purchased, so they don't extend a paid term.
+        base = (cur_until if isinstance(cur_until, _dt) and cur_until > now
+                and prev.get("tier") not in (None, "free_trial") else now)
+        paid_until = _add_months(base, months)
         await db.orgs.update_one({"_id": ooid}, {"$set": {"plan": {
             "tier": tier, "family": t["family"],
             "status": "active", "paid_until": paid_until,
