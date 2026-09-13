@@ -57,11 +57,12 @@ async def run():
         brand = await main._org_branding(str(job.get("org_id") or ""))
         if brand and brand.get("logo_url"):
             brand = {**brand, "logo_url": f"{main.APP_URL}{brand['logo_url']}"}
+        company = ((brand or {}).get("company_name")
+                   or (owner or {}).get("company_name") or "the hiring team")
         ok, info = send_interview_invite_email(
             to_email=str(a.get("email") or ""),
             candidate_name=str(a.get("name") or ""),
-            company=(brand or {}).get("company_name")
-                    or (owner or {}).get("company_name") or "the hiring team",
+            company=company,
             brand=brand,
             job_title=str(job.get("title") or "the role"),
             link=f"{main.APP_URL}/interview/{a['interview_token']}",
@@ -69,7 +70,10 @@ async def run():
             days=int(li.get("invite_window_days") or 5),
             reply_to=(owner or {}).get("email") or "",
             reminder=True,
-            language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"))
+            language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+            # Sender display name = the white-label company (never the
+            # "the hiring team" fallback; empty -> platform default name).
+            from_name=(company if company != "the hiring team" else ""))
         await db.applications.update_one(
             {"_id": a["_id"]},
             {"$set": {"reminder_sent_at": now,

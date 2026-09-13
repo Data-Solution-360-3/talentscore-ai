@@ -2096,20 +2096,28 @@ async def send_email_to_candidate(
     # not to the shared TopCandidate Gmail bot.
     recruiter_email = (db_user.get("email") if db_user else "") or user.get("email", "")
 
+    # White-label sender: the candidate sees the org's company name as the
+    # from display name (never "noreply"); the address stays the verified one.
+    from database import org_of_user as _org_of
+    sender_org = await _org_of(user["user_id"])
+    _sb = await _org_branding(str(sender_org or ""))
+    sender_name = ((_sb or {}).get("company_name")
+                   or (db_user or {}).get("company_name") or "")
+
     ok, err = send_candidate_email(
         to_email=target,
         subject=subject,
         body_text=body,
         reply_to=recruiter_email,
+        from_name=sender_name,
     )
     if not ok:
         raise HTTPException(status_code=502, detail=err)
 
     # Record the send so the UI can show "Email sent" next to this candidate
-    from database import org_of_user as _org_of
     await mongodb.email_history.insert_one({
         "screening_id":   screening_id,
-        "org_id":         await _org_of(user["user_id"]),
+        "org_id":         sender_org,
         "user_id":        user["user_id"],
         "company":        user.get("company", ""),
         "candidate_name": doc.get("candidate_name", "Unknown"),
@@ -5520,6 +5528,10 @@ async def invite_funnel_candidate(job: dict, application_id: str) -> dict:
         reply_to=(owner or {}).get("email") or "",
         language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
         brand=brand,
+        # Sender display name = the same white-label company the body uses —
+        # but never the "the hiring team" fallback (odd as an inbox sender;
+        # empty falls back to the platform default name).
+        from_name=(company if company != "the hiring team" else ""),
     )
     await db.applications.update_one(
         {"_id": app_doc["_id"]},

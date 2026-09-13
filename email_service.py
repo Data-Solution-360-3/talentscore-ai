@@ -22,6 +22,7 @@ and invites report a clear "not configured" error instead of pretending.
 
 import os
 import random
+import re
 import string
 
 import httpx
@@ -34,19 +35,46 @@ APP_NAME       = "TopCandidate"
 APP_URL        = os.getenv("APP_URL", "https://topcandidate.pro")
 RESEND_FROM    = os.getenv("RESEND_FROM", f"{APP_NAME} <onboarding@resend.dev>")
 
+# ── Sender identity ──────────────────────────────────────────
+# RESEND_FROM may be a bare address ("noreply@topcandidate.pro") or a named
+# sender ("TopCandidate <noreply@topcandidate.pro>"). The ADDRESS is kept
+# exactly as configured — it is the Resend-verified sender, and changing it
+# would hurt deliverability — but it is never sent bare: a bare from makes
+# inboxes display the mailbox local-part, so candidates saw "noreply".
+# Every send now carries a display name: the org's company name on
+# white-label candidate emails, DEFAULT_FROM_NAME otherwise.
+DEFAULT_FROM_NAME = "TopCandidate.pro"
+_m = re.match(r'^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$', RESEND_FROM)
+if _m:
+    FROM_ADDRESS = _m.group(2).strip()
+    if (_m.group(1) or "").strip():
+        DEFAULT_FROM_NAME = _m.group(1).strip()
+else:
+    FROM_ADDRESS = RESEND_FROM.strip()
+
+
+def _from_header(from_name: str = "") -> str:
+    """'Display Name <verified-address>'. The name is org-supplied text going
+    into a mail header, so strip anything header-breaking and cap the length."""
+    name = re.sub(r'[\r\n<>"\\]', "", (from_name or "").strip())[:80] or DEFAULT_FROM_NAME
+    return f"{name} <{FROM_ADDRESS}>"
+
 
 def generate_otp(length: int = 6) -> str:
     return ''.join(random.choices(string.digits, k=length))
 
 
 def _resend_send(to_email: str, subject: str, html: str | None = None,
-                 text: str | None = None, reply_to: str = "") -> tuple[bool, str]:
+                 text: str | None = None, reply_to: str = "",
+                 from_name: str = "") -> tuple[bool, str]:
     """One transport for every email. Returns (ok, resend_id_or_error).
     The returned id is Resend's delivery id — checkable in their dashboard,
-    so 'sent' here means accepted for delivery, not merely 'no exception'."""
+    so 'sent' here means accepted for delivery, not merely 'no exception'.
+    `from_name` sets the sender DISPLAY NAME only; the address is always the
+    verified FROM_ADDRESS."""
     if not RESEND_API_KEY:
         return False, "RESEND_API_KEY not set"
-    payload = {"from": RESEND_FROM, "to": [to_email], "subject": subject}
+    payload = {"from": _from_header(from_name), "to": [to_email], "subject": subject}
     if html:
         payload["html"] = html
     if text:
@@ -233,7 +261,8 @@ def send_interview_invite_email(to_email: str, candidate_name: str, company: str
                                 days: int, reply_to: str = "",
                                 reminder: bool = False,
                                 language: str = "en",
-                                brand: dict | None = None) -> tuple[bool, str]:
+                                brand: dict | None = None,
+                                from_name: str = "") -> tuple[bool, str]:
     """Automated AI-interview invite (funnel Part 2). Returns (ok, resend_id).
 
     HONEST by construction: says what it is (a live AI interview, ~12 min),
@@ -312,7 +341,8 @@ def send_interview_invite_email(to_email: str, candidate_name: str, company: str
   </table>
 </body>
 </html>"""
-    ok, info = _resend_send(to_email, subject, html=html, reply_to=reply_to)
+    ok, info = _resend_send(to_email, subject, html=html, reply_to=reply_to,
+                            from_name=from_name)
     if not ok:
         print(f"[EMAIL] Failed to send interview invite to {to_email}: {info}")
     return ok, info
@@ -464,7 +494,8 @@ def substitute_template(template_str: str, variables: dict) -> str:
 
 
 def send_candidate_email(to_email: str, subject: str, body_text: str,
-                          reply_to: str = "") -> tuple[bool, str]:
+                          reply_to: str = "",
+                          from_name: str = "") -> tuple[bool, str]:
     """Send a candidate email through Resend. Returns (success, error_message).
 
     Plain text first — recruiter emails should feel personal, not marketing-y —
@@ -487,7 +518,8 @@ def send_candidate_email(to_email: str, subject: str, body_text: str,
 </body></html>"""
 
     ok, info = _resend_send(to_email, subject, html=html_wrapper,
-                            text=body_text, reply_to=reply_to)
+                            text=body_text, reply_to=reply_to,
+                            from_name=from_name)
     if ok:
         return True, ""
     if "403" in info and "testing" in info.lower():
