@@ -12,7 +12,69 @@ import json
 from openai import AsyncOpenAI
 
 GEN_MODEL = "gpt-4o"
-GEN_VERSION = "qgen-2.0"
+GEN_VERSION = "qgen-2.1"   # 2.1: per-job seniority calibration (2026-09-14)
+
+# ── Seniority calibration (2026-09-14): shifts GENERATION difficulty only —
+# grading, storage, fairness floors untouched. Injected into job_ctx (all
+# three agents read it) + a bidirectional critic clause: too easy AND too
+# hard for the stated level both FAIL, and the refine loop fixes in place.
+SENIORITY_CALIBRATION = {
+    "junior": {
+        "label": "JUNIOR (entry level, 0-2 years)",
+        "draft": ("Test FUNDAMENTALS and their straightforward application in routine, "
+                  "first-year work situations. The best answer must be reachable from solid "
+                  "basics correctly applied; distractors are classic beginner misconceptions. "
+                  "Do NOT demand architecture choices, org-level strategy, or judgment that "
+                  "only years of experience builds."),
+        "critic": ("it demands system/architecture design, organizational strategy, or "
+                   "seasoned judgment beyond a capable entry-level professional — TOO HARD "
+                   "for a junior screen."),
+    },
+    "mid": {
+        "label": "MID-LEVEL (2-5 years, works independently)",
+        "draft": ("Test APPLIED JUDGMENT on real trade-offs: diagnosing familiar breakage, "
+                  "choosing the right standard approach for a concrete situation, knowing "
+                  "why the common shortcut fails. Beyond textbook basics, but not "
+                  "system-design or strategic scope."),
+        "critic": ("it is answerable from textbook fundamentals alone (TOO EASY for "
+                   "mid-level), or demands architecture/strategy scope (TOO HARD)."),
+    },
+    "senior": {
+        "label": "SENIOR (5+ years, owns hard problems)",
+        "draft": ("Test DEPTH: ambiguity, edge cases, what breaks at scale, why NOT the "
+                  "obvious option, weighing two defensible approaches and the cost of each. "
+                  "Prefer 'why' and 'what goes wrong' over 'what/how'. Routine application "
+                  "questions are below this level."),
+        "critic": ("it is routine application any 2-year practitioner handles confidently — "
+                   "TOO EASY for a senior screen (a senior set of junior questions FAILS)."),
+    },
+    "lead": {
+        "label": "LEAD / PRINCIPAL (sets direction, leads others)",
+        "draft": ("Test STRATEGIC, ARCHITECTURAL and LEADERSHIP judgment: direction-setting "
+                  "under constraints, cross-team consequences, prioritization calls, "
+                  "standards and mentoring decisions, when to rebuild vs. patch. Hands-on "
+                  "task mechanics alone are below this level."),
+        "critic": ("it tests hands-on task mechanics instead of direction-setting judgment — "
+                   "TOO EASY for a lead-level screen."),
+    },
+}
+
+
+def _seniority(level: str) -> dict:
+    return SENIORITY_CALIBRATION.get((level or "mid").strip().lower(),
+                                     SENIORITY_CALIBRATION["mid"])
+
+
+def _seniority_ctx(level: str) -> str:
+    s = _seniority(level)
+    return (f"\nSENIORITY LEVEL: {s['label']}\n"
+            f"CALIBRATION — every question must sit at exactly this level:\n{s['draft']}\n")
+
+
+def _seniority_check(level: str) -> str:
+    s = _seniority(level)
+    return (f"   - MISCALIBRATED for the stated seniority level ({s['label']}) — "
+            f"BOTH directions fail: {s['critic']}\n")
 
 WRITTEN_RATIO = 0.3   # ~30% of questions answered in writing
 
@@ -147,7 +209,7 @@ FAIL a question for ANY of these:
      politics, or anything a recruiter could not lawfully ask.
    - HARD TO PARSE: the wording itself is long, idiomatic, or convoluted —
      depth must live in the required answer, never in the sentence.
-{lang_checks}
+{level_check}{lang_checks}
 If you are UNSURE whether a question passes, FAIL it.
 
 Return JSON: {{"reviews": [{{"id": "<the bracketed id exactly as given>",
@@ -173,6 +235,7 @@ Return JSON: {{"fixes": [{{"id": "<same id>", "text": "<rewritten question>"}},
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
                                    n_topics: int = 2, followups: int = 3,
                                    language: str = "en", role_hint: str = "",
+                                   seniority: str = "mid",
                                    usage_out: list | None = None
                                    ) -> tuple[list | None, str | None]:
     """Deep spoken topic clusters via the drafter -> critic -> refiner loop
@@ -193,9 +256,11 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
     client = AsyncOpenAI(api_key=api_key)
     job_ctx = (f"JOB TITLE: {job_title or 'not specified'}\n"
                + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+               + _seniority_ctx(seniority)
                + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
     lang_rule = _lang(language)
-    critic_prompt = TOPIC_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language))
+    critic_prompt = TOPIC_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language),
+                                               level_check=_seniority_check(seniority))
 
     # ── 1) DRAFT the full structure in one call ──
     try:
@@ -469,7 +534,7 @@ those WITH their scenario. For EACH question, do two things IN ORDER:
    - DETACHED (scenario questions only): the question does not actually
      depend on its scenario's details — it could be answered identically
      with the scenario deleted.
-{lang_checks}
+{level_check}{lang_checks}
 Be strict: a question that merely "seems fine" but tests recall instead of
 applied judgment must FAIL. When you are unsure between pass and fail, FAIL.
 
@@ -521,7 +586,8 @@ async def _gen_json(client, system: str, user: str, temperature: float,
 
 async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                                   job_title: str = "", language: str = "en",
-                                  role_hint: str = "", usage_out: list | None = None
+                                  role_hint: str = "", seniority: str = "mid",
+                                  usage_out: list | None = None
                                   ) -> tuple[list | None, str | None]:
     """Mixed-structure MCQ DRAFT set via the drafter→critic→refiner loop.
 
@@ -543,9 +609,11 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     client = AsyncOpenAI(api_key=api_key)
     job_ctx = (f"JOB TITLE: {job_title or 'not specified'}\n"
                + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+               + _seniority_ctx(seniority)
                + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
     fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=_mcq_lang(language))
-    critic_prompt = MCQ_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language))
+    critic_prompt = MCQ_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language),
+                                             level_check=_seniority_check(seniority))
 
     def _fmt(items, with_keys=False, reasons=None):
         lines, last_scen = [], None
@@ -675,6 +743,7 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
 
 async def generate_written_scenario(jd_text: str, api_key: str, job_title: str = "",
                                     k: int = 3, language: str = "en", role_hint: str = "",
+                                    seniority: str = "mid",
                                     usage_out: list | None = None
                                     ) -> tuple[dict | None, str | None]:
     """One rich business case + its questions from the JD. `k` is the TOTAL
@@ -701,6 +770,7 @@ async def generate_written_scenario(jd_text: str, api_key: str, job_title: str =
                 {"role": "user", "content":
                     f"JOB TITLE: {job_title or 'not specified'}\n"
                     + (f"ROLE TYPE: {role_hint}\n" if role_hint else "")
+                    + _seniority_ctx(seniority)
                     + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\""},
             ],
         )

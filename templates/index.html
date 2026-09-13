@@ -1564,6 +1564,13 @@ img,svg,video{max-width:100%}
         <input id="j-jobcode" readonly placeholder="Assigned when you create" style="background:#f6f8f3;color:#6f7b68;font-family:ui-monospace,monospace;font-size:13px;cursor:default"></div>
       <div class="jm-f"><label>Your reference code <span class="jm-hint">· optional</span></label>
         <input id="j-refcode" maxlength="40" placeholder="e.g. OPS-Q3-2026"></div>
+      <div class="jm-f full"><label>Seniority level <span class="jm-hint">· calibrates MCQ &amp; interview question difficulty — not the scoring</span></label>
+        <select id="j-seniority">
+          <option value="junior">Junior — fundamentals, straightforward application</option>
+          <option value="mid" selected>Mid — applied judgment, real trade-offs</option>
+          <option value="senior">Senior — depth, ambiguity, edge cases</option>
+          <option value="lead">Lead — strategic &amp; leadership judgment</option>
+        </select></div>
       <div class="jm-f full"><label>Interview language</label>
         <select id="j-ivlang">
           <option value="en">English</option>
@@ -4780,7 +4787,7 @@ function iqRender(){
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <div style="flex:1;min-width:170px">
           <b style="font-size:14.5px;font-weight:650;display:block">No questions yet</b>
-          <span style="font-size:12.5px;color:#6f7b68">Draft with AI from the job description, then review before it goes live</span>
+          <span style="font-size:12.5px;color:#6f7b68">Draft with AI from the job description, then review before it goes live${_senChip()}</span>
         </div>
         <label class="jm-hint" style="display:inline-flex;align-items:center">Topics
           <input id="iq-topics" type="number" min="1" max="4" value="2" style="${numIn}"></label>
@@ -4814,6 +4821,14 @@ function iqSyncJobCache(){
   if(window._currentJob && window._currentJob._id===st.jobId)
     window._currentJob.interview_questions = patch;
 }
+// Seniority chip on the generation panels: what level the NEXT generation
+// will be calibrated for (set on the job in Edit job; display only).
+function _senChip(){
+  const lvl=((window._currentJob||{}).seniority_level||'mid');
+  const lbl={junior:'Junior',mid:'Mid',senior:'Senior',lead:'Lead'}[lvl]||'Mid';
+  return ` <span style="display:inline-block;font-size:10px;font-weight:800;padding:1px 8px;border-radius:999px;background:var(--gg);color:var(--green);vertical-align:1px" title="Questions are calibrated to this seniority level — change it in Edit job">calibrated for ${lbl}</span>`;
+}
+
 async function iqGenerate(){
   const st = window._iqState;
   const nt = Math.max(1, Math.min(4, parseInt(document.getElementById('iq-topics')?.value)||2));
@@ -4918,7 +4933,7 @@ function mcqfRender(){
             : '<span style="font-size:11px;font-weight:700;color:var(--t3)">Off — no approved set</span>');
   let html=`<div class="jm-card">
   <div class="jm-actbar">
-    <div class="lead"><b>Screening test${appr?` · ${appr.count} questions`:(draft?` · draft`:'')}</b><span>Draft with AI, then review the answer keys before it goes live</span></div>
+    <div class="lead"><b>Screening test${appr?` · ${appr.count} questions`:(draft?` · draft`:'')}</b><span>Draft with AI, then review the answer keys before it goes live${_senChip()}</span></div>
     <label class="jm-hint" style="display:inline-flex;align-items:center;gap:6px">Questions
       <input id="mcqf-ngen" type="number" min="5" max="20" value="15" style="width:58px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:700"></label>
     <button class="jm-big jm-big-gen" onclick="mcqfGenerate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l1.6 5L19 8l-5 1.6L12 15l-1.6-5.4L5 8l5.4-1z"/></svg>Generate</button>
@@ -5771,6 +5786,7 @@ function openJobModal(){
   const typeEl=document.getElementById('j-type');       if(typeEl)   typeEl.selectedIndex=0;
   const statusEl=document.getElementById('j-status');   if(statusEl) statusEl.value='active';
   const ivlEl=document.getElementById('j-ivlang');      if(ivlEl)    ivlEl.value='en';
+  const senEl=document.getElementById('j-seniority');   if(senEl)    senEl.value='mid';
   // Reset the role-category picker
   selectedRoleCat=null; renderRoleCats();
   const _rcn=document.getElementById('rc-note'); if(_rcn) _rcn.style.display='none';
@@ -5799,6 +5815,7 @@ async function editJob(id){
     document.getElementById('j-exp').value     = j.min_experience||'';
     const _jc=document.getElementById('j-jobcode'); if(_jc) _jc.value=j.job_code||'';
     const _rc=document.getElementById('j-refcode'); if(_rc) _rc.value=j.reference_code||'';
+    const _sn=document.getElementById('j-seniority'); if(_sn) _sn.value=j.seniority_level||'mid';
     const _chip=document.getElementById('j-jobid-chip');
     if(_chip){
       if(j.job_code){
@@ -5847,6 +5864,7 @@ async function saveJob(){
   fd.append('location',document.getElementById('j-loc').value);
   fd.append('employment_type',document.getElementById('j-type').value);
   fd.append('reference_code',(document.getElementById('j-refcode')||{value:''}).value.trim());
+  fd.append('seniority_level',(document.getElementById('j-seniority')||{}).value||'mid');
   fd.append('description',desc);
   fd.append('min_experience',document.getElementById('j-exp').value||'');
   fd.append('status',document.getElementById('j-status').value||'active');

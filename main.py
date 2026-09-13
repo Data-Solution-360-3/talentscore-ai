@@ -2806,7 +2806,8 @@ def _build_live_instructions(questions: list, max_turns: int,
                              interviewer_name: str = "",
                              scenario: dict | None = None,
                              topics: list | None = None,
-                             language: str = "en") -> str:
+                             language: str = "en",
+                             seniority: str = "mid") -> str:
     """questions: normalized [{"text","mode"}] (see _normalize_questions).
     scenario: normalized {"text","questions"} or None (_normalize_scenario).
     topics: normalized topic clusters or None (_normalize_topics).
@@ -2852,6 +2853,23 @@ def _build_live_instructions(questions: list, max_turns: int,
         "The scripted questions below are written in this register — read them as written.\n"
         if lang_bn else
         "- English only; if the candidate speaks another language, gently ask them to continue in English.\n")
+    # Seniority calibrates FOLLOW-UP DEPTH only (2026-09-14): what a live
+    # drill aims at — never the question count, the turn budget, or how
+    # answers are scored. Substance-not-language fairness applies unchanged.
+    depth_line = {
+        "junior": ("- FOLLOW-UP DEPTH — this is a JUNIOR role: probe how they actually did the "
+                   "basics (what they did, what happened, what they'd check) and stay on "
+                   "fundamentals — never escalate into design, scale, or strategy questions.\n"),
+        "mid": ("- FOLLOW-UP DEPTH — this is a MID-LEVEL role: probe the judgment behind the "
+                "answer — why that approach, what trade-off they weighed, what they'd do when "
+                "the standard way fails.\n"),
+        "senior": ("- FOLLOW-UP DEPTH — this is a SENIOR role: probe edge cases and limits — "
+                   "what breaks at scale, why not the obvious alternative, the cost of the "
+                   "trade-off they chose.\n"),
+        "lead": ("- FOLLOW-UP DEPTH — this is a LEAD-level role: probe the strategic reasoning — "
+                 "cross-team consequences, how they'd prioritize under constraints, how they'd "
+                 "set the standard for others.\n"),
+    }.get((seniority or "mid").strip().lower(), "")
 
     if topics:
         split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
@@ -2935,6 +2953,7 @@ def _build_live_instructions(questions: list, max_turns: int,
             "  A replacement CONSUMES that follow-up slot — never ask both, never add extra "
             "questions; the total count, the topics, and their order never change. Follow-ups in the "
             "written scenario section are never replaced.\n"
+            + depth_line +
             "- DEPTH IS ABOUT SUBSTANCE, NEVER LANGUAGE: many candidates are nervous or speak this "
             "language as a second language. Keep every question you ask short and simply worded; "
             "give them time; never press on grammar, accent, or fluency. A candidate who cannot go "
@@ -2993,7 +3012,7 @@ def _build_live_instructions(questions: list, max_turns: int,
         "candidate's final answer by thanking them warmly — for example \"Thanks, that's all my "
         "questions\" — tell them the team will review and be in touch, and end. Ask nothing further.\n\n"
         "RULES\n"
-        + lang_rule_line +
+        + lang_rule_line + depth_line +
         "- NEVER evaluate the candidate aloud, hint at how they did, or promise any outcome. "
         "No feedback, no scores, no 'great answer' judgments beyond neutral acknowledgement.\n"
         "- If you could not hear something clearly, ask them to repeat it rather than guessing."
@@ -3183,7 +3202,8 @@ async def viva_live_token(request: Request):
     vad = config.get("vad") if config.get("vad") in _VIVA_VAD_PRESETS else _VIVA_DEFAULT_VAD
 
     instructions = _build_live_instructions(questions, max_turns,
-                                            language=config.get("language", "en"))
+                                            language=config.get("language", "en"),
+                                            seniority=config.get("seniority") or "mid")
     recovered = False
     if transcript:
         lines = []
@@ -3765,7 +3785,8 @@ async def viva_live_preview_session(request: Request):
     instructions = _build_live_instructions(questions, int(config.get("max_turns", 4)),
                                             interviewer_name=config.get("interviewer_name", ""),
                                             scenario=scenario, topics=topics,
-                                            language=config.get("language", "en"))
+                                            language=config.get("language", "en"),
+                                            seniority=config.get("seniority") or "mid")
     structure = None
     if topics:
         split = ((len(topics) + 1) // 2) if (scenario and len(topics) > 1) else len(topics)
@@ -3941,7 +3962,8 @@ async def candidate_session_token(request: Request, token: str):
     instructions = _build_live_instructions(questions, max_turns,
                                             interviewer_name=cfg.get("interviewer_name", ""),
                                             scenario=scenario, topics=topics,
-                                            language=cfg.get("language", "en"))
+                                            language=cfg.get("language", "en"),
+                                            seniority=cfg.get("seniority") or "mid")
     recovered = False
     if transcript:
         lines = []
@@ -4104,6 +4126,7 @@ async def candidate_session_save(request: Request, background: BackgroundTasks, 
         "config": {"questions": cfg.get("questions"), "max_turns": cfg.get("max_turns"),
                    "vad": cfg.get("vad"), "job_title": cfg.get("job_title", ""),
                    "interviewer_name": cfg.get("interviewer_name", ""), "language": _ivlang,
+                   "seniority": cfg.get("seniority") or "mid",
                    "scenario": _normalize_scenario(cfg.get("scenario")),
                    "topics": _normalize_topics(cfg.get("topics")) or None},
         "questions_asked": _i(body.get("questions_asked"), 0, 20),
@@ -4628,6 +4651,7 @@ async def mcq_filter_save(request: Request, job_id: str):
             job.get("description") or "", OPENAI_API_KEY, n=n,
             job_title=job.get("title") or "",
             language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+            seniority=job.get("seniority_level") or "mid",
             usage_out=_gu)
         if err or not raw:
             raise HTTPException(status_code=502, detail=err or "Generation failed.")
@@ -5524,6 +5548,9 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
         # The interview language is a JOB setting (interview_language), so carry it
         # onto the launched interview's config regardless of the manual viva config.
         cfg["language"] = "bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"
+        # Seniority (2026-09-14) rides the job too — calibrates live follow-up
+        # DEPTH only; count, budget, and scoring untouched.
+        cfg["seniority"] = job.get("seniority_level") or "mid"
         # Job-based questions: the APPROVED set (and only the approved set —
         # drafts never reach a candidate) replaces the manual config's
         # questions. Turn budget: every main question plus 2 spoken adaptive
@@ -5857,16 +5884,17 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     from scorer import ROLE_CATEGORIES
     role_hint = ROLE_CATEGORIES.get(job.get("role_category") or "", {}).get("hint", "")
     _gen_usages: list = []
+    _sen = job.get("seniority_level") or "mid"
     topics, err = await generate_topic_questions(
         job.get("description") or "", OPENAI_API_KEY,
         job_title=job.get("title") or "", n_topics=n_topics, followups=followups,
-        language=lang, role_hint=role_hint, usage_out=_gen_usages)
+        language=lang, role_hint=role_hint, seniority=_sen, usage_out=_gen_usages)
     if err or not topics:
         raise HTTPException(status_code=502, detail=err or "Generation failed.")
     scenario, scen_err = await generate_written_scenario(
         job.get("description") or "", OPENAI_API_KEY,
         job_title=job.get("title") or "", k=scen_k, language=lang, role_hint=role_hint,
-        usage_out=_gen_usages)
+        seniority=_sen, usage_out=_gen_usages)
     topics = _normalize_topics(topics)
     flat = _flatten_topics(topics)
     # Cost observability (owner-only; measurement, never behavior).
@@ -6866,6 +6894,7 @@ async def create_job_endpoint(
     weights: str = Form(""),   # JSON-encoded dict of {dim_name: float}
     role_category: str = Form(""),   # key from scorer.ROLE_CATEGORIES; "" = none
     reference_code: str = Form(""),   # the client's own optional code, free text
+    seniority_level: str = Form("mid"),   # junior|mid|senior|lead — calibrates GENERATION only
 ):
     user = await get_current_user(request)
     # Parse weights JSON if provided. Invalid JSON → ignore (job will use default weights at score time).
@@ -6889,6 +6918,11 @@ async def create_job_endpoint(
         "interview_language": "bn" if (interview_language or "en").lower() == "bn" else "en",
         "user_id": user["user_id"], "company": user["company"],
         "reference_code": reference_code.strip()[:40],
+        # Seniority (2026-09-14): calibrates MCQ/viva GENERATION difficulty +
+        # live follow-up depth. Never scoring, grading, or storage.
+        "seniority_level": (seniority_level.strip().lower()
+                            if seniority_level.strip().lower() in ("junior", "mid", "senior", "lead")
+                            else "mid"),
     }
     if weights_dict is not None:
         job["weights"] = weights_dict
@@ -6943,6 +6977,7 @@ async def update_job_endpoint(
     role_category: str = Form(""),
     reference_code: str = Form(None),   # None = not submitted; "" = clear it
     dimension_labels: str = Form(None),  # JSON renames; None = untouched, "{}" clears
+    seniority_level: str = Form(""),    # junior|mid|senior|lead; "" = untouched
 ):
     """Update job fields — used to save description and other edits to existing jobs."""
     user = await get_current_user(request)
@@ -6954,6 +6989,8 @@ async def update_job_endpoint(
         updates["role_category"] = role_category
     if interview_language:
         updates["interview_language"] = "bn" if interview_language.lower() == "bn" else "en"
+    if seniority_level.strip().lower() in ("junior", "mid", "senior", "lead"):
+        updates["seniority_level"] = seniority_level.strip().lower()
     # Only update fields that were actually submitted (non-empty).
     # Empty string means "field was not in the form", NOT "clear the field".
     if description:     updates["description"] = description
