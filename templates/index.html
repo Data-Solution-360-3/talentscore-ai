@@ -182,9 +182,6 @@ img,svg,video{max-width:100%}
 #page-overview .rd .rd-donutwrap{gap:12px;min-height:104px;align-items:center}
 #page-overview .rd .rd-leg{font-size:11.5px;gap:7px}
 #page-overview .rd .rd-leg span{white-space:nowrap}
-/* the reused KPI horizontal bars sit comfortably inside a soft card */
-#page-overview .rd .kpi-hlbl{flex:0 0 116px;font-size:11.5px}
-#page-overview .rd .kpi-hrow{margin:6px 0}
 
 /* ═══════════════════════════════════════════════════════════════════
    Hiring dashboard — mockup redesign. EVERY selector is scoped to .dashx,
@@ -640,60 +637,43 @@ img,svg,video{max-width:100%}
   .dim-grid{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:1fr 1fr}
 }
-/* ── KPI dashboard ─────────────────────────────────────────── */
-.kpi-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
-.kpi-head h2{font-size:1.25rem;font-weight:900;color:var(--rg-ink);letter-spacing:-.5px}
-.kpi-head .sub{font-size:12px;color:var(--rg-mut);margin-top:2px;max-width:520px}
-.kpi-range{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.kpi-range select,.kpi-range input{padding:8px 10px;border:1.5px solid var(--border2);border-radius:10px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text);background:#fff}
-.kpi-sec{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--rg-mut);margin:20px 2px 10px}
-.kpi-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}
-.kpi-card{background:#fff;border-radius:16px;box-shadow:var(--rg-sh);padding:14px 16px}
-.kpi-card .kv{font-size:1.65rem;font-weight:900;color:var(--rg-ink);letter-spacing:-1px}
-.kpi-card .kl{font-size:12px;font-weight:700;color:var(--rg-mut);margin-bottom:6px}
-.kpi-card .ks{font-size:11px;color:var(--rg-mut2);margin-top:5px;line-height:1.5}
-.kpi-click{cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative}
-.kpi-click:hover{transform:translateY(-2px);box-shadow:var(--rg-sh2)}
-.kpi-click::after{content:'↗';position:absolute;top:10px;right:12px;font-size:12px;color:var(--rg-mut2);opacity:0;transition:opacity .12s}
-.kpi-click:hover::after{opacity:1}
-.kpi-funcell.kpi-click:hover{background:var(--rg-gg)}
+/* ── Key hiring metrics (kpi_clean, 2026-09-15) ─────────────── */
+.k2wrap{max-width:1040px;margin:0 auto}
+.k2h{margin-bottom:20px}
+.k2h h1{font-size:24px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+.k2h p{font-size:13.5px;color:var(--t2);margin-top:4px}
+.k2sec{font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--t3);text-transform:uppercase;margin:6px 0 14px}
+.k2grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+@media(max-width:900px){.k2grid{grid-template-columns:1fr}}
+.k2kpi{background:#fff;border:1px solid var(--border2);border-radius:16px;padding:22px 24px}
+.k2label{font-size:13px;font-weight:600;color:var(--t2);display:flex;align-items:center;gap:8px}
+.k2ic{width:26px;height:26px;border-radius:8px;background:var(--gg);display:grid;place-items:center;flex:none}
+.k2ic svg{width:14px;height:14px;color:var(--green)}
+.k2val{font-size:34px;font-weight:750;letter-spacing:-1px;margin-top:14px;color:var(--text)}
+.k2val small{font-size:16px;font-weight:600;color:var(--t2)}
+.k2delta{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;margin-top:10px;padding:3px 9px;border-radius:999px}
+.k2delta.up{color:#2f9e44;background:#e7f5ea}
+.k2delta.down{color:#c9603a;background:#f8ece6}
+.k2sub{font-size:12px;color:var(--t3);margin-top:10px}
+.k2kpi.locked{background:repeating-linear-gradient(135deg,#fff,#fff 10px,#fafcf7 10px,#fafcf7 20px)}
+.k2kpi.locked .k2val{color:var(--t3);font-size:22px;font-weight:600;margin-top:16px}
+.k2lockmsg{font-size:12px;color:var(--t2);margin-top:8px;line-height:1.5;display:flex;gap:7px}
+.k2lockmsg svg{width:13px;height:13px;color:var(--t3);flex:none;margin-top:1px}
+.k2funnel{background:#fff;border:1px solid var(--border2);border-radius:16px;padding:26px 28px}
+.k2funnel h3{font-size:15px;font-weight:650;color:var(--text)}
+.k2fsub{font-size:12.5px;color:var(--t2);margin-top:3px;margin-bottom:22px}
+.k2stage{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.k2sname{width:130px;font-size:13.5px;font-weight:500;color:var(--t2);flex:none;text-align:right}
+.k2sbar{flex:1;height:34px;background:var(--s2);border-radius:9px;overflow:hidden;position:relative}
+.k2sbar span{display:flex;align-items:center;height:100%;background:linear-gradient(90deg,#173404,var(--green));color:#fff;font-size:13px;font-weight:700;padding-left:14px;border-radius:9px;min-width:fit-content}
+.k2sbar .zero{background:none;color:var(--t3);padding-left:14px}
+.k2drop{width:86px;font-size:12px;color:var(--t3);flex:none;font-weight:600}
+.k2nlabel{font-size:11.5px;color:var(--t3);margin-top:16px;display:flex;align-items:center;gap:7px}
+.k2nlabel svg{width:13px;height:13px;flex:none}
+@media(max-width:640px){.k2sname{width:88px;font-size:12px}}
+/* shared honesty utilities (also used by the overview donut + HRM 360°) */
+.kpi-empty{padding:18px 6px;text-align:center;font-size:12.5px;color:var(--t3)}
 .kpi-lim{display:inline-block;background:rgba(217,119,6,.12);color:#B45309;border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
-.kpi-zero{display:inline-block;background:var(--rg-soft);color:var(--rg-mut);border-radius:9999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:2px}
-.kpi-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-@media(max-width:1000px){.kpi-grid2{grid-template-columns:1fr}}
-.kpi-chart-card{background:#fff;border-radius:20px;box-shadow:var(--rg-sh);padding:16px 18px;min-width:0}
-.kpi-ct{font-size:13.5px;font-weight:800;color:var(--rg-ink)}
-.kpi-cs{font-size:11.5px;color:var(--rg-mut);margin:2px 0 10px;line-height:1.5}
-.kpi-hrow{display:flex;align-items:center;gap:10px;margin:7px 0}
-.kpi-hlbl{flex:0 0 130px;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi-htrack{flex:1;height:16px;background:var(--rg-soft);border-radius:8px;overflow:hidden;min-width:40px}
-.kpi-hfill{height:100%;background:var(--rg-green);border-radius:0 4px 4px 0}
-.kpi-hval{flex:0 0 auto;font-size:12px;font-weight:800;color:var(--rg-ink);font-variant-numeric:tabular-nums}
-.kpi-legend{display:flex;gap:14px;font-size:11.5px;color:var(--rg-mut);font-weight:600;margin-top:8px}
-.kpi-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-.kpi-meter{height:12px;background:var(--rg-gg);border-radius:6px;overflow:hidden}
-.kpi-meter i{display:block;height:100%;background:var(--rg-green);border-radius:0 4px 4px 0;max-width:100%}
-.kpi-funrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
-.kpi-funcell{background:var(--rg-soft);border-radius:12px;padding:10px 12px;text-align:center}
-.kpi-funn{font-size:1.25rem;font-weight:900;color:var(--rg-ink)}
-.kpi-funl{font-size:10.5px;font-weight:700;color:var(--rg-mut);margin-top:2px}
-.kpi-funp{font-size:10.5px;font-weight:800;color:var(--rg-green2);margin-top:3px}
-#kpi-tip{position:fixed;z-index:999;background:#132018;color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;pointer-events:none;display:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-#kpi-tip b{display:block;font-size:13px}
-.kpi-note{font-size:11px;color:var(--rg-mut2);margin-top:10px;line-height:1.6}
-.kpi-empty{padding:18px 6px;text-align:center;font-size:12.5px;color:var(--rg-mut)}
-.kpi-soon{background:var(--rg-soft);box-shadow:none;border:1.5px dashed var(--rg-line)}
-.kpi-soon .kl{color:var(--rg-mut2)}
-.kv-soon{font-size:1.05rem;font-weight:800;color:var(--rg-mut2);letter-spacing:-.3px;margin:8px 0 2px}
-.kpi-soon .ks{color:var(--rg-mut2)}
-.kpi-soon-pill{display:inline-block;background:rgba(245,124,46,.10);color:#C2410C;border-radius:9999px;padding:2px 9px;font-size:10px;font-weight:800;margin-top:8px}
-.kpi-stuckrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--rg-line);font-size:12px}
-.kpi-stuckrow:last-child{border-bottom:none}
-.kpi-stuckrow b{flex:1;font-weight:700;color:var(--rg-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi-stuckrow .st{color:var(--rg-mut);font-weight:600}
-.kpi-stuckrow .dd{font-weight:800;color:#B45309;font-variant-numeric:tabular-nums}
-@media(max-width:640px){.kpi-funrow{grid-template-columns:repeat(2,1fr)}.kpi-hlbl{flex-basis:96px}}
-
 /* ── Candidate report card tabs + scoped session-render styles ── */
 .ctabs{display:flex;gap:4px;margin:8px 0 12px;border-bottom:2px solid var(--border)}
 .ctab-btn{padding:8px 16px;border:none;background:none;font-family:inherit;font-size:12.5px;font-weight:800;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:.12s}
@@ -1225,77 +1205,63 @@ img,svg,video{max-width:100%}
   </div>
 </div>
 
+<!-- KEY HIRING METRICS (kpi_clean mockup, 2026-09-15): the vital few — 6
+     named KPIs + ONE funnel, real candidates only, MoM/YoY honestly locked
+     behind server-side data thresholds. No walls of charts. -->
 <div class="page" id="page-kpi">
-  <div class="rd">
-  <div id="kpi-body">
-    <div class="kpi-head">
-      <div><h2>Hiring insights</h2><div class="sub">Deeper analysis of your REAL pipeline — test rows and self-uploaded CVs are excluded from every number here. Small samples are labelled, an empty metric says so, and trends stay locked until enough real history exists — nothing is ever fabricated.</div></div>
-      <div class="kpi-range"><span id="kpi-real-note" style="font-size:11.5px;color:var(--rg-mut);font-weight:600"></span></div>
+  <div class="k2wrap" id="kpi-body">
+    <div class="k2h">
+      <h1>Key hiring metrics</h1>
+      <p>The vital few — from your real candidate data. Trends unlock as your history grows.</p>
+      <p id="kpi-real-note" style="font-size:12px;color:var(--t3);margin-top:2px"></p>
     </div>
 
-    <div class="kpi-sec">Pipeline funnel — where candidates drop off</div>
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Screening funnel</div>
-        <div class="kpi-cs">CV-scored → shortlisted → interviewed → hired. Each step shows conversion from the step before — the stages are your recruiters' decisions, never the AI's.</div>
-        <div id="kpi-funnel2"></div>
-        <div class="kpi-note" id="kpi-funnel2-note"></div>
+    <div class="k2sec">This month &amp; year</div>
+    <div class="k2grid">
+      <div class="k2kpi">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></span>Hires this month</div>
+        <div class="k2val" id="k2-hires">—</div>
+        <div class="k2sub" id="k2-hires-s"></div>
       </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Apply-link funnel (MCQ head)</div>
-        <div class="kpi-cs">Applications via the public link → MCQ taken → advanced to CV screening. Direct CV uploads skip this head and enter at "CV-scored".</div>
-        <div id="kpi-funnel-mcq"></div>
-        <div class="kpi-note" id="kpi-funnel-mcq-note"></div>
+      <div class="k2kpi" id="k2-mom-card">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span>Month-over-month</div>
+        <div class="k2val" id="k2-mom">—</div>
+        <div class="k2lockmsg" id="k2-mom-s"></div>
       </div>
-    </div>
-
-    <div class="kpi-grid2">
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">Score distribution</div>
-        <div class="kpi-cs">Quality of the real pipeline — the same brackets as the candidates filter</div>
-        <div id="kpi-dist"></div>
-      </div>
-      <div class="kpi-chart-card">
-        <div class="kpi-ct">AI recommendation mix</div>
-        <div class="kpi-cs">How the scorer called your real candidates (a human makes every decision)</div>
-        <div id="kpi-bands"></div>
+      <div class="k2kpi" id="k2-yoy-card">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span>Year-over-year</div>
+        <div class="k2val" id="k2-yoy">—</div>
+        <div class="k2lockmsg" id="k2-yoy-s"></div>
       </div>
     </div>
 
-    <div class="kpi-sec">Per-job performance</div>
-    <div class="kpi-chart-card">
-      <div class="kpi-ct">How each role is performing</div>
-      <div class="kpi-cs">Real candidates per job — volume, score quality, and how far they progress</div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Job</th><th>Candidates</th><th>Avg score</th><th>Median</th><th>Shortlisted</th><th>Interviewed</th></tr></thead>
-        <tbody id="kpi-jobs2"><tr><td colspan="6" class="kpi-empty">Loading…</td></tr></tbody>
-      </table></div>
+    <div class="k2sec">Pipeline performance</div>
+    <div class="k2grid">
+      <div class="k2kpi">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg></span>Applied → hired</div>
+        <div class="k2val" id="k2-conv">—</div>
+        <div class="k2sub" id="k2-conv-s"></div>
+      </div>
+      <div class="k2kpi" id="k2-tth-card">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Avg time to hire</div>
+        <div class="k2val" id="k2-tth">—</div>
+        <div class="k2sub" id="k2-tth-s"></div>
+      </div>
+      <div class="k2kpi">
+        <div class="k2label"><span class="k2ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></span>Interview pass rate</div>
+        <div class="k2val" id="k2-pass">—</div>
+        <div class="k2sub" id="k2-pass-s"></div>
+      </div>
     </div>
 
-    <div class="kpi-sec">Interviews &amp; MCQ</div>
-    <div class="kpi-cards">
-      <div class="kpi-card"><div class="kl">Interview completion</div><div class="kv" id="kpi-ivc">—</div><div class="ks" id="kpi-ivc-s"></div></div>
-      <div class="kpi-card"><div class="kl">Avg interview score<span id="kpi-iva-b"></span></div><div class="kv" id="kpi-iva">—</div><div class="ks" id="kpi-iva-s"></div></div>
-      <div class="kpi-card"><div class="kl">CV ↔ interview delta<span id="kpi-ivd-b"></span></div><div class="kv" id="kpi-ivd">—</div><div class="ks" id="kpi-ivd-s"></div></div>
-      <div class="kpi-card"><div class="kl">MCQ takers<span id="kpi-mcq-b"></span></div><div class="kv" id="kpi-mcq">—</div><div class="ks" id="kpi-mcq-s"></div></div>
+    <div class="k2funnel">
+      <h3>Hiring funnel</h3>
+      <p class="k2fsub">Where real candidates drop off, stage by stage — your actual flow: the AI interview comes before the recruiter's shortlist decision.</p>
+      <div id="k2-funnel"></div>
+      <div class="k2nlabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><span id="k2-funnel-note">Based on real candidates only — test data excluded.</span></div>
     </div>
-
-    <div class="kpi-sec">Skills-gap patterns</div>
-    <div class="kpi-chart-card">
-      <div class="kpi-ct">Most-missed requirements across real candidates</div>
-      <div class="kpi-cs">What your applicant market lacks most, from the scorer's gap analysis — useful for deciding what to train for vs. require</div>
-      <div id="kpi-gaps2"></div>
-    </div>
-
-    <div class="kpi-sec">Trends</div>
-    <div class="kpi-chart-card kpi-soon" id="kpi-trends-card" style="border-style:dashed">
-      <div class="kpi-ct">Month-over-month trends</div>
-      <div class="kpi-cs" id="kpi-trends-s">Checking your real history…</div>
-    </div>
-  </div>
   </div>
 </div>
-<div id="kpi-tip"></div>
 
 <div class="page" id="page-analytics">
   <div class="ph"><h1>Analytics & Insights</h1><p>How each of your job postings is performing</p></div>
@@ -6623,99 +6589,75 @@ async function renderKpi(){
   body.style.opacity=1;
   if(!d){ K('kpi-real-note').textContent='Couldn’t load — refresh to retry.'; return; }
 
-  K('kpi-real-note').textContent=`${d.n_real.toLocaleString()} real candidate(s) · ${d.n_excluded.toLocaleString()} test row(s) excluded from all numbers`;
-  const smallN=(n,thresh)=> n>0&&n<thresh? ` <span class="kpi-lim">n=${n} — more needed for reliable rates</span>`:'';
+  K('kpi-real-note').textContent=`${d.n_real.toLocaleString()} real candidate(s) · ${d.n_excluded.toLocaleString()} test row(s) excluded from every number`;
+  const LOCK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
-  // ── Screening funnel with step-to-step conversion ──
-  const f=d.funnel;
-  const steps=[['CV-scored',f.cv_scored],['Shortlisted',f.shortlisted],
-               ['Interviewed',f.interviewed],['Hired (stage)',f.hired_stage]];
-  if(!f.cv_scored){
-    K('kpi-funnel2').innerHTML='<div class="kpi-empty">No real candidates yet — numbers appear as genuine applications come in.</div>';
-    K('kpi-funnel2-note').textContent='';
+  // ── This month & year ──
+  K('k2-hires').textContent=d.hires_this_month;
+  K('k2-hires-s').textContent=d.month_label+' · counted when your team sets a candidate to Hire';
+
+  const momCard=K('k2-mom-card');
+  if(d.mom.locked){
+    momCard.classList.add('locked');
+    K('k2-mom').textContent='Needs more data';
+    K('k2-mom-s').innerHTML=LOCK+`<span>Needs ${d.mom.need} consecutive months of real data. You have ${d.mom.consecutive} — we never fabricate a trend.</span>`;
   }else{
-    kpiHBars('kpi-funnel2',steps.map(([l,v],i)=>{
-      const prev=i? steps[i-1][1] : null;
-      const conv= prev? (prev>0? Math.round(v/prev*100)+'% of previous' : '') : 'entry point';
-      return {label:l,value:v,display:v,badge:` <span style="color:var(--rg-mut2);font-weight:600">· ${conv}</span>`};
-    }),{max:Math.max(f.cv_scored,1)});
-    K('kpi-funnel2-note').innerHTML=(f.cv_scored<20?`<span class="kpi-lim">n=${f.cv_scored} real candidates — conversion rates firm up with volume</span> `:'')
-      +'“Hired (stage)” is the pipeline column your team sets — the system never hires anyone.';
+    momCard.classList.remove('locked');
+    const p=d.mom.pct;
+    K('k2-mom').innerHTML= p==null? `${d.mom.this_month} <small>vs ${d.mom.prev_month} last month</small>` : `${p>0?'+':''}${p}<small>%</small>`;
+    K('k2-mom-s').innerHTML=`<span>${d.mom.this_month} hire(s) this month vs ${d.mom.prev_month} last month</span>`;
   }
 
-  // ── Apply-link / MCQ head ──
-  const msteps=[['Applications',f.applications],['MCQ taken',f.mcq_taken],['Advanced to CV',f.mcq_advanced]];
-  if(!f.applications){
-    K('kpi-funnel-mcq').innerHTML='<div class="kpi-empty">No public-link applications yet.</div>';
-    K('kpi-funnel-mcq-note').textContent='';
+  const yoyCard=K('k2-yoy-card');
+  if(d.yoy.locked){
+    yoyCard.classList.add('locked');
+    K('k2-yoy').textContent='Needs more data';
+    K('k2-yoy-s').innerHTML=LOCK+'<span>Compares against the same month last year — available once you have a year of history.</span>';
   }else{
-    kpiHBars('kpi-funnel-mcq',msteps.map(([l,v],i)=>{
-      const prev=i? msteps[i-1][1] : null;
-      const conv= prev&&prev>0? Math.round(v/prev*100)+'% of previous' : (i?'':'entry point');
-      return {label:l,value:v,display:v,badge:` <span style="color:var(--rg-mut2);font-weight:600">· ${conv}</span>`};
-    }),{max:Math.max(f.applications,1)});
-    K('kpi-funnel-mcq-note').innerHTML= f.applications<20? `<span class="kpi-lim">n=${f.applications} applications — early days for this funnel</span>`:'';
+    yoyCard.classList.remove('locked');
+    const p=d.yoy.pct;
+    K('k2-yoy').innerHTML= p==null? `${d.yoy.this_month} <small>vs ${d.yoy.last_year} a year ago</small>` : `${p>0?'+':''}${p}<small>%</small>`;
+    K('k2-yoy-s').innerHTML=`<span>${d.yoy.this_month} hire(s) this month vs ${d.yoy.last_year} in the same month last year</span>`;
   }
 
-  // ── Score distribution + recommendation mix ──
-  const distOrder=[['80+','#16A34A'],['65-80','#65A30D'],['48-65','#D97706'],['<48','#93A29A']];
-  kpiHBars('kpi-dist',distOrder.map(([k,c])=>({label:k+' score',value:d.score_dist[k]||0,display:d.score_dist[k]||0,color:c})),
-    {empty:'No real candidates scored yet.'});
-  const bandC={'STRONG HIRE':'#16A34A','HIRE':'#22d3ee','MAYBE':'#D97706','REJECT':'#93A29A'};
-  kpiHBars('kpi-bands',Object.entries(d.bands).map(([k,v])=>({label:k,value:v,display:v,color:bandC[k]})),
-    {empty:'No real candidates scored yet.'});
+  // ── Pipeline performance ──
+  const c=d.conversion;
+  K('k2-conv').innerHTML= c.pct!=null? `${c.pct}<small>%</small>` : '—';
+  K('k2-conv-s').textContent= c.pct!=null
+    ? `${c.hired} hired of ${c.applied} applied · overall funnel conversion`
+    : 'No real applicants yet';
 
-  // ── Per-job table ──
-  K('kpi-jobs2').innerHTML=(d.per_job||[]).length
-    ? d.per_job.map(j=>`<tr>
-        <td style="font-weight:600">${escapeHtml(j.title)}</td>
-        <td>${j.n}${j.n<5?' <span class="kpi-lim">small</span>':''}</td>
-        <td style="font-weight:800;color:${gc(j.avg)}">${j.avg}</td>
-        <td>${j.median}</td>
-        <td>${j.shortlisted}${j.n?` <span style="color:var(--rg-mut2);font-size:10.5px">(${Math.round(j.shortlisted/j.n*100)}%)</span>`:''}</td>
-        <td>${j.interviewed}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="6" class="kpi-empty">No real candidates linked to jobs yet.</td></tr>';
+  const tthCard=K('k2-tth-card');
+  if(d.time_to_hire){
+    tthCard.classList.remove('locked');
+    K('k2-tth').innerHTML=`${d.time_to_hire.avg_days}<small> days</small>`;
+    K('k2-tth-s').textContent=`Apply → hired decision · measured on ${d.time_to_hire.n} real hire(s)`;
+  }else{
+    tthCard.classList.add('locked');
+    K('k2-tth').textContent='No real hires yet';
+    K('k2-tth-s').textContent='Counts from your first real hire — mark a candidate as Hired in the pipeline.';
+  }
 
-  // ── Interview & MCQ cards ──
-  const iv=d.interviews;
-  K('kpi-ivc').textContent= iv.sessions? Math.round(iv.completed/iv.sessions*100)+'%' : '—';
-  K('kpi-ivc-s').textContent= iv.sessions? `${iv.completed} completed of ${iv.sessions} session(s)` : 'No live interview sessions yet';
-  K('kpi-iva').textContent= iv.avg_score!=null? iv.avg_score : '—';
-  K('kpi-iva-s').textContent= iv.avg_score!=null? `Across ${iv.scored_pairs} scored interview(s), 0–100` : 'No scored interviews yet';
-  K('kpi-iva-b').innerHTML=smallN(iv.scored_pairs,10);
-  K('kpi-ivd').textContent= iv.cv_iv_delta!=null? (iv.cv_iv_delta>0?'+':'')+iv.cv_iv_delta : '—';
-  K('kpi-ivd-s').textContent= iv.cv_iv_delta!=null
-    ? (iv.cv_iv_delta>=0?'Candidates interview better than their CV suggests':'Interviews score below the CV — CVs may oversell')
-    : 'Needs candidates with both a CV score and an interview score';
-  K('kpi-ivd-b').innerHTML=smallN(iv.scored_pairs,10);
-  K('kpi-mcq').textContent= d.mcq.takers||'—';
-  K('kpi-mcq-s').textContent= d.mcq.takers? `Avg mark ${d.mcq.avg_mark} · ${d.mcq.advanced} advanced to CV screening` : 'No MCQ tests completed yet';
-  K('kpi-mcq-b').innerHTML=smallN(d.mcq.takers,10);
+  const pr=d.pass_rate;
+  K('k2-pass').innerHTML= pr.pct!=null? `${pr.pct}<small>%</small>` : '—';
+  K('k2-pass-s').textContent= pr.n
+    ? `${pr.forwarded} of ${pr.n} interviewed candidate(s) shortlisted or hired by your team · n = ${pr.n}${pr.n<10?' — early, treat as directional':''}`
+    : 'No scored interviews yet';
 
-  // ── Skills gaps ──
-  kpiHBars('kpi-gaps2',(d.skills_gaps||[]).map(g=>({label:g.skill,value:g.count,display:g.count})),
-    {empty:'No gap data from real candidates yet.'});
-
-  // ── Trends: locked until the data honestly supports them ──
-  const need=d.trends_unlock_at, have=d.consecutive_months;
-  K('kpi-trends-s').innerHTML= have>=need
-    ? `You now have ${have} consecutive month(s) of real data — trend charts are ready to be built. Ask TopCandidate to enable them.`
-    : `Locked — month-over-month needs <b>${need} consecutive months</b> of real data to mean anything. You have <b>${d.months_of_history} month(s)</b> of real history (${have} consecutive). No chart is shown until then; we never fabricate a trend.`;
+  // ── ONE funnel: true flow order, drop-off vs previous stage ──
+  const F=d.funnel||[];
+  const max=Math.max(...F.map(s=>s.n),1);
+  K('k2-funnel').innerHTML=F.map((s,i)=>{
+    const prev=i? F[i-1].n : null;
+    const drop= i===0? '—' : (prev>0? Math.round(s.n/prev*100)+'% of prev' : '—');
+    const w=Math.max(s.n/max*100, s.n>0?8:0);
+    const bar= s.n>0
+      ? `<span style="width:${w.toFixed(1)}%">${s.n}</span>`
+      : `<span class="zero" style="width:100%">0</span>`;
+    return `<div class="k2stage"><span class="k2sname">${escapeHtml(s.label)}</span><div class="k2sbar">${bar}</div><span class="k2drop">${drop}</span></div>`;
+  }).join('');
+  K('k2-funnel-note').textContent=`Based on real candidates only — test data excluded. ${d.n_real<20?`n=${d.n_real} — early days; rates firm up with volume.`:''}`;
 }
-
-function kpiHBars(elId, rows, opts){
-  const el=document.getElementById(elId); if(!el) return;
-  if(!rows.length){ el.innerHTML='<div class="kpi-empty">'+((opts&&opts.empty)||'No data in this range.')+'</div>'; return; }
-  const max=(opts&&opts.max)||Math.max(...rows.map(r=>r.value),1);
-  el.innerHTML=rows.map(r=>`
-    <div class="kpi-hrow">
-      <div class="kpi-hlbl" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</div>
-      <div class="kpi-htrack"><div class="kpi-hfill" style="width:${Math.min(100,Math.max(r.value>0?2:0,r.value/max*100)).toFixed(1)}%${r.color?';background:'+r.color:''}"></div></div>
-      <div class="kpi-hval">${escapeHtml(String(r.display!=null?r.display:r.value))}${r.badge||''}</div>
-    </div>`).join('');
-}
-
 </script>
 <script src="/static/score_core.js"></script>
 <script src="/static/session_render.js?v=5"></script>

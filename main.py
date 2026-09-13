@@ -6498,104 +6498,49 @@ async def dimension_averages(request: Request):
     return {"dimensions": dims}
 
 
+# The M3 bulk-marking cutoff (approved 2026-09-15): screenings before this
+# date were marked is_test in the DB; applications carry no is_test field, so
+# the KPI funnel head applies the SAME cutoff (and the M1 self-email rule) on
+# the fly — one marker regime, no second source of truth.
+_TEST_DATA_CUTOFF = _dt(2026, 9, 1)
+
+
 @app.get("/api/kpi-insights")
 async def kpi_insights(request: Request):
-    """Deeper-analysis KPIs for the caller's OWN org (org from the session —
+    """The vital-few KPI set for the caller's OWN org (org from the session —
     no parameter exists, nothing to point cross-org). REAL candidates only:
-    is_test rows (M1 self-CV rule + M3 admin marking) are excluded from every
-    number here, and each block carries its n so small samples read honestly.
-    Point-in-time analysis — trends stay deferred until enough real history
-    exists (months_of_history says how much there is)."""
+    is_test rows (M1 self-CV rule + M3 marking) are excluded everywhere.
+    HIRE SIGNAL = the recruiter's stage='hire' pipeline action (HRM employee
+    records are empty and super-admin-only — never used here). MoM/YoY are
+    computed for real but LOCKED behind data thresholds server-side; the
+    client only renders locked vs value, so unlocking is automatic."""
     user = await get_current_user(request)
     from database import org_match, org_match_field, REAL_ROWS
     scope = org_match(user["user_id"])
     real = {**scope, **REAL_ROWS}
 
-    # ── screenings (one projected pass drives funnel/dist/per-job/interview) ──
     rows = []
     async for s in db.screenings.find(real, {
-            "overall_score": 1, "overall_combined": 1, "interview_score": 1,
-            "recommendation": 1, "stage": 1, "job_id": 1, "created_at": 1}):
+            "stage": 1, "stage_updated_at": 1, "interview_score": 1,
+            "created_at": 1, "source": 1}):
         rows.append(s)
     n_real = len(rows)
     n_excluded = await db.screenings.count_documents({**scope, "is_test": True})
 
-    def ov(s):
-        v = s.get("overall_combined")
-        if v is None:
-            v = s.get("overall_score") or 0
-        return float(v)
+    now = _dt.utcnow()
+    this_m = now.strftime("%Y-%m")
+    prev_m = (now.replace(day=1) - _td(days=1)).strftime("%Y-%m")
+    last_year_m = f"{now.year - 1}-{now.month:02d}"
 
-    # Score distribution — the same brackets the candidates filter uses.
-    dist = {"80+": 0, "65-80": 0, "48-65": 0, "<48": 0}
-    for s in rows:
-        v = ov(s)
-        dist["80+" if v >= 80 else "65-80" if v >= 65 else "48-65" if v >= 48 else "<48"] += 1
+    # ── hires: stage='hire', dated by when the stage was set ──
+    hires = [s for s in rows if s.get("stage") == "hire"]
+    def hired_in(month_key):
+        return sum(1 for s in hires
+                   if isinstance(s.get("stage_updated_at"), _dt)
+                   and s["stage_updated_at"].strftime("%Y-%m") == month_key)
+    hires_this_month = hired_in(this_m)
 
-    bands = {"STRONG HIRE": 0, "HIRE": 0, "MAYBE": 0, "REJECT": 0}
-    for s in rows:
-        r = (s.get("recommendation") or "").upper()
-        if r in bands:
-            bands[r] += 1
-
-    shortlisted = sum(1 for s in rows if s.get("stage") in ("shortlisted", "hire"))
-    hired_stage = sum(1 for s in rows if s.get("stage") == "hire")
-    interviewed = sum(1 for s in rows if s.get("interview_score") is not None)
-
-    # ── applications (MCQ funnel head) — real filter can't apply (no CV yet),
-    #    but these are volume counts of the org's own funnel. ──
-    app_scope = org_match_field("user_id", user["user_id"])
-    apps_total = await db.applications.count_documents(app_scope)
-    mcq_rows = [a async for a in db.applications.find(
-        {**app_scope, "mcq_score": {"$ne": None}}, {"mcq_score": 1, "advanced_at": 1})]
-    mcq_taken = len(mcq_rows)
-    mcq_avg = round(sum(a["mcq_score"] for a in mcq_rows) / mcq_taken, 1) if mcq_taken else None
-    mcq_advanced = sum(1 for a in mcq_rows if a.get("advanced_at"))
-
-    # ── interview sessions (completion) + CV↔interview delta from screenings ──
-    iv_scope = org_match_field("user_id", user["user_id"])
-    iv_sessions = await db.interview_sessions.count_documents(iv_scope)
-    iv_completed = await db.interview_sessions.count_documents(
-        {**iv_scope, "status": "completed"})
-    iv_scored = [s for s in rows if s.get("interview_score") is not None
-                 and s.get("overall_score") is not None]
-    iv_avg = (round(sum(float(s["interview_score"]) for s in iv_scored) / len(iv_scored), 1)
-              if iv_scored else None)
-    iv_delta = (round(sum(float(s["interview_score"]) - float(s["overall_score"])
-                          for s in iv_scored) / len(iv_scored), 1)
-                if iv_scored else None)
-
-    # ── per-job depth ──
-    jobs_by_id = {}
-    async for j in db.jobs.find(scope, {"title": 1}):
-        jobs_by_id[str(j["_id"])] = j.get("title") or "Untitled job"
-    per_job = {}
-    for s in rows:
-        jid = str(s.get("job_id") or "")
-        d = per_job.setdefault(jid, {"n": 0, "scores": [], "shortlisted": 0, "interviewed": 0})
-        d["n"] += 1
-        d["scores"].append(ov(s))
-        if s.get("stage") in ("shortlisted", "hire"):
-            d["shortlisted"] += 1
-        if s.get("interview_score") is not None:
-            d["interviewed"] += 1
-    job_rows = []
-    for jid, d in per_job.items():
-        sc = sorted(d["scores"])
-        job_rows.append({
-            "title": jobs_by_id.get(jid, "(no job linked)"),
-            "n": d["n"],
-            "avg": round(sum(sc) / len(sc), 1),
-            "median": round(sc[len(sc) // 2] if len(sc) % 2 else (sc[len(sc)//2 - 1] + sc[len(sc)//2]) / 2, 1),
-            "shortlisted": d["shortlisted"],
-            "interviewed": d["interviewed"],
-        })
-    job_rows.sort(key=lambda r: -r["n"])
-
-    # ── skills gaps (already real-filtered in the helper) ──
-    gaps = await get_skills_gaps_for_user(user["user_id"])
-
-    # ── history: distinct months with real rows + latest consecutive streak ──
+    # ── history: distinct real months + latest consecutive streak ──
     months = sorted({s["created_at"].strftime("%Y-%m") for s in rows if s.get("created_at")})
     streak = 0
     if months:
@@ -6608,21 +6553,78 @@ async def kpi_insights(request: Request):
             else:
                 break
 
+    # MoM: unlocks at 3 consecutive real months; YoY needs the same month a
+    # year ago to exist in real history. Both computed here, gated here.
+    mom = {"locked": streak < 3, "have": len(months), "consecutive": streak, "need": 3}
+    if not mom["locked"]:
+        cur, prev = hires_this_month, hired_in(prev_m)
+        mom.update({"this_month": cur, "prev_month": prev,
+                    "pct": (round((cur - prev) / prev * 100) if prev > 0 else None)})
+    yoy = {"locked": last_year_m not in months}
+    if not yoy["locked"]:
+        cur, then = hires_this_month, hired_in(last_year_m)
+        yoy.update({"this_month": cur, "last_year": then,
+                    "pct": (round((cur - then) / then * 100) if then > 0 else None)})
+
+    # ── funnel head: applications under the SAME test markers (M1 email rule
+    #    + M3 date cutoff), plus direct CV uploads which skip the apply step ──
+    acct_emails = set()
+    async for u in db.users.find({}, {"email": 1}):
+        e = (u.get("email") or "").strip().lower()
+        if e:
+            acct_emails.add(e)
+    app_scope = org_match_field("user_id", user["user_id"])
+    apps_real = 0
+    async for a in db.applications.find(app_scope, {"email": 1, "submitted_at": 1}):
+        sub = a.get("submitted_at")
+        if isinstance(sub, _dt) and sub < _TEST_DATA_CUTOFF:
+            continue
+        if (a.get("email") or "").strip().lower() in acct_emails:
+            continue
+        apps_real += 1
+    direct = sum(1 for s in rows if s.get("source") != "public_apply")
+    applied = apps_real + direct
+
+    # ── funnel in the TRUE product flow order (AI interview precedes the
+    #    recruiter's shortlist decision — the data proves it) ──
+    interviewed = sum(1 for s in rows if s.get("interview_score") is not None)
+    shortlisted = sum(1 for s in rows if s.get("stage") in ("shortlisted", "hire"))
+    hired = len(hires)
+    funnel = [
+        {"label": "Applied", "n": applied},
+        {"label": "CV screened", "n": n_real},
+        {"label": "Interviewed", "n": interviewed},
+        {"label": "Shortlisted", "n": shortlisted},
+        {"label": "Hired", "n": hired},
+    ]
+
+    # ── conversion / time-to-hire / pass rate ──
+    conversion = {"applied": applied, "hired": hired,
+                  "pct": (round(hired / applied * 100, 1) if applied else None)}
+    tth = [(s["stage_updated_at"] - s["created_at"]).total_seconds() / 86400
+           for s in hires
+           if isinstance(s.get("stage_updated_at"), _dt)
+           and isinstance(s.get("created_at"), _dt)
+           and s["stage_updated_at"] >= s["created_at"]]
+    time_to_hire = ({"avg_days": round(sum(tth) / len(tth), 1), "n": len(tth)}
+                    if tth else None)
+    # Pass rate = recruiter DECISION after a scored interview (shortlist/hire)
+    # — a human call, never an invented score threshold.
+    iv_rows = [s for s in rows if s.get("interview_score") is not None]
+    forwarded = sum(1 for s in iv_rows if s.get("stage") in ("shortlisted", "hire"))
+    pass_rate = {"n": len(iv_rows), "forwarded": forwarded,
+                 "pct": (round(forwarded / len(iv_rows) * 100) if iv_rows else None)}
+
     return {
         "n_real": n_real, "n_excluded": n_excluded,
-        "score_dist": dist, "bands": bands,
-        "funnel": {"applications": apps_total, "mcq_taken": mcq_taken,
-                   "mcq_advanced": mcq_advanced, "cv_scored": n_real,
-                   "shortlisted": shortlisted, "interviewed": interviewed,
-                   "hired_stage": hired_stage},
-        "per_job": job_rows[:12],
-        "interviews": {"sessions": iv_sessions, "completed": iv_completed,
-                       "avg_score": iv_avg, "cv_iv_delta": iv_delta,
-                       "scored_pairs": len(iv_scored)},
-        "mcq": {"takers": mcq_taken, "avg_mark": mcq_avg, "advanced": mcq_advanced},
-        "skills_gaps": gaps[:10],
+        "hires_this_month": hires_this_month,
+        "month_label": now.strftime("%B %Y"),
+        "mom": mom, "yoy": yoy,
+        "conversion": conversion,
+        "time_to_hire": time_to_hire,
+        "pass_rate": pass_rate,
+        "funnel": funnel,
         "months_of_history": len(months), "consecutive_months": streak,
-        "trends_unlock_at": 3,
     }
 
 
