@@ -39,13 +39,15 @@ def serialize_mongo(doc):
 
 async def connect():
     global client, db
+    # STRICT TLS (security hardening 2026-09-14): certificate AND hostname
+    # validation on. The old tlsAllowInvalid* flags exposed every tenant's
+    # data to MITM; a strict-mode probe against live Atlas passed before
+    # this change shipped, so removal is verified-safe.
     client = AsyncIOMotorClient(
         MONGO_URI,
         serverSelectionTimeoutMS=30000,
         connectTimeoutMS=30000,
         socketTimeoutMS=30000,
-        tlsAllowInvalidCertificates=True,
-        tlsAllowInvalidHostnames=True,
     )
     db = client[DB_NAME]
     await client.admin.command("ping")
@@ -717,17 +719,34 @@ async def store_otp(email: str, otp: str, company_name: str, password_hash: str)
     })
 
 
-async def verify_otp(email: str, otp: str) -> dict | None:
-    """Verify OTP. Returns pending registration data if valid."""
+OTP_MAX_ATTEMPTS = 5
+
+
+async def verify_otp(email: str, otp: str):
+    """Verify OTP with an ENFORCED attempt limit (security fix 2026-09-14 —
+    the attempts field was stored but never checked, so a 6-digit code was
+    brute-forceable inside its window). Returns the pending-registration doc
+    on success, the string "locked" when the code has burned its attempts,
+    and None for wrong/expired codes."""
     from datetime import timedelta
     cutoff = datetime.utcnow() - timedelta(minutes=15)
     doc = await db.pending_registrations.find_one({
         "email": email.lower(),
-        "otp": otp,
         "created_at": {"$gt": cutoff}
     })
-    if doc:
+    if not doc:
+        return None
+    if int(doc.get("attempts") or 0) >= OTP_MAX_ATTEMPTS:
+        # Burned: delete so it can't be retried; the user re-registers.
         await db.pending_registrations.delete_one({"_id": doc["_id"]})
+        return "locked"
+    if str(doc.get("otp")) != str(otp):
+        r = await db.pending_registrations.update_one(
+            {"_id": doc["_id"]}, {"$inc": {"attempts": 1}})
+        if int(doc.get("attempts") or 0) + 1 >= OTP_MAX_ATTEMPTS:
+            return "locked" if r.modified_count else None
+        return None
+    await db.pending_registrations.delete_one({"_id": doc["_id"]})
     return doc
 
 

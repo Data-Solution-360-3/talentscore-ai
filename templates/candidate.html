@@ -189,6 +189,10 @@ function rico(r){
   return'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
 }
 function initials(n){if(!n||n==='Unknown')return'?';return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();}
+// XSS guard (security fix 2026-09-14): every CV-originated string goes
+// through here before touching innerHTML — the whole report is parsed from
+// an applicant-controlled PDF.
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 
 // Mirror of the server's build_report() for rows scored before the report
 // format existed — same mapping, so old and new rows render identically.
@@ -291,12 +295,12 @@ function render(d){
 
   document.getElementById('detail-panel').innerHTML = `
     <div class="candidate-hd">
-      <div class="avatar">${initials(d.candidate_name)}</div>
+      <div class="avatar">${escapeHtml(initials(d.candidate_name))}</div>
       <div style="flex:1">
-        <div class="cand-name">${d.candidate_name||'Unknown'}</div>
-        <div class="cand-role">${d.current_title||'—'}</div>
+        <div class="cand-name">${escapeHtml(d.candidate_name||'Unknown')}</div>
+        <div class="cand-role">${escapeHtml(d.current_title||'—')}</div>
         <div class="chips">
-          <span class="chip">${d.years_experience||'?'} yrs exp</span>
+          <span class="chip">${escapeHtml(String(d.years_experience||'?'))} yrs exp</span>
           <span class="chip bl">${cov===null?'skills coverage not scored':cov+'% skills matched'}</span>
           ${d.batch?'<span class="chip ac">Batch</span>':''}
           <span class="chip">${date}</span>
@@ -316,7 +320,7 @@ function render(d){
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${rico(verdict)}</svg>
           ${verdict}
         </div>
-        <div class="rreason">${d.recommendation_reason||''}</div>
+        <div class="rreason">${escapeHtml(d.recommendation_reason||'')}</div>
         <div style="font-size:10.5px;color:var(--t3);margin-top:4px">Verdict bands: hire ≥75 · maybe 50–74 · reject &lt;50${rec!==verdict?` · engine recommendation: ${rec}`:''}${hasIv?' · verdict reflects the CV screening':''}</div>
       </div>
     </div>
@@ -344,7 +348,7 @@ function render(d){
 
     <div class="card">
       <div class="card-ttl">AI Assessment</div>
-      <div class="sum-txt">${rep.aiSummary||d.summary||'—'}</div>
+      <div class="sum-txt">${escapeHtml(rep.aiSummary||d.summary||'—')}</div>
       ${cov===null
         ? `<div class="cov-row"><div class="cov-lbl">Skills coverage</div>
              <span style="font-size:11.5px;color:var(--t3)">Not scored — this role has no required skills configured to compare against.</span></div>`
@@ -387,25 +391,25 @@ function render(d){
   Object.values(rep.breakdown||{}).forEach(dim=>{ dim.name=_dl[dim.name]||dim.name; });
   Object.values(rep.breakdown||{}).forEach(dim=>{
     const p=Math.round((dim.score/20)*100);const c=gc(p);
-    const mp=(dim.matchedSkills||[]).slice(0,4).map(s=>'<span class="pg">'+s+'</span>').join('');
-    const rp=(dim.missingSkills||[]).slice(0,4).map(s=>'<span class="pr">'+s+'</span>').join('');
+    const mp=(dim.matchedSkills||[]).slice(0,4).map(s=>'<span class="pg">'+escapeHtml(s)+'</span>').join('');
+    const rp=(dim.missingSkills||[]).slice(0,4).map(s=>'<span class="pr">'+escapeHtml(s)+'</span>').join('');
     const el=document.createElement('div');el.className='sg';
-    el.innerHTML='<div class="sg-top" style="background:'+c.b+'"></div><div class="sg-hd"><div><div class="sg-name">'+dim.name+'</div>'+(dim.weight?'<div class="sg-wt">'+dim.weight+'% weight</div>':'')+
+    el.innerHTML='<div class="sg-top" style="background:'+c.b+'"></div><div class="sg-hd"><div><div class="sg-name">'+escapeHtml(dim.name)+'</div>'+(dim.weight?'<div class="sg-wt">'+dim.weight+'% weight</div>':'')+
       '</div><span class="sg-score" style="color:'+c.t+'">'+dim.score.toFixed(1)+'<span style="font-size:10px;font-weight:400;opacity:.4">/20</span></span></div>'+
       '<div class="bar-bg"><div class="bar-fill" style="background:'+c.b+'" data-pct="'+p+'"></div></div>'+
-      '<p class="sg-fb">'+(dim.reasoning||'')+'</p><div class="pills">'+(mp||'')+(rp||'')+'</div>';
+      '<p class="sg-fb">'+escapeHtml(dim.reasoning||'')+'</p><div class="pills">'+(mp||'')+(rp||'')+'</div>';
     grid.appendChild(el);
   });
   setTimeout(()=>{document.querySelectorAll('.bar-fill').forEach(b=>{b.style.width=b.dataset.pct+'%';});},300);
 
-  document.getElementById('strl').innerHTML=(rep.keyStrengths||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
-  document.getElementById('gapl').innerHTML=(rep.criticalGaps||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
-  document.getElementById('ql').innerHTML=(rep.interviewQuestions||[]).map(s=>'<li>'+s+'</li>').join('')||'<li style="color:var(--t3)">—</li>';
+  document.getElementById('strl').innerHTML=(rep.keyStrengths||[]).map(s=>'<li>'+escapeHtml(s)+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
+  document.getElementById('gapl').innerHTML=(rep.criticalGaps||[]).map(s=>'<li>'+escapeHtml(s)+'</li>').join('')||'<li style="color:var(--t3)">None identified</li>';
+  document.getElementById('ql').innerHTML=(rep.interviewQuestions||[]).map(s=>'<li>'+escapeHtml(s)+'</li>').join('')||'<li style="color:var(--t3)">—</li>';
   // Honest-uncertainty flags lead the risks list: a shaky score must not read
   // as solid on this page while the report card flags it. (score_core.js)
-  const _rf=reviewFlagsOf(d).map(s=>'<li style="color:var(--amber)"><b>Review recommended:</b> '+s+'</li>').join('');
+  const _rf=reviewFlagsOf(d).map(s=>'<li style="color:var(--amber)"><b>Review recommended:</b> '+escapeHtml(s)+'</li>').join('');
   document.getElementById('rl').innerHTML=_rf+((rep.hiringRisks||[]).length
-    ? rep.hiringRisks.map(s=>'<li>'+s+'</li>').join('')
+    ? rep.hiringRisks.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')
     : (_rf?'':'<li style="color:var(--t3)">None identified — no concrete evidence-based risks flagged.</li>'));
   document.getElementById('pd-cv').textContent=JSON.stringify(d.parsed_cv||{},null,2);
   document.getElementById('pd-jd').textContent=JSON.stringify(d.parsed_jd||{},null,2);

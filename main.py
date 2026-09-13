@@ -329,7 +329,11 @@ async def lifespan(app: FastAPI):
     await disconnect()
 
 
-app = FastAPI(title="TopCandidate", version="5.0.0", lifespan=lifespan)
+# openapi_url/redoc_url=None: the auto-generated schema enumerated all ~190
+# routes (admin surface included) to anyone unauthenticated. The human docs
+# page at /docs is our own route and stays.
+app = FastAPI(title="TopCandidate", version="5.0.0", lifespan=lifespan,
+              openapi_url=None, redoc_url=None, docs_url=None)
 
 # Always return JSON for API errors, never HTML
 from fastapi import Request as FastAPIRequest
@@ -519,6 +523,18 @@ def _strip_cost_fields(doc, user: dict):
         for k in _COST_FIELDS:
             doc.pop(k, None)
     return doc
+
+
+async def _is_admin_fresh(user: dict) -> bool:
+    """Cross-org admin bypasses read the role FRESH from the DB — never the
+    (up to 30-day-old) JWT claim — so a demoted admin loses cross-tenant
+    access immediately (security fix 2026-09-14). Fails CLOSED: any lookup
+    error means 'not admin' and the normal org check applies."""
+    try:
+        db_user = await get_user_by_id(user["user_id"])
+        return bool(db_user and db_user.get("role") == "admin")
+    except Exception:
+        return False
 
 
 def _org_denied(doc: dict, user: dict) -> bool:
@@ -730,10 +746,18 @@ async def register(
 
 @app.post("/api/auth/verify")
 async def verify_email(
+    request: Request,
     email: str = Form(...),
     otp: str = Form(...),
 ):
+    if not await rate_limit_allows(f"verify-email:{(email or '').strip().lower()}", 10, 900):
+        raise HTTPException(status_code=429,
+                            detail="Too many attempts — please try again in a few minutes.")
     pending = await verify_otp(email=email, otp=otp)
+    if pending == "locked":
+        raise HTTPException(status_code=400, detail=(
+            "Too many wrong codes — this code is now void. Please register "
+            "again to get a fresh one."))
     if not pending:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code. Please try again.")
     # Create the user account
@@ -758,12 +782,17 @@ async def verify_email(
         "role": new_user.get("role", "client") if new_user else "client"
     })
     resp = JSONResponse({"success": True, "company": pending["company_name"]})
-    resp.set_cookie("access_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
+    resp.set_cookie("access_token", token, httponly=True, secure=True, max_age=30*24*3600, samesite="lax")
     return resp
 
 
 @app.post("/api/auth/resend-otp")
-async def resend_otp(email: str = Form(...)):
+async def resend_otp(request: Request, email: str = Form(...)):
+    # Resend throttle: also stops using this endpoint to email-bomb a victim.
+    if not await rate_limit_allows(f"resend-email:{(email or '').strip().lower()}", 3, 3600) or \
+       not await rate_limit_allows(f"resend-ip:{_client_ip_hash(request)}", 10, 3600):
+        raise HTTPException(status_code=429,
+                            detail="Too many resend requests — please try again later.")
     # Check pending registration exists
     from database import db
     pending = await db.pending_registrations.find_one({"email": email.lower()})
@@ -780,11 +809,26 @@ async def resend_otp(email: str = Form(...)):
     return JSONResponse({"success": True})
 
 
+def _client_ip_hash(request: Request) -> str:
+    ip = (request.headers.get("x-forwarded-for", "") or "").split(",")[0].strip() \
+        or (request.client.host if request.client else "unknown")
+    return hash_ip(ip)
+
+
 @app.post("/api/auth/login")
 async def login(
+    request: Request,
     email: str = Form(...),
     password: str = Form(...),
 ):
+    # Brute-force / credential-stuffing throttle (security fix 2026-09-14):
+    # per-email AND per-IP, generous enough that a forgotten password never
+    # locks a real user out for long. Deliberately generic 429 text.
+    email_norm = (email or "").strip().lower()
+    if not await rate_limit_allows(f"login-email:{email_norm}", 10, 900) or \
+       not await rate_limit_allows(f"login-ip:{_client_ip_hash(request)}", 30, 900):
+        raise HTTPException(status_code=429,
+                            detail="Too many attempts — please try again in a few minutes.")
     user = await get_user_by_email(email)
     if not user or not verify_password(password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -799,7 +843,7 @@ async def login(
         "role": user.get("role", "client"),
     })
     resp = JSONResponse({"success": True, "company": user["company_name"]})
-    resp.set_cookie("access_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
+    resp.set_cookie("access_token", token, httponly=True, secure=True, max_age=30*24*3600, samesite="lax")
     return resp
 
 
@@ -1519,7 +1563,7 @@ async def get_screening_attempts(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and _org_denied(doc, user):
+    if not await _is_admin_fresh(user) and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     email = str(doc.get("applicant_email") or "").strip().lower()
@@ -1554,7 +1598,7 @@ async def get_screening(request: Request, screening_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
     # Allow access if no user_id (legacy data) or if it belongs to this user
-    if user["role"] != "admin" and _org_denied(doc, user):
+    if not await _is_admin_fresh(user) and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     _strip_cost_fields(doc, user)
     await _attach_dimension_labels([doc])
@@ -1567,7 +1611,7 @@ async def delete_screening_endpoint(request: Request, screening_id: str):
     doc = await get_screening_by_id(screening_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
-    if user["role"] != "admin" and _org_denied(doc, user):
+    if not await _is_admin_fresh(user) and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
     await delete_screening(screening_id)
     return {"deleted": True}
@@ -2234,7 +2278,7 @@ async def get_cv_pdf(request: Request, screening_id: str):
         raise HTTPException(status_code=404, detail="CV file not found.")
     # Ownership before content: the old order answered "does this screening have a
     # CV?" for screenings the caller doesn't own.
-    if user["role"] != "admin" and _org_denied(doc, user):
+    if not await _is_admin_fresh(user) and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
 
     # application_files is the primary store; cv_pdf_b64 is the legacy copy that
@@ -6212,7 +6256,7 @@ def _employee_session_response(emp: dict) -> JSONResponse:
         "name": emp.get("name", ""),
     })
     resp = JSONResponse({"success": True, "name": emp.get("name", "")})
-    resp.set_cookie("emp_token", token, httponly=True, max_age=30*24*3600, samesite="lax")
+    resp.set_cookie("emp_token", token, httponly=True, secure=True, max_age=30*24*3600, samesite="lax")
     return resp
 
 
@@ -6498,7 +6542,7 @@ async def stats(request: Request):
 @app.get("/api/analytics/skills-gaps")
 async def skills_gaps(request: Request):
     user = await get_current_user(request)
-    if user["role"] == "admin":
+    if await _is_admin_fresh(user):
         gaps = await get_skills_gap_frequency()
     else:
         gaps = await get_skills_gaps_for_user(user["user_id"])
@@ -6508,7 +6552,7 @@ async def skills_gaps(request: Request):
 @app.get("/api/analytics/dimension-averages")
 async def dimension_averages(request: Request):
     user = await get_current_user(request)
-    if user["role"] == "admin":
+    if await _is_admin_fresh(user):
         dims = await get_dimension_averages()
     else:
         dims = await get_dimension_averages_for_user(user["user_id"])
@@ -7842,7 +7886,7 @@ async def accept_invite_route(
         "role": "client",
     })
     resp = JSONResponse({"success": True, "email": member["email"], "role": member["org_role"]})
-    resp.set_cookie("access_token", session, httponly=True, max_age=30*24*3600, samesite="lax")
+    resp.set_cookie("access_token", session, httponly=True, secure=True, max_age=30*24*3600, samesite="lax")
     return resp
 
 
@@ -8141,8 +8185,9 @@ async def admin_diagnostics(request: Request):
 
 @app.post("/api/admin/reset-my-count")
 async def reset_my_count(request: Request):
-    """Reset current user screening count to 0 (for testing)."""
-    user = await get_current_user(request)
+    """ADMIN-ONLY testing helper. Was gated only by login (security fix
+    2026-09-14) — any client could zero their own quota."""
+    user = await require_admin(request)
     from database import db as mongodb
     from bson import ObjectId as BsonObjId
     from datetime import datetime

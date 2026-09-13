@@ -2159,8 +2159,8 @@ function renderResultCard(d){
         <span style="font-size:9px;color:var(--t3)">/100</span>
       </div>
       <div style="flex:1">
-        <div style="font-size:17px;font-weight:800;margin-bottom:2px">${d.candidate_name||'Unknown Candidate'}</div>
-        <div style="font-size:12px;color:var(--t2);margin-bottom:6px">${d.current_title||'—'} · ${d.years_experience||'?'} yrs exp</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:2px">${escapeHtml(d.candidate_name||'Unknown Candidate')}</div>
+        <div style="font-size:12px;color:var(--t2);margin-bottom:6px">${escapeHtml(d.current_title||'—')} · ${escapeHtml(String(d.years_experience||'?'))} yrs exp</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           <span class="badge ${tbcls(rec)}">${rec}</span>
           <span class="badge b-indigo">${cov}% skills matched</span>
@@ -2168,14 +2168,14 @@ function renderResultCard(d){
         </div>
       </div>
     </div>
-    <div style="font-size:12px;color:var(--t2);line-height:1.75;margin-bottom:1rem">${d.summary||''}</div>
+    <div style="font-size:12px;color:var(--t2);line-height:1.75;margin-bottom:1rem">${escapeHtml(d.summary||'')}</div>
     <div class="dim-grid">
       ${(d.dimensions||[]).slice(0,6).map(dim=>{const p=Math.round((dim.score/20)*100);const c=gc(p);
         return`<div class="dim-card"><div class="dim-top" style="background:${c}"></div>
-          <div class="dim-name">${((d.dimension_labels||{})[dim.name])||dim.name}</div>
+          <div class="dim-name">${escapeHtml(((d.dimension_labels||{})[dim.name])||dim.name)}</div>
           <div class="dim-score" style="color:${c}">${dim.score.toFixed(1)}<span style="font-size:9px;opacity:.5;font-weight:400">/20</span></div>
           <div class="dim-bar-bg"><div class="dim-bar-fill" style="width:${p}%;background:${c}"></div></div>
-          <div class="dim-fb">${(dim.feedback||'').slice(0,60)}${dim.feedback&&dim.feedback.length>60?'...':''}</div>
+          <div class="dim-fb">${escapeHtml((dim.feedback||'').slice(0,60))}${dim.feedback&&dim.feedback.length>60?'...':''}</div>
         </div>`;}).join('')}
     </div>`;
 }
@@ -2357,18 +2357,18 @@ function renderCandidates(results){
     // candidate page) and the ✓/✕ actions stop propagation so neither also
     // triggers the row's modal.
     return`<tr class="row-click" onclick="openCandModal('${r._id}')">
-      <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${r.candidate_name||'Unknown'}</a></td>
-      <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${r.job_title||r.company||'—'}</span></td>
+      <td><a class="tbl-link" href="/candidate?id=${r._id}" onclick="event.stopPropagation()">${escapeHtml(r.candidate_name||'Unknown')}</a></td>
+      <td><span style="font-size:11px;font-weight:600;color:var(--t2)">${escapeHtml(r.job_title||r.company||'—')}</span></td>
       <td>${(()=>{const ov=ovOf(r);const rf=reviewFlagsOf(r);return scoreRing(ov.s,'sm')+
         (rf.length?`<span style="color:var(--amber);font-size:11px;margin-left:2px;cursor:help" title="Review recommended — ${escapeHtml(rf.join(' · '))}">⚑</span>`:'')+
         (ov.pending
           ?'<div style="font-size:8.5px;color:var(--amber);font-weight:700;margin-top:2px">IV pending · CV only</div>'
           :'<div style="font-size:8.5px;color:var(--t3);font-weight:600;margin-top:2px">CV '+ov.cv+' · IV '+ov.iv+(r.interview_status==='abandoned'?' <span style="color:var(--amber)">partial</span>':'')+'</div>');})()}</td>
       <td>${ivCell(r)}</td>
-      <td>${matched.map(s=>`<span class="tag matched">${s}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
+      <td>${matched.map(s=>`<span class="tag matched">${escapeHtml(s)}</span>`).join('')||'<span style="color:var(--t3);font-size:10px">—</span>'}</td>
       <td>${gapsCell}</td>
-      <td style="font-size:12px;color:var(--t2)">${r.years_experience||'?'} yrs</td>
-      <td style="font-size:10px;color:var(--t3)">${edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—'}</td>
+      <td style="font-size:12px;color:var(--t2)">${escapeHtml(String(r.years_experience||'?'))} yrs</td>
+      <td style="font-size:10px;color:var(--t3)">${escapeHtml(edu?(edu.degree||'')+(edu.field?' · '+edu.field:''):'—')}</td>
       <td><span class="badge ${tbcls(rec)}">${rec}</span>${stageBadge(stage)}${r.viva_capped?`<span class="badge b-amber" style="font-size:9px;margin-left:4px" title="Qualified for the live interview, but the job's daily interview cap was reached — send them a candidate link from /viva-live">INTERVIEW CAPPED</span>`:''}</td>
       <td style="font-size:10px;color:var(--t3)">${fmt(r.created_at)}</td>
       <td>
@@ -2566,8 +2566,8 @@ function openCandModal(id){
     <div class="cdx-banner">
       <div class="cdx-chip" style="border:3px solid ${col}"><b style="color:${col}">${score}</b><span>${ov.pending?'CV ONLY':'OVERALL'}</span></div>
       <div style="min-width:0">
-        <div class="cdx-name">${r.candidate_name||'Unknown'}</div>
-        <div class="cdx-role">${r.current_title||'—'} · ${r.years_experience||'?'} yrs experience</div>
+        <div class="cdx-name">${escapeHtml(r.candidate_name||'Unknown')}</div>
+        <div class="cdx-role">${escapeHtml(r.current_title||'—')} · ${escapeHtml(String(r.years_experience||'?'))} yrs experience</div>
         <span class="cdx-verdict" style="color:${vd[1]};background:${vd[2]};border:1px solid ${vd[1]}44">${vd[0]}</span>
       </div>
       <div class="cdx-split">
@@ -2587,7 +2587,7 @@ function openCandModal(id){
     <div class="cand-detail-grid">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">AI Summary</div>
-        <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">${(rep&&rep.aiSummary)||r.summary||'—'}</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">${escapeHtml((rep&&rep.aiSummary)||r.summary||'—')}</div>
         <div class="cdx-cov">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px">Skills coverage</div>
           ${cov===null||cov===undefined
@@ -2600,11 +2600,11 @@ function openCandModal(id){
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
           <div class="cdx-panel cdx-good">
             <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#4F7C1B;margin-bottom:4px">Key strengths</div>
-            ${strengths.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#639922;flex-shrink:0">✓</span><span>${s}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+            ${strengths.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#639922;flex-shrink:0">✓</span><span>${escapeHtml(s)}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
           </div>
           <div class="cdx-panel cdx-bad">
             <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#B91C1C;margin-bottom:4px">Critical gaps</div>
-            ${gaps.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#DC2626;flex-shrink:0">✗</span><span>${s}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
+            ${gaps.map(s=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;display:flex;gap:5px;line-height:1.5"><span style="color:#DC2626;flex-shrink:0">✗</span><span>${escapeHtml(s)}</span></div>`).join('')||'<div style="font-size:10px;color:var(--t3)">None identified</div>'}
           </div>
         </div>
       </div>
@@ -2617,18 +2617,18 @@ function openCandModal(id){
             return`
             <div>
               <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
-                <span style="color:var(--t2)">${((r.dimension_labels||{})[d.name])||d.name}${wt?` <span style="color:var(--t3)">· ${wt}%</span>`:''}</span>
+                <span style="color:var(--t2)">${escapeHtml(((r.dimension_labels||{})[d.name])||d.name)}${wt?` <span style="color:var(--t3)">· ${wt}%</span>`:''}</span>
                 <span style="font-weight:800;color:${c}">${(+d.score).toFixed(1)}/20</span>
               </div>
               <div class="cdx-bar"><i style="width:${p}%;background:${c}"></i></div>
             </div>`;}).join('')}
         </div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:5px">Suggested interview questions</div>
-        ${questions.map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:7px;line-height:1.55"><span style="color:#F57C2E;font-weight:800;flex-shrink:0">${i+1}</span><span>${q}</span></div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
+        ${questions.map((q,i)=>`<div style="font-size:11px;color:var(--t2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:7px;line-height:1.55"><span style="color:#F57C2E;font-weight:800;flex-shrink:0">${i+1}</span><span>${escapeHtml(q)}</span></div>`).join('')||'<div style="font-size:11px;color:var(--t3)">No questions generated</div>'}
         ${risks&&risks.length?`
         <div class="cdx-risk">
           <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#B45309;margin-bottom:4px;display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Hiring risks</div>
-          ${risks.map(risk=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;line-height:1.5">${risk}</div>`).join('')}
+          ${risks.map(risk=>`<div style="font-size:10.5px;color:var(--t2);padding:2px 0;line-height:1.5">${escapeHtml(risk)}</div>`).join('')}
         </div>`:''}
       </div>
     </div>
@@ -4011,8 +4011,8 @@ function renderPipeline(){
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             ${scoreRing(ovOf(r).s, 'sm')}
             <div style="min-width:0;flex:1">
-              <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.candidate_name||'Unknown'}</div>
-              <div style="font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.current_title||'—'}</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.candidate_name||'Unknown')}</div>
+              <div style="font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.current_title||'—')}</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -4293,8 +4293,8 @@ async function viewJobDetails(jobId){
             const ov = ovOf(r);   // headline: overall if the interview is scored, else CV + pending
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;cursor:pointer" onclick="closeModal('job-detail-modal');openCandModal('${r._id}')">
               <div>
-                <div style="font-size:13px;font-weight:600;color:var(--text)">${r.candidate_name||'Unknown'}</div>
-                <div style="font-size:11px;color:var(--t3)">${r.current_title||'—'}</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(r.candidate_name||'Unknown')}</div>
+                <div style="font-size:11px;color:var(--t3)">${escapeHtml(r.current_title||'—')}</div>
                 ${ov.pending
                   ? '<div style="font-size:10px;color:var(--amber);font-weight:700;margin-top:2px">Interview pending · CV only</div>'
                   : '<div style="font-size:10px;color:var(--t3);font-weight:600;margin-top:2px">Overall · CV '+ov.cv+' · IV '+ov.iv+'</div>'}
@@ -6014,7 +6014,7 @@ function renderAnalytics(){
 function renderAudit(){
   document.getElementById('audit-tbl').innerHTML=allResults.length
     ?allResults.map(r=>{const sc=r.score_consistency||{};const score=r.score||Math.round(r.overall_score||0);const rec=(r.rec||(r.recommendation||'MAYBE')).toUpperCase();return`<tr>
-        <td><a class="tbl-link" href="/candidate?id=${r._id}">${r.candidate_name||'Unknown'}</a></td>
+        <td><a class="tbl-link" href="/candidate?id=${r._id}">${escapeHtml(r.candidate_name||'Unknown')}</a></td>
         <td style="font-size:10px">${fmtTime(r.created_at)}</td>
         <td><span class="badge ${sc.confidence==='High'?'b-green':sc.confidence==='Medium'?'b-amber':'b-red'}">${sc.confidence||'High'}</span></td>
         <td style="font-size:11px">${sc.run_1||'—'}</td>

@@ -13,8 +13,17 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
 import os
+from dotenv import load_dotenv
 
-SECRET_KEY = os.getenv("SECRET_KEY", "talentscore-secret-key-change-in-production-2024")
+load_dotenv()   # self-sufficient: never depend on another module's import order
+
+# FAIL HARD if unset (security hardening 2026-09-14): the old hardcoded
+# fallback meant a missing env var silently made every session forgeable by
+# anyone who read this file. Refusing to start is the only safe behavior.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set — refusing to start with a "
+                       "forgeable session secret. Set it in .env.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 

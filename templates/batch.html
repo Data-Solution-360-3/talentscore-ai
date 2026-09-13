@@ -387,7 +387,7 @@ function renderFileList(){
   list.innerHTML=selectedFiles.map((f,i)=>
     `<div class="file-item">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <span class="file-name">${f.name}</span>
+      <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)}KB</span>
       <button class="file-remove" onclick="removeFile(${i})">✕</button>
     </div>`).join('');
@@ -463,7 +463,7 @@ async function runBatch(){
   selectedFiles.forEach((f,i)=>{
     const el=document.createElement('div');
     el.className='cv-card';el.id='cv-'+i;
-    el.innerHTML=`<div class="cv-fn">${f.name.replace('.pdf','')}</div><div class="cv-status wait">Waiting...</div>`;
+    el.innerHTML=`<div class="cv-fn">${escapeHtml(f.name.replace('.pdf',''))}</div><div class="cv-status wait">Waiting...</div>`;
     grid.appendChild(el);cvItems[i]=el;
   });
 
@@ -561,8 +561,8 @@ function renderResults(ev){
     const rankEl=r.rank<=3?`<span class="rank-badge rank-${r.rank}">${r.rank}</span>`:`<span style="font-size:13px;font-weight:600;color:var(--t3)">#${r.rank}</span>`;
     return`<tr style="cursor:pointer" onclick="window.location.href='/candidate?id=${r._id}'">
       <td>${rankEl}</td>
-      <td style="font-weight:600;color:var(--indigo)">${r.candidate_name||'—'}</td>
-      <td>${r.current_title||'—'}</td>
+      <td style="font-weight:600;color:var(--indigo)">${escapeHtml(r.candidate_name||'—')}</td>
+      <td>${escapeHtml(r.current_title||'—')}</td>
       <td><div class="score-bar"><span style="font-weight:700;color:${c};min-width:26px">${r.overall_score}</span><div class="score-bar-bg"><div class="score-bar-fill" style="width:${r.overall_score}%;background:${c}"></div></div></div></td>
       <td>${r.skills_coverage_pct||0}%</td>
       <td>${r.years_experience||'?'} yrs</td>
@@ -722,6 +722,10 @@ function fillBatchJd(){
 // and so the "X left this month" usage info reflects reality if they screened
 // in another tab. Also updates the usage banner text at the top of the page.
 let lastKnownPlan=null;
+// XSS guard (security fix 2026-09-14): every user/CV-originated string goes
+// through here before touching innerHTML.
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+
 async function refreshPlan(){
   try{
     const r = await fetch('/api/auth/me',{credentials:'include'});

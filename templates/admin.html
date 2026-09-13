@@ -932,7 +932,7 @@ function renderDashboard(stats){
   const sorted=Object.entries(compMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const max=sorted[0]?.[1]||1;
   document.getElementById('top-companies').innerHTML=sorted.length
-    ?sorted.map(([co,cnt])=>`<div class="prog-row"><span class="prog-lbl">${co}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(cnt/max*100)}%;background:var(--indigo)"></div></div><span class="prog-val">${cnt}</span></div>`).join('')
+    ?sorted.map(([co,cnt])=>`<div class="prog-row"><span class="prog-lbl">${escBl(co)}</span><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(cnt/max*100)}%;background:var(--indigo)"></div></div><span class="prog-val">${cnt}</span></div>`).join('')
     :'<p style="color:var(--t3);font-size:13px">No data yet</p>';
 
   // Rec breakdown
@@ -946,8 +946,8 @@ function renderDashboard(stats){
 
   // Recent users
   document.getElementById('recent-tbl').innerHTML=allUsers.slice(0,10).map(u=>`<tr>
-    <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div><span style="font-weight:600;color:var(--text)">${u.company_name||'—'}</span></div></td>
-    <td>${u.email}</td>
+    <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${escBl((u.company_name||'?').slice(0,2).toUpperCase())}</div><span style="font-weight:600;color:var(--text)">${escBl(u.company_name||'—')}</span></div></td>
+    <td>${escBl(u.email)}</td>
     <td><span class="badge b-indigo">${u.plan||'trial'}</span></td>
     <td style="font-weight:600;color:var(--indigo)">${u.screening_count||0}</td>
     <td>${fmt(u.created_at)}</td>
@@ -961,8 +961,8 @@ function renderUsers(){
   const filtered=allUsers.filter(u=>(u.company_name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
   document.getElementById('users-tbl').innerHTML=filtered.length
     ?filtered.map(u=>`<tr>
-        <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${(u.company_name||'?').slice(0,2).toUpperCase()}</div><span style="font-weight:600;color:var(--text)">${u.company_name||'—'}</span></div></td>
-        <td>${u.email}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="u-avatar">${escBl((u.company_name||'?').slice(0,2).toUpperCase())}</div><span style="font-weight:600;color:var(--text)">${escBl(u.company_name||'—')}</span></div></td>
+        <td>${escBl(u.email)}</td>
         <td><span class="badge ${u.role==='admin'?'b-orange':'b-indigo'}">${u.role||'client'}</span></td>
         <td>
           <select onchange="changePlan('${u._id}',this.value)" style="padding:3px 7px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rxs);font-size:11px;color:var(--t2);cursor:pointer">
@@ -1055,9 +1055,9 @@ function renderScreenings(){
     const cv=_ov.cv, hasIv=!_ov.pending, iv=_ov.iv, overall=_ov.s;
     const rec=(s.recommendation||'MAYBE').toUpperCase();
     return`<tr onclick="window.location.href='/candidate?id=${s._id}'" style="cursor:pointer${s.is_test?';opacity:.6':''}">
-      <td style="font-weight:600;color:var(--indigo)">${s.candidate_name||'Unknown'}
+      <td style="font-weight:600;color:var(--indigo)">${escBl(s.candidate_name||'Unknown')}
         <span class="badge ${s.is_test?'b-amber':'b-green'}" style="font-size:8.5px;margin-left:5px;cursor:pointer" title="${s.is_test?'Marked TEST — excluded from all analytics. Click to count as real.':'Counted as REAL in analytics. Click to mark as test data.'}" onclick="event.stopPropagation();toggleTestFlag('${s._id}')">${s.is_test?'TEST':'real'}</span></td>
-      <td>${s.company||'—'}</td>
+      <td>${escBl(s.company||'—')}</td>
       <td style="font-weight:700;color:${gc(cv)}">${cv}</td>
       <td>${hasIv?`<span style="font-weight:700;color:${gc(iv)}">${iv}</span>`:'<span style="color:var(--t3);font-size:11px">pending</span>'}</td>
       <td style="font-weight:800;color:${gc(overall)}">${overall}${hasIv?'':'<span style="font-size:9px;color:var(--t3);font-weight:600"> CV only</span>'}</td>
@@ -1243,7 +1243,7 @@ if(savedBrand.color2){document.getElementById('br-color2').value=savedBrand.colo
 // ── SETTINGS ──
 function loadSettings(){
   fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(me=>{
-    document.getElementById('admin-info').innerHTML=`Email: <strong style="color:var(--text)">${me.email}</strong><br>Role: <span class="badge b-orange">${me.role}</span><br>Company: <strong style="color:var(--text)">${me.company}</strong>`;
+    document.getElementById('admin-info').innerHTML=`Email: <strong style="color:var(--text)">${escBl(me.email)}</strong><br>Role: <span class="badge b-orange">${escBl(me.role)}</span><br>Company: <strong style="color:var(--text)">${escBl(me.company)}</strong>`;
   });
   document.getElementById('platform-stats').innerHTML=
     `Total users: <strong style="color:var(--text)">${allUsers.length}</strong><br>`+
