@@ -663,19 +663,24 @@ async function loadPayQueue(){
   const fmt=s=>{ try{ return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(_){ return s||''; } };
   const cnt=document.getElementById('mpq-count');
   if(cnt) cnt.textContent=(d.pending||[]).length ? (d.pending.length+' awaiting your verification') : 'Queue clear';
-  tb.innerHTML=(d.pending||[]).length ? d.pending.map(p=>`<tr>
+  tb.innerHTML=(d.pending||[]).length ? d.pending.map(p=>{
+    const amt=parseFloat(String(p.amount||'').replace(/[৳,]/g,''))||0;
+    const exp=p.expected_bdt;
+    const short=exp!=null&&amt<exp;   // H2: underpaid vs plan+period price
+    return `<tr>
     <td style="font-size:11px;color:var(--t3,#6B7280)">${fmt(p.created_at)}</td>
     <td style="font-weight:700">${escBl(p.company||p.org&&p.org.name||p.email)}</td>
     <td>${escBl(p.plan_label||p.plan_id)}</td>
     <td>${p.period==='annual'?'Annual':'Monthly'}</td>
-    <td style="font-weight:700">৳${escBl(p.amount)}</td>
+    <td style="font-weight:700;${short?'color:#B4232C':''}">৳${escBl(p.amount)}
+      <div style="font-size:9.5px;font-weight:${short?'800':'600'};color:${short?'#B4232C':'var(--t3,#6B7280)'}">${exp!=null?('expected ৳'+exp.toLocaleString('en-IN')+(short?' — UNDERPAID':'')):'expected —'}</div></td>
     <td>${escBl(p.payment_method)}</td>
     <td style="font-family:monospace;font-size:11.5px">${escBl(p.transaction_id)}</td>
     <td style="font-size:11px;color:var(--t3,#6B7280);max-width:160px">${escBl(p.note||'—')}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-xs" style="background:rgba(99,153,34,.12);color:#476B15;border:1px solid rgba(99,153,34,.3)" onclick="mpqApprove('${p._id}','${escBl(p.plan_label||p.plan_id)}','${escBl(p.company||'')}')">✓ Approve</button>
+      <button class="btn btn-xs" style="background:rgba(99,153,34,.12);color:#476B15;border:1px solid rgba(99,153,34,.3)" onclick="mpqApprove('${p._id}','${escBl(p.plan_label||p.plan_id)}','${escBl(p.company||'')}',${short?'true':'false'},${exp!=null?exp:0},${amt})">✓ Approve</button>
       <button class="btn btn-xs" style="background:rgba(220,38,38,.08);color:#B4232C;border:1px solid rgba(220,38,38,.25)" onclick="mpqReject('${p._id}')">✕ Reject</button>
-    </td></tr>`).join('')
+    </td></tr>`;}).join('')
     : '<tr><td colspan="9" class="tbl-empty">No payments awaiting verification 🎉</td></tr>';
   const dec=document.getElementById('mpq-decided');
   if(dec) dec.innerHTML=(d.decided||[]).length
@@ -688,9 +693,18 @@ async function loadPayQueue(){
       </div>`).join('')
     : '';
 }
-async function mpqApprove(id,label,company){
-  if(!confirm('Approve this payment?\n\n'+company+' → '+label+'\n\nOnly approve after matching the transaction ID against the bank/wallet statement. This activates/extends the plan immediately.')) return;
-  const r=await fetch('/api/admin/manual-payments/'+id+'/approve',{method:'POST',credentials:'include'});
+async function mpqApprove(id,label,company,short,expected,amt){
+  let url='/api/admin/manual-payments/'+id+'/approve';
+  if(short){
+    // H2: underpaid — the server refuses without an explicit override+reason.
+    const reason=prompt('⚠ UNDERPAID: submitted ৳'+amt+' but '+label+' expects ৳'+expected+'.\n\nTo approve anyway, type the override reason (goes on the audit record). Cancel to leave it pending.');
+    if(reason===null) return;
+    if(!reason.trim()){ alert('An override reason is required.'); return; }
+    url+='?override=true&override_reason='+encodeURIComponent(reason.trim());
+  }else{
+    if(!confirm('Approve this payment?\n\n'+company+' → '+label+'\n\nOnly approve after matching the transaction ID against the bank/wallet statement. This activates/extends the plan immediately.')) return;
+  }
+  const r=await fetch(url,{method:'POST',credentials:'include'});
   const d=await r.json().catch(()=>({}));
   alert(r.ok ? (d.message||'Approved — plan active.') : ('Failed: '+(d.detail||r.status)));
   loadPayQueue();

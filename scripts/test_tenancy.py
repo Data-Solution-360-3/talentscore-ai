@@ -369,12 +369,43 @@ def main():
             st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
             check("10 days past -> state paused", st.get("state") == "paused",
                   f"got {st.get('state')}")
+            # C1 (2026-09-14): tier-less orgs are NO LONGER uncapped by default.
             dbx.orgs.update_one({"_id": _OIDX(org_a)}, {"$unset": {"plan": ""}})
             r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
             st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
-            check("no tier -> Legacy stays active (never gated)",
-                  st.get("state") == "active" and st.get("assigned") is False,
-                  f"got {st.get('state')}/{st.get('assigned')}")
+            check("tier-less org WITHOUT grandfather flag -> capped free trial",
+                  st.get("tier_key") == "free_trial" and st.get("applicants_mo") == 25
+                  and st.get("interviews_mo") == 2 and st.get("jobs") == 2,
+                  f"got {st.get('tier_key')}/{st.get('applicants_mo')}/{st.get('interviews_mo')}")
+            dbx.orgs.update_one({"_id": _OIDX(org_a)},
+                                {"$set": {"legacy_uncapped": True}})
+            r = c.get("/api/org/billing-usage", headers=hdr(t_owner_a))
+            st = ((r.json() if r.status_code == 200 else {}).get("plan") or {})
+            check("grandfathered (legacy_uncapped) org stays uncapped Legacy",
+                  st.get("assigned") is False and st.get("applicants_mo") is None
+                  and st.get("state") == "active",
+                  f"got {st.get('assigned')}/{st.get('applicants_mo')}/{st.get('state')}")
+            dbx.orgs.update_one({"_id": _OIDX(org_a)},
+                                {"$unset": {"legacy_uncapped": ""}})
+
+            print("\nOpenAI cost fields — super-admin only, stripped for client owners (H3)")
+            dbx.screenings.update_one(
+                {"_id": __import__("bson").ObjectId(scr_a)},
+                {"$set": {"api_usage": {"cv_scoring": {"est_usd": 0.01}},
+                          "interview_scoring_usage": {"est_usd": 0.02},
+                          "interview_realtime_usage": {"est_usd": 0.03}}})
+            r = c.get("/api/screenings", headers=hdr(t_owner_a))
+            check("owner's screening LIST carries no cost fields",
+                  r.status_code == 200 and "est_usd" not in r.text
+                  and '"api_usage"' not in r.text
+                  and "interview_scoring_usage" not in r.text
+                  and "interview_realtime_usage" not in r.text,
+                  f"got {r.status_code}")
+            r = c.get(f"/api/screenings/{scr_a}", headers=hdr(t_owner_a))
+            check("owner's screening DETAIL carries no cost fields",
+                  r.status_code == 200 and "est_usd" not in r.text
+                  and '"api_usage"' not in r.text,
+                  f"got {r.status_code}")
 
             print("\nKPI insights — own-org only, test rows excluded")
             r = c.get("/api/kpi-insights", headers=hdr(t_owner_a))

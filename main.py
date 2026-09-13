@@ -18,7 +18,7 @@ from api_keys import (
 )
 from payment_service import (
     create_stripe_checkout, verify_stripe_webhook,
-    create_sslcommerz_payment, verify_sslcommerz_payment,
+    create_sslcommerz_payment,
     cancel_stripe_subscription, create_stripe_portal_session,
     STRIPE_PUBLISHABLE_KEY, PLANS
 )
@@ -513,11 +513,12 @@ require_org_owner = require_org_role("owner")
 _COST_FIELDS = ("api_usage", "interview_scoring_usage", "interview_realtime_usage")
 
 
-def _strip_cost_fields(doc, user: dict):
-    """Cost telemetry is OWNER/ADMIN-only display data. Recruiters, viewers,
-    and API consumers get the same documents with the cost keys removed —
-    candidates never receive these documents at all."""
-    if user.get("org_role") == "owner" or user.get("role") == "admin":
+def _strip_cost_fields(doc, is_admin: bool):
+    """OpenAI-cost telemetry is SUPER-ADMIN-ONLY (H3 fix 2026-09-14): a
+    client org owner used to receive these fields and could read our raw
+    per-candidate cost — i.e. our margin — next to the price we charge them.
+    Callers pass a FRESH DB role check, never the stale JWT claim."""
+    if is_admin:
         return doc
     if isinstance(doc, dict):
         for k in _COST_FIELDS:
@@ -1514,7 +1515,7 @@ async def list_screenings(request: Request, limit: int = 2000):
         total = await count_screenings_for_user(user["user_id"])
 
     for s in screenings:
-        _strip_cost_fields(s, user)
+        _strip_cost_fields(s, fresh_role == "admin")
     await _attach_dimension_labels(screenings)
     return {
         "screenings": screenings,
@@ -1598,9 +1599,10 @@ async def get_screening(request: Request, screening_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Not found.")
     # Allow access if no user_id (legacy data) or if it belongs to this user
-    if not await _is_admin_fresh(user) and _org_denied(doc, user):
+    _admin = await _is_admin_fresh(user)
+    if not _admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
-    _strip_cost_fields(doc, user)
+    _strip_cost_fields(doc, _admin)
     await _attach_dimension_labels([doc])
     return doc
 
@@ -7044,7 +7046,17 @@ def _paisa_to_tk_str(p: int) -> str:
 # atomic spend counters as everything else (reserve_org_monthly).
 # ─────────────────────────────────────────────────────────────
 
+# Free trial (C1 fix, 2026-09-14): the DEFAULT for every NEW self-registered
+# org — before this, new orgs landed on uncapped Legacy (unlimited free
+# service, interviews at ~Tk38/each on our OpenAI bill). Hidden: never shown
+# on pricing pages, never purchasable (no price). 14 days, then the normal
+# grace->paused machinery applies. Existing orgs are grandfathered via the
+# orgs.legacy_uncapped flag (set by the one-time migration).
+_TRIAL_DAYS = 14
+
 PLAN_TIERS = {
+    "free_trial": {"family": "full", "label": "Free trial", "hidden": True,
+        "price_bdt": None, "applicants_mo": 25, "interviews_mo": 2, "jobs": 2},
     # Screening prices FINAL 2026-09-14 (was 1500/6000/18000).
     "screening_starter": {"family": "screening", "label": "Screening Starter",
         "price_bdt": 1000,  "applicants_mo": 500,  "interviews_mo": 0, "jobs": None},
@@ -7115,20 +7127,32 @@ async def _plan_catalog() -> dict:
 
 
 async def _org_plan(org_id: str) -> dict:
-    """Resolved plan for an org. Unassigned (the default for every existing
-    org, approved 2026-09-14) = 'Legacy' — uncapped, interviews allowed —
-    so NOTHING changes for anyone until the super-admin assigns a tier."""
+    """Resolved plan for an org. Tier-less orgs (C1 fix, 2026-09-14):
+    orgs carrying the legacy_uncapped GRANDFATHER flag (every org that
+    existed before the trial default) keep the uncapped Legacy behavior,
+    byte-identical; any OTHER tier-less org gets a synthesized free trial
+    clocked from its created_at — nothing can ever land on uncapped free
+    service by accident again. New signups are stamped free_trial at org
+    birth (create_user), so this synthesis is only the fail-safe."""
     if not org_id:
         return dict(_UNASSIGNED_PLAN)
     from bson import ObjectId as _OID
     try:
-        org = await db.orgs.find_one({"_id": _OID(str(org_id))}, {"plan": 1})
+        org = await db.orgs.find_one({"_id": _OID(str(org_id))},
+                                     {"plan": 1, "legacy_uncapped": 1, "created_at": 1})
     except Exception:
         org = None
     p = (org or {}).get("plan") or {}
     tier_key = p.get("tier")
     if not tier_key:
-        return dict(_UNASSIGNED_PLAN)
+        if org is None or org.get("legacy_uncapped"):
+            # org unreadable (DB hiccup): fail open to Legacy rather than
+            # falsely gating a paying client; grandfathered: as approved.
+            return dict(_UNASSIGNED_PLAN)
+        tier_key = "free_trial"
+        created = org.get("created_at")
+        base = created if isinstance(created, _dt) else _dt.utcnow()
+        p = {"tier": tier_key, "paid_until": base + _td(days=_TRIAL_DAYS)}
     cat = await _plan_catalog()
     t = cat.get(tier_key)
     if not t:
@@ -7332,7 +7356,7 @@ async def public_plan_catalog():
     return {"tiers": {k: {kk: v.get(kk) for kk in
                           ("family", "label", "price_bdt", "applicants_mo",
                            "interviews_mo", "jobs")}
-                      for k, v in cat.items()},
+                      for k, v in cat.items() if not v.get("hidden")},
             "annual_months_free": 2}
 
 
@@ -7582,18 +7606,11 @@ async def payment_success(request: Request, plan: str = "", session_id: str = ""
     return RedirectResponse("/settings?tab=billing&payment=success")
 
 
-@app.get("/payment/sslcommerz/success")
-async def ssl_success(request: Request, plan: str = "", user_id: str = "", val_id: str = "", tran_id: str = ""):
-    verification = await verify_sslcommerz_payment(val_id)
-    if verification.get("valid") and user_id and plan:
-        await update_user_subscription(user_id, plan, {"tran_id": tran_id, "method": "sslcommerz"})
-        await save_payment({"user_id": user_id, "plan": plan, "amount": f"৳{PLANS.get(plan, {}).get('bdt_price', 0)}", "method": "SSLCommerz", "status": "paid", "tran_id": tran_id})
-    return RedirectResponse("/settings?tab=billing&payment=success")
-
-
-@app.get("/payment/sslcommerz/fail")
-async def ssl_fail():
-    return RedirectResponse("/settings?tab=billing&payment=failed")
+# /payment/sslcommerz/success and /fail DELETED (M1, 2026-09-14): the success
+# route never validated the AMOUNT and had no val_id replay guard — a Tk10
+# real payment (replayed at will) could set any users.plan. Dormant (no
+# gateway creds configured) but a loaded gun. Re-add properly — amount check
+# against the catalog + one-time val_id — if a gateway is ever integrated.
 
 
 # ── USER PROFILE & SETTINGS ──
@@ -8600,17 +8617,43 @@ async def list_manual_payments(request: Request):
                          "paid_until": (o.get("plan") or {}).get("paid_until")}
     for p in payments:
         p["org"] = orgs.get(p.get("org_id")) or {}
+    # H2: each pending row carries the EXPECTED price for its plan+period so
+    # the queue can show it next to the submitted amount (red on mismatch).
+    cat = await _plan_catalog()
+    for p in payments:
+        if p.get("status") != "pending_review":
+            continue
+        t = cat.get(str(p.get("plan_id") or "")) or {}
+        price = t.get("price_bdt")
+        p["expected_bdt"] = (price * (10 if p.get("period") == "annual" else 1)
+                             if isinstance(price, (int, float)) else None)
     pending = [p for p in payments if p.get("status") == "pending_review"]
     decided = [p for p in payments if p.get("status") != "pending_review"][:25]
     return {"pending": pending, "decided": decided}
 
 
+def _mp_amount_bdt(payment: dict) -> float:
+    try:
+        return float(str(payment.get("amount") or "").replace("৳", "").replace(",", "").strip())
+    except Exception:
+        return 0.0
+
+
 @app.post("/api/admin/manual-payments/{payment_id}/approve")
-async def approve_manual_payment(request: Request, payment_id: str):
+async def approve_manual_payment(request: Request, payment_id: str,
+                                 override: bool = False,
+                                 override_reason: str = ""):
     """Super-admin verifies the transaction against the bank/wallet and
     approves: the ORG plan (the enforced one) activates/extends for the paid
     period, stacking on any remaining time — paying early never loses days.
-    Only a pending submission can be approved (each payment counts once)."""
+
+    H1 (2026-09-14): the payment record is CLAIMED atomically BEFORE any plan
+    write — the claim is the idempotency lock, so a double-click or second
+    tab gets a 409 and one payment can never credit twice.
+    H2 (2026-09-14): an amount below the plan+period's expected price is
+    REFUSED unless override=true with a stored override_reason — a client
+    can't pay the monthly price and get an annual term past a careless
+    click."""
     user = await require_admin(request)
     from database import db as mongodb
     from bson import ObjectId
@@ -8642,25 +8685,60 @@ async def approve_manual_payment(request: Request, payment_id: str):
     org = await db.orgs.find_one({"_id": ooid}, {"plan": 1, "name": 1})
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found.")
+    # ── H2: price validation BEFORE anything is consumed ──
     months = 12 if payment.get("period") == "annual" else 1
+    expected = float(t["price_bdt"]) * (10 if months == 12 else 1)
+    submitted = _mp_amount_bdt(payment)
+    if submitted < expected:
+        if not override:
+            raise HTTPException(status_code=409, detail=(
+                f"Underpaid: submitted ৳{submitted:g}, expected ৳{expected:g} "
+                f"for {'annual' if months == 12 else 'monthly'} {t['label']}. "
+                "The payment stays pending — approve with an explicit override "
+                "and a reason if this shortfall is intentional."))
+        if not (override_reason or "").strip():
+            raise HTTPException(status_code=400, detail=(
+                "An override reason is required when approving below the "
+                "expected price — it goes on the audit record."))
+
+    # ── H1: CLAIM FIRST — the atomic status flip is the idempotency lock.
+    #    Only the winner of a concurrent double-click proceeds to activate;
+    #    everyone else gets the 409 and one payment can never credit twice. ──
     now = _dt.utcnow()
-    cur_until = ((org.get("plan") or {}).get("paid_until"))
-    base = cur_until if isinstance(cur_until, _dt) and cur_until > now else now
-    paid_until = _add_months(base, months)
-    prev = org.get("plan") or {}
-    await db.orgs.update_one({"_id": ooid}, {"$set": {"plan": {
-        "tier": tier, "family": t["family"],
-        "status": "active", "paid_until": paid_until,
-        "assigned_at": prev.get("assigned_at") or now,
-        "assigned_by": prev.get("assigned_by") or f"payment approval by {user.get('email')}",
-        "activated_at": now, "activated_by": str(user.get("email") or ""),
-        "last_payment_id": str(pid),
-    }}})
-    await mongodb.manual_payments.update_one(
+    claimed = await mongodb.manual_payments.find_one_and_update(
         {"_id": pid, "status": "pending_review"},
         {"$set": {"status": "approved", "approved_by": user.get("email"),
                   "approved_at": now, "months_granted": months,
-                  "paid_until_after": paid_until}})
+                  "expected_bdt": expected, "submitted_bdt": submitted,
+                  **({"override_reason": override_reason.strip()}
+                     if override and submitted < expected else {})}})
+    if not claimed:
+        raise HTTPException(status_code=409, detail=(
+            "Already decided — a payment is credited once."))
+    try:
+        cur_until = ((org.get("plan") or {}).get("paid_until"))
+        base = cur_until if isinstance(cur_until, _dt) and cur_until > now else now
+        paid_until = _add_months(base, months)
+        prev = org.get("plan") or {}
+        await db.orgs.update_one({"_id": ooid}, {"$set": {"plan": {
+            "tier": tier, "family": t["family"],
+            "status": "active", "paid_until": paid_until,
+            "assigned_at": prev.get("assigned_at") or now,
+            "assigned_by": prev.get("assigned_by") or f"payment approval by {user.get('email')}",
+            "activated_at": now, "activated_by": str(user.get("email") or ""),
+            "last_payment_id": str(pid),
+        }}})
+        await mongodb.manual_payments.update_one(
+            {"_id": pid}, {"$set": {"paid_until_after": paid_until}})
+    except Exception as e:
+        # Claimed but NOT activated: visible in the audit list (approved with
+        # no paid_until_after). Loud log + explicit error so the admin fixes
+        # it via manual assignment instead of silently losing the credit.
+        print(f"[PAYMENTS] CRITICAL: payment {pid} claimed but plan activation "
+              f"FAILED for org {org_id}: {e}")
+        raise HTTPException(status_code=500, detail=(
+            "Payment marked approved but the plan activation failed — assign "
+            "the tier manually in Usage & Billing and check the server log."))
     # Client-visible history row (their Payment history table reads db.payments)
     await save_payment({
         "user_id": payment["user_id"],

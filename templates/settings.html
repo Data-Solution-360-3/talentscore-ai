@@ -751,15 +751,9 @@ function confirmDialog(opts){
 
 let userData = null;
 let usageData = null;
-let selectedPlan = null;
-let selectedPayment = 'stripe';
-let useBDT = false;
-
-const PLANS = {
-  starter: { name:'Starter', usd:'$29', bdt:'৳3,200', period:'/month', screenings:100, features:['100 screenings/month','Batch up to 20 CVs','Full reports','5 job postings','Basic analytics'] },
-  pro:     { name:'Pro',     usd:'$79', bdt:'৳8,500', period:'/month', screenings:500, features:['500 screenings/month','Batch up to 100 CVs','Full reports + CV viewer','Unlimited jobs','Advanced analytics','Priority support'], popular:true },
-  enterprise: { name:'Enterprise', usd:'Custom', bdt:'কাস্টম', period:'', screenings:999999, features:['Unlimited screenings','Unlimited batch','White-label','API access','Account manager','SLA guarantee'] }
-};
+// The legacy $29/$79 PLANS object + upgrade-cards UI were DELETED (M1 audit
+// cleanup 2026-09-14): dead code — no markup referenced any of it, and the
+// real pricing renders from /api/plans (one shared catalog).
 
 // ── NAVIGATION ──
 function nav(id, el){
@@ -1220,62 +1214,6 @@ async function changePassword(){
 }
 
 // ── BILLING ──
-function showUpgrade(){
-  document.getElementById('upgrade-section').style.display='block';
-  renderPlanCards();
-}
-function hideUpgrade(){document.getElementById('upgrade-section').style.display='none';}
-
-function toggleCurrency(){
-  useBDT=document.getElementById('currency-tog').checked;
-  renderPlanCards();
-}
-
-function renderPlanCards(){
-  const current=userData?.plan||'trial';
-  document.getElementById('plan-cards').innerHTML=Object.entries(PLANS).map(([id,p])=>`
-    <div class="plan-card ${id===current?'current':''} ${p.popular?'popular':''}" onclick="selectPlan('${id}')">
-      ${p.popular?'<div class="plan-badge">Most Popular</div>':''}
-      ${id===current?'<div class="current-badge">Current</div>':''}
-      <div class="plan-name">${p.name}</div>
-      <div class="plan-price">${useBDT?p.bdt:p.usd}<span>${p.period}</span></div>
-      <div class="plan-desc">${p.screenings>=999999?'Unlimited':p.screenings+' screenings/month'}</div>
-      <div class="plan-features">${p.features.map(f=>'✓ '+f).join('<br>')}</div>
-    </div>`).join('');
-}
-
-function selectPlan(id){
-  selectedPlan=id;
-  document.querySelectorAll('.plan-card').forEach(c=>c.style.borderColor='');
-  event.currentTarget.style.borderColor='var(--indigo)';
-  document.getElementById('payment-method-section').style.display='block';
-}
-
-function selectPayment(method){
-  selectedPayment=method;
-  document.getElementById('pm-stripe').classList.toggle('selected',method==='stripe');
-  document.getElementById('pm-ssl').classList.toggle('selected',method==='ssl');
-}
-
-async function proceedPayment(){
-  if(!selectedPlan){ toast('Please select a plan first', {type:'warning'}); return; }
-  const btn=document.getElementById('pay-btn');
-  btn.innerHTML='<div class="spin"></div> Processing...';btn.disabled=true;
-  try{
-    const fd=new FormData();
-    fd.append('plan_id',selectedPlan);fd.append('payment_method',selectedPayment);
-    const res=await fetch('/api/payments/checkout',{method:'POST',body:fd,credentials:'include'});
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.detail||'Payment failed');
-    if(data.url)window.location.href=data.url;
-    else throw new Error('No payment URL received');
-  }catch(e){
-    toast('Payment error: '+e.message, {type:'error'});
-    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Proceed to payment';
-    btn.disabled=false;
-  }
-}
-
 async function submitManualPayment(){
   const plan=document.getElementById('mp-plan').value;
   const method=document.getElementById('mp-method').value;

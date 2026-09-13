@@ -2689,8 +2689,11 @@ function openCandModal(id){
 // one), CV scoring, interview (audio + scoring). Taka-primary at the real
 // all-in rate (142 BDT/USD incl. VAT, set 2026-09-13 — was a stale 122.85).
 function candCostHTML(r){
+  // SUPER-ADMIN ONLY (H3 fix 2026-09-14): clients see their PRICE on the
+  // billing pages, never our OpenAI cost — the server strips these fields
+  // for non-admins too; this gate is belt-and-braces.
   const me = window._meCache || {};
-  if(!(me.org_role === 'owner' || me.role === 'admin')) return '';
+  if(me.role !== 'admin') return '';
   const BDT = 142;
   const cv = (r.api_usage && r.api_usage.cv_scoring) || null;
   const sc = r.interview_scoring_usage || null;

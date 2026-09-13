@@ -441,10 +441,19 @@ async def create_user(email: str, hashed_password: str, company_name: str, role:
     # A1: every account gets an org at birth. Registration is the only place a
     # user can exist without one; team members arrive via accept_team_invite,
     # which puts them INTO an existing org instead.
+    # C1 fix (2026-09-14): every NEW org starts on the capped FREE TRIAL —
+    # 14 days, then the normal grace->paused machinery gates it. Before this,
+    # new orgs landed on uncapped Legacy (unlimited free service). Existing
+    # orgs are grandfathered via the legacy_uncapped flag, untouched here.
+    from datetime import timedelta as _td14
+    _now = datetime.utcnow()
     org = await db.orgs.insert_one({
         "name": (company_name or email).strip()[:120],
         "owner_user_id": str(inserted.inserted_id),
-        "created_at": datetime.utcnow(),
+        "created_at": _now,
+        "plan": {"tier": "free_trial", "family": "full", "status": "active",
+                 "paid_until": _now + _td14(days=14),
+                 "assigned_at": _now, "assigned_by": "self-signup trial"},
     })
     await db.users.update_one(
         {"_id": inserted.inserted_id},
