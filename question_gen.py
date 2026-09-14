@@ -713,11 +713,18 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             # must not score. This is the fix for the introspection trap
             # (the old critic asked itself whether solving "felt easy" and
             # systematically rationalized yes-it-needed-role-knowledge).
+            # Code-kill at HIGH confidence only (calibrated 2026-09-14 after
+            # the proof run): the guesser always picks SOMETHING, chance
+            # aligns it with the key 25% of the time, and "medium" is its
+            # default confidence — a >=medium code-kill executed a ~20%
+            # random death per review round and compounded across rounds to
+            # a 1-in-10 yield. HIGH-confidence hits are the real screenshot-
+            # class failures; medium-confidence hits stay a prompt-level
+            # fail signal the model applies with the strawman/virtue checks.
             guessable = False
             try:
                 guessable = (int(v.get("naive_index")) == int(m["correct"])
-                             and str(v.get("naive_confidence", "")).lower()
-                             in ("medium", "high"))
+                             and str(v.get("naive_confidence", "")).lower() == "high")
             except Exception:
                 pass
             if guessable:
