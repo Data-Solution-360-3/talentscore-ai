@@ -623,6 +623,34 @@ the middle ground. Rate how confident that guess feels.
 Return JSON: {"guesses": [{"i": <index>, "pick": <0-3>,
 "confidence": "low"|"medium"|"high"}, ...]} — one entry per question."""
 
+# TELL-DETECTOR (qgen-2.3, the GATE — replaces the naive-guesser as the gate).
+# An LLM "naive guesser" cannot validate KNOWLEDGE questions: it already knows
+# the field, so it answers SQL/stats questions correctly via KNOWLEDGE, not via
+# a tell (measured on a real Data-Analyst set: 93% "guessed", nearly all of them
+# genuine knowledge questions). That is a false positive, not a weak question.
+# So we detect the ACTUAL defect — a WORDING TELL, which a no-knowledge reader
+# could follow — and drop a question only when the wording pulls that reader to
+# the CORRECT option (a leak). Questions whose four options read as equally
+# plausible, separable only by real knowledge, have no tell and PASS. The
+# naive-guesser above is kept only for the proof harness's contrast.
+MCQ_TELL_DETECTOR_PROMPT = """You are auditing multiple-choice questions for WORDING TELLS. Imagine a person
+with ZERO knowledge of the field is taking the test. ASSUME YOU KNOW NOTHING
+about the topic — do NOT use any real knowledge to decide which option is
+correct. Judge ONLY the WRITING of the options.
+
+For each question, decide which option (if any) a no-knowledge reader would be
+PULLED toward using ONLY these surface tells:
+- one option SOUNDS more thorough / careful / professional / complete /
+  responsible than the others;
+- one option is noticeably LONGER, more detailed, or more hedged;
+- the OTHER options sound careless, dismissive, extreme, absurd, or clearly wrong.
+If all four options read as equally plausible and NO wording tell points to any
+one of them — so only real field knowledge could choose — the pull is "none".
+
+Return JSON: {"tells": [{"i": <index>, "pick": <0-3, or -1 if none>,
+"pull": "none"|"weak"|"medium"|"strong"}, ...]} — one per question. Base "pick"
+on WORDING ALONE, never on whether you think it is factually correct."""
+
 MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job. You are NOT given the
 answer key. Some questions belong to a SCENARIO (shown above them) — judge
 those WITH their scenario. For EACH question: first solve it properly with
@@ -635,7 +663,12 @@ FAIL a question when ANY of these clearly applies (name the reason):
      social-desirability ("which sounds most professional / thorough / careful").
      If real DOMAIN, TECHNICAL, or REASONING knowledge is NOT required to choose,
      FAIL. This is the most important check — a screening question that common
-     sense can answer measures nothing.
+     sense can answer measures nothing. Watch for GENERIC-GOOD-PRACTICE answers
+     that everyone knows without the field: "present to non-technical people with
+     a summary and charts", "double-check the data for accuracy", "communicate
+     clearly with stakeholders", "verify before acting", "document your work",
+     "test before deploying". If the correct answer is one of these and the
+     distractors are just less-careful versions, FAIL — the field is decoration.
    - STRAWMAN OPTION: any option NO competent professional would EVER pick,
      even on a lazy day — "do nothing", "ignore it", "never contact them
      again", "call them every day", "fabricate the data", joke options, or
@@ -900,50 +933,49 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
             break
 
-    # ── 4) NAIVE-GUESSER GATE (reinstated qgen-2.3). ONE final pass: an
-    #      INDEPENDENT zero-context guesser (no JD, no role) tries to game every
-    #      survivor with pure test-taking tells. DROP a question only when the
-    #      guesser lands the correct answer with MEDIUM or HIGH confidence — a
-    #      low-confidence lucky hit is tolerated (keeps yield). This is a real
-    #      gate again (not the Option-B advisory) because 2.3 questions are
-    #      DOMAIN / TECHNICAL / REASONING, which genuinely resist naive guessing
-    #      — so the guess-proof-vs-realism tension that tanked judgment-era yield
-    #      is gone, and few questions get dropped. It runs ONCE here, never
-    #      per-round: the old per-round × multi-round guesser is what pushed
-    #      generation past the request timeout into 502s. Fail-soft: any trouble,
-    #      or a gate that would empty the set, keeps the pre-gate passers (the
-    #      recruiter still reviews every question before it goes live). ──
+    # ── 4) TELL-DETECTOR GATE (qgen-2.3). ONE final pass over the survivors,
+    #      looking NOT for "can an expert answer this" (an LLM always can — it
+    #      knows the field) but for a WORDING TELL a no-knowledge reader could
+    #      follow: one option that reads as more thorough/careful/professional,
+    #      is much longer, or sits among careless/absurd others. DROP a question
+    #      only when the wording pulls that reader to the CORRECT option with
+    #      MEDIUM/STRONG pull (a genuine leak). A pull that points AWAY from the
+    #      answer, or none at all, is fine — knowledge questions with four
+    #      equally-plausible options have no tell and PASS, so yield holds. Runs
+    #      ONCE here, never per-round (the old per-round guesser caused 502s).
+    #      Fail-soft: any trouble, or a gate that would empty the set, keeps the
+    #      pre-gate passers (the recruiter reviews every question before live). ──
     if passed:
         try:
-            graw = await _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
+            traw = await _gen_json(client, MCQ_TELL_DETECTOR_PROMPT,
                                    "QUESTIONS:\n" + _fmt(passed),
                                    0.0, 2500, usage_out)
-            guesses = {}
-            for gg in (graw.get("guesses") or []):
+            tells = {}
+            for tt in (traw.get("tells") or []):
                 try:
-                    guesses[int(gg.get("i"))] = gg
+                    tells[int(tt.get("i"))] = tt
                 except Exception:
                     continue
             kept = []
             for i, m in enumerate(passed):
-                gg = guesses.get(i)
-                if gg is None:
+                tt = tells.get(i)
+                if tt is None:
                     kept.append(m)
                     continue
                 try:
-                    hit = int(gg.get("pick")) == int(m["correct"])
+                    leak = int(tt.get("pick")) == int(m["correct"])
                 except Exception:
-                    hit = False
-                conf = str(gg.get("confidence") or "").strip().lower()
-                if hit and conf in ("medium", "high"):
-                    continue   # confidently guessable -> drop
+                    leak = False
+                pull = str(tt.get("pull") or "").strip().lower()
+                if leak and pull in ("medium", "strong"):
+                    continue   # wording tell points at the answer -> drop the leak
                 kept.append(m)
             # Never let the gate starve the set below a usable floor; if it would,
             # keep the pre-gate passers (recruiter reviews everything anyway).
             if len(kept) >= min(n, 5) or len(kept) >= 3:
                 passed = kept
         except Exception as e:
-            print(f"[MCQ-GEN] naive-guesser gate skipped (keeping passers): {str(e)[:120]}")
+            print(f"[MCQ-GEN] tell-detector gate skipped (keeping passers): {str(e)[:120]}")
 
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
     #    a scenario string are one group downstream), standalones follow. ──
