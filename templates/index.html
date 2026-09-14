@@ -1634,7 +1634,42 @@ let allResults=[], allJobs=[], filteredResults=[], currentCandId=null;
 const PLAN_LIMITS={trial:10,starter:100,pro:500,enterprise:999999};
 
 // ── NAVIGATION ──
-function showPage(id){
+// ── SPA HISTORY (hash routing) ───────────────────────────────────────────
+// Section changes used to be pure show/hide, invisible to the browser. The URL
+// never moved, so Back popped to the last REAL page load (typically /settings)
+// instead of the section you came from, and returning to /app always reset you
+// to Overview. Every section change now writes `#<id>`, and Back/Forward replay
+// it. Hash-only: /app#pipeline hits the same server route, so nothing changes
+// server-side.
+const HIRING_ONLY = ['overview','candidates','pipeline','jobs','analytics','screener','audit'];
+const HRM_ONLY    = ['hrm-dashboard','employees','leave','attendance','payroll','performance'];
+// 'kpi' deliberately sits in BOTH rail sets, so it is valid in either mode.
+const PAGE_IDS    = HIRING_ONLY.concat(HRM_ONLY, ['kpi']);
+function _validPage(id){ return PAGE_IDS.includes(id); }
+function _pageFromHash(){
+  const h = (location.hash || '').replace(/^#/, '').trim();
+  return _validPage(h) ? h : '';
+}
+function _pageAllowed(id, hiring){
+  if(id === 'kpi') return true;                 // shared by both rails
+  return hiring ? HIRING_ONLY.includes(id) : HRM_ONLY.includes(id);
+}
+// Back/Forward. pushState (used on the way in) fires no event, so this only
+// runs for real history moves; the _currentPage guard stops a double render.
+window.addEventListener('hashchange', () => {
+  const id = _pageFromHash();
+  if(!id || id === window._currentPage) return;
+  const hiring = window.APP_MODE === 'hiring';
+  if(_pageAllowed(id, hiring)){ showPage(id, {fromHistory:true}); return; }
+  // Stepping back into the other rail set takes the mode with it. Clients are
+  // hiring-only, so an HRM hash is ignored for them (setMode enforces it too).
+  if(HRM_ONLY.includes(id) && window._isSuper) setMode('hrm', {page:id, fromHistory:true});
+  else if(HIRING_ONLY.includes(id))           setMode('hiring', {page:id, fromHistory:true});
+});
+
+function showPage(id, opts){
+  opts = opts || {};
+  window._currentPage = id;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
   document.querySelectorAll('.sb-item,.tn').forEach(s=>s.classList.remove('act'));
   document.getElementById('page-'+id)?.classList.add('act');
@@ -1654,13 +1689,28 @@ function showPage(id){
   if(id==='kpi')renderKpi();
   if(id==='payroll')loadPayroll();
   if(id==='performance')perfLoad();
+
+  // Record the section in the URL. pushState (not `location.hash =`) so no
+  // hashchange fires on the way in — the listener above is for Back/Forward
+  // only. `replace` is used for the very first render so the initial view
+  // doesn't become a history entry you have to press Back through twice.
+  if(!opts.fromHistory && _validPage(id)){
+    const want = '#' + id;
+    if(location.hash !== want){
+      try{
+        if(opts.replace) history.replaceState(null, '', want);
+        else             history.pushState(null, '', want);
+      }catch(_){ location.hash = id; }   // pushState can throw on exotic origins
+    }
+  }
 }
 
 // ── APP MODE — Hiring | HRM. Swaps the sidebar rail set + the default
 // dashboard. Remembered within the session so paging doesn't reset it. ──
 window.APP_MODE = 'hiring';
 window._isSuper = false;   // assume client until /api/auth/me proves otherwise
-function setMode(m){
+function setMode(m, opts){
+  opts = opts || {};
   // Clients are hiring-only, enforced here too: even a stale 'hrm' in
   // sessionStorage or a direct call can never flip a non-super account.
   if(!window._isSuper) m = 'hiring';
@@ -1672,12 +1722,24 @@ function setMode(m){
   document.getElementById('rail-hrm')?.classList.toggle('hidden', hiring);
   document.getElementById('mt-hiring')?.classList.toggle('on', hiring);
   document.getElementById('mt-hrm')?.classList.toggle('on', !hiring);
-  showPage(hiring ? 'overview' : 'hrm-dashboard');
+  // Land on the requested section when it belongs to this mode, else the
+  // mode's own dashboard. Switching mode by hand is a fresh navigation (push);
+  // a restore or a Back/Forward replay must not add an entry.
+  const dflt = hiring ? 'overview' : 'hrm-dashboard';
+  const want = (opts.page && _pageAllowed(opts.page, hiring)) ? opts.page : dflt;
+  showPage(want, {replace: !!(opts.replace || opts.fromHistory),
+                  fromHistory: !!opts.fromHistory});
 }
 function initMode(){
   let m = 'hiring';
   try{ m = sessionStorage.getItem('appmode') || 'hiring'; }catch(_){}
-  setMode(m);
+  // Restore the section from the URL, so coming back from Settings / Batch /
+  // a candidate report returns you where you were instead of Overview. A hash
+  // belonging to the other rail set brings its mode with it (super only).
+  const want = _pageFromHash();
+  if(want && HRM_ONLY.includes(want) && window._isSuper) m = 'hrm';
+  else if(want && HIRING_ONLY.includes(want))            m = 'hiring';
+  setMode(m, {page: want || undefined, replace: true});
 }
 // Called once /api/auth/me resolves: reveal HRM only for super-admin, and
 // hard-hide the HRM rail for everyone else (belt-and-braces with the toggle).
@@ -2474,7 +2536,8 @@ function kpiDrill(kind, arg){
   if(kind==='stage'){ filterByStage(arg); return; }
   if(kind==='jobs'){ showPage('jobs'); return; }
   if(kind==='employees'){
-    if(window._isSuper){ setMode('hrm'); showPage('employees'); }
+    // One navigation, one history entry — setMode lands the section itself.
+    if(window._isSuper){ setMode('hrm', {page:'employees'}); }
     else showPage('candidates');   // clients have no HRM; fall back to candidates
     return;
   }
@@ -2486,15 +2549,19 @@ function kpiDrill(kind, arg){
 }
 
 function filterByStage(stage){
-  showPage('candidates');
-  const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
-  if(!fStage||!fResult) return;
-  const valid=['all','screening','review','interview','shortlisted','rejected'];
+  // 'hire' was missing from this list while the Analytics funnel's Hire bar
+  // passed exactly that — and because the page switch used to run FIRST, the
+  // click dumped you on Candidates with no filter applied and no way back.
+  // Validate BEFORE navigating: an unknown key now leaves you where you are.
+  const valid=['all','screening','review','interview','shortlisted','hire','rejected'];
   if(!valid.includes(stage)){
     console.error('filterByStage: unknown stage',stage);
     toast('Could not filter by "'+stage+'" — this is a bug, please report it',{type:'error'});
     return;
   }
+  showPage('candidates');
+  const fStage=document.getElementById('f-stage'), fResult=document.getElementById('f-result');
+  if(!fStage||!fResult) return;
   fResult.value='';
   fStage.value = stage==='all' ? '' : stage;
   applyFilters();
@@ -2520,7 +2587,16 @@ function filterByRec(kind){
 // ── CANDIDATE MODAL ──
 function openCandModal(id){
   const r=allResults.find(x=>x._id===id);
-  if(!r)return;
+  if(!r){
+    // This used to `return` silently, so the click did nothing at all — which
+    // reads as a broken app. The row just isn't in the loaded set (stale list,
+    // a different filter page); the server-rendered report always is, so send
+    // them somewhere real instead of nowhere.
+    toast("That candidate isn't in the loaded list — opening their full report instead.",
+          {type:'warning'});
+    window.location.href='/candidate?id='+encodeURIComponent(id);
+    return;
+  }
   currentCandId=id;
   // (restyle) Authenticity is still COMPUTED server-side and still feeds
   // hiring_risks when strongly flagged — only its dedicated display rows were

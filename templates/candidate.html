@@ -128,7 +128,7 @@ img,video{max-width:100%}
   <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" style="flex-shrink:0"><rect x="1" y="1" width="62" height="62" rx="14" fill="#EAF3DE"/><circle cx="28" cy="23" r="8.6" fill="#639922"/><path d="M12.5 49.8 C12.5 38.6 19.4 33 28 33 C36.6 33 43.5 38.6 43.5 49.8 Z" fill="#639922"/><circle cx="46.5" cy="46.5" r="13" fill="#EAF3DE"/><circle cx="46.5" cy="46.5" r="10.6" fill="#EF9F27"/><path d="M41.2 46.8 L45 50.5 L52.2 42.6" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
   <span class="tln">TopCandidate<span style="color:#fb923c">.pro</span></span>
   <div class="topbar-actions">
-    <a href="/" class="btn-back"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Back to dashboard</a>
+    <a href="/app" class="btn-back" onclick="return backToApp(event)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Back to dashboard</a>
     <button class="btn-primary" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print report</button>
   </div>
 </header>
@@ -158,10 +158,26 @@ img,video{max-width:100%}
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+// "Back to dashboard" used to point at "/", which serves the MARKETING landing
+// page — so it ejected you from the product. The dashboard is /app. When we
+// arrived from inside the app, a real history step is better still: it returns
+// to the exact section (/app#pipeline) rather than resetting to Overview.
+function backToApp(ev){
+  try{
+    const r = document.referrer ? new URL(document.referrer) : null;
+    if(r && r.origin === location.origin && r.pathname === '/app'){
+      if(ev) ev.preventDefault();
+      history.back();
+      return false;
+    }
+  }catch(_){}
+  return true;   // fall through to href="/app"
+}
+
 const id = new URLSearchParams(window.location.search).get('id');
 let data = null, zoom = 1.0, showText = false, cvText = '', pdfURL = null;
 
-if (!id) location.href = '/';
+if (!id) location.href = '/app';
 
 async function load() {
   try {
@@ -173,7 +189,7 @@ async function load() {
     buildCVText(data);
     tryLoadPDF(data);
   } catch(e) {
-    document.getElementById('detail-panel').innerHTML = '<p style="color:var(--red);padding:2rem">Could not load. <a href="/" style="color:var(--accent)">Go back</a></p>';
+    document.getElementById('detail-panel').innerHTML = '<p style="color:var(--red);padding:2rem">Could not load this candidate. <a href="/app" style="color:var(--accent)">Back to dashboard</a></p>';
   }
 }
 

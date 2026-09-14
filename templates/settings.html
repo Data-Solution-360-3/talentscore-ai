@@ -173,7 +173,20 @@ img,video{max-width:100%}
     <span class="t-name">TopCandidate<span style="color:#F06000">.pro</span></span>
   </a>
   <div class="t-right">
-    <a href="/app" class="t-btn">← Back to dashboard</a>
+    <a href="/app" class="t-btn" onclick="return backToApp(event)">← Back to dashboard</a>
+    <script>
+    // Return to the exact section you left (/app#pipeline) when we came from
+    // inside the app; a plain /app link would reset you to Overview.
+    function backToApp(ev){
+      try{
+        const r = document.referrer ? new URL(document.referrer) : null;
+        if(r && r.origin === location.origin && r.pathname === '/app'){
+          if(ev) ev.preventDefault(); history.back(); return false;
+        }
+      }catch(_){}
+      return true;
+    }
+    </script>
   </div>
 </header>
 
