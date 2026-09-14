@@ -522,9 +522,12 @@ things IN ORDER:
 
 3. JUDGE — fail the question if ANY of these apply:
    - GUESSABLE: your step-1 naive guess matches your step-2 expert answer
-     with medium or high confidence. If a layperson gaming the test lands
-     on the right answer, the question measures test-taking, not the role.
-     This is the most important check — apply it ruthlessly.
+     at HIGH confidence — the layperson gamed it; the question measures
+     test-taking, not the role. At MEDIUM confidence, fail ONLY when one of
+     the step-1 tells (social desirability, strawman elimination, shape,
+     middle-ground) clearly EXPLAINS the guess — a coincidental medium-
+     confidence guess alone is not a failure (chance alone matches 1 in 4).
+     This is the most important check.
    - STRAWMAN OPTION: ANY option that NO competent professional — even on a
      lazy, bad day — would actually choose: "do nothing", "never call them
      again", "call them every day", "fabricate the data", joke options,
@@ -550,9 +553,11 @@ things IN ORDER:
      question in this set (interchangeable stems or options) — fail the
      later one.
 {level_check}{lang_checks}
-BIAS TOWARD FAILING: when unsure between pass and fail, FAIL. A dropped
-question costs nothing; a guessable one costs the client a bad hiring
-signal. A pass should feel rare and earned.
+BIAS TOWARD FAILING: when genuinely unsure between pass and fail, FAIL —
+a dropped question costs nothing; a guessable one costs the client a bad
+hiring signal. But judge each criterion on its OWN test above: a question
+whose four options are all professionally defensible and whose answer
+needs real role judgment DESERVES its pass.
 
 Return JSON:
 {{"reviews": [{{"i": <index in the list>, "naive_index": <0-3>,
