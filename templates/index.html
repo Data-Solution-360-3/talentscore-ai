@@ -4472,6 +4472,7 @@ function renderJobConfigTabs(job){
   // Viva tab: the live-interview gate (threshold input lives on the CV tab).
   const vBox = document.getElementById('viva-box');
   if(vBox){
+    const imode = job.interview_mode || 'case_study_voice';
     const iqa = (job.interview_questions||{}).approved || null;
     const cfgLine = iqa
       ? `this job's APPROVED question set (${iqa.count} questions, ~70/30 spoken/typed) · ${(cfg&&cfg.vad)||'patient'} pace · proctoring ${(cfg&&cfg.proctoring)||'off'}`
@@ -4490,6 +4491,12 @@ function renderJobConfigTabs(job){
         <div class="jm-sec" id="viva-fields" style="display:${von?'block':'none'}">
           <div class="jm-st">Interview settings</div>
           <div class="jm-grid">
+            <div class="jm-f full"><label>Interview mode</label>
+              <select id="viva-mode" onchange="vivaModeHint()">
+                <option value="case_study" ${imode==='case_study'?'selected':''}>Written case study — typed only (no voice)</option>
+                <option value="case_study_voice" ${imode==='case_study_voice'?'selected':''}>Voice + written — spoken interview</option>
+              </select></div>
+            <div class="jm-f full"><div id="viva-mode-hint" class="jm-hint" style="background:var(--og,rgba(245,124,46,.1));border:1px solid var(--ob,rgba(245,124,46,.3));border-radius:10px;padding:9px 12px;line-height:1.6"></div></div>
             <div class="jm-f"><label>Daily interview cap</label>
               <input id="viva-cap" type="number" min="1" max="200" value="${(v&&v.daily_cap!=null)?v.daily_cap:25}"></div>
             <div class="jm-f"><label>Invite window <span class="jm-hint">· days</span></label>
@@ -4506,6 +4513,7 @@ function renderJobConfigTabs(job){
             <a href="/viva-live" class="tbl-link" target="_blank" rel="noopener">/viva-live</a></div>
         </div>
       </div>`;
+    vivaModeHint();
   }
 
   // MCQ tab: state init + render into the pane's static header/body.
@@ -5453,23 +5461,41 @@ async function mcqfAdvanceOne(appId){
   mcqFunnelLoad();
 }
 
+// Honest per-mode cost + behavior note under the Interview-mode selector.
+// The rupee ranges are the real interview-cost gap: the written mode mints NO
+// Realtime voice session (voice is ~90% of the interview cost).
+function vivaModeHint(){
+  const sel = document.getElementById('viva-mode');
+  const box = document.getElementById('viva-mode-hint');
+  if(!sel || !box) return;
+  if(sel.value === 'case_study'){
+    box.innerHTML = '<b>~৳2–5 per interview.</b> Voice-free — candidates read ~12 questions and type their answers (auto-graded MCQs included). No microphone or call is used, so no voice minutes are spent. Best for cost-sensitive, high-volume hiring.';
+  }else{
+    box.innerHTML = '<b>~৳20–28 per interview.</b> A spoken interview (~4 questions answered by voice) plus ~8 typed questions. Uses live voice minutes — richer signal, higher cost. Best for shortlisted or senior candidates.';
+  }
+}
 async function saveJobViva(jobId, enabled){
   const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
   const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));
   const win = Math.max(1, Math.min(30, parseInt(document.getElementById('viva-window')?.value)||5));
   const proc = ['off','S','M'].includes(document.getElementById('viva-proc')?.value)
     ? document.getElementById('viva-proc').value : undefined;
+  const mode = ['case_study','case_study_voice'].includes(document.getElementById('viva-mode')?.value)
+    ? document.getElementById('viva-mode').value : undefined;
   const res = await fetch(`/api/jobs/${jobId}/viva`,{
     method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(enabled ? {enabled:true, threshold:th, daily_cap:cap,
                                     invite_window_days:win,
-                                    ...(proc?{proctoring:proc}:{})} : {enabled:false})
+                                    ...(proc?{proctoring:proc}:{}),
+                                    ...(mode?{interview_mode:mode}:{})}
+                                 : {enabled:false, ...(mode?{interview_mode:mode}:{})})
   });
   let d={}; try{ d=await res.json(); }catch(_){}
   if(!res.ok) throw new Error(d.detail || `Server returned ${res.status}`);
   const cached = allJobs.find(x=>x._id===jobId);
-  if(cached) cached.viva = d.viva;
+  if(cached){ cached.viva = d.viva; if(mode) cached.interview_mode = mode; }
+  if(mode && window._currentJob && window._currentJob._id === jobId) window._currentJob.interview_mode = mode;
   if(window._currentJob && window._currentJob._id === jobId){
     window._currentJob.viva = d.viva;
     renderPublicLink(window._currentJob, window._currentSpend);

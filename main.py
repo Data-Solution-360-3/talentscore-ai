@@ -2719,13 +2719,17 @@ def _normalize_topics(raw) -> list[dict]:
     return out
 
 
-def _flatten_topics(topics: list[dict]) -> list[dict]:
+def _flatten_topics(topics: list[dict], spoken: bool = True) -> list[dict]:
     """Topics -> the flat normalized question list every existing path
-    (storage, recovery caps, preview) already understands. All spoken."""
+    (storage, recovery caps, preview) already understands. `spoken` controls
+    the presentation mode: True (case_study_voice) reads them aloud via the
+    Realtime model; False (case_study) presents the SAME questions as typed
+    text — no voice session, so they score through the written scorer."""
+    m = "spoken" if spoken else "typed"
     qs = []
     for t in topics:
-        qs.append({"text": t["main"], "mode": "spoken"})
-        qs.extend({"text": f, "mode": "spoken"} for f in t["followups"])
+        qs.append({"text": t["main"], "mode": m})
+        qs.extend({"text": f, "mode": m} for f in t["followups"])
     return qs[:_VIVA_MAX_QUESTIONS]
 
 
@@ -3296,13 +3300,21 @@ async def score_live_session(session_id: str):
         spoken_only = [t for t in full
                        if (t or {}).get("mode") not in ("typed", "scenario", "mcq")]
 
-        result, err = await score_spoken_interview(
-            spoken_only, OPENAI_API_KEY, job_title=job_title, language=lang)
-        if err or not result:
-            await db.interview_sessions.update_one(
-                {"_id": _OID(session_id)},
-                {"$set": {"score_status": "failed", "score_error": err or "unknown"}})
-            return
+        # Voice-free (case_study) interviews have NO spoken turns: skip the
+        # spoken scorer entirely (2026-09-15) rather than calling it on an
+        # empty list and failing the whole session. The interview then scores
+        # written-only at the combination layer below — the per-answer scorers
+        # and the fairness floor are unchanged.
+        has_spoken = bool(spoken_only)
+        result, err = (None, None)
+        if has_spoken:
+            result, err = await score_spoken_interview(
+                spoken_only, OPENAI_API_KEY, job_title=job_title, language=lang)
+            if err or not result:
+                await db.interview_sessions.update_one(
+                    {"_id": _OID(session_id)},
+                    {"$set": {"score_status": "failed", "score_error": err or "unknown"}})
+                return
 
         written_result, written_error = None, None
         if qa_pairs:
@@ -3399,20 +3411,28 @@ async def score_live_session(session_id: str):
             scenario_result["overall"] = max(0, min(100, combined))
 
         # One combined interview number from the existing segment scores.
-        spoken_overall = int(result.get("overall", 0))
+        spoken_overall = int(result.get("overall", 0)) if result else None
         wr_scores = []
         if written_result and written_result.get("segment_score") is not None:
             wr_scores.append(int(written_result["segment_score"]))
         if scenario_result and scenario_result.get("overall") is not None:
             wr_scores.append(int(scenario_result["overall"]))
-        if wr_scores:
-            written_overall = round(sum(wr_scores) / len(wr_scores))
+        written_overall = round(sum(wr_scores) / len(wr_scores)) if wr_scores else None
+        # Composition-aware combine (2026-09-15). No spoken segment (case_study)
+        # -> written-only at weight 1.0, so a strong typed assessment is NOT
+        # wrongly capped at 40%. Both present -> the existing 0.6/0.4 blend.
+        # Spoken only -> spoken alone (unchanged).
+        if has_spoken and written_overall is not None:
             interview_score = round(IV_W_SPOKEN * spoken_overall + IV_W_WRITTEN * written_overall)
-        else:
-            written_overall = None
+            _w = {"spoken": IV_W_SPOKEN, "written": IV_W_WRITTEN}
+        elif has_spoken:
             interview_score = spoken_overall
+            _w = {"spoken": 1.0, "written": 0.0}
+        else:
+            interview_score = written_overall if written_overall is not None else 0
+            _w = {"spoken": 0.0, "written": 1.0}
         interview_parts = {"spoken": spoken_overall, "written": written_overall,
-                           "weights": {"spoken": IV_W_SPOKEN, "written": IV_W_WRITTEN}}
+                           "weights": _w}
 
         # Cost observability: fold the three scorers' token usage into one
         # per-session summary (owner-only display; pure measurement).
@@ -3472,7 +3492,7 @@ async def score_live_session(session_id: str):
                             # evidence than a full conversation — say so instead
                             # of presenting it as solid. Cleared (None) otherwise.
                             iv_flag = None
-                            if len(spoken_only) < 6:
+                            if has_spoken and len(spoken_only) < 6:
                                 iv_flag = (f"Spoken transcript has only {len(spoken_only)} turns — "
                                            "the interview score rests on very little conversation")
                             # M2 tripwire: fence on the doc's OWN org stamp —
@@ -3756,6 +3776,10 @@ def _validated_viva_config(body: dict) -> dict:
         "job_title": str(body.get("job_title", "")).strip()[:120],
         # Interview language (BETA for Bangla): 'en' (default) or 'bn'.
         "language": "bn" if str(body.get("language", "en")).lower() == "bn" else "en",
+        # Interview mode: voice-free typed assessment vs voice+typed. Missing
+        # (e.g. a manually-minted /viva-live session) resolves to voice.
+        "interview_mode": ("case_study" if str(body.get("interview_mode") or "").strip().lower()
+                           == "case_study" else "case_study_voice"),
     }
     scenario = _normalize_scenario(body.get("scenario"))
     if scenario:
@@ -3894,6 +3918,32 @@ async def candidate_interview_page(token: str):
         except Exception:
             rail = "cv"
 
+    # Voice-free (case_study) mode: a typed assessment page — no Realtime voice
+    # session is ever minted (that's the ~90% saving). Same branding, timer, and
+    # proctoring shell; the question TEXT is fetched from the assessment data
+    # endpoint (no answer keys leak). Everything else on this route is unchanged.
+    if (cfg.get("interview_mode") or "case_study_voice") == "case_study":
+        page = read_template("assessment.html")
+        # case_study presents every question as typed text, so the count is the
+        # full question list plus the scenario turns — no spoken/typed split.
+        n_typed = len(_normalize_questions(cfg.get("questions")))
+        scen = _normalize_scenario(cfg.get("scenario"))
+        total_q = n_typed + _scen_turns(scen)
+        for key, val in {
+            "{{RAIL}}": rail,
+            "{{BRAND_CSS}}": _brand_css(brand),
+            "{{BRAND_MARK}}": _brand_mark(brand, ""),
+            "{{TOKEN}}": esc(token),
+            "{{COMPANY}}": esc(company),
+            "{{DEADLINE}}": esc(deadline, ""),
+            "{{JOB_TITLE}}": esc(cfg.get("job_title"), ""),
+            "{{PROCTORING}}": esc(cfg.get("proctoring"), "off"),
+            "{{LANG}}": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
+            "{{TOTAL_Q}}": str(total_q),
+        }.items():
+            page = page.replace(key, val)
+        return HTMLResponse(page)
+
     page = read_template("interview.html")
     for key, val in {
         "{{RAIL}}": rail,
@@ -3930,6 +3980,57 @@ async def candidate_interview_page(token: str):
     return HTMLResponse(page)
 
 
+@app.get("/api/interview/{token}/assessment")
+async def candidate_assessment_data(token: str):
+    """Case_study (voice-free) mode: serve the candidate the QUESTION TEXT for
+    the typed assessment. NO Realtime session is minted here — this is the whole
+    cost saving. Security mirrors the MCQ-apply pattern: the scenario's MCQ
+    answer key (`correct`) is NEVER sent; only the questions and option texts
+    leave the server. Refuses on a voice-mode token so the two flows can't be
+    crossed."""
+    live = await get_live_interview_by_token(token)
+    if not live:
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+    cfg = live.get("config") or {}
+    if (cfg.get("interview_mode") or "case_study_voice") != "case_study":
+        # A voice-mode link must use the voice flow — never expose question text.
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+
+    # Typed topic questions, in order, with their topic label for grouping.
+    topics = _normalize_topics(cfg.get("topics"))
+    topic_qs = []
+    if topics:
+        for t in topics:
+            topic_qs.append({"topic": t.get("topic") or "", "text": t["main"]})
+            for f in t.get("followups") or []:
+                topic_qs.append({"topic": t.get("topic") or "", "text": f})
+    else:
+        # Legacy flat set (no topic structure): in case_study EVERY question is
+        # presented as typed text, regardless of any stale mode tag carried over
+        # from a voice-era approved set.
+        for q in _normalize_questions(cfg.get("questions")):
+            topic_qs.append({"topic": "", "text": q["text"]})
+
+    scen = _normalize_scenario(cfg.get("scenario"))
+    scenario = None
+    if scen:
+        scenario = {
+            "text": scen.get("text") or "",
+            "questions": [str(q) for q in (scen.get("questions") or [])],
+            # MCQ: question + options ONLY. The `correct` index is server-side
+            # grading data and is stripped here, exactly as on the apply page.
+            "mcq": [{"q": m.get("q") or "", "options": list(m.get("options") or [])}
+                    for m in (scen.get("mcq") or [])],
+        }
+    return {
+        "job_title": cfg.get("job_title") or "",
+        "language": "bn" if (cfg.get("language") or "en").lower() == "bn" else "en",
+        "proctoring": cfg.get("proctoring") if cfg.get("proctoring") in ("off", "S", "M") else "off",
+        "topic_questions": topic_qs,
+        "scenario": scenario,
+    }
+
+
 @app.post("/api/interview/{token}/session-token")
 async def candidate_session_token(request: Request, token: str):
     """Mint a Realtime secret for a candidate session. NOT owner-gated —
@@ -3939,6 +4040,11 @@ async def candidate_session_token(request: Request, token: str):
     transcript, which is size-capped and framed as data-not-instructions."""
     live = await get_live_interview_by_token(token)
     if not live:
+        raise HTTPException(status_code=404, detail="This interview isn't available.")
+    # SAFETY (2026-09-15): a case_study interview is voice-free by design and must
+    # NEVER mint a Realtime secret — that is the entire cost saving. Refuse here
+    # so no stray or crafted client call can spend audio on a typed assessment.
+    if ((live.get("config") or {}).get("interview_mode") or "case_study_voice") == "case_study":
         raise HTTPException(status_code=404, detail="This interview isn't available.")
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="Interview service not configured.")
@@ -5608,6 +5714,9 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
         # Seniority (2026-09-14) rides the job too — calibrates live follow-up
         # DEPTH only; count, budget, and scoring untouched.
         cfg["seniority"] = job.get("seniority_level") or "mid"
+        # Interview mode (2026-09-15). Existing jobs (no field) -> voice, so a
+        # live link that predates this change keeps working exactly as before.
+        cfg["interview_mode"] = job.get("interview_mode") or "case_study_voice"
         # Job-based questions: the APPROVED set (and only the approved set —
         # drafts never reach a candidate) replaces the manual config's
         # questions. Turn budget: every main question plus 2 spoken adaptive
@@ -5622,7 +5731,10 @@ async def _launch_viva_for_application(job: dict, app_doc: dict) -> dict:
             # count-mismatch fix — the old path added "+2 adaptive follow-ups"
             # ON TOP of the approved count, so a 10-question set asked 12.
             cfg["topics"] = jtopics
-            cfg["questions"] = _flatten_topics(jtopics)
+            # case_study presents the topic questions as typed text (no voice);
+            # case_study_voice reads them aloud. The mode was set just above.
+            cfg["questions"] = _flatten_topics(
+                jtopics, spoken=(cfg["interview_mode"] != "case_study"))
             cfg["max_turns"] = min(_VIVA_MAX_TURNS_CAP,
                                    len(cfg["questions"]) + scen_turns)
         elif jqs:
@@ -5832,6 +5944,15 @@ async def set_job_viva_config(request: Request, job_id: str):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid request body.")
 
+    # Interview mode toggle (2026-09-15) — stored on the JOB (drives generation
+    # composition + the candidate page branch). Accepted on enable OR disable.
+    if "interview_mode" in body:
+        _m = str(body.get("interview_mode") or "").strip().lower()
+        if _m in ("case_study", "case_study_voice"):
+            await db.jobs.update_one(
+                {"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                {"$set": {"interview_mode": _m}})
+
     if not body.get("enabled"):
         await set_job_viva(job["_id"], None)
         return {"success": True, "viva": None}
@@ -5923,14 +6044,21 @@ async def job_interview_questions_generate(request: Request, job_id: str):
             return max(lo, min(hi, int(body.get(key, default))))
         except Exception:
             return default
-    # Defaults moved to a 50/50 spoken/written mix (2026-09-09, cost decision):
-    # 2 topics x (1 main + 2 follow-ups) = 6 spoken + 6 scenario = 12. Written
-    # questions cost ~nothing (text-only section) and typed answers carry no
-    # ESL transcription penalty. Recruiters can still set any mix per job;
-    # existing approved sets are untouched until regenerated.
+    # Interview mode decides how the topic questions are PRESENTED, not what
+    # is generated (both modes draft topics + a written scenario from the same
+    # JD). case_study (default new jobs) presents every question as typed text
+    # — no Realtime voice session, ~90% cheaper — so the topic questions score
+    # through the written scorer. case_study_voice reads the topics aloud.
+    # Existing jobs with no stored mode run voice, matching the launch default.
+    mode = job.get("interview_mode") or "case_study_voice"
+    topics_spoken = (mode != "case_study")
+    # Composition: 2 topics x (1 main + 1 follow-up) = 4 topic questions, plus a
+    # written scenario of 6 case questions + 2 MCQ = 8. So voice = ~4 spoken +
+    # ~8 typed; case_study = ~12 typed. Recruiters can still set any mix per
+    # job; existing approved sets are untouched until regenerated.
     n_topics = _clamp("topics", 2, 1, 4)
-    followups = _clamp("followups", 2, 1, 5)
-    scen_k = _clamp("scenario_questions", 6, 2, 8)
+    followups = _clamp("followups", 1, 1, 5)
+    scen_k = _clamp("scenario_questions", 8, 2, 8)
     if not await rate_limit_allows(f"iqgen:{job_id}", 10, 86400):
         raise HTTPException(status_code=429, detail="Generation limit reached for this job today.")
 
@@ -5955,11 +6083,12 @@ async def job_interview_questions_generate(request: Request, job_id: str):
         job_title=job.get("title") or "", k=scen_k, language=lang, role_hint=role_hint,
         seniority=_sen, usage_out=_gen_usages)
     topics = _normalize_topics(topics)
-    flat = _flatten_topics(topics)
+    flat = _flatten_topics(topics, spoken=topics_spoken)
     # Cost observability (owner-only; measurement, never behavior).
     from usage_meter import summarize_chat_usage
     gen_usage = summarize_chat_usage(GEN_MODEL, _gen_usages)
     draft = {"topics": topics, "questions": flat, "count": len(flat),
+             "interview_mode": mode,
              "generated_at": _dt.utcnow(), "model": GEN_MODEL,
              "gen_usage": gen_usage,
              "scenario": _normalize_scenario(scenario)}
@@ -6982,6 +7111,11 @@ async def create_job_endpoint(
         "seniority_level": (seniority_level.strip().lower()
                             if seniority_level.strip().lower() in ("junior", "mid", "senior", "lead")
                             else "mid"),
+        # Interview mode (2026-09-15): NEW jobs default to the cheap voice-free
+        # typed assessment; existing jobs (no field) resolve to voice at launch
+        # so nothing in-flight changes. Drives generation composition + whether
+        # a Realtime session is minted for the candidate.
+        "interview_mode": "case_study",
     }
     if weights_dict is not None:
         job["weights"] = weights_dict
