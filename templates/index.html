@@ -4591,8 +4591,10 @@ function iqEditorRows(list){
 }
 // ── topic clusters (the spoken part) — same draft/approve discipline ──
 function iqTopics(){ const st=window._iqState; return st.editing ? st.workT : (st.draft ? (st.draft.topics||null) : null); }
-function iqTSet(i,f,v){ const t=iqTopics(); if(t&&t[i]) t[i][f]=v; }
-function iqTF(i,j,v){ const t=iqTopics(); if(t&&t[i]) t[i].followups[j]=v; }
+// Editing a slot clears its AI review flag (the recruiter has addressed it).
+function _iqClearFlag(t,slot){ if(t&&t.review_flags){ const k=t.review_flags.indexOf(slot); if(k>=0){ t.review_flags.splice(k,1); iqRender(); } } }
+function iqTSet(i,f,v){ const t=iqTopics(); if(t&&t[i]){ t[i][f]=v; if(f==='main') _iqClearFlag(t[i],'main'); } }
+function iqTF(i,j,v){ const t=iqTopics(); if(t&&t[i]){ t[i].followups[j]=v; _iqClearFlag(t[i],'f'+j); } }
 function iqTFDel(i,j){ const t=iqTopics(); if(t&&t[i]){ t[i].followups.splice(j,1); iqRender(); } }
 function iqTFAdd(i){ const t=iqTopics(); if(t&&t[i]&&t[i].followups.length<5){ t[i].followups.push(''); iqRender(); } }
 function iqTDel(i){ const t=iqTopics(); if(t){ t.splice(i,1); iqRender(); } }
@@ -4613,6 +4615,14 @@ function iqTopicEditor(tps){
     <div style="flex:1;height:1px;background:var(--border)"></div>
     <span style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.05em">📋 written scenario sits here — the middle of the interview</span>
     <div style="flex:1;height:1px;background:var(--border)"></div></div>`;
+  // Review flags (Option A): questions the AI critic could not make deep
+  // enough. Shown so the recruiter fixes them before approving; editing a
+  // flagged field clears its flag.
+  const flaggedTotal = tps.reduce((a,t)=>a+((t.review_flags||[]).length),0);
+  const _fl=(t,slot)=>((t.review_flags||[]).indexOf(slot)>=0);
+  const _tag=`<span style="font-size:8.5px;font-weight:800;color:#B45309;background:rgba(217,119,6,.14);border-radius:6px;padding:1px 5px;margin-left:4px;white-space:nowrap" title="The AI review judged this question shallow and could not deepen it — rewrite it to force a concrete demonstration, or it will still work but be a weaker question.">⚠ review</span>`;
+  const _fbord=on=>on?'border-color:#E9A23B;box-shadow:0 0 0 2px rgba(217,119,6,.12)':'border:1px solid var(--border)';
+  const banner = flaggedTotal ? `<div style="background:rgba(217,119,6,.09);border:1px solid rgba(217,119,6,.35);border-radius:var(--rs);padding:8px 11px;font-size:11.5px;color:#8A5A00;line-height:1.55;margin-bottom:9px"><strong>${flaggedTotal} question${flaggedTotal>1?'s':''} flagged by the AI review</strong> as too shallow to test real reasoning — marked <span style="font-weight:800;color:#B45309">⚠ review</span> below. Deepen or replace them (force a concrete "walk me through what you did / why / what broke"), then approve. They will still work if left as-is — just weaker.</div>` : '';
   const parts = tps.map((t,i)=>`
     <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
@@ -4622,22 +4632,22 @@ function iqTopicEditor(tps){
         <button onclick="iqTDel(${i})" title="Remove topic" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
-        <span style="font-size:10px;font-weight:800;color:var(--green);width:44px;text-align:right;flex-shrink:0">MAIN</span>
+        <span style="font-size:10px;font-weight:800;color:var(--green);width:44px;text-align:right;flex-shrink:0">MAIN${_fl(t,'main')?_tag:''}</span>
         <input value="${escapeHtml(t.main||'')}" maxlength="300" oninput="iqTSet(${i},'main',this.value)"
-               style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+               style="flex:1;padding:7px 9px;${_fbord(_fl(t,'main'))};border-radius:var(--rs);font-family:inherit;font-size:12px">
       </div>
       ${(t.followups||[]).map((f,j)=>`
       <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:var(--t3);width:44px;text-align:right;flex-shrink:0">F${j+1}</span>
+        <span style="font-size:10px;font-weight:700;color:var(--t3);width:44px;text-align:right;flex-shrink:0">F${j+1}${_fl(t,'f'+j)?_tag:''}</span>
         <input value="${escapeHtml(f)}" maxlength="300" oninput="iqTF(${i},${j},this.value)"
-               style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:12px">
+               style="flex:1;padding:7px 9px;${_fbord(_fl(t,'f'+j))};border-radius:var(--rs);font-family:inherit;font-size:12px">
         <button onclick="iqTFDel(${i},${j})" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
       </div>`).join('')}
       ${(t.followups||[]).length<5?`<button class="btn btn-xs" onclick="iqTFAdd(${i})" style="margin-left:50px">+ Follow-up</button>`:''}
     </div>`);
   if(hasScen && split < tps.length) parts.splice(split, 0, divider);
   else if(hasScen) parts.push(divider.replace('the middle of the interview','after these topics — add a 2nd topic to sandwich it'));
-  return parts.join('')
+  return banner + parts.join('')
     + (tps.length<4?'<button class="btn btn-xs" onclick="iqTAdd()">+ Add topic</button>':'');
 }
 

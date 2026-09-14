@@ -193,25 +193,42 @@ RULES
 Return JSON: {{"topics": [{{"topic": "<short label>", "main": "...", "followups": ["...", ...]}}, ...]}}"""
 
 
-TOPIC_CRITIC_PROMPT = """You are reviewing spoken interview questions for a specific job, as a harsh
-quality bar. Judge EVERY question independently against one standard: it must
-force the candidate to demonstrate real, role-specific experience.
+TOPIC_CRITIC_PROMPT = """You are reviewing SPOKEN interview questions for a specific job, as a harsh
+quality bar. Spoken answers are open-ended — this is where genuine reasoning
+depth can and MUST be tested, so be demanding. Judge EVERY question
+independently against one standard: answering it well must require real,
+role-specific experience AND reasoning that someone who only read about the
+topic could not fake.
 
 FAIL a question for ANY of these:
    - SHALLOW: a candidate can fully answer it with one generic sentence, or
      with yes/no ("do you know X", "have you worked with X").
    - GENERIC: it would fit almost any job — nothing in it names this role's
      actual tools, duties, or situations.
-   - NO DEPTH REQUIRED: it does not demand walking through real work (no how
-     exactly / why / what broke / what trade-off) — someone who only read
-     about the topic could answer as well as someone who has done it.
+   - NO SPECIFIC DEMONSTRATION: the best answer does not force the candidate
+     to WALK THROUGH concrete real work — what they actually built, decided,
+     diagnosed, or measured; HOW exactly; WHY that way and not the obvious
+     alternative; what BROKE and how they found it; what TRADE-OFF they took
+     and what it cost; what the RESULT was. A question answerable with
+     opinions, generalities, or "what one should do in theory" FAILS.
+   - BOOK-ANSWERABLE: someone who studied the topic but never DID it could
+     answer as fully as a practitioner. If reciting knowledge suffices — with
+     no lived specifics required — FAIL.
+   - WRONG DEPTH FOR THE LEVEL: too easy for the stated seniority. A question
+     a junior could fully answer FAILS for a senior/lead role — senior/lead
+     questions must probe trade-offs, edge cases, what fails at scale, or
+     cross-team / strategic reasoning; junior questions must still demand a
+     concrete demonstration of the fundamentals in practice, not theory.
    - TWO-PART: it asks more than one thing.
    - UNLAWFUL/UNFAIR: it touches age, religion, family, health, ethnicity,
      politics, or anything a recruiter could not lawfully ask.
    - HARD TO PARSE: the wording itself is long, idiomatic, or convoluted —
-     depth must live in the required answer, never in the sentence.
+     depth must live in the required ANSWER, never in the sentence. (A
+     nervous or second-language candidate must grasp the question instantly.)
 {level_check}{lang_checks}
-If you are UNSURE whether a question passes, FAIL it.
+When genuinely unsure whether a question forces real demonstrated reasoning,
+FAIL it — a shallow spoken question wastes the interview's most valuable
+minutes.
 
 Return JSON: {{"reviews": [{{"id": "<the bracketed id exactly as given>",
 "pass": true|false, "reasons": ["<short reason>", ...]}}, ...]}} — one review
@@ -325,10 +342,10 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
         print(f"[VIVA-GEN] critic call failed — returning uncritiqued draft: {str(e)[:120]}")
         return topics, None
 
-    # ── 3) REFINE loop: up to 3 rounds, failures rewritten in place and
+    # ── 3) REFINE loop: up to 4 rounds, failures rewritten in place and
     #      re-checked. The round cap is the never-infinite rail. ──
     fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=lang_rule)
-    for _round in range(3):
+    for _round in range(4):
         if not failed:
             break
         cur = {qid: (topic, text) for qid, topic, text in _slots()}
@@ -338,7 +355,7 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
         try:
             raw = await _gen_json(client, TOPIC_REFINE_PROMPT.format(fairness=fairness),
                                   job_ctx + "\n\nQUESTIONS TO FIX:\n" + listing,
-                                  0.4, 1800, usage_out)
+                                  0.4, 2200, usage_out)
             valid = {qid for qid, _ in failed}
             fixed_ids = []
             for fx in (raw.get("fixes") or []):
@@ -353,9 +370,25 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
         except Exception as e:
             print(f"[VIVA-GEN] refine round {_round + 1} failed (keeping current text): {str(e)[:120]}")
             break
+    # ── 4) FLAG, don't silently ship (Option A, 2026-09-14). The topic
+    #      structure is FIXED (each interview's phase-sequencing depends on
+    #      exact slot counts), so a still-shallow question CANNOT be dropped
+    #      like an MCQ. Instead it is MARKED on the draft — the viva editor
+    #      shows the recruiter exactly which questions the AI could not deepen,
+    #      so nothing shallow reaches a candidate looking verified. Slot names
+    #      match the qids: "main", "f0", "f1", ... ──
     if failed:
-        print(f"[VIVA-GEN] {len(failed)} question(s) still flagged after refinement — "
-              "latest version kept: " + ", ".join(qid for qid, _ in failed))
+        for qid, _rs in failed:
+            try:
+                ti_str, part = qid.split(".")
+                ti = int(ti_str[1:])
+                topics[ti].setdefault("review_flags", [])
+                if part not in topics[ti]["review_flags"]:
+                    topics[ti]["review_flags"].append(part)
+            except Exception:
+                continue
+        print(f"[VIVA-GEN] {len(failed)} question(s) still flagged for recruiter "
+              "review after refinement: " + ", ".join(qid for qid, _ in failed))
     return topics, None
 
 

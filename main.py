@@ -2707,7 +2707,15 @@ def _normalize_topics(raw) -> list[dict]:
         fups = [str(q).strip()[:300] for q in (t.get("followups") or [])
                 if str(q).strip()][:5]
         if main:
-            out.append({"topic": topic or "Topic", "main": main, "followups": fups})
+            row = {"topic": topic or "Topic", "main": main, "followups": fups}
+            # Advisory-only review flags (Option A): which slots the AI critic
+            # could not deepen ("main"/"f0"/…). Display metadata — never touches
+            # scoring, storage of answers, or the interview flow.
+            rf = [str(s).strip() for s in (t.get("review_flags") or [])
+                  if str(s).strip() in ("main", "f0", "f1", "f2", "f3", "f4")]
+            if rf:
+                row["review_flags"] = rf
+            out.append(row)
     return out
 
 
