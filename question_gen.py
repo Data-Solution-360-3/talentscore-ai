@@ -592,12 +592,34 @@ THE HARD RULE — applies to EVERY question and EVERY option, no exceptions:
   fact, a method, a syntax, a computation), never on tone. If exactly one option
   reads as "the responsible choice", the question is broken — rewrite it as a
   knowledge/technical/reasoning question instead.
-- The correct option must NOT be the longest, most detailed, or most hedged (no
-  length/format leak), and no two options may overlap in meaning.
+- BANNED "GENERIC GOOD PRACTICE" ANSWERS: the correct answer must be a specific,
+  field-dependent fact/method — NEVER a piece of universal workplace advice that
+  everyone knows without the field. Do NOT let the right answer be "set up
+  automated tests", "document it / use version control", "communicate clearly
+  with stakeholders", "present to non-technical people with charts", "double-
+  check / validate the data", "standardize the formats", "test before you
+  deploy". A layperson picks these on sight — they measure nothing.
+- BANNED STEMS: do NOT ask "what is the best practice", "what is a/the crucial
+  (or first, or best) step", "how do you ensure / how can you ensure", "how
+  should you", "what should you do to". These invite generic good-practice
+  answers. Ask instead for a determinate knowledge answer: "what does this
+  query/formula return", "which clause/function does X", "given these numbers,
+  what is [the value / the cause]", "which statement about X is correct".
+- PARALLEL OPTIONS (length must not leak): all four options must be about the
+  SAME length and the same grammatical shape. The correct one must NOT be the
+  longest, most detailed, most qualified, or the only one with an added clause
+  ("...considering data types and formats"). If you are tempted to append a
+  qualifier to the right answer to make it "more complete", STOP — that is a
+  tell; trim it so all four read as equally terse and plausible.
+- No two options may overlap in meaning.
 - BARE VOCABULARY IS BANNED, APPLICATION IS REQUIRED: never "what does term X
   mean" / "which word defines Y". But making the candidate APPLY a fact, read a
   query, compute a result, or pick the correct method FOR A SPECIFIC CASE is
   exactly what you want — do that.
+- STAY IN THE SELECTED DIMENSIONS: every question must be a real instance of one
+  of the dimensions listed above. If a question would only fit "judgment" and
+  judgment is not in the selected list, do NOT write it — write a domain,
+  technical, or reasoning question on the same topic instead.
 - Self-contained: answerable from real knowledge of the role plus the question
   (and its scenario, for grouped ones). No company-internal facts.
 {fairness}
@@ -680,6 +702,11 @@ FAIL a question when ANY of these clearly applies (name the reason):
      or extreme — the tone leaks the answer. Every option must be defensible on
      the MERITS; the wrong ones are wrong because of a fact, method, or
      computation, never because they sound less responsible.
+   - LENGTH / DETAIL TELL: your best_index option is noticeably longer, more
+     detailed, more hedged, or the only one carrying an extra qualifying clause
+     ("...considering data types and formats") — a no-knowledge reader picks the
+     most detailed option and is right. The four options must read as equally
+     terse and parallel; FAIL when the answer stands out by length or detail.
    - BARE VOCABULARY: a pure definition/vocabulary ask — "what does term X
      mean", "which word/key defines Y" — with no application at all. (A question
      that makes them APPLY a fact, read a query/formula, compute a result, or
@@ -773,17 +800,18 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     role knowledge. Language: pure English, or natural Banglish for 'bn'
     (critic rejects over-translation). Bounded: draft(~2x) → critic → up to
     FOUR refine+re-check rounds (the infinite-loop rail, not a cost limit),
-    stopping early once the target passes, then ONE naive-guesser gate pass.
+    stopping early once the target passes, then a knowledge-free structural gate.
 
     `dimensions` (qgen-2.3) is the recruiter's chosen kinds of question —
     any subset of {domain, technical, reasoning, judgment}; the drafter spreads
     the set evenly across them and tags each. Default (empty) is the
-    knowledge-heavy {domain, technical, reasoning} — judgment off. The final
-    naive-guesser gate drops questions a zero-knowledge layperson answers with
-    medium/high confidence, which now works (and keeps full yield) because
-    knowledge questions genuinely resist guessing. Draft only — the recruiter
-    still reviews, edits, and approves before anything goes live.
-    Returns (mcq list, None) or (None, error)."""
+    knowledge-heavy {domain, technical, reasoning} — judgment off. Guess-proofing
+    lives in the DRAFTER (terse parallel options, banned generic-good-practice
+    answers and stems) and the expert CRITIC (social-desirability + length-tell
+    checks); the final gate is a DETERMINISTIC length-leak drop — no LLM
+    "guesser", which can't validate knowledge questions because it knows the
+    field. Draft only — the recruiter still reviews, edits, and approves before
+    anything goes live. Returns (mcq list, None) or (None, error)."""
     n = max(5, min(20, int(n)))
     jd = (jd_text or "").strip()
     if len(jd) < 40:
@@ -933,49 +961,39 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
             break
 
-    # ── 4) TELL-DETECTOR GATE (qgen-2.3). ONE final pass over the survivors,
-    #      looking NOT for "can an expert answer this" (an LLM always can — it
-    #      knows the field) but for a WORDING TELL a no-knowledge reader could
-    #      follow: one option that reads as more thorough/careful/professional,
-    #      is much longer, or sits among careless/absurd others. DROP a question
-    #      only when the wording pulls that reader to the CORRECT option with
-    #      MEDIUM/STRONG pull (a genuine leak). A pull that points AWAY from the
-    #      answer, or none at all, is fine — knowledge questions with four
-    #      equally-plausible options have no tell and PASS, so yield holds. Runs
-    #      ONCE here, never per-round (the old per-round guesser caused 502s).
-    #      Fail-soft: any trouble, or a gate that would empty the set, keeps the
-    #      pre-gate passers (the recruiter reviews every question before live). ──
-    if passed:
+    # ── 4) STRUCTURAL LENGTH-LEAK GATE (qgen-2.3, knowledge-free). NO LLM
+    #      "guesser" can validate knowledge questions — it knows the field and
+    #      flags everything (proved: naive-guesser AND tell-detector both marked
+    #      ~15/15, including a clean 4-equal-length JOIN question). So the
+    #      automated gate checks only STRUCTURE, which needs no knowledge: a
+    #      LENGTH/DETAIL LEAK — the single most common mechanical tell, where the
+    #      correct option is a clear length OUTLIER, so a no-knowledge reader
+    #      picks "the most detailed one" and is right. Four roughly-equal-length
+    #      options have no such leak and pass, so yield holds. Deterministic, no
+    #      API call. The expert critic (which CAN judge social-desirability per
+    #      question) plus the recruiter's review handle the tells length can't
+    #      see. Fail-soft: never drop below the usable floor. ──
+    def _length_leak(m):
+        opts = [str(o) for o in (m.get("options") or [])]
+        if len(opts) != 4:
+            return False
         try:
-            traw = await _gen_json(client, MCQ_TELL_DETECTOR_PROMPT,
-                                   "QUESTIONS:\n" + _fmt(passed),
-                                   0.0, 2500, usage_out)
-            tells = {}
-            for tt in (traw.get("tells") or []):
-                try:
-                    tells[int(tt.get("i"))] = tt
-                except Exception:
-                    continue
-            kept = []
-            for i, m in enumerate(passed):
-                tt = tells.get(i)
-                if tt is None:
-                    kept.append(m)
-                    continue
-                try:
-                    leak = int(tt.get("pick")) == int(m["correct"])
-                except Exception:
-                    leak = False
-                pull = str(tt.get("pull") or "").strip().lower()
-                if leak and pull in ("medium", "strong"):
-                    continue   # wording tell points at the answer -> drop the leak
-                kept.append(m)
-            # Never let the gate starve the set below a usable floor; if it would,
-            # keep the pre-gate passers (recruiter reviews everything anyway).
-            if len(kept) >= min(n, 5) or len(kept) >= 3:
-                passed = kept
-        except Exception as e:
-            print(f"[MCQ-GEN] tell-detector gate skipped (keeping passers): {str(e)[:120]}")
+            ci = int(m["correct"])
+        except Exception:
+            return False
+        lengths = [len(o) for o in opts]
+        others = [lengths[j] for j in range(4) if j != ci]
+        med = sorted(others)[len(others) // 2]   # median of the distractor lengths
+        # Correct option is a clear length outlier: the longest AND materially
+        # longer than a typical distractor (guards short terse sets from tripping).
+        return lengths[ci] == max(lengths) and lengths[ci] >= max(med * 1.6, med + 25)
+
+    if passed:
+        kept = [m for m in passed if not _length_leak(m)]
+        dropped = len(passed) - len(kept)
+        if dropped and (len(kept) >= min(n, 5) or len(kept) >= 3):
+            print(f"[MCQ-GEN] structural length-leak gate dropped {dropped} question(s)")
+            passed = kept
 
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
     #    a scenario string are one group downstream), standalones follow. ──
