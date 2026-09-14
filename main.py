@@ -4765,6 +4765,13 @@ def _normalize_mcq_set(raw) -> list:
             scen = str(m.get("scenario") or "").strip()[:1200]
             if scen:
                 item["scenario"] = scen
+            # Optional dimension tag (qgen-2.3): advisory display metadata only —
+            # which KIND of question this is (domain/technical/reasoning/judgment).
+            # Grading, review, and the approve guard stay index-based and never
+            # read it, exactly like the scenario string.
+            dim = str(m.get("dimension") or "").strip().lower()
+            if dim in ("domain", "technical", "reasoning", "judgment"):
+                item["dimension"] = dim
             out.append(item)
     return out
 
@@ -4793,6 +4800,19 @@ async def mcq_filter_save(request: Request, job_id: str):
     action = body.get("action")
     mf = dict(job.get("mcq_filter") or {})
 
+    # Dimension selection (qgen-2.3) — which KINDS of question to test. Persisted
+    # on the filter doc whenever the client sends it (chip toggle or generate),
+    # so the recruiter's choice sticks between generations. Validated to the
+    # known set; default (knowledge-heavy, judgment off) lives in question_gen.
+    from question_gen import _validate_dimensions
+    if "dimensions" in body:
+        mf["dimensions"] = _validate_dimensions(body.get("dimensions"))
+        if action in (None, "save_dimensions"):
+            await db.jobs.update_one({"_id": __import__("bson").ObjectId(str(job["_id"]))},
+                                     {"$set": {"mcq_filter": mf}})
+            return {"success": True, "mcq_filter": serialize_mongo(mf)}
+    _dims = _validate_dimensions(mf.get("dimensions"))
+
     if action == "generate":
         if not OPENAI_API_KEY:
             raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
@@ -4814,6 +4834,7 @@ async def mcq_filter_save(request: Request, job_id: str):
                     job_title=job.get("title") or "",
                     language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
                     seniority=job.get("seniority_level") or "mid",
+                    dimensions=_dims,
                     usage_out=_gu),
                 timeout=240)
         except asyncio.TimeoutError:

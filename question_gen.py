@@ -13,7 +13,7 @@ import json
 from openai import AsyncOpenAI
 
 GEN_MODEL = "gpt-4o"
-GEN_VERSION = "qgen-2.2"   # 2.2: adversarial naive-guesser MCQ critic (2026-09-14); 2.1: seniority calibration
+GEN_VERSION = "qgen-2.3"   # 2.3: knowledge-not-judgment MCQs + recruiter dimension selector + reinstated naive-guesser GATE (2026-09-15); 2.2: adversarial naive-guesser MCQ critic; 2.1: seniority calibration
 
 # ── Seniority calibration (2026-09-14): shifts GENERATION difficulty only —
 # grading, storage, fairness floors untouched. Injected into job_ctx (all
@@ -481,56 +481,131 @@ _MCQ_FAIRNESS_RULES = """- {lang_rule}
   status, pregnancy, health or disability, ethnicity, political views, or
   anything a recruiter could not lawfully ask."""
 
+# ── MCQ DIMENSIONS (qgen-2.3): the recruiter picks WHICH kinds of question to
+# test per job; generation splits the set roughly EVENLY across the chosen ones.
+# The whole point of 2.3 is to move OFF pure workplace-judgment ("what would you
+# do") — which is guessable by common sense — and ONTO knowledge/technical/
+# reasoning questions, where four close options can be separated ONLY by real
+# knowledge. Judgment stays available but minimized (off by default) because it
+# is the guessable kind. These tags are advisory display metadata; grading is
+# unchanged and index-based.
+MCQ_DIMENSIONS = {
+    "domain": {
+        "label": "DOMAIN KNOWLEDGE",
+        "guide": ("Do they actually KNOW this field? Test facts, core concepts, and the "
+                  "correct method or standard for a specific task in THIS role. The right "
+                  "answer is a fact or an established best method — not an opinion. Every "
+                  "distractor is a real misconception, an outdated/kind-of-right method, or "
+                  "the correct answer to a subtly different question — something a "
+                  "half-informed practitioner genuinely believes."),
+    },
+    "technical": {
+        "label": "TECHNICAL SKILL",
+        "guide": ("If the role uses a concrete tool, language, or process (SQL, Excel, a "
+                  "framework, a formula, a standard workflow), TEST IT DIRECTLY with a "
+                  "question only someone skilled could answer: read this query/formula and "
+                  "say what it returns, pick the one that does X correctly, spot the bug, "
+                  "choose the right function for the job. Distractors are plausible-but-wrong "
+                  "syntax, near-miss functions, or approaches that look right but fail on the "
+                  "specifics. A crisp technical item needs no work-story wrapper."),
+    },
+    "reasoning": {
+        "label": "REASONING / PROBLEM-SOLVING",
+        "guide": ("Give a concrete problem and make them WORK IT THROUGH — apply role "
+                  "knowledge across a step or two to reach the answer. The right option "
+                  "follows from correct reasoning about the specifics; each distractor is the "
+                  "result of a SPECIFIC reasoning error (a wrong assumption, a skipped step, "
+                  "the right idea misapplied) — never merely the 'less careful' option."),
+    },
+    "judgment": {
+        "label": "JUDGMENT (situational — use sparingly)",
+        "guide": ("A situational call — but write one ONLY when all four options are genuinely "
+                  "close, each a choice a competent professional could defend, separated by a "
+                  "real trade-off a knowledgeable person weighs (not by which sounds most "
+                  "diligent). If you cannot make the options that close, write a domain, "
+                  "technical, or reasoning question instead. Never a 'which sounds "
+                  "professional' question."),
+    },
+}
+DIMENSION_ORDER = ["domain", "technical", "reasoning", "judgment"]
+DEFAULT_DIMENSIONS = ["domain", "technical", "reasoning"]   # knowledge-heavy; judgment OFF
+
+
+def _validate_dimensions(dims) -> list:
+    """Clamp a recruiter dimension selection to the known set, preserving the
+    canonical order. Empty/garbage -> the knowledge-heavy default (no judgment)."""
+    if not dims:
+        return list(DEFAULT_DIMENSIONS)
+    want = {str(x).strip().lower() for x in dims}
+    out = [d for d in DIMENSION_ORDER if d in want]
+    return out or list(DEFAULT_DIMENSIONS)
+
+
+def _dimensions_block(dims) -> str:
+    """Per-dimension drafting guidance for the SELECTED mix, injected into the
+    drafter. Also tells the drafter to spread questions ~evenly and tag each."""
+    picked = _validate_dimensions(dims)
+    lines = ["DIMENSIONS TO TEST — spread the questions roughly EVENLY across these, and "
+             "tag EACH question with its dimension (the \"dimension\" field):"]
+    for d in picked:
+        info = MCQ_DIMENSIONS[d]
+        lines.append(f'- {info["label"]} — tag "{d}": {info["guide"]}')
+    if "judgment" not in picked:
+        lines.append("Do NOT write pure situational-judgment questions — they are not in the "
+                     "selected mix.")
+    return "\n".join(lines)
+
+
 MCQ_DRAFT_PROMPT = """You are writing a knowledge screen for a specific job. Draft {n}
 multiple-choice questions grounded in the ACTUAL day-to-day work this job
 description describes, in a MIXED STRUCTURE:
 
+{dimensions}
+
 STRUCTURE (both kinds, mixed)
 - SCENARIO GROUPS: {n_scen} realistic role scenarios — each a substantial
   paragraph (a concrete situation with context: what's happening, who's
-  involved, real numbers/constraints where natural) — followed by 3-4 MCQs
-  ABOUT that scenario. The questions must genuinely depend on the scenario's
-  details, not merely sit next to it.
-- STANDALONE questions: the remainder — each self-framed as its own mini
-  work situation.
+  involved, real numbers/constraints/data where natural) — followed by 3-4
+  questions whose answers genuinely DEPEND on the scenario's specifics, not
+  merely sit next to it.
+- STANDALONE questions: the remainder — each self-contained: a crisp technical
+  item, a domain-knowledge question, or a short reasoning problem. These need
+  NOT be wrapped in a work story — a direct "which query returns X", "what does
+  this metric indicate", or "read this and compute Y" is good.
 
-WHAT MAKES A QUESTION GOOD HERE
-- Frame EVERY question as a realistic work SCENARIO for this role: a
-  situation the person is in, then what they should do, conclude, check
-  first, or prioritize. NEVER a bare recall stem — no "which
-  term/clause/function/feature does X", no definitions, no vocabulary.
-  A knowledgeable-but-thoughtless person must not be able to ace it on
-  memorized facts alone; the answer must require applying knowledge to the
-  situation.
-- Exactly 4 options, exactly ONE defensibly best answer.
-- THE DISTRACTORS ARE THE CRAFT: each wrong option must be something a person
-  with PARTIAL knowledge would genuinely pick — a real, common misconception,
-  a plausible-but-inferior approach, or a right-sounding answer for a subtly
-  different situation. A distractor a layperson can eliminate on sight is a
-  failure. No joke options, no obviously-absurd options, and no
-  universally-bad-behavior options ("ignore it", "do nothing", "never contact
-  them again", "assume it will resolve itself") — every option must be a
-  choice a reasonable-but-imperfect professional might actually make,
-  ESPECIALLY in judgment and soft-skills questions.
-- BEAT THE GUESSER: a smart layperson with zero role knowledge will try to
-  game your question by picking the most professional/thorough/kind-sounding
-  option, eliminating careless-sounding ones, or taking the middle ground.
-  Write options so that trick FAILS: every option should sound like something
-  a diligent professional could say — the wrong ones are wrong on the MERITS
-  (a real misconception, the right move for a subtly different situation),
-  never on tone. If only one option sounds conscientious, the question is
-  already broken.
-- No two options may overlap in meaning, and the correct one must not be the
-  longest, most detailed, or most hedged option (length/format must not leak
-  the answer).
-- Self-contained: answerable from professional knowledge of the role plus the
-  question (and its scenario, for grouped ones). No company-internal facts.
+THE HARD RULE — applies to EVERY question and EVERY option, no exceptions:
+- TEST REAL KNOWLEDGE, NOT COMMON SENSE. A smart person with ZERO knowledge of
+  this role must NOT be able to pick the right answer better than random chance.
+  If common sense, elimination, or "which option sounds most professional /
+  thorough / careful / kind" can find the answer, the question is BROKEN. This
+  is the single most important rule — everything below serves it.
+- Exactly 4 options, exactly ONE correct (or clearly-best) answer.
+- ALL FOUR options must be close and plausible to someone with PARTIAL
+  knowledge. No strawmen, no joke or absurd options, no universally-bad options
+  ("ignore it", "do nothing", "never contact them again", "fabricate the
+  data"), nothing eliminable on sight. Every distractor is a real misconception,
+  a near-miss method/function, a plausible-but-wrong computation, or the correct
+  answer to a subtly different question — something a half-trained person
+  genuinely believes.
+- NO SOCIAL-DESIRABILITY TELL: the options must NOT differ in how conscientious,
+  responsible, or thorough they SOUND. The wrong ones are wrong on the MERITS (a
+  fact, a method, a syntax, a computation), never on tone. If exactly one option
+  reads as "the responsible choice", the question is broken — rewrite it as a
+  knowledge/technical/reasoning question instead.
+- The correct option must NOT be the longest, most detailed, or most hedged (no
+  length/format leak), and no two options may overlap in meaning.
+- BARE VOCABULARY IS BANNED, APPLICATION IS REQUIRED: never "what does term X
+  mean" / "which word defines Y". But making the candidate APPLY a fact, read a
+  query, compute a result, or pick the correct method FOR A SPECIFIC CASE is
+  exactly what you want — do that.
+- Self-contained: answerable from real knowledge of the role plus the question
+  (and its scenario, for grouped ones). No company-internal facts.
 {fairness}
 
-Return JSON:
+Return JSON (tag every question with its "dimension" — one of: domain, technical, reasoning, judgment):
 {{"scenarios": [{{"scenario": "...paragraph...",
-                "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}, ...],
-  "standalone": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+                "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>, "dimension": "domain|technical|reasoning|judgment"}}, ...]}}, ...],
+  "standalone": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>, "dimension": "domain|technical|reasoning|judgment"}}, ...]}}"""
 
 # The GUESSER runs as its OWN call with NO job context (v3, 2026-09-14): an
 # in-critic "pretend you know nothing" pass proved contaminated — the model
@@ -555,33 +630,42 @@ full role knowledge and pick the single best option (best_index); then decide
 pass/fail.
 
 FAIL a question when ANY of these clearly applies (name the reason):
+   - COMMON-SENSE ANSWERABLE: a smart person with ZERO knowledge of this role
+     could pick the best option using general reasoning, elimination, or
+     social-desirability ("which sounds most professional / thorough / careful").
+     If real DOMAIN, TECHNICAL, or REASONING knowledge is NOT required to choose,
+     FAIL. This is the most important check — a screening question that common
+     sense can answer measures nothing.
    - STRAWMAN OPTION: any option NO competent professional would EVER pick,
      even on a lazy day — "do nothing", "ignore it", "never contact them
      again", "call them every day", "fabricate the data", joke options, or
      options from a different profession. A distractor must be a real
      misconception or a plausible-but-inferior approach someone could
-     genuinely choose. This is the most important check — apply it to EVERY
-     option.
-   - UNIQUELY VIRTUOUS: exactly one option reads as the diligent/professional
-     choice while the others read careless, dismissive, or extreme — the
-     tone leaks the answer. Every option must sound like something a
-     competent person could say; the wrong ones are wrong on the MERITS.
-   - PURE RECALL: a bare definition/vocabulary ask with NO application
-     ("what does X mean", "which key defines Y") — no situation, no judgment.
-     (Choosing the right technique/tool FOR A SITUATION is fine and good —
-     do NOT fail a question just because a correct answer names a method.)
+     genuinely choose. Apply it to EVERY option.
+   - SOCIAL-DESIRABILITY TELL: exactly one option reads as the diligent /
+     careful / professional choice while the others read careless, dismissive,
+     or extreme — the tone leaks the answer. Every option must be defensible on
+     the MERITS; the wrong ones are wrong because of a fact, method, or
+     computation, never because they sound less responsible.
+   - BARE VOCABULARY: a pure definition/vocabulary ask — "what does term X
+     mean", "which word/key defines Y" — with no application at all. (A question
+     that makes them APPLY a fact, read a query/formula, compute a result, or
+     pick the correct method FOR A SPECIFIC CASE is GOOD — do NOT fail it just
+     because answering requires knowing something. A crisp, self-contained
+     technical question with no work-story is fine.)
    - AMBIGUOUS or WRONG KEY: two options overlap, more than one is defensibly
      best, or none clearly is.
    - NOT GROUNDED: not about this role's real work at all.
-   - NEAR-DUPLICATE: it asks essentially the same decision as an EARLIER
+   - NEAR-DUPLICATE: it asks essentially the same thing as an EARLIER
      question in this set — fail the later one.
 {level_check}{lang_checks}
 Otherwise PASS. A good question has four options a competent person could
-each defend, and needs real role knowledge (not just common sense) to choose
-between them — such a question DESERVES a pass. Judge each criterion on its
-own test; do not fail a solid question out of general strictness. (A separate
-zero-knowledge guesser is also run over the survivors, so you do not have to
-catch every guessable question yourself — focus on the defects above.)
+each defend, and needs real role knowledge or careful reasoning (NOT common
+sense) to choose between them — such a question DESERVES a pass. Judge each
+criterion on its own test; do not fail a solid knowledge/technical question out
+of general strictness. (A separate zero-knowledge guesser is also run over the
+survivors as a hard gate, so you do not have to catch every guessable question
+yourself — focus on the defects above.)
 
 Return JSON:
 {{"reviews": [{{"i": <index in the list>, "best_index": <0-3>,
@@ -595,27 +679,28 @@ reasons while keeping it grounded in this job's real work. A question shown
 WITH a scenario must stay about THAT scenario (revise the question, not the
 scenario). You may rewrite
 the stem, any option, or replace the question entirely with a better one on
-the same topic area. A question failed for TRIVIA/RECALL or NO SCENARIO must
-come back CONVERTED into a realistic work scenario on the same topic — a
-situation, then what to do / conclude / check first — never a lightly
-reworded recall stem. Same bar as before:
+the same topic area. A question failed as COMMON-SENSE ANSWERABLE, GUESSABLE, or
+a SOCIAL-DESIRABILITY tell must come back as a genuine DOMAIN, TECHNICAL, or
+REASONING question on the same topic — one that requires real knowledge (a fact,
+a method, reading a query/formula, a computation, a multi-step deduction) — with
+its DISTRACTORS rebuilt as real misconceptions, NOT the stem lightly reworded. A
+question failed for BARE VOCABULARY must come back as an APPLICATION question on
+the same topic (apply the fact / read the query / compute the result), never a
+reworded definition. Same bar as before:
 - 4 options, ONE defensibly best answer, distractors = genuine
-  partial-knowledge misconceptions, nothing a layperson can eliminate,
-  no universally-bad-behavior options ("ignore it", "do nothing",
-  "never contact them again"), no length/format leak, no recall-only
-  stems, no ambiguity.
+  partial-knowledge misconceptions or near-miss methods, nothing a layperson can
+  eliminate, no universally-bad options ("ignore it", "do nothing", "never
+  contact them again"), no length/format leak, no ambiguity.
 - BEAT THE GUESSER: a zero-knowledge test-gamer picks the most
-  professional-sounding option, eliminates careless-sounding ones, and takes
-  the middle ground. Your rewrite must defeat that: EVERY option must sound
-  like something a diligent professional could say, with the wrong ones
-  wrong on the MERITS (real misconception, right move for a subtly
-  different situation) — never on tone. A question failed as GUESSABLE or
-  UNIQUELY VIRTUOUS needs its DISTRACTORS rebuilt this way, not the stem
-  reworded.
+  professional-sounding option, eliminates careless-sounding ones, and takes the
+  middle ground. Your rewrite must defeat that — a smart layperson must not beat
+  chance. EVERY option must be defensible on the MERITS, with the wrong ones
+  wrong because of a fact/method/computation, never because of tone. The
+  right answer must NOT differ from the others in how conscientious it sounds.
 {fairness}
 
-Return JSON (same order as given):
-{{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
+Return JSON (same order as given; keep each question's "dimension"):
+{{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>, "dimension": "domain|technical|reasoning|judgment"}}, ...]}}"""
 
 
 def _mcq_shape_ok(m) -> bool:
@@ -642,6 +727,7 @@ async def _gen_json(client, system: str, user: str, temperature: float,
 async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                                   job_title: str = "", language: str = "en",
                                   role_hint: str = "", seniority: str = "mid",
+                                  dimensions: list | None = None,
                                   usage_out: list | None = None
                                   ) -> tuple[list | None, str | None]:
     """Mixed-structure MCQ DRAFT set via the drafter→critic→refiner loop.
@@ -652,10 +738,18 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     untouched. The critic BLIND-SOLVES every question (never sees the key):
     a key mismatch fails it, and so does the critic finding it EASY without
     role knowledge. Language: pure English, or natural Banglish for 'bn'
-    (critic rejects over-translation). Bounded: draft(target+8) → critic →
-    up to THREE refine+re-check rounds (the infinite-loop rail, not a cost
-    limit), stopping early once the target passes. Draft only — the
-    recruiter still reviews, edits, and approves before anything goes live.
+    (critic rejects over-translation). Bounded: draft(~2x) → critic → up to
+    FOUR refine+re-check rounds (the infinite-loop rail, not a cost limit),
+    stopping early once the target passes, then ONE naive-guesser gate pass.
+
+    `dimensions` (qgen-2.3) is the recruiter's chosen kinds of question —
+    any subset of {domain, technical, reasoning, judgment}; the drafter spreads
+    the set evenly across them and tags each. Default (empty) is the
+    knowledge-heavy {domain, technical, reasoning} — judgment off. The final
+    naive-guesser gate drops questions a zero-knowledge layperson answers with
+    medium/high confidence, which now works (and keeps full yield) because
+    knowledge questions genuinely resist guessing. Draft only — the recruiter
+    still reviews, edits, and approves before anything goes live.
     Returns (mcq list, None) or (None, error)."""
     n = max(5, min(20, int(n)))
     jd = (jd_text or "").strip()
@@ -667,6 +761,7 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                + _seniority_ctx(seniority)
                + f"\nJOB DESCRIPTION:\n\"\"\"\n{jd[:8000]}\n\"\"\"")
     fairness = _MCQ_FAIRNESS_RULES.format(lang_rule=_mcq_lang(language))
+    dims_block = _dimensions_block(dimensions)   # per-dimension guidance for the drafter
     critic_prompt = MCQ_CRITIC_PROMPT.format(lang_checks=_mcq_lang_checks(language),
                                              level_check=_seniority_check(seniority))
 
@@ -695,7 +790,7 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     try:
         raw = await _gen_json(client,
                               MCQ_DRAFT_PROMPT.format(n=draft_target, n_scen=n_scen,
-                                                      fairness=fairness),
+                                                      fairness=fairness, dimensions=dims_block),
                               job_ctx, 0.5, 9000, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
@@ -783,9 +878,12 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             for i, m in enumerate(got[:len(items)]):
                 # The scenario is reattached FROM THE ORIGINAL — the refiner
                 # revises questions, never the scenario, and we don't trust
-                # it to echo the paragraph back byte-perfect.
+                # it to echo the paragraph back byte-perfect. The dimension tag
+                # is advisory; keep the original if the refiner dropped it.
                 if items[i].get("scenario"):
                     m["scenario"] = items[i]["scenario"]
+                if not m.get("dimension") and items[i].get("dimension"):
+                    m["dimension"] = items[i]["dimension"]
                 refined.append(m)
             # Any batch item the refiner didn't return is still a failure —
             # carry it too, so nothing is silently dropped.
@@ -802,20 +900,50 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
             break
 
-    # ── Naive-guesser HARD GATE removed (Option B, 2026-09-14). Proof runs
-    #    showed an independent zero-knowledge guesser scores 25-100% on any
-    #    given set: for a well-formed workplace-judgment MCQ the professionally
-    #    correct answer usually IS the one a thoughtful person picks, so a
-    #    "guess-proof" gate is in permanent tension with "realistic + role-
-    #    relevant" and it tanked yield unpredictably (6-7 of 15, frequent
-    #    "try again"). The MCQ is the CHEAP FIRST FILTER, not the real
-    #    assessment (the live viva is) — so we rely on the strengthened EXPERT
-    #    critic above, which reliably rejects the actual garbage (strawman
-    #    options + uniquely-virtuous patterns) while keeping a full set, and
-    #    accept that some questions are guessable-by-competence. The recruiter
-    #    reviews and approves before anything goes live. MCQ_NAIVE_GUESS_PROMPT
-    #    is kept for the proof harness / possible future advisory use, not as
-    #    a gate.
+    # ── 4) NAIVE-GUESSER GATE (reinstated qgen-2.3). ONE final pass: an
+    #      INDEPENDENT zero-context guesser (no JD, no role) tries to game every
+    #      survivor with pure test-taking tells. DROP a question only when the
+    #      guesser lands the correct answer with MEDIUM or HIGH confidence — a
+    #      low-confidence lucky hit is tolerated (keeps yield). This is a real
+    #      gate again (not the Option-B advisory) because 2.3 questions are
+    #      DOMAIN / TECHNICAL / REASONING, which genuinely resist naive guessing
+    #      — so the guess-proof-vs-realism tension that tanked judgment-era yield
+    #      is gone, and few questions get dropped. It runs ONCE here, never
+    #      per-round: the old per-round × multi-round guesser is what pushed
+    #      generation past the request timeout into 502s. Fail-soft: any trouble,
+    #      or a gate that would empty the set, keeps the pre-gate passers (the
+    #      recruiter still reviews every question before it goes live). ──
+    if passed:
+        try:
+            graw = await _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
+                                   "QUESTIONS:\n" + _fmt(passed),
+                                   0.0, 2500, usage_out)
+            guesses = {}
+            for gg in (graw.get("guesses") or []):
+                try:
+                    guesses[int(gg.get("i"))] = gg
+                except Exception:
+                    continue
+            kept = []
+            for i, m in enumerate(passed):
+                gg = guesses.get(i)
+                if gg is None:
+                    kept.append(m)
+                    continue
+                try:
+                    hit = int(gg.get("pick")) == int(m["correct"])
+                except Exception:
+                    hit = False
+                conf = str(gg.get("confidence") or "").strip().lower()
+                if hit and conf in ("medium", "high"):
+                    continue   # confidently guessable -> drop
+                kept.append(m)
+            # Never let the gate starve the set below a usable floor; if it would,
+            # keep the pre-gate passers (recruiter reviews everything anyway).
+            if len(kept) >= min(n, 5) or len(kept) >= 3:
+                passed = kept
+        except Exception as e:
+            print(f"[MCQ-GEN] naive-guesser gate skipped (keeping passers): {str(e)[:120]}")
 
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
     #    a scenario string are one group downstream), standalones follow. ──
