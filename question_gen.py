@@ -13,7 +13,7 @@ import json
 from openai import AsyncOpenAI
 
 GEN_MODEL = "gpt-4o"
-GEN_VERSION = "qgen-2.3"   # 2.3: knowledge-not-judgment MCQs + recruiter dimension selector + reinstated naive-guesser GATE (2026-09-15); 2.2: adversarial naive-guesser MCQ critic; 2.1: seniority calibration
+GEN_VERSION = "qgen-2.4"   # 2.4: exam item-writing standard (functional distractors, homogeneity, tell words, one defensible key) + viva marking rubric + verification-hole fixes (2026-09-15); 2.3: knowledge-not-judgment MCQs + dimension selector + structural gate; 2.2: adversarial naive-guesser MCQ critic; 2.1: seniority calibration
 
 # ── Seniority calibration (2026-09-14): shifts GENERATION difficulty only —
 # grading, storage, fairness floors untouched. Injected into job_ctx (all
@@ -178,6 +178,11 @@ WHAT MAKES A QUESTION DEEP ENOUGH — every question must pass this bar
   the sentence short — the depth is in what the ANSWER must contain, not in
   the question's language. A nervous or second-language candidate must
   understand the question instantly.
+- EXAMINABLE STANDARD: for every question you write it must be OBVIOUS what a
+  strong answer contains versus a weak one, so two different reviewers would
+  rank the same answer the same way. A question whose answers cannot be ranked
+  — one that invites opinion or preference rather than demonstrable competence
+  — has no place in an assessment. Write questions that can be MARKED.
 
 RULES
 - Every question must be answerable from the candidate's own experience and
@@ -219,6 +224,11 @@ FAIL a question for ANY of these:
      questions must probe trade-offs, edge cases, what fails at scale, or
      cross-team / strategic reasoning; junior questions must still demand a
      concrete demonstration of the fundamentals in practice, not theory.
+   - NO DEFENSIBLE ANSWER STANDARD: you cannot articulate what separates a
+     STRONG answer from a WEAK one for this question — there is no examinable
+     bar, so two reviewers would score the same answer differently. A question
+     that invites opinion or preference rather than demonstrable competence
+     FAILS. (State the strong-vs-weak split to yourself before you pass it.)
    - TWO-PART: it asks more than one thing.
    - UNLAWFUL/UNFAIR: it touches age, religion, family, health, ethnicity,
      politics, or anything a recruiter could not lawfully ask.
@@ -250,6 +260,30 @@ Return JSON: {{"fixes": [{{"id": "<same id>", "text": "<rewritten question>"}},
 ...]}} — every id you were given, exactly once each."""
 
 
+# MARKING STANDARD (qgen-2.4). Written like an examiner's marking scheme so the
+# recruiter reviews spoken answers against a defensible bar instead of a vibe.
+# ADVISORY ONLY: this text is recruiter-facing review metadata and is NEVER sent
+# to any scorer — interview scoring, grading and the fairness floor are untouched.
+TOPIC_RUBRIC_PROMPT = """You are writing the MARKING STANDARD for spoken interview questions, the way an
+examiner writes a marking scheme. For EACH question you are given (with its id
+and topic), state what separates a strong answer from a weak one for THIS role
+at THIS seniority.
+
+For each question give:
+- "strong": what a STRONG answer actually contains — the specific things the
+  candidate must name, walk through, or justify (the concrete decision and why,
+  the trade-off and its cost, how they diagnosed it, what the result was).
+  Ground it in THIS role's real tools and situations. Not generic praise.
+- "weak": what a WEAK answer looks like — the generic, theoretical or recited
+  version someone gives when they have READ about the topic but never done it.
+
+Two or three lines each, plain language, concrete. This is a reviewer's guide:
+it is never shown to the candidate and never used to compute a score.
+
+Return JSON: {{"rubrics": [{{"id": "<the bracketed id exactly as given>",
+"strong": "...", "weak": "..."}}, ...]}} — one per question, every id covered."""
+
+
 async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = "",
                                    n_topics: int = 2, followups: int = 3,
                                    language: str = "en", role_hint: str = "",
@@ -260,11 +294,17 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
     (the same bounded pattern as the MCQ multi-agent). The critic fails
     shallow / generic / no-depth questions (and, for 'bn', over-translation
     out of the Banglish register); failures are refined IN PLACE — the topic
-    structure and slot counts never change — and re-checked, up to THREE
-    rounds. After the cap the latest refined text stands (bounded best-effort,
-    never an infinite loop). Draft only — the recruiter still reviews, edits,
-    and approves before anything reaches a candidate.
-    Returns ([{"topic","main","followups"}], None) or (None, error)."""
+    structure and slot counts never change — and re-checked, up to FOUR
+    rounds. After the cap the latest refined text stands, FLAGGED (bounded
+    best-effort, never an infinite loop). Nothing unverified ships looking
+    verified: a critic failure flags every slot, and a mid-refine failure flags
+    exactly the slots whose text was replaced but not re-checked.
+
+    Finally an advisory MARKING STANDARD ("rubric": {slot: {strong, weak}}) is
+    generated over the FINAL text — recruiter-facing review metadata, never sent
+    to a scorer, so scoring/grading/fairness are untouched. Draft only — the
+    recruiter still reviews, edits, and approves before anything reaches a
+    candidate. Returns ([{"topic","main","followups"}], None) or (None, error)."""
     n_topics = max(1, min(4, int(n_topics)))
     followups = max(1, min(5, int(followups)))
     jd = (jd_text or "").strip()
@@ -339,7 +379,14 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
     try:
         failed = await _critic([qid for qid, _, _ in _slots()])
     except Exception as e:
-        print(f"[VIVA-GEN] critic call failed — returning uncritiqued draft: {str(e)[:120]}")
+        # VERIFICATION HOLE (fixed 2026-09-15): this used to return a COMPLETELY
+        # uncritiqued draft carrying no flags at all — which reads to the
+        # recruiter as "reviewed and clean". Nothing unverified may ship looking
+        # verified, so every slot is flagged for review instead.
+        print(f"[VIVA-GEN] critic call failed — returning draft with ALL slots "
+              f"flagged unverified: {str(e)[:120]}")
+        for t in topics:
+            t["review_flags"] = ["main"] + [f"f{fi}" for fi in range(len(t["followups"]))]
         return topics, None
 
     # ── 3) REFINE loop: up to 4 rounds, failures rewritten in place and
@@ -352,12 +399,12 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
         listing = "\n".join(
             f"[{qid}] (topic: {cur[qid][0]}) {cur[qid][1]}\n   reviewer reasons: " + "; ".join(rs)
             for qid, rs in failed)
+        fixed_ids = []
         try:
             raw = await _gen_json(client, TOPIC_REFINE_PROMPT.format(fairness=fairness),
                                   job_ctx + "\n\nQUESTIONS TO FIX:\n" + listing,
                                   0.4, 2200, usage_out)
             valid = {qid for qid, _ in failed}
-            fixed_ids = []
             for fx in (raw.get("fixes") or []):
                 qid = str((fx or {}).get("id", ""))
                 text = str((fx or {}).get("text", "")).strip()[:300]
@@ -368,7 +415,16 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
                 break
             failed = await _critic(fixed_ids)
         except Exception as e:
-            print(f"[VIVA-GEN] refine round {_round + 1} failed (keeping current text): {str(e)[:120]}")
+            # VERIFICATION HOLE (fixed 2026-09-15): _set() above may already have
+            # REPLACED question text before this failure, so that new text was
+            # never re-checked — it used to ship behind the previous round's
+            # stale verdicts. Flag exactly the slots we touched as unverified.
+            print(f"[VIVA-GEN] refine round {_round + 1} failed — flagging "
+                  f"{len(fixed_ids)} unverified slot(s): {str(e)[:120]}")
+            _touched = set(fixed_ids)
+            failed = ([(qid, ["refined but not re-verified — please review"])
+                       for qid in fixed_ids]
+                      + [(q, r) for q, r in failed if q not in _touched])
             break
     # ── 4) FLAG, don't silently ship (Option A, 2026-09-14). The topic
     #      structure is FIXED (each interview's phase-sequencing depends on
@@ -389,6 +445,37 @@ async def generate_topic_questions(jd_text: str, api_key: str, job_title: str = 
                 continue
         print(f"[VIVA-GEN] {len(failed)} question(s) still flagged for recruiter "
               "review after refinement: " + ", ".join(qid for qid, _ in failed))
+
+    # ── 5) MARKING STANDARD (qgen-2.4, advisory). ONE call over the FINAL text,
+    #      so the rubric always matches the question the recruiter will actually
+    #      see — generating it at draft time would go stale the moment refinement
+    #      rewrote a question. Recruiter-facing review metadata ONLY: it is never
+    #      sent to a scorer, so interview scoring, grading and the fairness floor
+    #      are untouched. Fail-soft: a missing rubric is a lost nicety, never a
+    #      failed generation. ──
+    try:
+        slots = _slots()
+        listing = "\n".join(f"[{qid}] (topic: {topic}) {text}" for qid, topic, text in slots)
+        rraw = await _gen_json(client, TOPIC_RUBRIC_PROMPT,
+                               job_ctx + "\n\nQUESTIONS:\n" + listing,
+                               0.3, 2200, usage_out)
+        by_id = {}
+        for r in (rraw.get("rubrics") or []):
+            qid = str((r or {}).get("id", ""))
+            strong = str((r or {}).get("strong", "")).strip()[:600]
+            weak = str((r or {}).get("weak", "")).strip()[:600]
+            if qid and (strong or weak):
+                by_id[qid] = {"strong": strong, "weak": weak}
+        for qid, _topic, _text in slots:
+            if qid not in by_id:
+                continue
+            try:
+                ti_str, part = qid.split(".")
+                topics[int(ti_str[1:])].setdefault("rubric", {})[part] = by_id[qid]
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"[VIVA-GEN] rubric pass skipped (questions unaffected): {str(e)[:120]}")
     return topics, None
 
 
@@ -622,6 +709,34 @@ THE HARD RULE — applies to EVERY question and EVERY option, no exceptions:
   technical, or reasoning question on the same topic instead.
 - Self-contained: answerable from real knowledge of the role plus the question
   (and its scenario, for grouped ones). No company-internal facts.
+
+EXAM ITEM-WRITING STANDARD — write these the way a professional certification-
+exam item writer would. Each of these is a published item-flaw to eliminate:
+- FUNCTIONAL DISTRACTORS: every wrong option must encode ONE specific, nameable
+  error a partially-competent candidate actually makes — a named misconception,
+  the right method for a DIFFERENT case, a classic wrong-tool or wrong-step
+  mistake. You must be able to say in one line WHY each distractor is wrong and
+  why someone would still pick it. An option nobody would ever choose is a
+  wasted option and breaks the item.
+- HOMOGENEOUS OPTIONS: the four options must match each other in LENGTH,
+  grammatical form, specificity, and structure — all noun phrases, or all
+  clauses, or all code/formula snippets. The key must be indistinguishable from
+  the distractors by FORM alone.
+- NO TELL WORDS: never "All of the above", "None of the above", or "Both A and
+  B". No absolute qualifiers (always, never, every, all, none) — a test-wise
+  reader scores those as wrong on sight. No grammatical clue: every option must
+  fit the stem's grammar equally (a/an, singular/plural, tense).
+- ONE DEFENSIBLE KEY: exactly one option is unambiguously best and a subject
+  expert would agree without debate. If two options could both be defended,
+  tighten the stem until only one survives.
+- SCENARIO-DEPENDENT (grouped items): a question attached to a scenario must be
+  UNANSWERABLE without reading it — the answer must turn on that scenario's
+  specific details (its numbers, its constraint, what already happened). If the
+  question still works with the scenario deleted, rewrite it.
+- SELF-CONTAINED STEM: the stem (plus its scenario) poses one complete, clear
+  question. No trick phrasing, no double negatives, no window dressing.
+- NO CROSS-CLUEING: no item may reveal or imply the answer to another item in
+  this set, and no option may restate another item's key.
 {fairness}
 
 Return JSON (tag every question with its "dimension" — one of: domain, technical, reasoning, judgment):
@@ -713,8 +828,26 @@ FAIL a question when ANY of these clearly applies (name the reason):
      pick the correct method FOR A SPECIFIC CASE is GOOD — do NOT fail it just
      because answering requires knowing something. A crisp, self-contained
      technical question with no work-story is fine.)
-   - AMBIGUOUS or WRONG KEY: two options overlap, more than one is defensibly
-     best, or none clearly is.
+   - NON-FUNCTIONAL DISTRACTOR: before deciding, name to yourself the SPECIFIC
+     error each non-best option encodes — a real misconception, the right answer
+     for a different case, a classic wrong step. If you cannot name a genuine
+     error for some option (nobody would ever pick it, or it is filler), FAIL.
+   - HETEROGENEOUS OPTIONS: the four options do not match in length, grammatical
+     form, specificity, or structure — so FORM alone separates the key from the
+     rest (e.g. one full clause among three short noun phrases).
+   - TELL WORDS: contains "All of the above", "None of the above", "Both A and
+     B", an absolute qualifier (always / never / every / all / none) in an
+     option, or a grammatical clue where only one option fits the stem (a/an,
+     singular/plural, tense).
+   - MULTIPLE DEFENSIBLE KEYS: more than one option can be defended as best by a
+     subject expert, or no option clearly is.
+   - SCENARIO-INDEPENDENT: the question belongs to a SCENARIO but can be answered
+     correctly WITHOUT reading it — the scenario is decoration, not evidence.
+     (Applies only to questions shown under a scenario.)
+   - CROSS-CLUED: another question or option in this set gives away this one's
+     answer, or this item restates another item's key.
+   - AMBIGUOUS or WRONG KEY: two options overlap or are synonymous, or the key
+     does not hold.
    - NOT GROUNDED: not about this role's real work at all.
    - NEAR-DUPLICATE: it asks essentially the same thing as an EARLIER
      question in this set — fail the later one.
@@ -757,6 +890,14 @@ reworded definition. Same bar as before:
   chance. EVERY option must be defensible on the MERITS, with the wrong ones
   wrong because of a fact/method/computation, never because of tone. The
   right answer must NOT differ from the others in how conscientious it sounds.
+- EXAM ITEM-WRITING STANDARD (the rewrite must satisfy all of it): every
+  distractor encodes ONE specific, nameable error someone actually makes;
+  the four options are HOMOGENEOUS in length, grammar, specificity and
+  structure; NO "All/None of the above", no absolute qualifiers (always/never/
+  every), no grammatical clue; exactly ONE defensible key an expert agrees on
+  without debate; a scenario-attached question must be UNANSWERABLE without its
+  scenario; the stem is self-contained with no double negatives; and it must not
+  give away, or repeat, another item's answer.
 {fairness}
 
 Return JSON (same order as given; keep each question's "dimension"):

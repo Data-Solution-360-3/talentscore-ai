@@ -2715,6 +2715,24 @@ def _normalize_topics(raw) -> list[dict]:
                   if str(s).strip() in ("main", "f0", "f1", "f2", "f3", "f4")]
             if rf:
                 row["review_flags"] = rf
+            # Advisory MARKING STANDARD (qgen-2.4): {slot: {"strong","weak"}} —
+            # recruiter-facing review metadata, exactly like review_flags above.
+            # It is NEVER sent to a scorer, so interview scoring, grading and the
+            # fairness floor are untouched by its presence or absence.
+            rub = {}
+            _raw_rub = t.get("rubric")
+            if isinstance(_raw_rub, dict):
+                for slot, val in _raw_rub.items():
+                    if slot not in ("main", "f0", "f1", "f2", "f3", "f4"):
+                        continue
+                    if not isinstance(val, dict):
+                        continue
+                    s = str(val.get("strong", "")).strip()[:600]
+                    w = str(val.get("weak", "")).strip()[:600]
+                    if s or w:
+                        rub[slot] = {"strong": s, "weak": w}
+            if rub:
+                row["rubric"] = rub
             out.append(row)
     return out
 
@@ -5979,8 +5997,24 @@ async def set_job_viva_config(request: Request, job_id: str):
                 {"$set": {"interview_mode": _m}})
 
     if not body.get("enabled"):
-        await set_job_viva(job["_id"], None)
-        return {"success": True, "viva": None}
+        # Turning the interview OFF used to null the whole viva doc, which threw
+        # away the recruiter's CV threshold — the reason it read as stuck at the
+        # 48 default and "not editable". Keep the doc, flipped off, so the
+        # threshold (and any stored setup) survives and reloads. SAFE: every
+        # consumer tests viva.enabled first and returns early, so a
+        # disabled-but-populated doc changes no gate or launch behavior.
+        _prev = job.get("viva") or {}
+        try:
+            _th = max(0, min(100, int(body.get(
+                "threshold", _prev.get("threshold", VIVA_THRESHOLD_DEFAULT)))))
+        except Exception:
+            _th = VIVA_THRESHOLD_DEFAULT
+        _off = {"enabled": False, "threshold": _th, "updated_at": _dt.utcnow()}
+        for _k in ("daily_cap", "invite_window_days", "config"):
+            if _prev.get(_k) is not None:
+                _off[_k] = _prev[_k]
+        await set_job_viva(job["_id"], _off)
+        return {"success": True, "viva": serialize_mongo(_off)}
 
     # Plan gate: a screening-only org cannot even ENABLE the interview stage
     # on a job — backend-refused, so hidden UI is not the only protection.

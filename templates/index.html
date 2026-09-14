@@ -4461,10 +4461,10 @@ function renderJobConfigTabs(job){
         <div class="jm-st">CV score threshold</div>
         <div class="jm-grid">
           <div class="jm-f"><label>Minimum score to qualify <span class="jm-hint">· at or above goes straight to the interview</span></label>
-            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}" ${von?'':'disabled'}></div>
-          <div class="jm-f" style="justify-content:flex-end">${von
-            ? `<button class="jm-btn-save" style="width:100%" onclick="saveJobViva('${job._id}', true)">Save</button>`
-            : `<span class="jm-hint">Turn on the live interview (Viva tab) to use the threshold.</span>`}</div>
+            <input id="viva-th" type="number" min="0" max="100" value="${(v&&v.threshold!=null)?v.threshold:48}"></div>
+          <div class="jm-f" style="justify-content:flex-end">
+            <button class="jm-btn-save" style="width:100%" onclick="saveJobViva('${job._id}', ${von})">Save</button></div>
+          ${von?'':`<div class="jm-f full"><span class="jm-hint">Saved now and kept — it takes effect once you turn on the live interview (Viva tab).</span></div>`}
         </div>
       </div></div>`;
   }
@@ -4600,7 +4600,13 @@ function iqEditorRows(list){
 // ── topic clusters (the spoken part) — same draft/approve discipline ──
 function iqTopics(){ const st=window._iqState; return st.editing ? st.workT : (st.draft ? (st.draft.topics||null) : null); }
 // Editing a slot clears its AI review flag (the recruiter has addressed it).
-function _iqClearFlag(t,slot){ if(t&&t.review_flags){ const k=t.review_flags.indexOf(slot); if(k>=0){ t.review_flags.splice(k,1); iqRender(); } } }
+function _iqClearFlag(t,slot){
+  // The marking standard describes the ORIGINAL wording — once the recruiter
+  // rewrites the question it no longer applies, so drop that slot's rubric.
+  // Done silently: re-rendering on every keystroke would steal focus mid-typing.
+  if(t&&t.rubric&&t.rubric[slot]) delete t.rubric[slot];
+  if(t&&t.review_flags){ const k=t.review_flags.indexOf(slot); if(k>=0){ t.review_flags.splice(k,1); iqRender(); } }
+}
 function iqTSet(i,f,v){ const t=iqTopics(); if(t&&t[i]){ t[i][f]=v; if(f==='main') _iqClearFlag(t[i],'main'); } }
 function iqTF(i,j,v){ const t=iqTopics(); if(t&&t[i]){ t[i].followups[j]=v; _iqClearFlag(t[i],'f'+j); } }
 function iqTFDel(i,j){ const t=iqTopics(); if(t&&t[i]){ t[i].followups.splice(j,1); iqRender(); } }
@@ -4609,8 +4615,14 @@ function iqTDel(i){ const t=iqTopics(); if(t){ t.splice(i,1); iqRender(); } }
 function iqTAdd(){ const t=iqTopics(); if(t&&t.length<4){ t.push({topic:'',main:'',followups:['','','']}); iqRender(); } }
 function iqTopicsPayload(){
   const tps=iqTopics(); if(!tps) return null;
-  const clean=tps.map(t=>({topic:String(t.topic||'').trim(), main:String(t.main||'').trim(),
-                           followups:(t.followups||[]).map(f=>String(f).trim()).filter(Boolean)}))
+  const clean=tps.map(t=>{
+                     const row={topic:String(t.topic||'').trim(), main:String(t.main||'').trim(),
+                                followups:(t.followups||[]).map(f=>String(f).trim()).filter(Boolean)};
+                     // Carry the advisory marking standard through save/approve so
+                     // the approved set keeps it (server re-validates the shape).
+                     if(t.rubric && typeof t.rubric==='object' && Object.keys(t.rubric).length) row.rubric=t.rubric;
+                     return row;
+                   })
                  .filter(t=>t.main);
   if(!clean.length || clean.some(t=>!t.followups.length)) return {invalid:true};
   return clean;
@@ -4630,6 +4642,20 @@ function iqTopicEditor(tps){
   const _fl=(t,slot)=>((t.review_flags||[]).indexOf(slot)>=0);
   const _tag=`<span style="font-size:8.5px;font-weight:800;color:#B45309;background:rgba(217,119,6,.14);border-radius:6px;padding:1px 5px;margin-left:4px;white-space:nowrap" title="The AI review judged this question shallow and could not deepen it — rewrite it to force a concrete demonstration, or it will still work but be a weaker question.">⚠ review</span>`;
   const _fbord=on=>on?'border-color:#E9A23B;box-shadow:0 0 0 2px rgba(217,119,6,.12)':'border:1px solid var(--border)';
+  // Marking standard (advisory): the examiner-style strong-vs-weak guide for
+  // this question. Review metadata only — it never reaches the candidate and is
+  // never used to compute a score.
+  const _rub=(t,slot)=>{
+    const r=(t.rubric||{})[slot];
+    if(!r||(!r.strong&&!r.weak)) return '';
+    return `<details style="margin:-2px 0 7px 50px">
+      <summary style="cursor:pointer;font-size:10px;font-weight:800;color:var(--t3);letter-spacing:.03em">marking standard</summary>
+      <div style="font-size:11px;line-height:1.55;color:var(--t2);background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:7px 9px;margin-top:4px">
+        ${r.strong?`<div><b style="color:var(--green)">Strong answer:</b> ${escapeHtml(r.strong)}</div>`:''}
+        ${r.weak?`<div style="margin-top:4px"><b style="color:#B45309">Weak answer:</b> ${escapeHtml(r.weak)}</div>`:''}
+        <div style="margin-top:5px;font-size:10px;color:var(--t3)">Reviewer's guide only — never shown to the candidate, never used to score.</div>
+      </div></details>`;
+  };
   const banner = flaggedTotal ? `<div style="background:rgba(217,119,6,.09);border:1px solid rgba(217,119,6,.35);border-radius:var(--rs);padding:8px 11px;font-size:11.5px;color:#8A5A00;line-height:1.55;margin-bottom:9px"><strong>${flaggedTotal} question${flaggedTotal>1?'s':''} flagged by the AI review</strong> as too shallow to test real reasoning — marked <span style="font-weight:800;color:#B45309">⚠ review</span> below. Deepen or replace them (force a concrete "walk me through what you did / why / what broke"), then approve. They will still work if left as-is — just weaker.</div>` : '';
   const parts = tps.map((t,i)=>`
     <div style="border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px">
@@ -4644,13 +4670,15 @@ function iqTopicEditor(tps){
         <input value="${escapeHtml(t.main||'')}" maxlength="300" oninput="iqTSet(${i},'main',this.value)"
                style="flex:1;padding:7px 9px;${_fbord(_fl(t,'main'))};border-radius:var(--rs);font-family:inherit;font-size:12px">
       </div>
+      ${_rub(t,'main')}
       ${(t.followups||[]).map((f,j)=>`
       <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
         <span style="font-size:10px;font-weight:700;color:var(--t3);width:44px;text-align:right;flex-shrink:0">F${j+1}${_fl(t,'f'+j)?_tag:''}</span>
         <input value="${escapeHtml(f)}" maxlength="300" oninput="iqTF(${i},${j},this.value)"
                style="flex:1;padding:7px 9px;${_fbord(_fl(t,'f'+j))};border-radius:var(--rs);font-family:inherit;font-size:12px">
         <button onclick="iqTFDel(${i},${j})" style="border:none;background:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 5px">×</button>
-      </div>`).join('')}
+      </div>
+      ${_rub(t,'f'+j)}`).join('')}
       ${(t.followups||[]).length<5?`<button class="btn btn-xs" onclick="iqTFAdd(${i})" style="margin-left:50px">+ Follow-up</button>`:''}
     </div>`);
   if(hasScen && split < tps.length) parts.splice(split, 0, divider);
@@ -5510,7 +5538,10 @@ function vivaModeHint(){
   }
 }
 async function saveJobViva(jobId, enabled){
-  const th  = Math.max(0, Math.min(100, parseInt(document.getElementById('viva-th')?.value)||48));
+  // Finite check, NOT `||48`: a deliberate threshold of 0 (accept everyone) is
+  // falsy and used to be silently rewritten to the 48 default.
+  const _thRaw = parseInt(document.getElementById('viva-th')?.value, 10);
+  const th  = Number.isFinite(_thRaw) ? Math.max(0, Math.min(100, _thRaw)) : 48;
   const cap = Math.max(1, Math.min(200, parseInt(document.getElementById('viva-cap')?.value)||25));
   const win = Math.max(1, Math.min(30, parseInt(document.getElementById('viva-window')?.value)||5));
   const proc = ['off','S','M'].includes(document.getElementById('viva-proc')?.value)
@@ -5524,7 +5555,11 @@ async function saveJobViva(jobId, enabled){
                                     invite_window_days:win,
                                     ...(proc?{proctoring:proc}:{}),
                                     ...(mode?{interview_mode:mode}:{})}
-                                 : {enabled:false, ...(mode?{interview_mode:mode}:{})})
+                                 // Threshold rides the OFF save too, so editing it
+                                 // from the CV tab persists without turning the
+                                 // interview on (the server keeps it).
+                                 : {enabled:false, threshold:th,
+                                    ...(mode?{interview_mode:mode}:{})})
   });
   let d={}; try{ d=await res.json(); }catch(_){}
   if(!res.ok) throw new Error(d.detail || `Server returned ${res.status}`);
@@ -5537,7 +5572,8 @@ async function saveJobViva(jobId, enabled){
   }
   toast(enabled
     ? `Live interview ON — threshold ${d.viva.threshold}, cap ${d.viva.daily_cap}/day, proctoring ${(d.viva.config&&d.viva.config.proctoring)||'off'}`
-    : 'Live interview off — applications are CV-only again', {type:'success'});
+    : `CV threshold saved (${(d.viva&&d.viva.threshold!=null)?d.viva.threshold:th}) — live interview stays off, so applications are CV-only`,
+    {type:'success'});
   // The auto-prompt: enabling the gate on a job with no approved question set
   // means candidates get the manual/default setup — point at the card below.
   if(enabled && window._iqState && !window._iqState.approved){
