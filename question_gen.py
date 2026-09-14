@@ -723,21 +723,28 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     except Exception as e:
         return None, f"Review call failed: {str(e)[:200]}"
 
-    # ── 3) REFINE loop: up to 3 rounds, stops EARLY the moment `n` clean
-    #      questions exist (the fix for generation never early-exiting). Each
-    #      round revises only that round's failures and re-checks them.
-    #      Fail-soft: trouble in a round never loses questions that passed. ──
-    for _round in range(3):
+    # ── 3) REFINE loop: up to 4 rounds, stops EARLY the moment `n` clean
+    #      questions exist (extra rounds only run when yield is still short,
+    #      so they cost time only when needed). Batched + carry-forward so
+    #      rounds accumulate toward n. Fail-soft: trouble never loses passers. ──
+    for _round in range(4):
         if not failed or len(passed) >= n:
             break
-        items = [m for m, _ in failed]
-        rs = [r for _, r in failed]
+        # Refine at most REFINE_BATCH failures per round so the model's JSON
+        # output isn't truncated (which silently dropped questions and starved
+        # yield). Failures beyond the batch are CARRIED FORWARD, not lost, so
+        # rounds accumulate toward n instead of shrinking.
+        REFINE_BATCH = 12
+        batch = failed[:REFINE_BATCH]
+        carry = failed[REFINE_BATCH:]
+        items = [m for m, _ in batch]
+        rs = [r for _, r in batch]
         try:
             raw = await _gen_json(client,
                                   MCQ_REFINE_PROMPT.format(fairness=fairness),
                                   job_ctx + "\n\nQUESTIONS TO FIX:\n"
                                   + _fmt(items, with_keys=True, reasons=rs),
-                                  0.4, 4000, usage_out)
+                                  0.4, 6000, usage_out)
             refined = []
             got = [m for m in (raw.get("mcq") or []) if _mcq_shape_ok(m)]
             for i, m in enumerate(got[:len(items)]):
@@ -747,46 +754,35 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                 if items[i].get("scenario"):
                     m["scenario"] = items[i]["scenario"]
                 refined.append(m)
-            if not refined:
-                break
-            re_passed, failed = await _critic(refined)
-            passed.extend(re_passed)
+            # Any batch item the refiner didn't return is still a failure —
+            # carry it too, so nothing is silently dropped.
+            unreturned = [(m, r) for (m, r) in batch[len(refined):]]
+            if refined:
+                re_passed, re_failed = await _critic(refined)
+                passed.extend(re_passed)
+                failed = re_failed + unreturned + carry
+            else:
+                failed = unreturned + carry
+                if not carry:
+                    break
         except Exception as e:
             print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
             break
 
-    # ── 4) FINAL NAIVE-GUESSER FILTER (ONE call, zero job context): drop any
-    #      question a zero-knowledge guesser nails at HIGH confidence — the
-    #      screenshot-class "pick the obviously-professional option" failures.
-    #      Fail-OPEN: a guesser hiccup never blocks a whole set. Medium hits
-    #      are left to the expert critic's tone/virtue rules so yield stays
-    #      healthy (a guesser's default confidence is 'medium' and chance
-    #      alone aligns it with the key 1-in-4). ──
-    if passed:
-        try:
-            nraw = await _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
-                                   "QUESTIONS:\n" + _fmt(passed), 0.0, 1500, usage_out)
-            guesses = {}
-            for g in (nraw.get("guesses") or []):
-                try:
-                    guesses[int(g.get("i"))] = g
-                except Exception:
-                    continue
-            kept = []
-            for i, m in enumerate(passed):
-                g = guesses.get(i)
-                nailed = False
-                try:
-                    nailed = (g is not None
-                              and int(g.get("pick")) == int(m["correct"])
-                              and str(g.get("confidence", "")).lower() == "high")
-                except Exception:
-                    pass
-                if not nailed:
-                    kept.append(m)
-            passed = kept
-        except Exception as e:
-            print(f"[MCQ-GEN] final guesser filter skipped (fail-open): {str(e)[:120]}")
+    # ── Naive-guesser HARD GATE removed (Option B, 2026-09-14). Proof runs
+    #    showed an independent zero-knowledge guesser scores 25-100% on any
+    #    given set: for a well-formed workplace-judgment MCQ the professionally
+    #    correct answer usually IS the one a thoughtful person picks, so a
+    #    "guess-proof" gate is in permanent tension with "realistic + role-
+    #    relevant" and it tanked yield unpredictably (6-7 of 15, frequent
+    #    "try again"). The MCQ is the CHEAP FIRST FILTER, not the real
+    #    assessment (the live viva is) — so we rely on the strengthened EXPERT
+    #    critic above, which reliably rejects the actual garbage (strawman
+    #    options + uniquely-virtuous patterns) while keeping a full set, and
+    #    accept that some questions are guessable-by-competence. The recruiter
+    #    reviews and approves before anything goes live. MCQ_NAIVE_GUESS_PROMPT
+    #    is kept for the proof harness / possible future advisory use, not as
+    #    a gate.
 
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
     #    a scenario string are one group downstream), standalones follow. ──
