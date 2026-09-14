@@ -12,7 +12,7 @@ import json
 from openai import AsyncOpenAI
 
 GEN_MODEL = "gpt-4o"
-GEN_VERSION = "qgen-2.1"   # 2.1: per-job seniority calibration (2026-09-14)
+GEN_VERSION = "qgen-2.2"   # 2.2: adversarial naive-guesser MCQ critic (2026-09-14); 2.1: seniority calibration
 
 # ── Seniority calibration (2026-09-14): shifts GENERATION difficulty only —
 # grading, storage, fairness floors untouched. Injected into job_ctx (all
@@ -474,10 +474,18 @@ WHAT MAKES A QUESTION GOOD HERE
   a plausible-but-inferior approach, or a right-sounding answer for a subtly
   different situation. A distractor a layperson can eliminate on sight is a
   failure. No joke options, no obviously-absurd options, and no
-  universally-bad-behavior options ("ignore it", "do nothing", "assume it
-  will resolve itself") — every option must be a choice a
-  reasonable-but-imperfect professional might actually make, ESPECIALLY in
-  judgment and soft-skills questions.
+  universally-bad-behavior options ("ignore it", "do nothing", "never contact
+  them again", "assume it will resolve itself") — every option must be a
+  choice a reasonable-but-imperfect professional might actually make,
+  ESPECIALLY in judgment and soft-skills questions.
+- BEAT THE GUESSER: a smart layperson with zero role knowledge will try to
+  game your question by picking the most professional/thorough/kind-sounding
+  option, eliminating careless-sounding ones, or taking the middle ground.
+  Write options so that trick FAILS: every option should sound like something
+  a diligent professional could say — the wrong ones are wrong on the MERITS
+  (a real misconception, the right move for a subtly different situation),
+  never on tone. If only one option sounds conscientious, the question is
+  already broken.
 - No two options may overlap in meaning, and the correct one must not be the
   longest, most detailed, or most hedged option (length/format must not leak
   the answer).
@@ -490,56 +498,66 @@ Return JSON:
                 "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}, ...],
   "standalone": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
 
-MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job. You are NOT given the
-answer key. Some questions belong to a SCENARIO (shown above them) — judge
-those WITH their scenario. For EACH question, do two things IN ORDER:
+MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job, as a HARSH gatekeeper.
+You are NOT given the answer key. Some questions belong to a SCENARIO (shown
+above them) — judge those WITH their scenario. For EACH question do THREE
+things IN ORDER:
 
-1. SOLVE IT BLIND: pick the single best option yourself (best_index), and
-   honestly note HOW you got there.
-2. JUDGE IT against these criteria — fail it if ANY apply:
-   - OBVIOUS: you could pick the correct answer CONFIDENTLY without any real
-     role knowledge — from wording, option shape or length, general common
-     sense, or one option simply standing out. The test is your own step 1:
-     if solving it felt easy and did NOT require weighing the situation with
-     role knowledge, FAIL it as OBVIOUS. A good question makes even you
-     hesitate between two defensible-looking options before role judgment
-     settles it.
-   - WEAK DISTRACTOR: any option a layperson (no role knowledge) could
-     eliminate immediately. This INCLUDES universally-bad-behavior options —
-     "ignore it", "do nothing", "assume they'll figure it out", "skip the
-     check", "move on" — which nobody trying to pass would ever pick.
-     Judgment and soft-skills questions are the usual offenders: every
-     option must be a choice a reasonable-but-imperfect professional might
-     actually make. The test, option by option: would at least SOME real
-     candidates with partial knowledge pick it? If any option would attract
-     nobody, FAIL.
+1. NAIVE GUESS — role-play a smart LAYPERSON with ZERO knowledge of this
+   role who is trying to GAME the test. Using ONLY these guessing tells,
+   pick the option that layperson would choose (naive_index) and rate
+   naive_confidence as low|medium|high:
+   - SOCIAL DESIRABILITY: the option that merely SOUNDS most professional,
+     thorough, kind, balanced, or conscientious;
+   - STRAWMAN ELIMINATION: discard options that are obviously careless or
+     absurd ("ignore it", "never contact them again", "hope it resolves
+     itself", "make something up") and pick from what's left;
+   - SHAPE TELLS: the longest, most specific, most hedged, or
+     middle-ground option.
+   Be honest about how confident that guesser would feel — most weak
+   questions fall to exactly these tells.
+
+2. EXPERT SOLVE — now solve it properly with full role knowledge and pick
+   the single best option (best_index).
+
+3. JUDGE — fail the question if ANY of these apply:
+   - GUESSABLE: your step-1 naive guess matches your step-2 expert answer
+     with medium or high confidence. If a layperson gaming the test lands
+     on the right answer, the question measures test-taking, not the role.
+     This is the most important check — apply it ruthlessly.
+   - STRAWMAN OPTION: ANY option that NO competent professional — even on a
+     lazy, bad day — would actually choose: "do nothing", "never call them
+     again", "call them every day", "fabricate the data", joke options,
+     options from a different profession. EVERY distractor must be a genuine
+     misconception or a plausible-but-inferior approach that a
+     competent-but-mistaken person would really pick. ONE strawman = FAIL.
+   - UNIQUELY VIRTUOUS: exactly one option reads as the diligent/
+     professional choice while the others read careless, dismissive, or
+     extreme — the virtue itself leaks the answer.
    - NOT GROUNDED: not clearly about this specific role's real work as
      described in the job description.
    - TRIVIA / RECALL: answerable by memorized definition, terminology, or
-     tool/keyword/clause/function knowledge ALONE. Any stem of the form
-     "which term/clause/function/feature does X" FAILS — even when the
-     distractors are plausible. The test: could a knowledgeable-but-
-     thoughtless person ace it on recall, without weighing the situation?
-     If yes, FAIL.
+     tool-name knowledge ALONE ("which tool/term/clause does X") — even
+     with plausible distractors.
    - NO SCENARIO: the stem does not put the candidate in a realistic work
-     situation for THIS role (a decision to make, a trade-off to weigh, a
-     problem to diagnose, something to check or prioritize FIRST).
-     Calibration: "While analyzing a dataset you notice missing values in a
-     key column — what is the best FIRST step?" PASSES (a situation, tempting
-     shortcuts as distractors, judgment required). "Which SQL concept would
-     you use to retrieve data from two related tables?" FAILS (recall dressed
-     as a task).
-   - AMBIGUOUS: two options overlap, or more than one option is defensibly
-     correct, or none clearly is.
-   - DETACHED (scenario questions only): the question does not actually
-     depend on its scenario's details — it could be answered identically
-     with the scenario deleted.
+     situation for THIS role (a decision, a trade-off, a diagnosis, a
+     what-to-check-FIRST).
+   - AMBIGUOUS: two options overlap, more than one is defensibly correct,
+     or none clearly is.
+   - DETACHED (scenario questions only): the question could be answered
+     identically with its scenario deleted.
+   - NEAR-DUPLICATE: it asks essentially the same decision as ANOTHER
+     question in this set (interchangeable stems or options) — fail the
+     later one.
 {level_check}{lang_checks}
-Be strict: a question that merely "seems fine" but tests recall instead of
-applied judgment must FAIL. When you are unsure between pass and fail, FAIL.
+BIAS TOWARD FAILING: when unsure between pass and fail, FAIL. A dropped
+question costs nothing; a guessable one costs the client a bad hiring
+signal. A pass should feel rare and earned.
 
 Return JSON:
-{{"reviews": [{{"i": <index in the list>, "best_index": <0-3>, "pass": true|false,
+{{"reviews": [{{"i": <index in the list>, "naive_index": <0-3>,
+"naive_confidence": "low"|"medium"|"high", "best_index": <0-3>,
+"pass": true|false,
 "reasons": ["short, specific reasons — empty when pass"]}}, ...]}}"""
 
 MCQ_REFINE_PROMPT = """You are fixing screening MCQs that failed review, for a specific job.
@@ -555,8 +573,17 @@ situation, then what to do / conclude / check first — never a lightly
 reworded recall stem. Same bar as before:
 - 4 options, ONE defensibly best answer, distractors = genuine
   partial-knowledge misconceptions, nothing a layperson can eliminate,
-  no universally-bad-behavior options ("ignore it", "do nothing"),
-  no length/format leak, no recall-only stems, no ambiguity.
+  no universally-bad-behavior options ("ignore it", "do nothing",
+  "never contact them again"), no length/format leak, no recall-only
+  stems, no ambiguity.
+- BEAT THE GUESSER: a zero-knowledge test-gamer picks the most
+  professional-sounding option, eliminates careless-sounding ones, and takes
+  the middle ground. Your rewrite must defeat that: EVERY option must sound
+  like something a diligent professional could say, with the wrong ones
+  wrong on the MERITS (real misconception, right move for a subtly
+  different situation) — never on tone. A question failed as GUESSABLE or
+  UNIQUELY VIRTUOUS needs its DISTRACTORS rebuilt this way, not the stem
+  reworded.
 {fairness}
 
 Return JSON (same order as given):
@@ -680,7 +707,25 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                 key_match = False
             if not key_match:
                 reasons.append("blind solver chose a different option — key is wrong or the question is ambiguous")
-            if bool(v.get("pass")) and key_match:
+            # GUESSABLE enforced IN CODE too (belt and braces, 2026-09-14):
+            # even if the model marks pass, a naive guess that lands on the
+            # key at medium+ confidence fails — a layperson gaming the test
+            # must not score. This is the fix for the introspection trap
+            # (the old critic asked itself whether solving "felt easy" and
+            # systematically rationalized yes-it-needed-role-knowledge).
+            guessable = False
+            try:
+                guessable = (int(v.get("naive_index")) == int(m["correct"])
+                             and str(v.get("naive_confidence", "")).lower()
+                             in ("medium", "high"))
+            except Exception:
+                pass
+            if guessable:
+                reasons.append("GUESSABLE: a zero-knowledge guesser picks the "
+                               "correct answer confidently (social desirability"
+                               "/strawman elimination) — make every option "
+                               "genuinely defensible")
+            if bool(v.get("pass")) and key_match and not guessable:
                 passed.append(m)
             else:
                 failed.append((m, reasons or ["failed review"]))
@@ -691,11 +736,14 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     except Exception as e:
         return None, f"Review call failed: {str(e)[:200]}"
 
-    # ── 3) REFINE loop: up to 3 rounds, stop early at target. The round cap
+    # ── 3) REFINE loop: up to 4 rounds (3→4 with the stricter critic,
+    #      2026-09-14 — cost is per-job one-time and a dropped question is
+    #      cheaper than a guessable one), stop early at target. The round cap
     #      is the never-infinite rail; each round revises ONLY that round's
     #      failures and re-checks them. Fail-soft throughout: trouble in a
-    #      round never loses questions that already passed. ──
-    for _round in range(3):
+    #      round never loses questions that already passed. Still-failing
+    #      questions after the cap are DROPPED, never shipped. ──
+    for _round in range(4):
         if not failed or len(passed) >= n:
             break
         items = [m for m, _ in failed]
