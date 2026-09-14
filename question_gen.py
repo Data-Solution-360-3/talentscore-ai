@@ -7,6 +7,7 @@ model's format_hint is advice; deterministic adjustment makes the ratio exact,
 so two generations with the same hints always land on the same mix.
 """
 
+import asyncio
 import json
 
 from openai import AsyncOpenAI
@@ -498,50 +499,45 @@ Return JSON:
                 "mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}, ...],
   "standalone": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>}}, ...]}}"""
 
+# The GUESSER runs as its OWN call with NO job context (v3, 2026-09-14): an
+# in-critic "pretend you know nothing" pass proved contaminated — the model
+# had the JD in front of it and systematically under-reported how guessable
+# its questions were, while an independent zero-context call guessed the
+# same questions confidently. Honest ignorance can't be role-played; it has
+# to be structural.
+MCQ_NAIVE_GUESS_PROMPT = """You are a smart test-taker with ZERO knowledge of any profession. You will see
+multiple-choice questions (some with a scenario). You know NOTHING about the
+job they belong to. GAME each one: pick the option a clever layperson would
+choose using only test-taking tells — the most professional/thorough/kind-
+sounding option, eliminating careless or absurd options, length/specificity,
+the middle ground. Rate how confident that guess feels.
+
+Return JSON: {"guesses": [{"i": <index>, "pick": <0-3>,
+"confidence": "low"|"medium"|"high"}, ...]} — one entry per question."""
+
 MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job, as a HARSH gatekeeper.
 You are NOT given the answer key. Some questions belong to a SCENARIO (shown
-above them) — judge those WITH their scenario. For EACH question do THREE
-things IN ORDER:
-
-1. NAIVE GUESS — role-play a smart LAYPERSON with ZERO knowledge of this
-   role who is trying to GAME the test. Using ONLY these guessing tells,
-   pick the option that layperson would choose (naive_index) and rate
-   naive_confidence as low|medium|high:
-   - SOCIAL DESIRABILITY: the option that merely SOUNDS most professional,
-     thorough, kind, balanced, or conscientious;
-   - STRAWMAN ELIMINATION: discard options that are obviously careless or
-     absurd ("ignore it", "never contact them again", "hope it resolves
-     itself", "make something up") and pick from what's left;
-   - SHAPE TELLS: the longest, most specific, most hedged, or
-     middle-ground option.
-   Be honest about how confident that guesser would feel — most weak
-   questions fall to exactly these tells.
-
-2. EXPERT SOLVE — now solve it properly with full role knowledge and pick
-   the single best option (best_index).
-
-3. JUDGE — fail the question if ANY of these apply:
-   - GUESSABLE: your step-1 naive guess matches your step-2 expert answer
-     at HIGH confidence — the layperson gamed it; the question measures
-     test-taking, not the role. At MEDIUM confidence, fail ONLY when one of
-     the step-1 tells (social desirability, strawman elimination, shape,
-     middle-ground) clearly EXPLAINS the guess — a coincidental medium-
-     confidence guess alone is not a failure (chance alone matches 1 in 4).
-     This is the most important check.
+above them) — judge those WITH their scenario. For EACH question: first
+solve it properly with full role knowledge and pick the single best option
+(best_index); then FAIL it if ANY of these apply:
    - STRAWMAN OPTION: ANY option that NO competent professional — even on a
-     lazy, bad day — would actually choose: "do nothing", "never call them
-     again", "call them every day", "fabricate the data", joke options,
-     options from a different profession. EVERY distractor must be a genuine
-     misconception or a plausible-but-inferior approach that a
-     competent-but-mistaken person would really pick. ONE strawman = FAIL.
+     lazy, bad day — would actually choose: "do nothing", "ignore it",
+     "never call them again", "call them every day", "fabricate the data",
+     "assume it is correct", joke options, options from a different
+     profession. EVERY distractor must be a genuine misconception or a
+     plausible-but-inferior approach that a competent-but-mistaken person
+     would really pick. ONE strawman = FAIL.
    - UNIQUELY VIRTUOUS: exactly one option reads as the diligent/
      professional choice while the others read careless, dismissive, or
      extreme — the virtue itself leaks the answer.
+   - TRIVIA / RECALL: answerable by memorized definition, terminology, or
+     tool/function-name knowledge ALONE ("which feature/function/tool does
+     X") — even with plausible distractors, and ESPECIALLY when the correct
+     name describes itself (a year-to-date function called TOTALYTD). The
+     test: could someone ace it from a glossary, without weighing the
+     situation? If yes, FAIL.
    - NOT GROUNDED: not clearly about this specific role's real work as
      described in the job description.
-   - TRIVIA / RECALL: answerable by memorized definition, terminology, or
-     tool-name knowledge ALONE ("which tool/term/clause does X") — even
-     with plausible distractors.
    - NO SCENARIO: the stem does not put the candidate in a realistic work
      situation for THIS role (a decision, a trade-off, a diagnosis, a
      what-to-check-FIRST).
@@ -553,15 +549,13 @@ things IN ORDER:
      question in this set (interchangeable stems or options) — fail the
      later one.
 {level_check}{lang_checks}
-BIAS TOWARD FAILING: when genuinely unsure between pass and fail, FAIL —
-a dropped question costs nothing; a guessable one costs the client a bad
-hiring signal. But judge each criterion on its OWN test above: a question
-whose four options are all professionally defensible and whose answer
-needs real role judgment DESERVES its pass.
+Be strict on each criterion's OWN test — when genuinely unsure between pass
+and fail, FAIL: a dropped question costs nothing; a weak one costs the
+client a bad hiring signal. (A separate zero-knowledge guesser also has to
+be fooled before a question ships — your job is the expert-side bar.)
 
 Return JSON:
-{{"reviews": [{{"i": <index in the list>, "naive_index": <0-3>,
-"naive_confidence": "low"|"medium"|"high", "best_index": <0-3>,
+{{"reviews": [{{"i": <index in the list>, "best_index": <0-3>,
 "pass": true|false,
 "reasons": ["short, specific reasons — empty when pass"]}}, ...]}}"""
 
@@ -688,15 +682,30 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     if len(drafts) < 3:
         return None, "Drafting produced too few valid questions — try again."
 
-    # ── 2) CRITIC: blind-solve + judge (batched; the key is never sent) ──
+    # ── 2) CRITIC (expert judge, sees the JD) + NAIVE GUESSER (a SEPARATE
+    #      zero-context call that sees ONLY the questions — v3, 2026-09-14).
+    #      An in-critic "pretend you know nothing" pass proved contaminated:
+    #      with the JD in front of it the model under-reported guessability,
+    #      while this independent call guessed the same questions at high
+    #      confidence. The two run in parallel; the key never reaches either. ──
     async def _critic(items):
-        raw = await _gen_json(client, critic_prompt,
-                              job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
-                              0.0, 3000, usage_out)
+        raw, nraw = await asyncio.gather(
+            _gen_json(client, critic_prompt,
+                      job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
+                      0.0, 3000, usage_out),
+            _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
+                      "QUESTIONS:\n" + _fmt(items), 0.0, 1500, usage_out),
+        )
         verdicts = {}
         for r in (raw.get("reviews") or []):
             try:
                 verdicts[int(r.get("i"))] = r
+            except Exception:
+                continue
+        guesses = {}
+        for g in (nraw.get("guesses") or []):
+            try:
+                guesses[int(g.get("i"))] = g
             except Exception:
                 continue
         passed, failed = [], []
@@ -712,31 +721,25 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                 key_match = False
             if not key_match:
                 reasons.append("blind solver chose a different option — key is wrong or the question is ambiguous")
-            # GUESSABLE enforced IN CODE too (belt and braces, 2026-09-14):
-            # even if the model marks pass, a naive guess that lands on the
-            # key at medium+ confidence fails — a layperson gaming the test
-            # must not score. This is the fix for the introspection trap
-            # (the old critic asked itself whether solving "felt easy" and
-            # systematically rationalized yes-it-needed-role-knowledge).
-            # Code-kill at HIGH confidence only (calibrated 2026-09-14 after
-            # the proof run): the guesser always picks SOMETHING, chance
-            # aligns it with the key 25% of the time, and "medium" is its
-            # default confidence — a >=medium code-kill executed a ~20%
-            # random death per review round and compounded across rounds to
-            # a 1-in-10 yield. HIGH-confidence hits are the real screenshot-
-            # class failures; medium-confidence hits stay a prompt-level
-            # fail signal the model applies with the strawman/virtue checks.
+            # GUESSABLE — enforced in code from the INDEPENDENT guesser: a
+            # zero-knowledge hit at medium+ confidence fails the question
+            # (it measures test-taking, not the role) and the refiner is
+            # told to rebuild the distractors.
             guessable = False
+            g = guesses.get(i)
             try:
-                guessable = (int(v.get("naive_index")) == int(m["correct"])
-                             and str(v.get("naive_confidence", "")).lower() == "high")
+                guessable = (g is not None
+                             and int(g.get("pick")) == int(m["correct"])
+                             and str(g.get("confidence", "")).lower()
+                             in ("medium", "high"))
             except Exception:
                 pass
             if guessable:
-                reasons.append("GUESSABLE: a zero-knowledge guesser picks the "
-                               "correct answer confidently (social desirability"
-                               "/strawman elimination) — make every option "
-                               "genuinely defensible")
+                reasons.append("GUESSABLE: a zero-knowledge guesser picked the "
+                               "correct answer confidently — rebuild the "
+                               "DISTRACTORS so every option sounds "
+                               "professionally defensible and the wrong ones "
+                               "are wrong on the merits, not on tone")
             if bool(v.get("pass")) and key_match and not guessable:
                 passed.append(m)
             else:
