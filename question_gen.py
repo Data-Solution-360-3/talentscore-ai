@@ -515,44 +515,40 @@ the middle ground. Rate how confident that guess feels.
 Return JSON: {"guesses": [{"i": <index>, "pick": <0-3>,
 "confidence": "low"|"medium"|"high"}, ...]} — one entry per question."""
 
-MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job, as a HARSH gatekeeper.
-You are NOT given the answer key. Some questions belong to a SCENARIO (shown
-above them) — judge those WITH their scenario. For EACH question: first
-solve it properly with full role knowledge and pick the single best option
-(best_index); then FAIL it if ANY of these apply:
-   - STRAWMAN OPTION: ANY option that NO competent professional — even on a
-     lazy, bad day — would actually choose: "do nothing", "ignore it",
-     "never call them again", "call them every day", "fabricate the data",
-     "assume it is correct", joke options, options from a different
-     profession. EVERY distractor must be a genuine misconception or a
-     plausible-but-inferior approach that a competent-but-mistaken person
-     would really pick. ONE strawman = FAIL.
-   - UNIQUELY VIRTUOUS: exactly one option reads as the diligent/
-     professional choice while the others read careless, dismissive, or
-     extreme — the virtue itself leaks the answer.
-   - TRIVIA / RECALL: answerable by memorized definition, terminology, or
-     tool/function-name knowledge ALONE ("which feature/function/tool does
-     X") — even with plausible distractors, and ESPECIALLY when the correct
-     name describes itself (a year-to-date function called TOTALYTD). The
-     test: could someone ace it from a glossary, without weighing the
-     situation? If yes, FAIL.
-   - NOT GROUNDED: not clearly about this specific role's real work as
-     described in the job description.
-   - NO SCENARIO: the stem does not put the candidate in a realistic work
-     situation for THIS role (a decision, a trade-off, a diagnosis, a
-     what-to-check-FIRST).
-   - AMBIGUOUS: two options overlap, more than one is defensibly correct,
-     or none clearly is.
-   - DETACHED (scenario questions only): the question could be answered
-     identically with its scenario deleted.
-   - NEAR-DUPLICATE: it asks essentially the same decision as ANOTHER
-     question in this set (interchangeable stems or options) — fail the
-     later one.
+MCQ_CRITIC_PROMPT = """You are reviewing screening MCQs for a specific job. You are NOT given the
+answer key. Some questions belong to a SCENARIO (shown above them) — judge
+those WITH their scenario. For EACH question: first solve it properly with
+full role knowledge and pick the single best option (best_index); then decide
+pass/fail.
+
+FAIL a question when ANY of these clearly applies (name the reason):
+   - STRAWMAN OPTION: any option NO competent professional would EVER pick,
+     even on a lazy day — "do nothing", "ignore it", "never contact them
+     again", "call them every day", "fabricate the data", joke options, or
+     options from a different profession. A distractor must be a real
+     misconception or a plausible-but-inferior approach someone could
+     genuinely choose. This is the most important check — apply it to EVERY
+     option.
+   - UNIQUELY VIRTUOUS: exactly one option reads as the diligent/professional
+     choice while the others read careless, dismissive, or extreme — the
+     tone leaks the answer. Every option must sound like something a
+     competent person could say; the wrong ones are wrong on the MERITS.
+   - PURE RECALL: a bare definition/vocabulary ask with NO application
+     ("what does X mean", "which key defines Y") — no situation, no judgment.
+     (Choosing the right technique/tool FOR A SITUATION is fine and good —
+     do NOT fail a question just because a correct answer names a method.)
+   - AMBIGUOUS or WRONG KEY: two options overlap, more than one is defensibly
+     best, or none clearly is.
+   - NOT GROUNDED: not about this role's real work at all.
+   - NEAR-DUPLICATE: it asks essentially the same decision as an EARLIER
+     question in this set — fail the later one.
 {level_check}{lang_checks}
-Be strict on each criterion's OWN test — when genuinely unsure between pass
-and fail, FAIL: a dropped question costs nothing; a weak one costs the
-client a bad hiring signal. (A separate zero-knowledge guesser also has to
-be fooled before a question ships — your job is the expert-side bar.)
+Otherwise PASS. A good question has four options a competent person could
+each defend, and needs real role knowledge (not just common sense) to choose
+between them — such a question DESERVES a pass. Judge each criterion on its
+own test; do not fail a solid question out of general strictness. (A separate
+zero-knowledge guesser is also run over the survivors, so you do not have to
+catch every guessable question yourself — focus on the defects above.)
 
 Return JSON:
 {{"reviews": [{{"i": <index in the list>, "best_index": <0-3>,
