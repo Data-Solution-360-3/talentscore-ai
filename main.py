@@ -3301,11 +3301,15 @@ async def score_live_session(session_id: str):
                        if (t or {}).get("mode") not in ("typed", "scenario", "mcq")]
 
         # Voice-free (case_study) interviews have NO spoken turns: skip the
-        # spoken scorer entirely (2026-09-15) rather than calling it on an
-        # empty list and failing the whole session. The interview then scores
-        # written-only at the combination layer below — the per-answer scorers
-        # and the fairness floor are unchanged.
-        has_spoken = bool(spoken_only)
+        # spoken scorer entirely (2026-09-15) rather than calling it on a
+        # candidate-answerless list and failing (or worse, scoring the empty
+        # segment 0 and dragging a strong typed interview down to ~40%). The
+        # gate is a CANDIDATE spoken answer, not merely any mode-less turn — the
+        # typed page still emits mode-less AI question turns, which must not be
+        # mistaken for a spoken conversation. Both scorers and the fairness
+        # floor are unchanged; a real voice interview (role "you" spoken turns)
+        # scores exactly as before.
+        has_spoken = any((t or {}).get("role") == "you" for t in spoken_only)
         result, err = (None, None)
         if has_spoken:
             result, err = await score_spoken_interview(
