@@ -9,6 +9,7 @@ so two generations with the same hints always land on the same mix.
 
 import asyncio
 import json
+import re
 
 from openai import AsyncOpenAI
 
@@ -904,6 +905,19 @@ Return JSON (same order as given; keep each question's "dimension"):
 {{"mcq": [{{"question": "...", "options": ["...", "...", "...", "..."], "correct": <0-based index>, "dimension": "domain|technical|reasoning|judgment"}}, ...]}}"""
 
 
+# Dismissive "do-nothing" distractors — the classic non-functional option a
+# test-wise reader eliminates on sight ("Ignore it as a one-time event"), which
+# quietly turns a 4-option item into a 3-option one. Both the drafter rule and
+# the critic's STRAWMAN check are meant to stop these and mostly do, but a
+# measured run still carried one in roughly a third of items — so the structural
+# gate uses this as a deterministic backstop. Only the LEADING verb is matched,
+# so a legitimate key that merely contains "ignore" mid-sentence is untouched.
+_STRAWMAN_PROBE = re.compile(
+    r"^\s*(ignore\b|do nothing\b|leave (it|them|the .{0,30}) as\b|"
+    r"keep (it|them) as\b|assume it('s| is| will)\b|report it as is\b|"
+    r"never contact\b|fabricat\w*\b)", re.I)
+
+
 def _mcq_shape_ok(m) -> bool:
     try:
         return (isinstance(m, dict) and str(m.get("question", "")).strip()
@@ -1106,14 +1120,28 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     #      "guesser" can validate knowledge questions — it knows the field and
     #      flags everything (proved: naive-guesser AND tell-detector both marked
     #      ~15/15, including a clean 4-equal-length JOIN question). So the
-    #      automated gate checks only STRUCTURE, which needs no knowledge: a
-    #      LENGTH/DETAIL LEAK — the single most common mechanical tell, where the
-    #      correct option is a clear length OUTLIER, so a no-knowledge reader
-    #      picks "the most detailed one" and is right. Four roughly-equal-length
-    #      options have no such leak and pass, so yield holds. Deterministic, no
-    #      API call. The expert critic (which CAN judge social-desirability per
-    #      question) plus the recruiter's review handle the tells length can't
-    #      see. Fail-soft: never drop below the usable floor. ──
+    #      automated gate checks only STRUCTURE, which needs no knowledge — the
+    #      two mechanical tells a no-knowledge reader actually follows:
+    #        (a) LENGTH/DETAIL LEAK: the key is a clear length outlier, so
+    #            "pick the most detailed one" wins;
+    #        (b) STRAWMAN DISTRACTOR: a wrong option is a dismissive do-nothing
+    #            ("Ignore it as a one-time event"), eliminated on sight — which
+    #            turns a 4-option item into a 3-option one.
+    #      Items with four roughly-equal-length, all-plausible options trip
+    #      neither and pass, so yield holds. Deterministic, no API call. The
+    #      expert critic (which CAN judge social-desirability per question) plus
+    #      the recruiter's review handle what structure cannot see. Fail-soft:
+    #      never drop below the usable floor. ──
+    def _strawman_distractor(m):
+        """True when a WRONG option is a dismissive do-nothing strawman. The key
+        itself is exempt — 'ignore NULLs in this average' can be correct."""
+        try:
+            ci = int(m["correct"])
+        except Exception:
+            return False
+        return any(_STRAWMAN_PROBE.match(str(o))
+                   for j, o in enumerate(m.get("options") or []) if j != ci)
+
     def _length_leak(m):
         opts = [str(o) for o in (m.get("options") or [])]
         if len(opts) != 4:
@@ -1130,10 +1158,14 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
         return lengths[ci] == max(lengths) and lengths[ci] >= max(med * 1.6, med + 25)
 
     if passed:
-        kept = [m for m in passed if not _length_leak(m)]
+        n_len = sum(1 for m in passed if _length_leak(m))
+        n_straw = sum(1 for m in passed if not _length_leak(m) and _strawman_distractor(m))
+        kept = [m for m in passed
+                if not _length_leak(m) and not _strawman_distractor(m)]
         dropped = len(passed) - len(kept)
         if dropped and (len(kept) >= min(n, 5) or len(kept) >= 3):
-            print(f"[MCQ-GEN] structural length-leak gate dropped {dropped} question(s)")
+            print(f"[MCQ-GEN] structural gate dropped {dropped} question(s) "
+                  f"(length-leak {n_len}, strawman distractor {n_straw})")
             passed = kept
 
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
