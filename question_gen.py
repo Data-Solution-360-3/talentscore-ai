@@ -653,17 +653,21 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             lines.append(block)
         return "\n\n".join(lines)
 
-    # ── 1) DRAFT target+8, mixed structure, flattened with scenario refs ──
-    n_scen = 3 if n >= 12 else 2
+    # ── 1) DRAFT ~2x target, mixed structure, flattened with scenario refs.
+    #      Heavy over-generation (2026-09-14): the strict critic drops ~half,
+    #      so drafting ~2x keeps the final set near the requested count. It's
+    #      one call — cost scales with tokens, not a round-trip. ──
+    n_scen = 4 if n >= 12 else 2
+    draft_target = min(40, n * 2)
     try:
         raw = await _gen_json(client,
-                              MCQ_DRAFT_PROMPT.format(n=n + 8, n_scen=n_scen,
+                              MCQ_DRAFT_PROMPT.format(n=draft_target, n_scen=n_scen,
                                                       fairness=fairness),
-                              job_ctx, 0.5, 6000, usage_out)
+                              job_ctx, 0.5, 9000, usage_out)
     except Exception as e:
         return None, f"Generation call failed: {str(e)[:200]}"
     drafts = []
-    for g in (raw.get("scenarios") or [])[:n_scen + 1]:
+    for g in (raw.get("scenarios") or [])[:n_scen + 2]:
         scen = str((g or {}).get("scenario") or "").strip()[:1200]
         if not scen:
             continue
@@ -674,7 +678,7 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     for m in (raw.get("standalone") or []):
         if _mcq_shape_ok(m):
             drafts.append(m)
-    drafts = drafts[:n + 12]   # over-generate: the strict bar + guesser drop some
+    drafts = drafts[:draft_target]   # over-generate: the strict bar drops some
     if len(drafts) < 3:
         return None, "Drafting produced too few valid questions — try again."
 
