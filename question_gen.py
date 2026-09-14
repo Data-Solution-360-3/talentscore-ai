@@ -678,34 +678,25 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     for m in (raw.get("standalone") or []):
         if _mcq_shape_ok(m):
             drafts.append(m)
-    drafts = drafts[:n + 8]
+    drafts = drafts[:n + 12]   # over-generate: the strict bar + guesser drop some
     if len(drafts) < 3:
         return None, "Drafting produced too few valid questions — try again."
 
-    # ── 2) CRITIC (expert judge, sees the JD) + NAIVE GUESSER (a SEPARATE
-    #      zero-context call that sees ONLY the questions — v3, 2026-09-14).
-    #      An in-critic "pretend you know nothing" pass proved contaminated:
-    #      with the JD in front of it the model under-reported guessability,
-    #      while this independent call guessed the same questions at high
-    #      confidence. The two run in parallel; the key never reaches either. ──
+    # ── 2) CRITIC — the EXPERT judge only, ONE call per round (sees the JD;
+    #      the key is never sent). The independent naive-guesser used to run
+    #      in PARALLEL here every round — 2 calls x 5 rounds = generation
+    #      routinely exceeded the request timeout (502). It now runs ONCE at
+    #      the end as a final filter (below), which is far cheaper and enough:
+    #      the expert critic's strawman / uniquely-virtuous / trivia rules
+    #      already catch most guessable questions each round. ──
     async def _critic(items):
-        raw, nraw = await asyncio.gather(
-            _gen_json(client, critic_prompt,
-                      job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
-                      0.0, 3000, usage_out),
-            _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
-                      "QUESTIONS:\n" + _fmt(items), 0.0, 1500, usage_out),
-        )
+        raw = await _gen_json(client, critic_prompt,
+                              job_ctx + "\n\nQUESTIONS TO REVIEW:\n" + _fmt(items),
+                              0.0, 3000, usage_out)
         verdicts = {}
         for r in (raw.get("reviews") or []):
             try:
                 verdicts[int(r.get("i"))] = r
-            except Exception:
-                continue
-        guesses = {}
-        for g in (nraw.get("guesses") or []):
-            try:
-                guesses[int(g.get("i"))] = g
             except Exception:
                 continue
         passed, failed = [], []
@@ -721,26 +712,7 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
                 key_match = False
             if not key_match:
                 reasons.append("blind solver chose a different option — key is wrong or the question is ambiguous")
-            # GUESSABLE — enforced in code from the INDEPENDENT guesser: a
-            # zero-knowledge hit at medium+ confidence fails the question
-            # (it measures test-taking, not the role) and the refiner is
-            # told to rebuild the distractors.
-            guessable = False
-            g = guesses.get(i)
-            try:
-                guessable = (g is not None
-                             and int(g.get("pick")) == int(m["correct"])
-                             and str(g.get("confidence", "")).lower()
-                             in ("medium", "high"))
-            except Exception:
-                pass
-            if guessable:
-                reasons.append("GUESSABLE: a zero-knowledge guesser picked the "
-                               "correct answer confidently — rebuild the "
-                               "DISTRACTORS so every option sounds "
-                               "professionally defensible and the wrong ones "
-                               "are wrong on the merits, not on tone")
-            if bool(v.get("pass")) and key_match and not guessable:
+            if bool(v.get("pass")) and key_match:
                 passed.append(m)
             else:
                 failed.append((m, reasons or ["failed review"]))
@@ -751,14 +723,11 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
     except Exception as e:
         return None, f"Review call failed: {str(e)[:200]}"
 
-    # ── 3) REFINE loop: up to 4 rounds (3→4 with the stricter critic,
-    #      2026-09-14 — cost is per-job one-time and a dropped question is
-    #      cheaper than a guessable one), stop early at target. The round cap
-    #      is the never-infinite rail; each round revises ONLY that round's
-    #      failures and re-checks them. Fail-soft throughout: trouble in a
-    #      round never loses questions that already passed. Still-failing
-    #      questions after the cap are DROPPED, never shipped. ──
-    for _round in range(4):
+    # ── 3) REFINE loop: up to 3 rounds, stops EARLY the moment `n` clean
+    #      questions exist (the fix for generation never early-exiting). Each
+    #      round revises only that round's failures and re-checks them.
+    #      Fail-soft: trouble in a round never loses questions that passed. ──
+    for _round in range(3):
         if not failed or len(passed) >= n:
             break
         items = [m for m, _ in failed]
@@ -786,6 +755,39 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
             print(f"[MCQ-GEN] refine round {_round + 1} failed (continuing with passers): {str(e)[:120]}")
             break
 
+    # ── 4) FINAL NAIVE-GUESSER FILTER (ONE call, zero job context): drop any
+    #      question a zero-knowledge guesser nails at HIGH confidence — the
+    #      screenshot-class "pick the obviously-professional option" failures.
+    #      Fail-OPEN: a guesser hiccup never blocks a whole set. Medium hits
+    #      are left to the expert critic's tone/virtue rules so yield stays
+    #      healthy (a guesser's default confidence is 'medium' and chance
+    #      alone aligns it with the key 1-in-4). ──
+    if passed:
+        try:
+            nraw = await _gen_json(client, MCQ_NAIVE_GUESS_PROMPT,
+                                   "QUESTIONS:\n" + _fmt(passed), 0.0, 1500, usage_out)
+            guesses = {}
+            for g in (nraw.get("guesses") or []):
+                try:
+                    guesses[int(g.get("i"))] = g
+                except Exception:
+                    continue
+            kept = []
+            for i, m in enumerate(passed):
+                g = guesses.get(i)
+                nailed = False
+                try:
+                    nailed = (g is not None
+                              and int(g.get("pick")) == int(m["correct"])
+                              and str(g.get("confidence", "")).lower() == "high")
+                except Exception:
+                    pass
+                if not nailed:
+                    kept.append(m)
+            passed = kept
+        except Exception as e:
+            print(f"[MCQ-GEN] final guesser filter skipped (fail-open): {str(e)[:120]}")
+
     # ── Assemble: scenario groups stay CONTIGUOUS (consecutive items sharing
     #    a scenario string are one group downstream), standalones follow. ──
     groups: dict = {}
@@ -801,6 +803,11 @@ async def generate_screening_mcqs(jd_text: str, api_key: str, n: int = 12,
         if len(final) >= n:
             break
         final.extend(groups[key][:max(0, n - len(final))])
+    # If the strict bar left too few to be a usable set, say so plainly —
+    # a clear "try again" beats shipping a 2-question draft.
+    if len(final) < 3:
+        return None, ("The quality bar rejected too many questions this time — "
+                      "please try Generate again (each run drafts fresh questions).")
     return final, None
 
 

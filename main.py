@@ -4686,12 +4686,22 @@ async def mcq_filter_save(request: Request, job_id: str):
             n = 15
         from question_gen import generate_screening_mcqs, GEN_MODEL
         _gu: list = []
-        raw, err = await generate_screening_mcqs(
-            job.get("description") or "", OPENAI_API_KEY, n=n,
-            job_title=job.get("title") or "",
-            language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
-            seniority=job.get("seniority_level") or "mid",
-            usage_out=_gu)
+        # Hard server-side ceiling BELOW the nginx/gunicorn 300s timeout, so a
+        # slow multi-agent run returns a clean JSON error the UI can show
+        # instead of being guillotined into a 502 (the "spins forever" bug).
+        try:
+            raw, err = await asyncio.wait_for(
+                generate_screening_mcqs(
+                    job.get("description") or "", OPENAI_API_KEY, n=n,
+                    job_title=job.get("title") or "",
+                    language=("bn" if (job.get("interview_language") or "en").lower() == "bn" else "en"),
+                    seniority=job.get("seniority_level") or "mid",
+                    usage_out=_gu),
+                timeout=240)
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail=(
+                "Generation took too long and was stopped — please try again. "
+                "(The AI review is thorough; a retry usually succeeds.)"))
         if err or not raw:
             raise HTTPException(status_code=502, detail=err or "Generation failed.")
         qs = _normalize_mcq_set(raw)
