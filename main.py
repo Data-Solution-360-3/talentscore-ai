@@ -718,8 +718,10 @@ async def batch_page(request: Request):
 async def privacy_page():
     """Public privacy policy (Batch 5). Every claim on this page maps to a
     mechanism that actually runs — TTL indexes, the retention purge timer, or
-    delete_candidate. If a mechanism changes, this page changes with it."""
-    return HTMLResponse(read_template("privacy.html"))
+    delete_candidate. If a mechanism changes, this page changes with it.
+    The version shown is PRIVACY_VERSION itself — the same stamp stored on each
+    consent — so the page can never show a different version than was recorded."""
+    return HTMLResponse(read_template("privacy.html").replace("{{PRIVACY_VERSION}}", PRIVACY_VERSION))
 
 
 @app.get("/candidate", response_class=HTMLResponse)
@@ -4557,7 +4559,7 @@ async def score_application(application_id: str):
 # Consent version stamped on every application (Batch 5). Bump when the
 # consent wording or the privacy policy changes MATERIALLY, so each stored
 # consent names the text the candidate actually saw.
-PRIVACY_VERSION = "2026-09-10.v1"
+PRIVACY_VERSION = "2026-09-15.v2"   # v2: one-line consent; policy adds the assessment test + corrects "no automatic decision"
 
 
 @app.post("/api/apply/{token}")

@@ -138,7 +138,19 @@ input,select,textarea{max-width:100%}
 .done-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:2.75rem 1.5rem;text-align:center}
 /* Instruction/notice sub-card — one neutral family (the flow's own greys,
    never slate/navy), so it reads premium under any client's brand colors. */
-.mi-box{background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:1.15rem 1.25rem;margin:1.1rem 0;font-size:.9rem;color:var(--t2);line-height:1.85}
+/* Assessment instruction page: two short sections of aligned icon rows. */
+.mi-sec{margin-top:1.25rem}
+.mi-h{font-size:.95rem;font-weight:700;color:var(--ink);margin:0 0 .6rem}
+.mi-list{list-style:none;margin:0;padding:0;display:grid;gap:.65rem}
+.mi-list li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:.7rem;align-items:start;font-size:.92rem;color:var(--text);line-height:1.55}
+.mi-list li>span:last-child{min-width:0}
+.mi-ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;margin-top:1px}
+.mi-ic svg{width:12px;height:12px}
+.mi-ic.g{background:rgba(22,163,74,.12);color:var(--green)}
+.mi-ic.o{background:var(--og);color:var(--orange2)}
+.mi-note{margin:1.25rem 0 0;padding:.75rem .9rem;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-lg);font-size:.83rem;color:var(--t2);line-height:1.55}
+#mcq-intro .btn{margin-top:1.35rem}
+body.bn-assess .mi-list li,body.bn-assess .mi-note{line-height:1.8}
 .mcq-nav{display:flex;gap:.75rem;margin-top:1.15rem}
 .mcq-nav .btn{margin-top:0}
 .done-ico{width:60px;height:60px;border-radius:50%;background:rgba(22,163,74,.10);display:grid;place-items:center;margin:0 auto 1.25rem}
@@ -243,11 +255,9 @@ input,select,textarea{max-width:100%}
         <div class="fw" style="background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:.95rem 1.05rem">
           <label style="display:flex;gap:.65rem;align-items:flex-start;cursor:pointer;font-size:.82rem;color:var(--t2);line-height:1.6">
             <input type="checkbox" id="consent" style="margin-top:3px;flex:none;width:15px;height:15px">
-            <span>I agree that my CV and application details will be analysed to assess my fit for this role,
-            and — if I'm invited to an AI interview — that a text transcript is kept for 12 months and
-            up to 12 periodic still camera/screen snapshots are kept for 30 days, with tab, paste, and
-            camera signals flagged for <strong>human</strong> review (no continuous video is stored, and no
-            automatic decision is made). Details and deletion requests:
+            <!-- The full disclosure lives in the privacy policy. If this wording
+                 changes materially, bump PRIVACY_VERSION in main.py. -->
+            <span>I agree to TopCandidate using my CV and application to assess me for this role, as set out in the
             <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>. <span style="color:#E16A1F">*</span></span>
           </label>
         </div>
@@ -255,7 +265,6 @@ input,select,textarea{max-width:100%}
         <button class="btn" type="submit" id="btn">Submit application</button>
       </form>
 
-      <p class="retention">Your CV is analysed to score your fit for this role. The file is deleted after {{RETENTION_DAYS}} days; the extracted profile is kept for 12 months.</p>
     </div>
   </div>
 
@@ -269,52 +278,54 @@ input,select,textarea{max-width:100%}
            never machine-translated. Every stated rule is filled from THIS
            job's real settings, so the page can't drift from behavior. -->
       <div id="mcq-intro">
+        <!-- Every line that depends on the job (count, time, paste, camera) is
+             filled from THIS job's settings in startMcq(), so the page can't
+             claim a rule the test doesn't apply. -->
         <div id="mi-en" style="display:none">
-          <div class="fc-title">One more step — a short assessment</div>
-          <div class="fc-sub">Your application is saved. Completing this test finishes it.</div>
-          <div class="mi-box">
-            <b>How it works</b><br>
-            • You'll see <b>one question at a time</b> — read it and pick one of the four options.<br>
-            • <b><span class="mi-count">—</span> multiple-choice questions</b> in total.<br>
-            • You <b>can go back</b> to any previous question and change your answer, any time before submitting.<br>
-            • <span class="mi-time">No time limit — take the time you need.</span><br>
-            • <span class="mi-paste"></span><br>
-            <span class="mi-proc" style="display:none">• <span class="mi-proc-t"></span><br></span>
-            • Switching browser tabs or windows will <b>not end your test</b> — but when you leave and how long you're away is recorded.<br>
-            • <b>To submit:</b> on the last question press <b>Submit answers</b> — you'll see a confirmation screen, and you're done.<br>
-            • <b>After you submit:</b> a person on the {{COMPANY}} hiring team reviews your test together with your CV. Strong results may be invited to an interview.
-            <span style="display:block;margin-top:.7rem;color:var(--t2);font-size:.83rem">
-            <b>Monitoring notice:</b> while the test is open we record tab/window switches, copy-paste
-            attempts, long inactivity, page reloads, and the time you spend on each question. These are
-            <b>review signals read by a human</b> — nothing automatically disqualifies you, and speed alone
-            means nothing. No camera is used in this assessment.
-            Details: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>.</span>
+          <div class="fc-title">Your assessment test</div>
+          <div class="fc-sub">Your application is saved. Finish this test to complete it.</div>
+          <div class="mi-sec">
+            <div class="mi-h">Before you start</div>
+            <ul class="mi-list">
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span><b><span class="mi-count">—</span> questions</b>, one at a time. Pick one of four options.</span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="mi-time"></span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>You can go back and change an answer before you submit.</span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>Answer every question, then press <b>Submit answers</b> on the last one.</span></li>
+            </ul>
           </div>
-          <button class="btn" onclick="mcqBegin()">Start the assessment</button>
+          <div class="mi-sec">
+            <div class="mi-h">Rules</div>
+            <ul class="mi-list">
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span>Stay on this tab. Leaving doesn't end the test, but it is recorded.</span></li>
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span class="mi-paste"></span></li>
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span class="mi-cam"></span></li>
+            </ul>
+          </div>
+          <p class="mi-note">We record tab switches, copying and pasting, idle time, reloads and time per question. A person reviews these. None of them fails you automatically.</p>
+          <button class="btn" onclick="mcqBegin()">Start the test</button>
         </div>
         <div id="mi-bn" style="display:none">
-          <div class="fc-title">আর একটা step — ছোট একটা assessment</div>
-          <div class="fc-sub">আপনার application save হয়ে গেছে। এই test টা complete করলেই application সম্পূর্ণ।</div>
-          <div class="mi-box" style="line-height:1.95">
-            <b>যেভাবে কাজ করে</b><br>
-            • একবারে <b>একটা করে question</b> দেখবেন — পড়ে চারটা option থেকে একটা বেছে নিন।<br>
-            • মোট <b><span class="mi-count">—</span> টা multiple-choice question</b>।<br>
-            • Submit করার আগ পর্যন্ত <b>আগের যেকোনো question এ ফিরে গিয়ে</b> answer change করতে পারবেন।<br>
-            • <span class="mi-time">কোনো time limit নেই — আপনার প্রয়োজনমতো সময় নিন।</span><br>
-            • <span class="mi-paste"></span><br>
-            <span class="mi-proc" style="display:none">• <span class="mi-proc-t"></span><br></span>
-            • অন্য tab বা window তে গেলে test <b>বন্ধ হয়ে যাবে না</b> — তবে কখন গেলেন আর কতক্ষণ বাইরে ছিলেন, সেটা record হয়।<br>
-            • <b>Submit করবেন যেভাবে:</b> শেষ question এ গিয়ে <b>Submit answers</b> button চাপুন — confirmation screen দেখলেই আপনার কাজ শেষ।<br>
-            • <b>Submit এর পরে:</b> {{COMPANY}} এর hiring team এর একজন মানুষ আপনার test আর CV একসাথে review করবেন। ভালো করলে interview এর invitation পেতে পারেন।
-            <span style="display:block;margin-top:.7rem;color:var(--t2);font-size:.85rem">
-            <b>Monitoring notice:</b> test চলার সময় tab/window switch, copy-paste attempt, লম্বা inactivity,
-            page reload আর প্রতিটা question এ আপনি কত সময় নিলেন — এগুলো record হয়। এগুলো শুধুই
-            <b>review signal, যেটা একজন মানুষ দেখে বিবেচনা করবেন</b> — কোনো কিছুই আপনাকে automatically
-            disqualify করবে না, আর তাড়াতাড়ি বা ধীরে answer করা নিজে থেকে কিছুই প্রমাণ করে না।
-            এই assessment এ কোনো camera ব্যবহার হয় না।
-            বিস্তারিত: <a href="/privacy" target="_blank" rel="noopener" style="color:#E16A1F;font-weight:600">privacy policy</a>।</span>
+          <div class="fc-title">আপনার assessment test</div>
+          <div class="fc-sub">আপনার application save হয়েছে। Test টা শেষ করলে application complete হবে।</div>
+          <div class="mi-sec">
+            <div class="mi-h">শুরুর আগে</div>
+            <ul class="mi-list">
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>মোট <b><span class="mi-count">—</span>টা question</b>, একবারে একটা। চারটা option থেকে একটা বেছে নিন।</span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="mi-time"></span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>Submit করার আগে আগের question এ ফিরে গিয়ে answer বদলাতে পারবেন।</span></li>
+              <li><span class="mi-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span>সব question এর answer দিন, তারপর শেষ question এ <b>Submit answers</b> চাপুন।</span></li>
+            </ul>
           </div>
-          <button class="btn" onclick="mcqBegin()">Assessment শুরু করুন</button>
+          <div class="mi-sec">
+            <div class="mi-h">নিয়ম</div>
+            <ul class="mi-list">
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span>এই tab এই থাকুন। অন্য tab এ গেলে test বন্ধ হবে না, তবে record হবে।</span></li>
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span class="mi-paste"></span></li>
+              <li><span class="mi-ic o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span><span class="mi-cam"></span></li>
+            </ul>
+          </div>
+          <p class="mi-note">Tab switch, copy-paste, idle সময়, reload আর প্রতিটা question এর সময় record হয়। একজন মানুষ এগুলো দেখেন — এগুলোর কারণে automatically fail হবেন না।</p>
+          <button class="btn" onclick="mcqBegin()">Test শুরু করুন</button>
         </div>
       </div>
       <!-- One-question pager — brand-styled; the clock ALWAYS ticks
@@ -565,23 +576,26 @@ async function startMcq(appId){
     document.getElementById('mi-en').style.display = bn ? 'none' : 'block';
     document.getElementById('mi-bn').style.display = bn ? 'block' : 'none';
     block.querySelectorAll('.mi-count').forEach(el => el.textContent = qs.length);
-    // OVERALL budget = questions x seconds-per-question, spent freely.
+    // OVERALL budget = questions x seconds-per-question, spent freely. Shown
+    // exactly — never rounded, which would overstate the time available.
     const bm = Math.floor(_mcq.budget/60), bs = _mcq.budget%60;
-    const bstr = bm + (bs ? ':'+String(bs).padStart(2,'0') : '') + ' min';
+    const tstr = bn
+      ? (bm && bs ? bm+' মিনিট '+bs+' সেকেন্ড' : bm ? bm+' মিনিট' : bs+' সেকেন্ড')
+      : (bm && bs ? bm+' min '+bs+' sec' : bm ? bm+(bm===1?' minute':' minutes') : bs+' seconds');
     block.querySelectorAll('.mi-time').forEach(el => el.innerHTML =
-      bn ? 'Time limit: <b>'+bstr+' total</b> ('+qs.length+' questions × '+_mcq.spq+'s) — পুরো সময়টা আপনার ইচ্ছামতো ভাগ করে নিন, কোনো প্রশ্নে বেশি, কোনোটায় কম। সময় শেষ হলে তখন পর্যন্ত দেওয়া answers <b>automatically submit</b> হয়ে যাবে।'
-         : 'Time limit: <b>'+bstr+' total</b> ('+qs.length+' questions × '+_mcq.spq+'s) — spend it however you like across questions. When it runs out, your answers so far are <b>submitted automatically</b>.');
-    if(_mcq.level === 'full'){
-      block.querySelectorAll('.mi-proc').forEach(el => el.style.display = '');
-      block.querySelectorAll('.mi-proc-t').forEach(el => el.innerHTML =
-        bn ? 'এই test এ <b>camera এবং full screen share</b> চাওয়া হবে — সর্বোচ্চ 12 টা still snapshot নেওয়া হয় (30 দিন রাখা হয়; কোনো continuous video না)। Camera/screen দিতে না পারলেও test চলবে — hiring team শুধু একটা flag দেখবে।'
-         : 'This test asks for your <b>camera and full screen share</b> — up to 12 still snapshots are taken (kept 30 days; never continuous video). If you can\'t share them, the test still continues — the hiring team just sees a flag.');
-    }
-    block.querySelectorAll('.mi-paste').forEach(el => el.innerHTML = _mcq.mode==='monitor'
-      ? (bn ? 'Copy-paste <b>allowed</b> — তবে প্রতিবার ব্যবহার করলে সেটা hiring team এর জন্য record হবে।'
-            : 'Copy and paste are <b>allowed</b>, but every use is recorded for the hiring team.')
-      : (bn ? 'Copy-paste এই test এ <b>disabled</b> — চেষ্টা করলে সেটাও record হয়।'
-            : 'Copy and paste are <b>disabled</b> during the test (attempts are recorded).'));
+      bn ? 'মোট সময় <b>'+tstr+'।</b> সময় শেষ হলে answers automatically submit হয়ে যাবে।'
+         : '<b>'+tstr+' in total.</b> When time runs out, your answers are submitted automatically.');
+    // Paste rule. In 'restrict' mode ONLY paste is blocked — copy and cut still
+    // work and are recorded (assessment_monitor.js), so never say copy is off.
+    block.querySelectorAll('.mi-paste').forEach(el => el.textContent = _mcq.mode==='monitor'
+      ? (bn ? 'Copy-paste করা যাবে, তবে record হবে।' : 'Copy and paste are allowed, but recorded.')
+      : (bn ? 'Paste করা যাবে না, আর copy করলে record হবে।' : 'Pasting is turned off, and copying is recorded.'));
+    // Camera rule. Only a job set to FULL proctoring requests camera + screen;
+    // refusing raises a flag but never blocks, hence "asked to share".
+    block.querySelectorAll('.mi-cam').forEach(el => el.textContent = _mcq.level === 'full'
+      ? (bn ? 'Camera আর screen share করতে বলা হবে; কয়েকটা still ছবি save হবে।'
+            : "You'll be asked to share your camera and screen. A few still images are saved.")
+      : (bn ? 'Camera লাগবে না।' : 'No camera needed.'));
     showView('mcq-view');
     document.getElementById('mcq-intro').style.display = _mcq.started ? 'none' : 'block';
     document.getElementById('mcq-quiz').style.display = _mcq.started ? 'block' : 'none';
