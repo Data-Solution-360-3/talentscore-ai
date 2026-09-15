@@ -623,6 +623,34 @@ def analyze_tenure(cv_profile: dict) -> dict:
 # HARD-REQUIREMENT GAP DETECTION
 # ─────────────────────────────────────────────────────────────
 
+# Behavioral requirements ("strong communication", "positive attitude") can't be
+# verified by string-matching a CV's skill list — the candidate-side buckets used
+# below don't even include soft skills — so every one was a guaranteed miss that
+# fed the skills hard-gap penalty. A role whose requirements are mostly behavioral
+# (telesales, counseling, customer service) scored 0/N for every applicant. These
+# are left to the LLM dimensions, which judge them from the candidate's actual
+# roles. A requirement naming a tool or technical knowledge is never treated as
+# behavioral, even if it also mentions a soft word ("communication protocols").
+_BEHAVIORAL_REQ = re.compile(
+    r"communicat|interpersonal|listening|convinc|persuas|negotiat|attitude|willing|"
+    r"eager|motivat|team ?player|teamwork|collaborat|empath|patience|punctual|honest|"
+    r"integrity|work ethic|adaptab|time management|multitask|under pressure|"
+    r"\btargets?\b|target[- ]driven|proactive|people skills|customer[- ]oriented|"
+    # JD text often uses the typographic apostrophe (learner’s), not ASCII '.
+    r"leadership|(?:learner|customer|client|student)(?:[’']s|s[’']|s)?\s+needs", re.I)
+_TECHNICAL_REQ = re.compile(
+    r"\b(?:sql|excel|ms office|microsoft office|office 365|google workspace|workspace|"
+    r"python|java|javascript|c\+\+|api|protocols?|database|crm|erp|sap|salesforce|"
+    r"hubspot|zoho|tally|quickbooks|tableau|power ?bi|aws|azure|gcp|linux|git|"
+    r"photoshop|autocad|figma|jira|slack|zoom|seo|google ads|typing|software|systems?)\b",
+    re.I)
+
+
+def is_behavioral_requirement(req) -> bool:
+    s = str(req or "")
+    return bool(_BEHAVIORAL_REQ.search(s)) and not _TECHNICAL_REQ.search(s)
+
+
 def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
     """Return a list of unmet hard requirements with penalty points.
 
@@ -656,8 +684,10 @@ def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
             "penalty": 10,
         })
 
-    # 2. Required-skills coverage cliff
-    req_skills_norm = normalize_skill_list(jd.get("required_skills", []))
+    # 2. Required-skills coverage cliff — verifiable (tool / knowledge)
+    #    requirements only; behavioral ones are judged by the LLM dimensions.
+    req_skills_norm = normalize_skill_list(
+        [r for r in (jd.get("required_skills", []) or []) if not is_behavioral_requirement(r)])
     req_tech_norm = normalize_skill_list(jd.get("required_technologies", []))
     cv_skills = []
     sk = cv_profile.get("skills", {}) or {}
@@ -683,6 +713,7 @@ def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
                 "kind": "skills",
                 "penalty": 15,
                 "missing": missing[:6],
+                "matched": len(matched), "total": len(all_required),
             })
         elif coverage < 0.5 and len(all_required) >= 4:
             gaps.append({
@@ -690,6 +721,7 @@ def detect_hard_gaps(cv_profile: dict, jd: dict) -> list:
                 "kind": "skills",
                 "penalty": 8,
                 "missing": missing[:6],
+                "matched": len(matched), "total": len(all_required),
             })
 
     return gaps
@@ -957,7 +989,7 @@ Respond ONLY with this JSON:
     {{"name": "Role Alignment",            "score": <0-20>, "weight": {w["Role Alignment"]:.2f}, "feedback": "<cite title progression>", "matched_skills": [], "missing_skills": []}},
     {{"name": "Stability & Tenure",        "score": <0-20>, "weight": {w["Stability & Tenure"]:.2f}, "feedback": "<reference the tenure signals>", "matched_skills": [], "missing_skills": []}}
   ],
-  "key_strengths": ["<specific strength with evidence>", "<strength 2>", "<strength 3>"],
+  "key_strengths": ["<specific strength with evidence from the CV — give at least one; a TRANSFERABLE strength counts (e.g. training and mentoring people -> guiding learners). Leave empty only if the CV has no usable content>", "<strength 2>", "<strength 3>"],
   "critical_gaps": ["<specific gap referencing JD requirement>", "<gap 2>", "<gap 3>"],
   "interview_questions": [
     "<targeted question probing a specific gap or verifying a claim>",
@@ -1087,6 +1119,27 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
         _guarded.append(g)
     hard_gaps = _guarded
 
+    # DON'T PENALIZE THE SAME SKILLS GAP TWICE. Missing required skills already
+    # pull the Skills Match dimension down (that loss flows into the overall via
+    # its weight). The hard-gap penalty exists to correct a GENEROUS dimension —
+    # a model crediting skills the CV doesn't show. So it only applies when
+    # Skills Match sits ABOVE what the literal coverage supports (rubric:
+    # 20 = all matched, scaling down). When the dimension already priced the gap
+    # in, subtracting 8-15 more double-counted it and could clamp a candidate
+    # straight to 0. The gap stays listed in critical_gaps either way.
+    _skills_dim = float(blended_dim_scores.get("Skills Match", 0) or 0)
+    _deduped = []
+    for g in hard_gaps:
+        if (g.get("kind") == "skills" and not g.get("suppressed")
+                and int(g.get("penalty", 0)) > 0 and g.get("total")):
+            implied = 20.0 * float(g.get("matched", 0)) / float(g["total"])
+            if _skills_dim <= implied + 2:
+                g = {**g, "penalty": 0, "priced_in": True,
+                     "note": (f"not subtracted again — Skills Match is already "
+                              f"{_skills_dim:g}/20 for {g.get('matched', 0)}/{g['total']} matched")}
+        _deduped.append(g)
+    hard_gaps = _deduped
+
     # Apply hard-gap penalties. Cap at 35 — per user spec: "lower significantly,
     # don't auto-reject". 35 is enough to flip HIRE → REJECT but won't nuke a
     # genuinely promising adjacent candidate.
@@ -1172,6 +1225,26 @@ def reconcile_scores(strict: dict, upside: dict, hard_gaps: list, tenure: dict,
         if msg not in risks:
             risks = [msg] + [r for r in risks if r != "None identified"]
     result["hiring_risks"] = risks
+
+    # STRENGTHS FROM BOTH PASSES. `result = dict(strict)` above meant the report
+    # carried ONLY the strict gatekeeper's strengths; the upside pass — told to
+    # recognize transferable skills — had its strengths thrown away, so a capable
+    # candidate applying outside their field could read "None identified".
+    # Interleaved (strict, upside, strict, ...) so neither perspective is cut by
+    # the cap, de-duplicated on normalized text.
+    def _skey(x):
+        return re.sub(r"[^a-z0-9]+", " ", str(x).lower()).strip()
+    _a = [s for s in (strict.get("key_strengths") or []) if str(s).strip()]
+    _b = [s for s in (upside.get("key_strengths") or []) if str(s).strip()]
+    _merged, _seen = [], set()
+    for i in range(max(len(_a), len(_b))):
+        for src in (_a, _b):
+            if i < len(src):
+                k = _skey(src[i])
+                if k and k not in _seen and k not in ("none identified", "none", "n a"):
+                    _seen.add(k)
+                    _merged.append(str(src[i]).strip())
+    result["key_strengths"] = _merged[:5]
 
     # Diagnostic metadata
     result["score_consistency"] = {
