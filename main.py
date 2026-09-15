@@ -4998,12 +4998,6 @@ async def apply_mcq_submit(request: Request, token: str, application_id: str):
     job = await get_job_by_public_token(token)
     if not job:
         raise HTTPException(status_code=404, detail="Not available.")
-    mf = job.get("mcq_filter") or {}
-    qs = (mf.get("approved") or {}).get("questions") or []
-    if not (mf.get("enabled") and qs):
-        raise HTTPException(status_code=404, detail="Not available.")
-    if not await rate_limit_allows(f"mcqsub:{application_id}", 5, 3600):
-        raise HTTPException(status_code=429, detail="Too many attempts.")
     try:
         aid = _OID(application_id)
     except Exception:
@@ -5012,8 +5006,18 @@ async def apply_mcq_submit(request: Request, token: str, application_id: str):
     if not app_doc or app_doc.get("funnel") != "mcq":
         raise HTTPException(status_code=404, detail="Not available.")
     if app_doc.get("mcq_score") is not None:
-        # One shot: a re-post cannot re-roll the grade.
+        # One shot: a re-post cannot re-roll the grade. Checked BEFORE the rate
+        # limit and the filter-enabled check on purpose: the test page retries
+        # when a reply is lost, so a submission that was already saved must
+        # always confirm — never 429 after a few retries, and never 404 because
+        # the recruiter switched the filter off afterwards. No grading, no write.
         return {"success": True, "state": "received"}
+    mf = job.get("mcq_filter") or {}
+    qs = (mf.get("approved") or {}).get("questions") or []
+    if not (mf.get("enabled") and qs):
+        raise HTTPException(status_code=404, detail="Not available.")
+    if not await rate_limit_allows(f"mcqsub:{application_id}", 5, 3600):
+        raise HTTPException(status_code=429, detail="Too many attempts.")
     try:
         body = await request.json()
         choices = body.get("choices")

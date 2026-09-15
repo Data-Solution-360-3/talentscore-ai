@@ -41,6 +41,15 @@
 .mcq-opt span.tx{min-width:0}
 .btn-mcqprev{background:#F1F4EE !important;color:var(--brand-deep,#173404) !important;box-shadow:none !important}
 .btn-mcqsubmit{background:linear-gradient(135deg,var(--brand-accent,#EF9F27),#F57C2E) !important}
+/* Once the test ends (time ran out, or the candidate submitted) the questions
+   and controls are REMOVED, not just disabled — there is nothing left to click
+   while the answers are being sent, however slow the network is. */
+#mcq-quiz.locked #mcq-qbox,#mcq-quiz.locked .mcq-nav,#mcq-quiz.locked #mcq-unanswered,#mcq-quiz.locked #mcq-err{display:none !important}
+.mcq-timeup{display:none;background:#fff;border:1.5px solid #E4E8E0;border-radius:16px;padding:1.4rem 1.3rem;text-align:center;box-shadow:0 3px 14px rgba(23,52,4,.06)}
+#mcq-quiz.locked .mcq-timeup{display:block}
+.mcq-timeup h3{margin:0 0 .45rem;font-size:1.12rem;font-weight:800;color:var(--brand-deep,#173404)}
+.mcq-timeup p{margin:.25rem 0 0;color:#4B5563;font-size:.92rem;line-height:1.6}
+.mcq-timeup .btn{margin-top:.9rem}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --ink:var(--brand-primary,#173404);--indigo:#E16A1F;--orange:#F57C2E;--orange2:#E16A1F;
@@ -318,6 +327,11 @@ input,select,textarea{max-width:100%}
         </div>
         <div class="mcq-progbar"><i id="mcq-bar" style="width:0%"></i></div>
         <div class="err" id="mcq-err"></div>
+        <div class="mcq-timeup" id="mcq-timeup" role="status" aria-live="polite">
+          <h3 id="mcq-tu-title">Time's up</h3>
+          <p id="mcq-tu-msg">Submitting the answers you gave…</p>
+          <button class="btn" id="mcq-tu-retry" type="button" style="display:none" onclick="mcqRetryNow()">Try again now</button>
+        </div>
         <div id="mcq-qbox"></div>
         <div class="mcq-nav">
           <button class="btn btn-mcqprev" id="mcq-prev" onclick="mcqNav(-1)">← Previous</button>
@@ -504,7 +518,10 @@ function escq(s){const d=document.createElement('div');d.textContent=s==null?'':
 function _mcqKey(){ return 'tc-mcq-'+_mcq.appId; }
 function _mcqSave(){
   try{ sessionStorage.setItem(_mcqKey(), JSON.stringify({
-    answers:_mcq.answers, timings:_mcq.timings, started:_mcq.started, cur:_mcq.cur})); }catch(_){}
+    answers:_mcq.answers, timings:_mcq.timings, started:_mcq.started, cur:_mcq.cur,
+    // The frozen copy taken when the test ended. Present = the test is OVER
+    // and still being sent, so a reload keeps sending instead of reopening it.
+    frozen:_mcq.frozen||null})); }catch(_){}
 }
 async function startMcq(appId){
   try{
@@ -519,12 +536,15 @@ async function startMcq(appId){
             level: d.proctor_level === 'full' ? 'full' : 'light',
             cur:0, answers:qs.map(()=>-1),
             timings:qs.map(()=>({first_opened_at:null,total_ms:0,returns:0,answer_changes:0,visited:false})),
-            started:0, activeSince:0, deadline:0, clock:null};
+            started:0, activeSince:0, deadline:0, clock:null,
+            frozen:null, expired:false, submitting:false, done:false, tries:0, retryTimer:null};
     try{ const saved=JSON.parse(sessionStorage.getItem(_mcqKey())||'null');
       if(saved && Array.isArray(saved.answers) && saved.answers.length===qs.length){
         _mcq.answers=saved.answers; _mcq.cur=Math.min(saved.cur||0, qs.length-1);
         if(Array.isArray(saved.timings) && saved.timings.length===qs.length) _mcq.timings=saved.timings;
         _mcq.started=saved.started||0;
+        if(saved.frozen && Array.isArray(saved.frozen.choices)
+           && saved.frozen.choices.length===qs.length) _mcq.frozen=saved.frozen;
       } }catch(_){}
     // Disclosure text reflects the ACTUAL settings — no silent rules. Two
     // hand-written templates; the job's language picks one, and the dynamic
@@ -575,28 +595,164 @@ function mcqBegin(){
   _mcqResume();
 }
 async function _mcqResume(){
+  // One overall countdown for the whole test: budget = questions x seconds
+  // per question, spent freely. Auto-submit at zero is the only automatic
+  // action, disclosed on the instruction page.
+  _mcq.deadline = _mcq.started + _mcq.budget*1000;
+  // Reloaded after the test already ended on this page (time ran out, or they
+  // submitted) but before the server confirmed: never reopen the questions or
+  // the camera — show the locked state and keep sending the frozen copy.
+  if(_mcq.frozen){ _mcqLock(!!_mcq.frozen.timed_out); _mcqSend(); return; }
   AssessMonitor.start({pasteMode:_mcq.mode, storageKey:_mcqKey()});
+  // Reloaded after time ran out: end it now, before asking for the camera.
+  if(Date.now() >= _mcq.deadline){ _mcqExpire(); return; }
   // FULL proctoring level: camera + screen requested BEFORE question 1
   // (disclosed on the instruction page). Denial only flags — never blocks.
   if(_mcq.level === 'full' && window.AssessMonitor.startMedia){
     try{ await AssessMonitor.startMedia('/api/apply/'+TOKEN+'/assessment-snapshot/'+encodeURIComponent(_mcq.appId)); }catch(_){}
   }
-  // One overall countdown for the whole test: budget = questions x seconds
-  // per question, spent freely. Auto-submit at zero is the only automatic
-  // action, disclosed on the instruction page.
-  _mcq.deadline = _mcq.started + _mcq.budget*1000;
   _mcq.clock = setInterval(_mcqTick, 1000); _mcqTick();
+  if(_mcq.frozen) return;          // the camera prompt outlasted the clock
   _mcqShow(_mcq.cur);
   _mcqSave();
 }
 function _mcqmmss(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function _mcqTick(){
+  if(!_mcq || _mcq.frozen) return;
   const el = document.getElementById('mcq-clock');
   const left = Math.max(0, Math.round((_mcq.deadline-Date.now())/1000));
   el.textContent = '⏱ '+_mcqmmss(left)+' left';
   el.classList.toggle('warn', left<=60);
-  if(left<=0){ clearInterval(_mcq.clock); submitMcqTest(true); }
+  if(left<=0) _mcqExpire();
 }
+
+// ── ENDING THE TEST: freeze → lock → send, with retry ──────────────────────
+// The test ends the INSTANT time is up (or the candidate submits), whatever the
+// network is doing. What gets sent is a frozen copy taken at that moment and
+// kept in sessionStorage, so every retry — and a reload — sends exactly the
+// answers given before the end. Previously the auto-submit disabled only the
+// Submit button, left every option clickable, stopped the clock at 0:00, and on
+// "Failed to fetch" simply gave up: no retry, test still open.
+const _MCQ_BACKOFF = [2, 5, 10, 20, 30];   // seconds between retries, then every 60s
+const _MCQ_SEND_TIMEOUT_MS = 20000;        // a hung mobile connection must not stall forever
+function _mcqTimeUp(){
+  return !!(_mcq && (_mcq.expired || (_mcq.deadline > 0 && Date.now() >= _mcq.deadline)));
+}
+function _mcqFreeze(timedOut){
+  if(_mcq.frozen) return _mcq.frozen;
+  _mcqCloseTiming();
+  _mcq.frozen = {
+    choices: _mcq.answers.slice(),
+    timed_out: !!timedOut,
+    started_at_epoch: Math.round(_mcq.started/1000),
+    timings: _mcq.timings.map(t=>({first_opened_at:t.first_opened_at||0, total_ms:Math.round(t.total_ms),
+                                   returns:t.returns, answer_changes:t.answer_changes})),
+    // Taken ONCE: summary() also stops camera/screen capture, and its
+    // total_seconds keeps growing — calling it per retry would record network
+    // waiting time as assessment time.
+    activity: (window.AssessMonitor ? AssessMonitor.summary() : {enabled:false}),
+  };
+  return _mcq.frozen;
+}
+function _mcqLock(timedOut){
+  if(_mcq.clock){ clearInterval(_mcq.clock); _mcq.clock = null; }
+  if(timedOut) _mcq.expired = true;
+  _mcqFreeze(timedOut);
+  document.querySelectorAll('#mcq-qbox button, .mcq-nav button').forEach(b=>{ b.disabled = true; });
+  document.getElementById('mcq-quiz').classList.add('locked');
+  if(_mcq.expired){
+    const el = document.getElementById('mcq-clock');
+    if(el){ el.textContent = '⏱ 0:00'; el.classList.add('warn'); }
+  }
+  _mcqSave();
+}
+function _mcqExpire(){
+  if(!_mcq || _mcq.done) return;
+  if(!_mcq.frozen) _mcqLock(true);
+  _mcqSend();
+}
+function _mcqStatus(state, arg){
+  const t = document.getElementById('mcq-tu-title'),
+        m = document.getElementById('mcq-tu-msg'),
+        b = document.getElementById('mcq-tu-retry');
+  if(!t || !m || !b) return;
+  const bn = document.body.classList.contains('bn-assess');
+  const ex = !!(_mcq && _mcq.expired);
+  t.textContent = ex ? (bn ? 'সময় শেষ' : "Time's up")
+                     : (bn ? 'Answers submit হচ্ছে' : 'Submitting your answers');
+  b.style.display = 'none';
+  if(state === 'sending'){
+    m.textContent = ex ? (bn ? 'আপনার দেওয়া answers submit করা হচ্ছে…' : 'Submitting the answers you gave…')
+                       : (bn ? 'একটু অপেক্ষা করুন…' : 'One moment…');
+  }else if(state === 'retry'){
+    m.textContent = bn
+      ? 'Server এ পৌঁছানো যায়নি। আপনার answers এই page এ রাখা আছে এবং automatically পাঠানো হবে — ' + arg + ' সেকেন্ড পর আবার চেষ্টা। Page টা খোলা রাখুন।'
+      : "We couldn't reach the server. Your answers are kept on this page and will be sent automatically — retrying in " + arg + 's. Please keep this page open.';
+    b.style.display = 'inline-block';
+  }else if(state === 'failed'){
+    m.textContent = bn
+      ? 'Test টা submit করা যায়নি (' + arg + ')। অনুগ্রহ করে hiring team এর সাথে যোগাযোগ করুন।'
+      : 'This test could not be submitted (' + arg + '). Please contact the hiring team.';
+  }
+}
+async function _mcqSend(){
+  if(!_mcq || _mcq.done || _mcq.submitting || !_mcq.frozen) return;
+  _mcq.submitting = true;
+  if(_mcq.retryTimer){ clearInterval(_mcq.retryTimer); _mcq.retryTimer = null; }
+  _mcqStatus('sending');
+  let outcome = 'retry', detail = '';
+  const ctrl = new AbortController();
+  const to = setTimeout(()=>ctrl.abort(), _MCQ_SEND_TIMEOUT_MS);
+  try{
+    const r = await fetch('/api/apply/'+TOKEN+'/mcq/'+encodeURIComponent(_mcq.appId), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(_mcq.frozen), signal: ctrl.signal});
+    const d = await r.json().catch(()=>({}));
+    if(r.ok) outcome = 'done';
+    // Transient: server error, timeout, or rate-limited. A test the server
+    // already saved answers "received" BEFORE its rate limit, so a retry of a
+    // lost reply always succeeds rather than tripping the limit.
+    else if(r.status >= 500 || r.status === 408 || r.status === 429) outcome = 'retry';
+    else { outcome = 'failed'; detail = d.detail || ('error ' + r.status); }
+  }catch(_){
+    outcome = 'retry';                 // "Failed to fetch" / aborted: no reply at all
+  }finally{
+    clearTimeout(to);
+  }
+  _mcq.submitting = false;
+  if(outcome === 'done'){
+    _mcq.done = true;
+    try{ sessionStorage.removeItem(_mcqKey()); }catch(_){}
+    showDone();
+    return;
+  }
+  if(outcome === 'failed'){ _mcqStatus('failed', detail); return; }
+  _mcq.tries++;
+  _mcqScheduleRetry(_MCQ_BACKOFF[_mcq.tries - 1] || 60);
+}
+function _mcqScheduleRetry(secs){
+  let left = secs;
+  _mcqStatus('retry', left);
+  if(_mcq.retryTimer) clearInterval(_mcq.retryTimer);
+  _mcq.retryTimer = setInterval(()=>{
+    left--;
+    if(left <= 0){ clearInterval(_mcq.retryTimer); _mcq.retryTimer = null; _mcqSend(); }
+    else _mcqStatus('retry', left);
+  }, 1000);
+}
+function mcqRetryNow(){ if(_mcq && !_mcq.done) _mcqSend(); }
+// Background tabs throttle timers, so check the clock the moment the page is
+// usable again — and a click must never beat that check (see mcqPick/mcqNav).
+function _mcqWake(){
+  if(!_mcq || _mcq.done || _mcq.frozen || !_mcq.clock) return;
+  _mcqTick();
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _mcqWake(); });
+window.addEventListener('focus', _mcqWake);
+window.addEventListener('pageshow', _mcqWake);
+window.addEventListener('online', ()=>{
+  if(_mcq && _mcq.frozen && !_mcq.done && !_mcq.submitting) _mcqSend();
+});
 function _mcqCloseTiming(){
   if(_mcq.activeSince){
     _mcq.timings[_mcq.cur].total_ms += Date.now()-_mcq.activeSince;
@@ -644,6 +800,10 @@ function _mcqShow(i){
   _mcqSave();
 }
 function mcqPick(oi){
+  // Enforced HERE, not only by the ticking clock: a background tab throttles
+  // timers, so a click can land before the next tick notices time is up.
+  if(!_mcq || _mcq.frozen) return;
+  if(_mcqTimeUp()){ _mcqExpire(); return; }
   if(_mcq.answers[_mcq.cur]>=0 && _mcq.answers[_mcq.cur]!==oi) _mcq.timings[_mcq.cur].answer_changes++;
   _mcq.answers[_mcq.cur]=oi;
   _mcqSave();
@@ -657,39 +817,27 @@ function mcqPick(oi){
     if(un) unEl.textContent = un+' question(s) still unanswered — use Previous to go back before submitting.';
   }
 }
-function mcqNav(d){ _mcqShow(Math.max(0, Math.min(_mcq.qs.length-1, _mcq.cur+d))); }
+function mcqNav(d){
+  if(!_mcq || _mcq.frozen) return;
+  if(_mcqTimeUp()){ _mcqExpire(); return; }
+  _mcqShow(Math.max(0, Math.min(_mcq.qs.length-1, _mcq.cur+d)));
+}
 async function submitMcqTest(timedOut){
+  if(!_mcq || _mcq.done || _mcq.frozen) return;
+  // Time is up: end the test with what they have. The "every question must be
+  // answered" rule applies only to an on-time submit — it used to run after a
+  // failed auto-submit too, sending the candidate back to answer MORE questions
+  // after time ran out, and recording the test as not timed out.
+  if(timedOut || _mcqTimeUp()){ _mcqExpire(); return; }
   const err=document.getElementById('mcq-err');
   err.style.display='none';
-  _mcqCloseTiming();
-  if(!timedOut){
-    const firstUn=_mcq.answers.findIndex(a=>a<0);
-    if(firstUn>=0){ err.textContent='Please answer question '+(firstUn+1)+' — use Previous to go back.';
-      err.style.display='block'; err.classList.add('on'); _mcqShow(firstUn); return; }
-  }
-  if(_mcq.clock) clearInterval(_mcq.clock);
-  const btn=document.getElementById('mcq-btn');
-  btn.disabled=true; btn.textContent='Submitting…';
-  const payload={
-    choices:_mcq.answers,
-    timed_out:!!timedOut,
-    started_at_epoch: Math.round(_mcq.started/1000),
-    timings:_mcq.timings.map(t=>({first_opened_at:t.first_opened_at||0,total_ms:Math.round(t.total_ms),
-                                  returns:t.returns,answer_changes:t.answer_changes})),
-    activity: (window.AssessMonitor?AssessMonitor.summary():{enabled:false}),
-  };
-  try{
-    const r=await fetch('/api/apply/'+TOKEN+'/mcq/'+encodeURIComponent(_mcq.appId),{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(d.detail||'Could not submit — please try again.');
-    try{ sessionStorage.removeItem(_mcqKey()); }catch(_){}
-    showDone();
-  }catch(e){
-    err.textContent=e.message; err.style.display='block'; err.classList.add('on');
-    btn.disabled=false; btn.textContent='Submit answers';
-  }
+  const firstUn=_mcq.answers.findIndex(a=>a<0);
+  if(firstUn>=0){ err.textContent='Please answer question '+(firstUn+1)+' — use Previous to go back.';
+    err.style.display='block'; err.classList.add('on'); _mcqShow(firstUn); return; }
+  // On-time submit: the candidate is finished, so freeze and lock exactly as at
+  // expiry — a slow or failed request can't be followed by more editing.
+  _mcqLock(false);
+  _mcqSend();
 }
 function showDone(){
   try{ sessionStorage.removeItem(PENDING_KEY); }catch(_){}
