@@ -122,6 +122,10 @@ window.SessionRender = (function(){
   const BDT_PER_USD = 122.85;   // display conversion only — an estimate, like the USD itself
 
   function costHTML(s){
+    // OUR OpenAI cost — super-admin only. The server strips usage/scoring_usage
+    // for everyone else; this is belt-and-braces wherever the page knows who
+    // is viewing (the dashboard caches /api/auth/me in window._meCache).
+    if(window._meCache && window._meCache.is_super_admin !== true) return '';
     const u = s.usage;                 // Realtime audio (metered live)
     const sc = s.scoring_usage;        // transcript scoring (chat completions)
     if((!u || typeof u!=='object') && (!sc || typeof sc!=='object')) return '';
@@ -138,7 +142,7 @@ window.SessionRender = (function(){
       <span>💵 Interview est. <b>$${total.toFixed(3)}</b> (৳${(total*BDT_PER_USD).toFixed(1)})</span>
       <span>audio $${rtUsd.toFixed(3)} · scoring $${scUsd.toFixed(3)}</span>
       ${u?`<span>cache hit ${hit}%</span>`:''}
-      <span style="opacity:.65">estimated · owner only</span></div>`;
+      <span style="opacity:.65">estimated · internal · super-admin only</span></div>`;
   }
 
   // ── Color-coded transcript: navy interviewer bubbles, green candidate ──

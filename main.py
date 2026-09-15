@@ -510,20 +510,50 @@ def require_org_role(*roles: str):
 require_org_owner = require_org_role("owner")
 
 
-_COST_FIELDS = ("api_usage", "interview_scoring_usage", "interview_realtime_usage")
+# Screening docs carry api_usage / interview_*_usage; interview SESSION docs
+# carry the same telemetry as usage / scoring_usage — both spellings are cost.
+_COST_FIELDS = ("api_usage", "interview_scoring_usage", "interview_realtime_usage",
+                "usage", "scoring_usage")
 
 
-def _strip_cost_fields(doc, is_admin: bool):
+def _strip_cost_fields(doc, is_super: bool):
     """OpenAI-cost telemetry is SUPER-ADMIN-ONLY (H3 fix 2026-09-14): a
     client org owner used to receive these fields and could read our raw
     per-candidate cost — i.e. our margin — next to the price we charge them.
-    Callers pass a FRESH DB role check, never the stale JWT claim."""
-    if is_admin:
+    Callers pass _is_super_admin_fresh(), never users.role: role 'admin' is a
+    separate flag that /api/admin/make-admin can grant without super-admin."""
+    if is_super:
         return doc
     if isinstance(doc, dict):
         for k in _COST_FIELDS:
             doc.pop(k, None)
     return doc
+
+
+async def _is_super_admin_fresh(user: dict) -> bool:
+    """The ONE check for seeing our OpenAI cost: users.is_super_admin, read
+    fresh from the DB (never the JWT). Fails CLOSED — any lookup error means
+    'not super-admin', so cost is stripped."""
+    try:
+        db_user = await get_user_by_id(user["user_id"])
+        return bool(db_user and db_user.get("is_super_admin"))
+    except Exception:
+        return False
+
+
+def _strip_job_cost(job, is_super: bool):
+    """Question-generation cost (gen_usage, incl. est_usd) used to be stored on
+    a job's interview-question draft and so rode along in /api/jobs to client
+    owners. It is no longer written there (the api_usage_log ledger keeps it);
+    this removes any copy already stored on older jobs."""
+    if is_super or not isinstance(job, dict):
+        return job
+    iq = job.get("interview_questions")
+    if isinstance(iq, dict):
+        for slot in ("draft", "approved"):
+            if isinstance(iq.get(slot), dict):
+                iq[slot].pop("gen_usage", None)
+    return job
 
 
 def _org_fence(user_org_id) -> dict:
@@ -1520,8 +1550,12 @@ async def list_screenings(request: Request, limit: int = 2000):
     try:
         db_user = await get_user_by_id(user["user_id"])
         fresh_role = db_user.get("role", "client") if db_user else user.get("role", "client")
+        # Cost visibility is its own, stricter flag — never the role (see
+        # _strip_cost_fields). Fails closed.
+        fresh_super = bool(db_user and db_user.get("is_super_admin"))
     except Exception:
         fresh_role = user.get("role", "client")
+        fresh_super = False
 
     # The dashboard computes every stat client-side over this whole list, so a silent
     # truncation shows up as wrong numbers rather than a missing page. Cap generously
@@ -1536,7 +1570,7 @@ async def list_screenings(request: Request, limit: int = 2000):
         total = await count_screenings_for_user(user["user_id"])
 
     for s in screenings:
-        _strip_cost_fields(s, fresh_role == "admin")
+        _strip_cost_fields(s, fresh_super)
     await _attach_dimension_labels(screenings)
     return {
         "screenings": screenings,
@@ -1623,7 +1657,7 @@ async def get_screening(request: Request, screening_id: str):
     _admin = await _is_admin_fresh(user)
     if not _admin and _org_denied(doc, user):
         raise HTTPException(status_code=403, detail="Access denied.")
-    _strip_cost_fields(doc, _admin)
+    _strip_cost_fields(doc, await _is_super_admin_fresh(user))
     await _attach_dimension_labels([doc])
     return doc
 
@@ -1959,10 +1993,13 @@ async def usage_cost_dashboard(request: Request):
 
     user = await get_current_user(request)
     db_user = await get_user_by_id(user["user_id"])
-    if not (db_user and db_user.get("role") == "admin"):
+    # OUR OpenAI cost: super-admin only. role 'admin' alone used to pass here and
+    # see its own org's cost — role can be granted by make-admin without the
+    # super-admin flag, so it is not the gate for margin data.
+    if not (db_user and db_user.get("is_super_admin")):
         raise HTTPException(status_code=403, detail="Not available for your role.")
-    is_super = bool(db_user.get("is_super_admin"))
-    org = None if is_super else str(user.get("org_id") or "")
+    is_super = True   # only the super-admin reaches this line
+    org = None        # so the view is always platform-wide
 
     now = _dtt.utcnow()
     day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -3684,8 +3721,11 @@ async def viva_live_save_session(request: Request, background: BackgroundTasks):
 async def viva_live_list_sessions(request: Request):
     """Owner-only: recorded live-interview sessions, newest first, with the
     applicant's name joined in so the list is trackable by person."""
-    await require_admin(request)
+    _caller = await require_admin(request)
+    _super = await _is_super_admin_fresh(_caller)
     sessions = await get_interview_sessions()
+    for s in sessions:
+        _strip_cost_fields(s, _super)   # session cost = usage / scoring_usage
     from bson import ObjectId as _OID
     oids = []
     for s in sessions:
@@ -3762,11 +3802,11 @@ async def viva_live_session_snapshots(request: Request, session_id: str):
 @app.get("/api/viva-live/sessions/{session_id}")
 async def viva_live_session_detail(request: Request, session_id: str):
     """Owner-only: one session — full transcript, scores, evidence, events."""
-    await require_admin(request)
+    _caller = await require_admin(request)
     sess = await get_interview_session(session_id)
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found.")
-    return sess
+    return _strip_cost_fields(sess, await _is_super_admin_fresh(_caller))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -6152,10 +6192,12 @@ async def job_interview_questions_generate(request: Request, job_id: str):
     # Cost observability (owner-only; measurement, never behavior).
     from usage_meter import summarize_chat_usage
     gen_usage = summarize_chat_usage(GEN_MODEL, _gen_usages)
+    # gen_usage is deliberately NOT stored on the job: the draft is returned to
+    # client owners (this response and /api/jobs), and est_usd is OUR cost. The
+    # api_usage_log row below is the single record the cost dashboard reads.
     draft = {"topics": topics, "questions": flat, "count": len(flat),
              "interview_mode": mode,
              "generated_at": _dt.utcnow(), "model": GEN_MODEL,
-             "gen_usage": gen_usage,
              "scenario": _normalize_scenario(scenario)}
     await update_job_interview_questions(job["_id"], {"draft": draft})
     from database import log_api_usage
@@ -7055,6 +7097,9 @@ async def list_jobs(request: Request):
         jobs = await get_all_jobs()
     else:
         jobs = await get_jobs_for_user(user["user_id"])
+    _super = bool(db_user and db_user.get("is_super_admin"))
+    for j in jobs:
+        _strip_job_cost(j, _super)
 
     # Pending counts for the Jobs table badge. One grouped aggregation rather
     # than a count per job — the table renders every job at once.

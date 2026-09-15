@@ -2774,9 +2774,10 @@ function openCandModal(id){
 function candCostHTML(r){
   // SUPER-ADMIN ONLY (H3 fix 2026-09-14): clients see their PRICE on the
   // billing pages, never our OpenAI cost — the server strips these fields
-  // for non-admins too; this gate is belt-and-braces.
+  // for everyone else too; this gate is belt-and-braces. It checks
+  // is_super_admin, NOT role: role 'admin' is a separate grantable flag.
   const me = window._meCache || {};
-  if(me.role !== 'admin') return '';
+  if(me.is_super_admin !== true) return '';
   const BDT = 142;
   const cv = (r.api_usage && r.api_usage.cv_scoring) || null;
   const sc = r.interview_scoring_usage || null;
@@ -2793,7 +2794,7 @@ function candCostHTML(r){
   return `<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:10px;color:var(--t3);margin-top:6px">
     <strong style="color:var(--t2)">💵 OpenAI cost, this candidate (est.):</strong>
     ${parts.join(' · ')} · Total <b style="color:var(--t2)">${tk(total)}</b>
-    <span style="opacity:.65">($${total.toFixed(3)} @ ৳${BDT}/USD incl. VAT · latest scoring run · owner only)</span>
+    <span style="opacity:.65">($${total.toFixed(3)} @ ৳${BDT}/USD incl. VAT · latest scoring run · internal · super-admin only)</span>
   </div>`;
 }
 
@@ -6931,6 +6932,6 @@ async function renderKpi(){
 }
 </script>
 <script src="/static/score_core.js"></script>
-<script src="/static/session_render.js?v=5"></script>
+<script src="/static/session_render.js?v=6"></script>
 </body>
 </html>
